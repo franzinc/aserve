@@ -743,7 +743,7 @@ operating system.</p>
 <hr>
 
 <p><a name="f-get-multipart-sequence"></a><strong><font face="Courier New">(get-multipart-sequence
-request buffer &amp;key start end raw)</font></strong></p>
+request buffer &amp;key start end)</font></strong></p>
 
 <p>This retrieves the next chunk of data for the current form field and stores it in <strong>buffer</strong>.
 &nbsp;&nbsp; If <strong>start</strong> is given then it specifies the index in the buffer
@@ -754,13 +754,11 @@ specifies the index just after the last index in which to store data.</p>
 it is the index one after the last last index filled with data in <strong>buffer.</strong></p>
 
 <p>The buffer can be a one dimensional array of <strong>character</strong> or of <strong>(unsigned-byte
-8)</strong>.&nbsp;&nbsp; If the buffer is a <strong>character</strong> buffer then <strong>raw</strong>
-defaults to <strong>nil, </strong>otherwise <strong>raw </strong>defaults to true.</p>
+8)</strong>.&nbsp; For the most efficient transfer of data from the browser to
+AllegroServe, the program should use a 4096 byte (unsigned-byte 8) array.</p>
 
-<p>If <strong>raw </strong>is true then the buffer is filled with the bytes just as they
-are sent from the web browser.&nbsp; If <strong>raw</strong> is false then the sequence of
-characters #\return #\newline is converted to just #\newline (which is the preferred
-format for line separation in Lisp strings).</p>
+<p>If the buffer is&nbsp; a character array then the data is converted from
+get-multipart-sequence's (unsigned-byte 8) array to characters using <strong>code-char. </strong></p>
 
 <p><strong>get-multipart-sequence</strong> may return before filling up the whole buffer,
 so program should be sure to make use of the index returned by <strong>get-multipart-sequence</strong>.</p>
