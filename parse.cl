@@ -640,7 +640,39 @@
 		   else (incf start)))))
     po))
   
-					 
+(defun split-into-words (str)
+  ;; split the given string into words (items separated by white space)
+  ;;
+  (let ((state 0)
+	(i 0)
+	(len (length str))
+	(start nil)
+	(res)
+	(ch)
+	(spacep))
+    (loop
+      (if* (>= i len)
+	 then (setq ch #\space)
+	 else (setq ch (char str i)))
+      (setq spacep (eq ch-space (svref *syntax-table* (char-code ch))))
+      
+      (case state
+	(0  ; looking for non-space
+	 (if* (not spacep)
+	    then (setq start i
+		       state 1)))
+	(1  ; have left anchor, looking for space
+	 (if* spacep
+	    then (push (subseq str start i) res)
+		 (setq state 0))))
+      (if* (>= i len) then (return))
+      (incf i))
+    (nreverse res)))
+		 
+      
+	      
+  
+  
 					 
 			     
 ;------- base64
@@ -689,15 +721,24 @@
 			 :adjustable t))
 	(arr *base64-decode*))
     (declare (type (simple-array (unsigned-byte 8) 128) arr))
-    (do ((i 0 (+ i 4)))
+    (do ((i 0 (+ i 4))
+	 (cha)
+	 (chb))
 	((>= i (length string)))
       (let ((val (+ (ash (aref arr (char-code (char string i))) 18)
 		    (ash (aref arr (char-code (char string (+ i 1)))) 12)
-		    (ash (aref arr (char-code (char string (+ i 2)))) 6)
-		    (aref arr (char-code (char string (+ i 3)))))))
+		    (ash (aref arr (char-code 
+				    (setq cha (char string (+ i 2)))))
+			 6)
+		    (aref arr (char-code 
+			       (setq chb (char string (+ i 3))))))))
 	(vector-push-extend (code-char (ash val -16)) res)
-	(vector-push-extend (code-char (logand #xff (ash val -8))) res)
-	(vector-push-extend (code-char (logand #xff val)) res)))
+	;; when the original size wasn't a mult of 3 there may be
+	;; non-characters left over
+	(if* (not (eq cha #\=))
+	   then (vector-push-extend (code-char (logand #xff (ash val -8))) res))
+	(if* (not (eq chb #\=))
+	   then (vector-push-extend (code-char (logand #xff val)) res))))
     res))
 
 	

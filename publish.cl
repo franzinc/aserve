@@ -1,7 +1,7 @@
 ;; neo
 ;; url publishing
 ;;
-;; $Id: publish.cl,v 1.9 1999/07/22 05:53:12 jkf Exp $
+;; $Id: publish.cl,v 1.10 1999/07/29 21:36:00 jkf Exp $
 ;;
 
 
@@ -190,6 +190,8 @@
 
 
 (defun publish-directory (&key prefix 
+			       host
+			       port
 			       destination
 			       (server *wserver*)
 			       
@@ -199,6 +201,8 @@
   (push (cons prefix (make-instance 'directory-entity 
 		       :directory destination
 		       :prefix prefix
+		       :host host
+		       :port port
 		       ))
 	  (wserver-prefix-url server)))
 

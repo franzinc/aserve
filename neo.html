@@ -1,0 +1,367 @@
+<html>
+
+<head>
+<title>Neo</title>
+<meta name="GENERATOR" content="Microsoft FrontPage 3.0">
+</head>
+
+<body>
+
+<h1 align="center">Neo</h1>
+
+<h2 align="left">Introduction</h2>
+
+<p><strong>Neo</strong> is a webserver currently being written at <a
+href="http://www.franz.com">Franz Inc</a>.&nbsp;&nbsp; The name <strong>neo</strong> is
+just an internal project name and isn't intended to be the name of&nbsp; the final
+product.&nbsp;&nbsp;&nbsp; Neo is designed to work with the <a href="htmlgen.html">htmlgen</a>
+system for generating dynamic html, as one of the big advantages of&nbsp; a web server
+written in Common Lisp is the ability to generate html dynamically.&nbsp; In this document
+we'll consider the web server and dynamic html generation to be parts of the same product.</p>
+
+<p>The design goals of Neo are: 
+
+<ul>
+  <li>a very small footprint.&nbsp;&nbsp; It should be possible to make Neo a part of every
+    application without being concerned about the impact of its size and processing
+    requirements.</li>
+  <li>simple configuration.&nbsp; Neo should start automatically with minimal input from the
+    user.&nbsp; </li>
+  <li>easy to use.&nbsp;&nbsp; The typical scenarios should be easy to program with just
+    knowledge of simple html.</li>
+  <li>usable in commerical applications .</li>
+  <li>support the latest http protocol (currently HTTP/1.1)</li>
+  <li>runnable in multiple configuration.&nbsp;&nbsp;&nbsp; We want to support a program that
+    just wants to make some part of it visible or configurable by one user through a web
+    server.&nbsp; We also want to support&nbsp; a web site running on a multiprocessor taking
+    many hits per second.&nbsp;&nbsp; And we want so support levels inbetween those scenarios.</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<h2>Running Neo</h2>
+
+<p>Running&nbsp; Neo requires that you 
+
+<ul>
+  <li><strong>load</strong> <em>neo.fasl</em> into Lisp</li>
+  <li><strong>publish </strong>zero or more urls</li>
+  <li><strong>start</strong> the server</li>
+  <li><strong>publish </strong>zero or more urls</li>
+</ul>
+
+<p>We mention <strong>publish</strong> twice to emphasize that you can publish urls either
+before or after you start the server.</p>
+
+<p>&nbsp;</p>
+
+<h2>Starting the server</h2>
+
+<p>The function <font face="Courier New">neo:start</font> is used to start the server
+running.</p>
+
+<p><strong><font face="Courier New">(start &amp;key port listeners chunking keep-alive
+server debug)</font></strong></p>
+
+<p>If no arguments are given then this just starts a simple single threaded web server on
+port 80, which is the standard web server port.&nbsp;&nbsp; The <strong>start</strong>
+function doesn't return in this case as it has to handle the web client requests.
+&nbsp;&nbsp; If you are running this on Unix then you can only allocate port 80 if you are
+logged in as root or have made Lisp a set-user-id root program.</p>
+
+<p>The&nbsp; are quite a few keyword arguments to <strong>start</strong>, but in practice
+you only need be concerned with <strong>:port</strong> and <strong>:listeners.
+&nbsp;&nbsp; </strong>The arguments have the following meanings: 
+
+<ul>
+  <li>port -- the port on which to open the web server.&nbsp; 80 is the default.</li>
+  <li>listeners -- the number of threads to process http requests.&nbsp;&nbsp;&nbsp;&nbsp; If
+    a value isn't given for the <strong>:listeners</strong> argument or if that value is <strong>nil
+    </strong>then the server runs in <em>simple server mode<strong> </strong></em>in which the
+    <strong>start</strong> function doesn't return - instead it processes the request itself,
+    one at a time.&nbsp; If a positive number is given as the value of <strong>:listeners</strong>
+    then the server runs in <em>threaded server mode<strong>.</em> </strong>&nbsp; In this
+    mode separate lisp lightweight processes are started to handle requests from clients, the
+    number of request handing threads equal to the value of the <strong>:listeners</strong>
+    keyword argument.&nbsp; In this mode the <strong>start </strong>function returns after
+    starting the other threads.</li>
+  <li>chunking -- if true then the server will using the chunked transfer encoding when it's
+    possible to do so.&nbsp; This is an optimization and should be left enabled unless you
+    suspect that it is the cause of some sort of error.&nbsp;&nbsp; The default is true.</li>
+  <li>keep-alive -- if true then the server will keep connections alive if requested by the
+    web client, and if there are sufficient free threads to handle new requests coming in.
+    &nbsp;&nbsp; This is an optimization and should be left on.&nbsp;&nbsp; The default is
+    true.</li>
+  <li>server -- if this is a passed a value it must be a <strong>wserver</strong> object,
+    which denotes&nbsp; a particular instance of a web server.&nbsp;&nbsp; This is for support
+    of running multiple independent web servers in the same lisp image.&nbsp; This will be
+    describe in a later section (eventually).</li>
+  <li>debug -- if given a number this will print debugging messages whose associated codes are
+    this number or less.&nbsp;&nbsp;&nbsp; This is really an internal switch and may be
+    removed in future versions.</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<h2>Publishing information</h2>
+
+<p>Once the server is started it will accept requests from http clients, typically web
+browsers.&nbsp;&nbsp; Each request is parsed and then Neo searches for an object to handle
+that request.&nbsp;&nbsp; That object is called an <strong>entity</strong>.&nbsp; If an
+entity is found, it is passed the request and is responsible for generating and sending a
+response to the client.&nbsp; If an entity can't be found then Neo sends back a response
+saying that that request was invalid.</p>
+
+<p><em>Publishing</em> is the process of creating entities and registering them in the
+tables scanned by Neo after a request is read.</p>
+
+<h3>Components of a request</h3>
+
+<p>A request from an http client contains a lot of information.&nbsp; The three items that
+determine which entity will handle the request are 
+
+<ul>
+  <li>the name part of the url minus any arguments.&nbsp;&nbsp; The arguments are the
+    characters beginning with the first '?' and extending to the end of the url.&nbsp; For
+    example in the url&nbsp; <a href="http://bar.com:8030/files/foo?xx=3&amp;yy=4">http://bar.com:8030/files/foo?xx=3&amp;yy=4</a>
+    the part we're referring to in this item is just <strong>/files/foo.</strong></li>
+  <li>the host to which the request is directed.&nbsp;&nbsp; This is not necessarily the host
+    that is receiving the request due to virtual hosts and proxy servers.&nbsp; This value
+    comes from the <strong>Host:</strong> header line, if one is given.&nbsp; If one isn't
+    given then this value is unspecified for this request.</li>
+  <li>the port to which the request was directed.&nbsp; Again, this information comes from <strong>Host:</strong>
+    header line, if it is present in the request.&nbsp; If it is not present then this value
+    is unspecified.</li>
+</ul>
+
+<p>The following functions create entities and specify which request they will handle:</p>
+
+<p>&nbsp;</p>
+
+<p><strong><font face="Courier New">(publish-file &amp;key url host port&nbsp; file
+content-type class preload server)</font></strong></p>
+
+<p>This creates an entity that will return the contents of a file on the disk in response
+to a request.&nbsp;&nbsp; The <strong>url</strong>, <strong>file</strong> and <strong>content-type</strong>
+must be given, the rest of the arguments are optional. (We plan to make <strong>content-type</strong>
+optional too in the future).&nbsp; The arguments have these meanings: 
+
+<ul>
+  <li><strong>url </strong>-- a string that must match the name part of the url as described
+    above in <strong>Components of a Request</strong></li>
+  <li><strong>host -- </strong>a string that must match (in a case insensitive manner) the
+    host part of the request.&nbsp;&nbsp; If this argument is not given then it will match the
+    host part of any request.&nbsp; If this argument is given and the request does not have a
+    host part specified, then it will not match.</li>
+  <li><strong>port</strong> -- a number that must match the port part of the request.&nbsp; If
+    this argument is not given then it will match the port&nbsp; part of any request.&nbsp; If
+    this argument is given and the request does not have a port&nbsp; part specified, then it
+    will not match.</li>
+  <li><strong>file </strong>-- the name of the file to return when a request this entity is
+    made.&nbsp;&nbsp; The file doesn't have to exist until the request is made unless <strong>preload</strong>
+    is specified as true.</li>
+  <li><strong>content-type</strong> -- A string describing the content of the file.&nbsp; This
+    often referred to as the MIME type of the file.&nbsp; An example is &quot;text/html&quot;
+    to describe an html file.</li>
+  <li><strong>class</strong> -- a Clos class name or class object to be used to hold this
+    entity.&nbsp; The class must be a subclass of&nbsp; <strong>file-entity</strong>.
+    &nbsp;&nbsp; </li>
+  <li><strong>preload</strong> -- read the contents of the file in immediately and store it in
+    a lisp object.&nbsp; This will speed up the reponse to this request.</li>
+  <li><strong>server</strong> -- if this entity should only be served by a particular server,
+    then this specifies which server.&nbsp;&nbsp; See the section (to be written) on running
+    multiple servers in the same Lisp process.</li>
+</ul>
+
+<p>The function that handles requests for files will respond correctly to <strong>If-Modified-Since</strong>
+header lines and thus minimize network traffic. </p>
+
+<p>Example: </p>
+
+<p>This will work on Unix where the password file is stored in /etc.</p>
+
+<pre>(publish-file :url &quot;/password&quot; :file &quot;/etc/passwd&quot; :content-type &quot;text/plain&quot;)</pre>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong><font face="Courier New">(publish-directory &amp;key prefix host port
+destination server)</font></strong></p>
+
+<p>This creates a mapping from all urls whose name begins with<strong> prefix</strong> to
+files stored in the directory specified by the destination.&nbsp;&nbsp; The <strong>host</strong>,
+<strong>port </strong>and <strong>server</strong> arguments are as described above for <strong>publish.</strong>
+&nbsp;&nbsp;&nbsp; When a request comes in for which there isn't an entity that matches it
+exactly,&nbsp; Neo checks to see if a prefix of the request matches the request.&nbsp; If
+so, and if the resulting entity is a <strong>directory-entity</strong> as created by this
+function, then it strips the prefix off the given request and appends the remaining part
+of the request to the destination string.&nbsp; It then publishes that (using <strong>publish-file</strong>
+and computing the content-type from the file type).&nbsp;&nbsp; Next that <strong>file-entity
+</strong>is made to handle the request in the normal manner.</p>
+
+<p>We plan to make a number of refinements to <strong>publish-directory</strong> including
+the ability to specify how deep in the directory structure it will look and also &nbsp;
+restricting what kinds of files it will match.</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong><font face="Courier New">(publish &amp;key url host port content-type function
+class format server)</font></strong></p>
+
+<p>This creates a mapping from a url to a <strong>computed-entity</strong>, that is an
+entity that computes its response every time a request comes in.&nbsp; The <strong>url</strong>,
+<strong>host</strong>, <strong>port</strong>, <strong>server</strong> and <strong>class</strong>
+arguments are as in the other publish functions.&nbsp;&nbsp; The <strong>content-type</strong>
+sets a default value for the response to the request but this can be overridden.&nbsp; The
+<strong>format</strong> argument is either <strong>:text </strong>(the default) or <strong>:binary</strong>
+and it specifies the kind of value that will be sent back (after the response headers,
+which are always in text).&nbsp;&nbsp; This value is only important if the response is
+generated in a particular way (described below).</p>
+
+<p>The <strong>function </strong>argument is&nbsp; a function of two arguments: an object
+of class <strong>http-request</strong> that holds a description of the request, and an
+object of class <strong>entity </strong>that holds this entity which is handling the
+request.&nbsp;&nbsp; This function must generate a response to the http request, even if
+the response is only that the request wasn't found.</p>
+
+<p>&nbsp;</p>
+
+<h2>Generating a computed response </h2>
+
+<p>There are a variety of ways that a response can been sent back to the http client
+depending on whether keep-alive is being done, chunking is possible, whether the response
+is text or binary, whether the client already has the most recently data, and whether the
+size of the body of the reesponse is known before the headers are sent.&nbsp; Neo deals
+with complexity of determing the optimal response strategy and the user need only use a
+few specific macros in the computation of the response in order ot take advantage of Neo's
+strategy computation</p>
+
+<p>Here's a very simple computed response.&nbsp; It just puts &quot;Hello World!&quot; in
+the browser window:</p>
+
+<pre>(publish :url &quot;/hello&quot;
+         :content-type &quot;text/html&quot;
+         :function #'(lambda (req ent)
+                       (with-http-response (req ent)
+                          (with-http-body (req ent)
+                             (html &quot;Hello World!&quot;)))))
+</pre>
+
+<p align="left">This example works regardless of whether the request comes in from an old
+HTTP/0.9 browser or a modern HTTP/1.1 browser.&nbsp; It may or may not send the response
+back with Chunked transfer encoding and it may or may not keep the connection alive after
+sending back the response.&nbsp;&nbsp; The user code doesn't have to deal with those
+options, it just uses <strong>with-http-response</strong> and <strong>with-http-body</strong>
+and the rest is automatic.&nbsp; The <strong>html</strong> macro is part of the htmlgen
+package that accompanies Neo.&nbsp;&nbsp; In the case above we are being lazy and not
+putting out the html directives that should be found on every page of html since most
+browsers are accomodating.&nbsp;&nbsp; Here's the function that generates the correct
+html:</p>
+<div align="left">
+
+<pre>(publish :url &quot;/hello2&quot;
+         :content-type &quot;text/html&quot;
+         :function #'(lambda (req ent)
+                       (with-http-response (req ent)
+                         (with-http-body (req ent)
+                           (html 
+                             (:html
+                               (:body &quot;Hello World!&quot;)))))))</pre>
+</div>
+
+<p align="left">&nbsp;</p>
+
+<p align="left">The function above generates: <font face="Courier New">&lt;html&gt;&lt;body&gt;Hello
+World!&lt;/body&gt;&lt;/html&gt;.</font></p>
+
+<p align="left">&nbsp;</p>
+
+<p align="left">The macros and functions used in computing responses are these:</p>
+
+<hr>
+
+<p align="left"><strong><font face="Courier New">(with-http-response (req ent &amp;key
+timeout check-modified response content-type) <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+&amp;rest body)</font></strong></p>
+
+<p align="left">This macro begins the process of generating a responds to an http request
+and then it runs the code in the <strong>body</strong> which will actually send out the
+response.&nbsp; <strong>req</strong> and <strong>ent</strong> are the request and entity
+objects passed into the function designated to compute the response for the request.
+&nbsp;&nbsp; <strong>timeout </strong>sets a time limit for the computation of the
+response.&nbsp;&nbsp; The default is 60 (meaning 60 seconds).&nbsp;&nbsp; If <strong>check-modified
+</strong>is true (the default) then the <strong>last-modified </strong>time stored in the
+entity object will be compared against the <strong>if-modified-since </strong>time of the
+request and if that indicates that the client already has the latest copy of this entity
+then a <strong>not-modified</strong> response will be automatically returned to the client
+and the <strong>body </strong>of this macro will not be run.&nbsp;&nbsp; <strong>response </strong>is
+an object contaning the code and description of the http response we wish to return.
+&nbsp; The default value is the value of <strong>*response-ok*</strong> (which has a code
+of 200 and a string descriptor &quot;OK&quot;).&nbsp;&nbsp; <strong>content-type </strong>is
+a string describing the body (if any) sent after the headers.&nbsp; It has a form like
+&quot;text/html&quot;.&nbsp;&nbsp; If <strong>content-type</strong> isn't given here then
+the content-type value in the entity (which is set in the call to <strong>publish)</strong>
+will be used.</p>
+
+<p align="left">&nbsp;</p>
+
+<p align="left">An http response consists of a line describing the response code, followed
+by headers (unless it's the HTTP/0.9 protocol in which case there are no headers), &nbsp;
+and then followed by the body (if any) of the response.&nbsp;&nbsp; <strong>with-http-response</strong>
+doesn't normally send anything to the client.&nbsp; It only does so when it determines
+that the <strong>if-modified-since</strong> predicate doesn't hold and that it must send
+back a <strong>not-modified</strong> response.&nbsp;&nbsp;&nbsp; Thus in the normal case
+it isn't enough, even if there no body to send, to just call <strong>with-http-response</strong>.
+&nbsp;&nbsp;&nbsp;&nbsp; This is where the <strong>with-http-body </strong>is used.</p>
+
+<p align="left">&nbsp;</p>
+
+<hr>
+
+<p align="left"><strong><font face="Courier New">(with-http-body (req ent &amp;key format
+headers)&nbsp; &amp;rest body)</font></strong></p>
+
+<p align="left">This macro causes the whole http response to be sent out.&nbsp; The macro
+itself will send out everything except the body of the response.&nbsp; That is the
+responsibilty of the code supplied as the <strong>body </strong> form of the macro.
+&nbsp;&nbsp; In cases where there is no body to the response being sent it is still
+necessary to call <strong>with-http-body </strong>so that the other parts of the response
+are sent out, e.g.<font face="Courier New"> (with-http-body (req ent))</font></p>
+
+<p align="left">The <strong>format</strong> argument specifies whether the code in the <strong>body</strong>
+will want to write <strong>:text</strong> (e.g. <strong>write-char</strong>) or <strong>:binary</strong>
+(e.g. <strong>write-byte</strong>) when it writes the data of the body of the response.
+&nbsp;&nbsp;&nbsp; Based on the value of the <strong>format</strong> argument, Neo will
+create the correct kind of response stream.&nbsp;&nbsp; If <strong>format </strong> is not
+specified here it will default to the value specified when <strong>publish</strong> was
+called to create the entity.</p>
+
+<p align="left">The <strong>headers</strong> argument is a list of conses, where the car
+is the header name and the cdr is the header value.&nbsp; These headers are added to the
+headers sent as part of this response.</p>
+
+<p align="left">Within the <strong>body </strong>forms the code call <strong>(resp-stream
+req)</strong> to obtain a stream to which it can write to supply the body of the response.</p>
+
+<hr>
+
+<p><strong><font face="Courier New">(get-request-body request)</font></strong></p>
+
+<p>Return the body of the request as a string.&nbsp; If there is no body the return value
+will be an empty string or nil.&nbsp;&nbsp; If a request has a body you should call this
+function even if you don't plan on using what is in the body.&nbsp; <em>We will fix this
+in future version so that you don't always have to call this function if you don't need
+the value.&nbsp; </em>The typical reason for their to be a body to a request is when a web
+browser sends the result of a form with&nbsp; a POST method.</p>
+
+<hr>
+
+<p>(url-argument-list request)</p>
+
+<p>Return an aliast o</p>
+</body>
+</html>

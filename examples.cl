@@ -21,7 +21,22 @@
 			 ))))))
 			     
 
-	     
+
+(publish :url "/hello"
+	 :content-type  "text/html"
+	 :function #'(lambda (req ent)
+		       (with-http-response (req ent)
+			 (with-http-body (req ent)
+			   (html "Hello World!")))))
+
+(publish :url "/hello2"
+	 :content-type  "text/html"
+	 :function #'(lambda (req ent)
+		       (with-http-response (req ent)
+			 (with-http-body (req ent)
+			   (html 
+			    (:html
+			     (:body "Hello World!")))))))
 
 (publish :url "/gc"
 	 :content-type "text/html"
@@ -177,12 +192,14 @@
 	 :content-type "text/html"
 	 :function
 	 #'(lambda (req ent)
-	     (let ((auth-val (neo::header-slot-value "authorization" req)))
+	     (let ((auth-val (header-slot-value "authorization" req)))
 	       (if* (and (stringp auth-val)
-			 (equal auth-val "foo:bar"))
+			 (equal (base64-decode 
+				 (cadr (split-into-words auth-val)))
+				"foo:bar"))
 		  then (with-http-response (req ent)
 			 (with-http-body (req ent)
-			   (html (:head "Secret page")
+			   (html (:head (:title "Secret page"))
 				 (:body "You made it to the secret page"))))
 		  else
 		       (with-http-response (req ent :response *response-unauthorized*)
@@ -196,11 +213,11 @@
 		   :destination "/net/tanya/home/httpd/html/"
 		   )
 
-#+ignore 
+ 
 (publish-directory :prefix "/"
 		   :destination "/net/tanya/www/internal/htdocs/")
 
-(publish-directory :prefix "/"
+#+ignore (publish-directory :prefix "/"
 		   :destination "/home/alphapro/public_html/alphapro/")
 
 

@@ -8,6 +8,7 @@
    #:publish
    #:publish-file
    #:publish-directory
+   #:split-into-words
    #:start
    #:unpublish
    #:url-argument
@@ -138,7 +139,8 @@
        (catch 'with-http-response
 	 (compute-strategy ,g-req ,g-ent)
 	 (up-to-date-check ,g-check-modified ,g-req ,g-ent)
-	 (mp::with-timeout ((if* (> ,g-timeout 0)
+	 (mp::with-timeout ((if* (and (fixnump ,g-timeout)
+				      (> ,g-timeout 0))
 			       then ,g-timeout
 			       else 9999999)
 			    (timedout-response ,g-req ,g-ent))
