@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.20 2001/09/20 17:28:01 jkf Exp $
+;; $Id: examples.cl,v 1.21 2001/09/21 19:02:40 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -138,7 +138,16 @@
 				  ((:a :href "urian")
 				   "International Web Page Character Finder")))
 			 
-		  
+			 #+(and unix (version>= 6 1))
+			 (html
+			  "cgi tests: " 
+			  ((:a :href "cgi0") "show environment")
+			  ", "
+			  ((:a :href "cgi1") "handle unix-style headers")
+			  ", "
+			  ((:a :href "cgi2") "redirect")
+			  ", "
+			  ((:a :href "cgi3") "set status to unauthorized request"))
 			 ))))))
 			     
 
@@ -683,6 +692,30 @@
 	     (with-http-response (req ent)
 	       (with-http-body (req ent)
 		 (html "done")))))
+
+
+
+;; cgi publishing, we publish a shell script that only works
+;; on Unix shells:
+#+unix
+(publish :path "/cgi0" :function
+	 #'(lambda (req ent)
+	     (net.aserve::run-cgi-program req ent "aserve/examples/cgitest.sh")))
+
+#+unix
+(publish :path "/cgi1" :function
+	 #'(lambda (req ent)
+	     (net.aserve::run-cgi-program req ent "aserve/examples/cgitest.sh 1")))
+
+#+unix
+(publish :path "/cgi2" :function
+	 #'(lambda (req ent)
+	     (net.aserve::run-cgi-program req ent "aserve/examples/cgitest.sh 2")))
+
+#+unix
+(publish :path "/cgi3" :function
+	 #'(lambda (req ent)
+	     (net.aserve::run-cgi-program req ent "aserve/examples/cgitest.sh 3")))
 
 
 ;;;;;;  directory publishing.  These will only work on a particular

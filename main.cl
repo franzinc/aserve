@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.111 2001/09/18 21:21:53 layer Exp $
+;; $Id: main.cl,v 1.112 2001/09/21 19:02:40 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -68,6 +68,7 @@
    #:publish-directory
    #:query-to-form-urlencoded
    #:reply-header-slot-value 
+   #:run-cgi-program
    #:set-basic-authorization
    #:standard-locator
    #:unpublish-locator
@@ -136,7 +137,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 9))
+(defparameter *aserve-version* '(1 2 10))
 
 (eval-when (eval load)
     (require :sock)
@@ -1613,11 +1614,20 @@ by keyword symbols and not by strings"
 
 
 (defparameter *crlf-crlf-usb8*
+    ;; the correct way to end a block of headers
     (make-array 4 :element-type '(unsigned-byte 8)
 		:initial-contents
 		(list #.(char-code #\return)
 		      #.(char-code #\linefeed)
 		      #.(char-code #\return)
+		      #.(char-code #\linefeed))))
+
+(defparameter *lf-lf-usb8*
+    ;; the incorrect way to end a block of headers but still found
+    ;; in some Unix apps
+    (make-array 2 :element-type '(unsigned-byte 8)
+		:initial-contents
+		(list #.(char-code #\linefeed)
 		      #.(char-code #\linefeed))))
 
 (defmethod get-multipart-header ((req http-request))

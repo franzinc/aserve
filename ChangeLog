@@ -1,3 +1,8 @@
+2001-09-21  John Foderaro  <jkf@tiger.franz.com>
+1.2.10
+	* added ability to run cgi programs
+	  new file cgi.cl
+
 2001-09-20  John Foderaro  <jkf@tiger.franz.com>
 
 	* examples/examples.cl - add commentary to some of the links

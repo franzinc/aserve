@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.20 2000/11/07 18:16:35 jkf Exp $
+;; $Id: headers.cl,v 1.21 2001/09/21 19:02:40 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -97,7 +97,7 @@
 ;; its size will effectively be hardwired into cache entries and
 ;; thus a change in this value should be accompanied by a 
 ;; clearing of the cache.
-(defconstant *headers-count* 50)
+(defconstant *headers-count* 51)
 
 (defmacro header-block-data-start ()
   ;; return index right above the first data index object stored
@@ -119,6 +119,9 @@
   ;;	 :mp - either exact match or no value for new request-header
   ;;     nil - no match needed
   ;;
+  ;;***** note well: adding something to this table must be accompanied
+  ;;      by modifying *headers-count* above and then removing all caches
+  ;;      if we're using a proxy cache.
   (defparameter *http-headers* 
       '(("Accept" :p :nf :mp) 
 	("Accept-Charset" :p :nf :mp)
@@ -161,6 +164,7 @@
 	("Retry-After" :nf :p nil )
 	("Server" :nf :p nil)
 	("Set-Cookie" :nf :p nil)
+	("Status" :nf :nf nil) ; not real header but found in cgi responses
 	("TE" :p :nf   :mx)
 	("Trailer" :np :np nil)
 	("Transfer-Encoding" :np :np nil)
@@ -243,6 +247,11 @@
 		    ;; number of distinct headers
 		    ,(1+ header-number))
 		  
+		  (if* (not (eql *header-count* *headers-count*))
+		     then (error "setq *headers-count* to ~d in headers.cl" 
+				 *header-count*))
+		  
+			    
 		  (dolist (hkw ',plists)
 		    (setf (get (car hkw) 'kwdi) (cdr hkw)))
 		  
@@ -399,7 +408,7 @@
 		       
       (block done
 	(loop
-	  ; (format t "st ~d  ch ~s~%" state (code-char (aref buff i)))
+	  ;(format t "i: ~d, st ~d  ch ~s~%" i state (code-char (aref buff i)))
 	  (case state
 	    (0 ; beginning a header
 	     (if* (>= i end) 
@@ -679,36 +688,53 @@
   (let* ((buff (get-sresource *header-block-sresource*))
 	 (end (read-headers-into-buffer sock buff)))
     (if* end
-       then (let ((ans  (get-sresource *header-index-sresource*))
-		  (headers))
-	      (parse-header-block-internal buff 0 end ans)
-		   
-	      ; now cons up the headers
-	      (dotimes (i *header-count*)
-		(let ((res (svref ans i)))
-		  (if* res
-		     then (let ((kwd (svref *header-keyword-array* i)))
-			    (dolist (ent res)
-			      (let ((start (car ent))
-				    (end   (cdr ent)))
-				(let ((str (make-string (- end start))))
-				  (do ((i start (1+ i))
-				       (ii 0 (1+ ii)))
-				      ((>= i end))
-				    (setf (schar str ii)
-				      (code-char 
-				       (aref buff i))))
-				     
-				  (push (cons kwd str) headers))))))))
-		   
-	      (free-sresource *header-block-sresource* buff)
-	      (free-sresource *header-index-sresource* ans)
-		   
-	      headers)
+       then (prog1 (parse-and-listify-header-block buff end)
+	      (free-sresource *header-block-sresource* buff))
        else (free-sresource *header-block-sresource* buff)
 	    (error "Incomplete headers sent by server"))))
 
-							   
+
+(defun parse-and-listify-header-block (buff end)
+  ;; buff is a header-block 
+  ;; parse the headers in the block and then extract the info
+  ;; in assoc list form
+  (let ((ans  (get-sresource *header-index-sresource*))
+	(headers))
+    (parse-header-block-internal buff 0 end ans)
+		   
+    ; now cons up the headers
+    (dotimes (i *header-count*)
+      (let ((res (svref ans i)))
+	(if* res
+	   then (let ((kwd (svref *header-keyword-array* i)))
+		  (dolist (ent res)
+		    (let ((start (car ent))
+			  (end   (cdr ent)))
+		      (let ((str (make-string (- end start))))
+			(do ((i start (1+ i))
+			     (ii 0 (1+ ii)))
+			    ((>= i end))
+			  (setf (schar str ii)
+			    (code-char 
+			     (aref buff i))))
+				     
+			(push (cons kwd str) headers))))))))
+		   
+    (free-sresource *header-index-sresource* ans)
+		   
+    headers))
+
+(defun listify-parsed-header-block (buff)
+  ;; the header block buff has been parsed.
+  ;; we just extract all headers in conses
+  (let (res)
+    (dotimes (i *headers-count*)
+      (let ((val (header-buffer-header-value buff i)))
+	(if* val
+	   then (push (cons (aref *header-keyword-array* i) val) res))))
+    (nreverse res)))
+  
+    
 
 (defun initialize-header-block (buf)
   ;; set the parsed header block buf to the empty state

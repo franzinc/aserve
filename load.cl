@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.48 2001/09/18 21:21:53 layer Exp $
+;; $Id: load.cl,v 1.49 2001/09/21 19:02:40 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -18,6 +18,7 @@
       "log" 
       "client"
       "proxy"
+      "cgi"
       ))
 
 (defparameter *aserve-other-files*
@@ -41,6 +42,7 @@
       "load.cl"
       "test/t-aserve.cl"
       "test/server.pem"
+      "test/cgitest.sh"
       "doc/aserve.html"
       "doc/tutorial.html"
       "doc/htmlgen.html"
@@ -157,7 +159,8 @@
 		  "examples/examples.fasl"
 		  "examples/foo.txt"
 		  "examples/fresh.jpg"
-		  "examples/prfile9.jpg"))
+		  "examples/prfile9.jpg"
+		  "examples/cgitest.sh"))
     (copy-files-to (list file)
 		   (format nil "aserve-dist/~a" file)
 		   :root *aserve-root*)))
