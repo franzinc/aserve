@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.12 2000/09/07 19:48:04 jkf Exp $
+;; $Id: t-aserve.cl,v 1.13 2000/09/24 22:54:50 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -905,6 +905,80 @@
     ))
   
   
+
+
+;; proxy cache tests
+(defun test-proxy-cache ()
+  (let ((*wserver* (start :port nil :server :new))
+	(proxy-wserver (start :port nil :server :new :proxy t :cache t))
+	(proxy-host)
+	(origin-server))
+    
+    (setq proxy-host (format nil "localhost:~d"
+			     (socket:local-port
+			      (net.aserve::wserver-socket proxy-wserver))))
+    
+    (setq origin-server
+      (format nil "http://localhost:~d" (socket:local-port
+					 (net.aserve::wserver-socket *wserver*))))
+
+    (format t "server on port ~d, proxy server on port ~d~%"
+	    (socket:local-port
+	     (net.aserve::wserver-socket *wserver*))
+	    (socket:local-port
+	     (net.aserve::wserver-socket proxy-wserver)))
+
+    (with-tests (:name "aserve-proxy-cache")
+      (unwind-protect
+	  (progn
+	    (publish :path "/foo"
+		     :function #'(lambda (req ent)
+				   (with-http-response (req ent)
+				     (with-http-body (req ent)
+				       (html "foo")))))
+	  
+	    (test "foo" 
+		  (values (do-http-request 
+			      (format nil "~a/foo" origin-server)
+			    :proxy proxy-host))
+		  :test #'equal)
+	    (test "foo" 
+		  (values (do-http-request 
+			      (format nil "~a/foo" origin-server)
+			    :proxy proxy-host))
+		  :test #'equal)
+	    (test "foo" 
+		  (values (do-http-request 
+			      (format nil "~a/foo" origin-server)
+			    :proxy proxy-host))
+		  :test #'equal)
+	  
+	  
+	    (sleep 15)
+	    (test "foo" 
+		  (values (do-http-request 
+			      (format nil "~a/foo" origin-server)
+			    :proxy proxy-host))
+		  :test #'equal)
+	  
+	    (test "foo" 
+		  (values (do-http-request 
+			      (format nil "~a/foo" origin-server)
+			    :proxy proxy-host))
+		  :test #'equal)
+	  
+		
+	    )
+	    
+	  
+      
+      
+	(shutdown  proxy-wserver)
+	(shutdown  *wserver*)))))
+
+
+    
+    
     
     
 

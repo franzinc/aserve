@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.9 2000/09/19 16:08:38 jkf Exp $
+;; $Id: headers.cl,v 1.10 2000/09/24 22:54:50 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -77,6 +77,30 @@
     ;; the number of headers we're tracking
     )
     
+
+(defconstant *header-block-size* 4096) ; bytes in a header block
+(defconstant *header-block-used-size-index*
+    ;; where the size of lower part of the buffer is kept
+    (- *header-block-size* 2))
+(defconstant *header-block-data-start-index*
+    ;; where the start of the lowest data block is stored
+    (- *header-block-size* 4))
+
+(defmacro header-block-header-index (index)
+  ;; where in the buffer the 2byte entry for header 'index' is located
+  `(- *header-block-size* 6  (ash ,index 1)))
+
+;; this must be kept in sync with the length of *http-headers*.
+;; we don't want to make it a defparameter and compute it at runtime
+;; since we want to take advantage of it being a constant, plus
+;; its size will effectively be hardwired into cache entries and
+;; thus a change in this value should be accompanied by a 
+;; clearing of the cache.
+(defconstant *headers-count* 49)
+
+(defmacro header-block-data-start ()
+  ;; return index right above the first data index object stored
+  `(- *header-block-size* 4 (* *headers-count* 2)))
 
 (eval-when (compile eval)
   ;; the headers from the http spec
@@ -236,7 +260,7 @@
 		 (if* size
 		    then (error "size can't be specifed for header blocks"))
 		 
-		 (make-array 4096
+		 (make-array *header-block-size*
 			     :element-type '(unsigned-byte 8)))))
 
 (defparameter *header-index-sresource*
@@ -254,13 +278,18 @@
 		 (setf (svref buffer i) nil)))))
 
 
+(defun free-header-blocks (blocks)
+  ;; free a list of blocks
+  (dolist (block blocks)
+    (free-sresource *header-block-sresource* block)))
 
-;; parsed header blocks
+	      
+;; parsed header array
 ;;  We have to work with headers and to reduce consing we work with
 ;;  them in place in a structure called a parsed header block
 ;;  This is stored in a 4096 byte usb8 vector.
 ;;  The layout is:
-;;  headers and values .. empty .. data-block header-index-block size
+;;  headers and values .. empty .. data-block header-index-block min-db size
 ;;
 ;;  The headers and values are exactly what's read from the web client/server.
 ;;  they end in a crlf after the last value.
@@ -268,6 +297,8 @@
 ;;  The size is a 2 byte value specifying the index after the last 
 ;;  header value.  It says where we can add new headers if we want.
 ;;  All values greater than 2 bytes are stored in big endian form.
+;;
+;;  min-db is a 2 byte value telling where the lowest data-block entry starts
 ;;
 ;;  The header-index-block is 2 bytes per entry and specifies in index
 ;;  into the data-block where a descriptor for the value associated with
@@ -279,7 +310,29 @@
 ;;  which describes how many header values there are and where they
 ;;  are.  end is one byte beyond the header value.
 
-      
+(defmacro unsigned-16-value (array index)
+  (let ((gindex (gensym)))
+    `(let ((,gindex ,index))
+       (declare (fixnum ,gindex))
+       (the fixnum
+	 (+ (the fixnum (ash (aref ,array ,gindex) 8))
+	    (aref ,array (1+ ,gindex)))))))
+
+(defsetf unsigned-16-value (array index) (value)
+  (let ((gindex (gensym))
+	(gvalue (gensym)))
+    `(let ((,gindex ,index)
+	   (,gvalue ,value))
+       (setf (aref ,array ,gindex) (hipart ,gvalue))
+       (setf (aref ,array (1+ ,gindex)) (lopart ,gvalue))
+       ,gvalue)))
+
+(defmacro hipart (x)
+  `(the fixnum (logand #xff (ash (the fixnum ,x) -8))))
+
+(defmacro lopart (x) 
+  `(the fixnum (logand #xff (the fixnum ,x))))
+
 
 
 (defun parse-header-block-internal (buff start end ans)
@@ -426,44 +479,40 @@
     
     ; store the info in ans into the buffer at the end
 
-    (macrolet ((hipart (x)
-		 `(the fixnum (logand #xff (ash (the fixnum ,x) -8))))
-	       (lopart (x) 
-		 `(the fixnum (logand #xff (the fixnum ,x)))))
-      (let* ((table-index (- (length buff) 2))
-	     (data-index (- table-index
-			    (the fixnum (ash (the fixnum (length ans)) 1)))))
-	(dotimes (i (length ans))
-	  (decf table-index 2)
-	  (let ((data (svref ans i)))
-	    (if*  data
-	       then ; must store data and an index to it
-		    (let* ((data-len (length data))
-			   (size (+ 1 ; count
-				    (ash data-len 2) ; 4 bytes per data entry
-				    )))
-		      (decf data-index size)
+    (let* ((table-index (header-block-header-index 0))
+	   (data-index (header-block-data-start)))
+      (dotimes (i (length ans))
+	(let ((data (svref ans i)))
+	  (if*  data
+	     then ; must store data and an index to it
+		  (let* ((data-len (length data))
+			 (size (+ 1 ; count
+				  (ash data-len 2) ; 4 bytes per data entry
+				  )))
+		    (decf data-index size)
+
+		    (setf (unsigned-16-value buff table-index) data-index)
 		    
-		      (setf (aref buff table-index) (hipart data-index))
-		      (setf (aref buff (1+ table-index)) (lopart data-index))
-		    
-		      (setf (aref buff data-index) data-len)
-		      (let ((i (1+ data-index)))
-			(dolist (datum data)
-			  (setf (aref buff i) (hipart (car datum)))
-			  (setf (aref buff (+ 1 i)) (lopart (car datum))) 
-			  (setf (aref buff (+ 2 i)) (hipart (cdr datum)))
-			  (setf (aref buff (+ 3 i)) (lopart (cdr datum)))
-			  (incf i 4))))
-	       else ; nothing there, zero it out
-		    (setf (aref buff table-index) 0)
-		    (setf (aref buff (1+ table-index)) 0))))
-	(let ((size-index (- (length buff) 2)))
-	  (setf (aref buff size-index) (hipart end))
-	  (setf (aref buff (1+ size-index)) (lopart end)))
+		    (setf (aref buff data-index) data-len)
+		    (let ((i (1+ data-index)))
+		      (dolist (datum data)
+			(setf (unsigned-16-value buff i) (car datum))
+			(incf i 2)
+			  
+			(setf (unsigned-16-value buff i) (cdr datum))
+			(incf i 2))))
+	     else ; nothing there, zero it out
+		  (setf (aref buff table-index) 0)
+		  (setf (aref buff (1+ table-index)) 0)))
+	(decf table-index 2))
+	
+      (setf (unsigned-16-value buff *header-block-used-size-index*) end)
+      (setf (unsigned-16-value buff *header-block-data-start-index* )
+	data-index)
+	      
     
-	(if* (> end data-index)
-	   then (error "header is too large"))))
+      (if* (> end data-index)
+	 then (error "header is too large")))
     
     (free-sresource *header-index-sresource* ans)
     buff))
@@ -484,45 +533,41 @@
   ;;  start index
   ;;  end index
   ;;  list of (start-index . end-index) for the rest of the values, if any
-  (macrolet ((unsigned-16-value (array index)
-	       `(the fixnum
-		  (+ (the fixnum (ash (aref buff ,index) 8))
-		     (aref buff (1+ ,index))))))
     
-    ;; be a nice guy and handle a symbolic header keyword name
-    (if* (symbolp header-index)
-       then (let ((ans (get header-index 'kwdi)))
-	      (if* (null ans)
-		 then (error "no such header as ~s" header-index))
-	      (setq header-index ans)))
+  ;; be a nice guy and handle a symbolic header keyword name
+  (if* (symbolp header-index)
+     then (let ((ans (get header-index 'kwdi)))
+	    (if* (null ans)
+	       then (error "no such header as ~s" header-index))
+	    (setq header-index ans)))
     
 	    
-    (let ((table-index (- (length buff)
-			  4  ; 2 for size, then 2 for first value
-			  (ash header-index 1) ; *2 
-			  ))
-	  (data-index))
+  (let ((table-index (header-block-header-index header-index))
+	(data-index))
     
-      (setq data-index (unsigned-16-value buff table-index))
+    (setq data-index (unsigned-16-value buff table-index))
+
     
-      (if* (< 0 data-index (length buff))
-	 then ; get values
-	      (let ((count (aref buff data-index))
-		    (first-start (unsigned-16-value buff (+ 1 data-index)))
-		    (first-end   (unsigned-16-value buff (+ 3 data-index))))
-		(if* (> count 1)
-		   then ; must get a list of the rest
-			(incf data-index 5)
-			(let (res)
-			  (dotimes (i (1- count))
-			    (push (cons (unsigned-16-value buff data-index)
-					(unsigned-16-value buff 
-							   (+ 2 data-index)))
-				  res))
-			  (values first-start
-				  first-end
-				  (nreverse res)))
-		   else (values first-start first-end)))))))
+    (if* (< 0 data-index (length buff))
+       then ; get values
+	    (let ((count (aref buff data-index))
+		  (first-start (unsigned-16-value buff (+ 1 data-index)))
+		  (first-end   (unsigned-16-value buff (+ 3 data-index))))
+	      (if* (> count 1)
+		 then ; must get a list of the rest
+		      (incf data-index 5)
+		      (let (res)
+			(dotimes (i (1- count))
+			  (push (cons (unsigned-16-value buff data-index)
+				      (unsigned-16-value buff 
+							 (+ 2 data-index)))
+				res)
+			  (incf data-index 4))
+			(values first-start
+				first-end
+				(nreverse res)))
+		 else (values first-start first-end))))))
+
 
 (defun buffer-subseq-to-string (buff start end)
   ;; extract a subsequence of the usb8 buff and return it as a string
@@ -634,40 +679,80 @@
   ;; in frombuf to the tobuf
   ;;
   ;; return the index after the last header stored.
-  (let ((toi 0))
+  (let ((toi 0)
+	(data-index (header-block-data-start))
+	(this-data-index)
+	(header-index (header-block-header-index 0)))
     (dotimes (i (length header-array))
       (if* (eq :p (svref header-array i))
 	 then ; passed intact
 	      (multiple-value-bind (start end others)
 		  (header-buffer-values frombuf i)
-		(loop
-		  (if* (null start) then (return))
-		  ; copy in header name
-		  (let ((name (svref *header-name-array* i)))
-		    (dotimes (j (length name))
-		      (setf (aref tobuf toi) (char-code (schar name j)))
-		      (incf toi))
-		    (setf (aref tobuf toi) #.(char-code #\:))
-		    (incf toi)
-		    (setf (aref tobuf toi) #.(char-code #\space))
-		    (incf toi)
-		    (do ((j start (1+ j)))
-			((>= j end))
-		      (setf (aref tobuf toi) (aref frombuf j))
-		      (incf toi))
-		    (setf (aref tobuf toi) #.(char-code #\return))
-		    (incf toi)
-		    (setf (aref tobuf toi) #.(char-code #\linefeed))
-		    (incf toi))
-		  (let ((next (pop others)))
-		    (if* next
-		       then (setq start (car next)
-				  end   (cdr next))
-		       else (return)))))))
+		(if* start
+		   then (let ((items (1+ (length others))))
+			  (decf data-index (1+ (* items 4)))
+			  (setf (aref tobuf data-index) items)
+			  
+			  (setf (unsigned-16-value tobuf header-index)
+			    data-index)
+			  
+			  
+			  (setq this-data-index (1+ data-index)))
+			(loop
+			  (if* (null start) then (return))
+			  (let ((name (svref *header-name-array* i)))
+			    
+			    ; copy in header name
+			    (dotimes (j (length name))
+			      (setf (aref tobuf toi) (char-code (schar name j)))
+			      (incf toi))
+			    
+			    (setf (aref tobuf toi) #.(char-code #\:))
+			    (incf toi)
+			    (setf (aref tobuf toi) #.(char-code #\space))
+			    (incf toi)
+
+			    ; set the start address
+			    (setf (unsigned-16-value tobuf this-data-index)
+			      toi)
+			    (incf this-data-index 2)
+			    
+			    
+			    ; copy in the header value
+			    (do ((j start (1+ j)))
+				((>= j end))
+			      (setf (aref tobuf toi) (aref frombuf j))
+			      (incf toi))
+
+			    ; set the end address
+			    (setf (unsigned-16-value tobuf this-data-index)
+			      toi)
+			    (incf this-data-index 2)
+			    
+
+			    ; add the obligatory crlf
+			    (setf (aref tobuf toi) #.(char-code #\return))
+			    (incf toi)
+			    (setf (aref tobuf toi) #.(char-code #\linefeed))
+			    (incf toi))
+			  (let ((next (pop others)))
+			    (if* next
+			       then (setq start (car next)
+					  end   (cdr next))
+			       else (return))))
+		   else (setf (unsigned-16-value tobuf header-index) 0)))
+	 else ; clear out the header index
+	      (setf (unsigned-16-value tobuf header-index) 0))
+      (decf header-index 2))
+
+    (setf (unsigned-16-value tobuf *header-block-used-size-index*) toi)
+    (setf (unsigned-16-value tobuf *header-block-data-start-index* )
+      data-index)
+    
     toi))
 
 	      
-(defun insert-header (buff end header value)
+(defun insert-header (buff header value)
   ;; insert the header (kwd symbol or integer) at the end of the current buffer
   ;; end is the index of the next buffer position to fill
   ;; return the index of the first unfilled spot of the buffer
@@ -677,26 +762,61 @@
 	    (if* (null val)
 	       then (error "no such header as ~s" header))
 	    (setq header val)))
-  (let ((name (svref *header-name-array* header)))
-    (dotimes (j (length name))
-      (setf (aref buff end) (char-code (schar name j)))
+  (let ((end (unsigned-16-value buff *header-block-used-size-index*))
+	(starth)
+	(endh))
+    (let ((name (svref *header-name-array* header)))
+      (dotimes (j (length name))
+	(setf (aref buff end) (char-code (schar name j)))
+	(incf end))
+      (setf (aref buff end) #.(char-code #\:))
+      (incf end)
+      (setf (aref buff end) #.(char-code #\space))
+      (incf end)
+      (setq starth end)
+      (dotimes (j (length value))
+	(setf (aref buff end) (char-code (schar value j)))
+	(incf end))
+      (setq endh end)
+      (setf (aref buff end) #.(char-code #\return))
+      (incf end)
+      (setf (aref buff end) #.(char-code #\linefeed))
       (incf end))
-    (setf (aref buff end) #.(char-code #\:))
-    (incf end)
-    (setf (aref buff end) #.(char-code #\space))
-    (incf end)
-    (dotimes (j (length value))
-      (setf (aref buff end) (char-code (schar value j)))
-      (incf end))
-    (setf (aref buff end) #.(char-code #\return))
-    (incf end)
-    (setf (aref buff end) #.(char-code #\linefeed))
-    (incf end))
   
-  end)
+    ; now insert the information about this header in the data list
+    (let ((this-data-index (unsigned-16-value buff (header-block-header-index
+						    header)))
+	  (data-start (unsigned-16-value buff *header-block-data-start-index*)))
+      (let ((count 0))
+	(if* (not (zerop this-data-index))
+	   then ; must copy this one down and add to it
+		(setq count (aref buff this-data-index)))
+	(incf count) ; for our new one
+	(decf data-start (+ 1 (* count 4)))
+	(setf (unsigned-16-value buff (header-block-header-index header))
+	  data-start)
+	(setf (unsigned-16-value buff *header-block-data-start-index*)
+	  data-start)
+	(setf (aref buff data-start) count)
+	; copy in old stuff
+	(incf this-data-index)
+	(incf data-start)
+	(dotimes (i (* 4 (1- count)))
+	  (setf (aref buff data-start) (aref buff this-data-index))
+	  (incf data-start)
+	  (incf this-data-index))
+    
+	; store in new info
+	(setf (unsigned-16-value buff data-start) starth)
+	(setf (unsigned-16-value buff (+ 2 data-start)) endh)))
+    
+    ; new end of headers
+    (setf (unsigned-16-value buff *header-block-used-size-index*) end)))
+    
+	      
   
 			     
-
+#+ignore
 (defun insert-end-of-headers (buff end)
   ;; put in the final crlf
   (setf (aref buff end) #.(char-code #\return))
@@ -745,7 +865,19 @@
 	       
 			 
 	       
-	  
+(defun add-trailing-crlf (buff)
+  ;; buff is a parsed header block.
+  ;; find the end of the data and add a crlf and then return the
+  ;; index right after the linefeed
+  (let ((size (unsigned-16-value buff *header-block-used-size-index*)))
+    (if* (not (< 0 size (header-block-data-start)))
+       then (error "buffer likely isn't a parsed header block"))
+    
+    (setf (aref buff size) #.(char-code #\return))
+    (setf (aref buff (1+ size)) #.(char-code #\linefeed))
+    
+    (+ size 2)))
+    
 	  
 
 #+ignore (defun testit ()
@@ -764,19 +896,26 @@
 	  (char-int (schar str i))))
       (parse-header-block thebuf 0 (length str))
       (setq *xx* thebuf)
-      ;(break "foo")
 
+      (format t "original~%")
+      (dump-header-block thebuf)
       
-      (dotimes (i *header-count*)
-	(let ((val (header-buffer-header-value thebuf i)))
-	  (if* val
-	     then (format t "~a: ~a~%"
-			  (svref *header-name-array* i)
-			  val)))))))
+      (insert-header thebuf :last-modified "dec 11, 1945")
+      (insert-header thebuf :user-agent  "new agent")
+      
+      (format t "after mod~%")
+      (dump-header-block thebuf)
+      
+      (let ((newbuf (get-sresource *header-block-sresource*)))
+	(copy-headers thebuf newbuf *header-client-array*)
+	(format t "after copy ~%")
+	(dump-header-block newbuf))
+      )))
+
 	
 
 		    
-(defun dump-header-block (thebuf)
+(defun dump-header-block (thebuf &optional (str t))
   ;; debugging function to print out the contents of a block
   ;; buffer that has been parsed and the parse table stored in it.
   (dotimes (i *header-count*)
@@ -787,15 +926,15 @@
       (dolist (res rest)
 	  
 	(if* res
-	   then (format t "~d: ~a ~s '" 
+	   then (format str "~d: ~a ~s '" 
 			i
 			(svref *header-name-array* i)
 			res)
 		(do ((ind (car res) (1+ ind)))
 		    ((>= ind (cdr res)))
-		  (write-char (code-char (aref thebuf ind))))
-		(format t "'")
-		(terpri))))))
+		  (write-char (code-char (aref thebuf ind)) str))
+		(format str "'")
+		(terpri str))))))
 
 
 	      

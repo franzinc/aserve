@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.70 2000/09/16 17:38:28 jkf Exp $
+;; $Id: main.cl,v 1.71 2000/09/24 22:54:50 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1197,7 +1197,7 @@ by keyword symbols and not by strings"
 		    (return-from read-http-request nil))
 	    
 	    ; insert the host name and port into the uri
-	    (let ((host (request-header-host req)))
+	    (let ((host (header-slot-value req :host)))
 	      (if* host
 		 then (let ((colonpos (find-it #\: host 0 (length host)))
 			    (uri (request-uri req))
@@ -1289,6 +1289,11 @@ by keyword symbols and not by strings"
 				      
 				      
 		     else ; no content length given
+			  (format *initial-terminal-io*
+				  "grb: connection is ~s~%"
+				  (header-slot-value req :connection))
+			  (dump-header-block (request-header-block req)
+					     *initial-terminal-io*)
 			  (if* (equalp "keep-alive" 
 				       (header-slot-value req :connection))
 			     then ; must be no body
@@ -1307,7 +1312,7 @@ by keyword symbols and not by strings"
 						     (setq ch (read-char 
 							       sock nil :eof)))
 					       then (return  ans)
-					       else (vector-push-extend ans ch))))))))
+					       else (vector-push-extend ch ans))))))))
 	   else "" ; no body
 		))))
 
