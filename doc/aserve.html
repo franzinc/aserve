@@ -7,7 +7,7 @@
 
 <body>
 
-<h1 align="center">AllegroServe</h1>
+<h1 align="center">AllegroServe - A Web Application Server</h1>
 
 <p align="left"><strong><small>copyright(c) 2000-2001. Franz Inc</small></strong></p>
 
@@ -1379,7 +1379,8 @@ content content-type query format cookies <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 redirect redirect-methods basic-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-keep-alive headers proxy user-agent external-format ssl)</font></strong></p>
+keep-alive headers proxy user-agent external-format ssl<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; skip-body)</font></strong></p>
 
 <p>Sends a request to <strong>uri</strong> and returns four values: 
 
@@ -1539,6 +1540,17 @@ keep-alive headers proxy user-agent external-format ssl)</font></strong></p>
     <td width="62%">If true then the connection is made using the Secure Sockets Layer
     protocol.&nbsp;&nbsp;&nbsp; If the uri uses the <strong>https</strong> scheme then <strong>ssl</strong>
     is assumed to be true and the <strong>ssl </strong>argument need not be specified.</td>
+  </tr>
+  <tr>
+    <td width="22%">skip-body</td>
+    <td width="16%">nil</td>
+    <td width="62%">If the value is a fucntion (satisifies <strong>functionp</strong>) then
+    the value is funcalled passing the <strong>client-request </strong>object as an argument.
+    &nbsp; At this point the client-request object contains the information on the headers of
+    the response.&nbsp;&nbsp; The function should return true if the body of the response
+    should be skipped and <strong>nil</strong> returned as the first value from
+    do-http-request.&nbsp; If skip-body is not a function then if its value is true then
+    reading the body is skipped and <strong>nil</strong> returned in its place.</td>
   </tr>
 </table>
 

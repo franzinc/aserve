@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.48.2.7.2.1 2001/09/10 17:55:43 layer Exp $
+;; $Id: main.cl,v 1.48.2.7.2.2 2001/09/17 04:49:22 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -136,7 +136,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 7))
+(defparameter *aserve-version* '(1 2 8))
 
 (eval-when (eval load)
     (require :sock)

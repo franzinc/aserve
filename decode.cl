@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: decode.cl,v 1.8.10.3.4.1 2001/09/10 17:55:42 layer Exp $
+;; $Id: decode.cl,v 1.8.10.3.4.2 2001/09/17 04:49:22 layer Exp $
 
 ;; Description:
 ;;   decode/encode code
@@ -345,6 +345,11 @@
   ;; of conses, the car being the name and the cdr the value, for
   ;; each form element.  This list is called a query list.
   ;;
+  
+  (if* (not (typep str 'simple-array))
+     then ; we need it to be a simple array for the code below to work
+	  (setq str (copy-seq str)))
+  
   (let ((res nil)
 	(max (length str)))
     

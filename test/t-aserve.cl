@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.6.6.5.4.1 2001/09/10 17:55:47 layer Exp $
+;; $Id: t-aserve.cl,v 1.6.6.5.4.2 2001/09/17 04:49:23 layer Exp $
 
 ;; Description:
 ;;   test iserve
@@ -287,6 +287,10 @@
     ; verify it's still there
     (test 200 (values2 (x-do-http-request (format nil "~a/frob" prefix-local))))
     (test 200 (values2 (x-do-http-request (format nil "~a/frob" prefix-dns))))
+    
+    ; check that skip-body works
+    (test nil (values (x-do-http-request (format nil "~a/frob" prefix-local)
+					 :skip-body t)))
     
     ; remove it
     (publish-file :path "/frob" :remove t)
@@ -1108,6 +1112,7 @@
 	(step 0))
     (multiple-value-bind (ok whole dir)
 	(match-regexp "\\(.*[/\\]\\).*" (namestring *load-truename*))
+      (declare (ignore whole))
       (if* (not ok) 
 	 then (error "can't find the server.pem directory"))
       
@@ -1115,6 +1120,7 @@
       (publish-directory :prefix "/test-pd/"
 			 :destination dir
 			 :filter #'(lambda (req ent filename)
+				     (declare (ignore ent))
 				     (test t
 					   (values 
 					    (match-regexp "server.pem"

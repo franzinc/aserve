@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.10.6.5.2.1 2001/09/10 17:55:46 layer Exp $
+;; $Id: examples.cl,v 1.10.6.5.2.2 2001/09/17 04:49:23 layer Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -102,6 +102,7 @@
 			 :br
 			 #+unix
 			 ((:a :href "long-slow") "long, slow cpu bound")
+			 #+unix
 			  " action to demo multiple process actions"
 			 :br
 			 ;; run only in an international lisp.

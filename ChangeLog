@@ -1,7 +1,17 @@
 *******************************************************************************
 merge from trunk to acl61 branch
+command: ../../join.sh trunk trunk_to_acl61_merge1 trunk_to_acl61_merge2 aserve
+*******************************************************************************
+merge from trunk to acl61 branch
 command: ../../join.sh trunk acl61 trunk_to_acl61_merge1 aserve
 *******************************************************************************
+
+2001-09-12  John Foderaro  <jkf@tiger.franz.com>
+1.2.8
+	* client.cl: add :skip-body to do-http-request. add test for this.
+	* decode.cl: fix form-urlencoded-to-query so that it can
+		handle a non simple string (which can be returned under
+	        certain circumstances from get-request-body)
 
 2001-08-28  John Foderaro  <jkf@tiger.franz.com>
 1.2.7
