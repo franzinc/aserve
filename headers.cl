@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.18 2000/10/27 02:49:33 jkf Exp $
+;; $Id: headers.cl,v 1.19 2000/10/27 15:40:29 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -614,7 +614,10 @@
 
 (defun header-buffer-req-header-value (req header)
   ;; see header-buffer-header-value for what this does.
-  (header-buffer-header-value (request-header-block req) header))
+  (let ((buff (request-header-block req)))
+    ; there will be no buffer for http/0.9 requests
+    (and buff  
+	 (header-buffer-header-value (request-header-block req) header))))
 
 
 (defun header-buffer-header-value (buff header)

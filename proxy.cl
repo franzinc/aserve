@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.26 2000/10/27 02:49:34 jkf Exp $
+;; $Id: proxy.cl,v 1.27 2000/10/27 15:40:29 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -990,6 +990,8 @@
 		   (:princ (pcache-ent-data-length ent))
 		   (:b ", State: ")
 		   (:princ-safe (pcache-ent-state ent))
+		   (:b ", Use: ")
+		   (:princ-safe (pcache-ent-use ent))
 		   (:b ", Code: ")
 		   (:princ-safe (pcache-ent-code ent))
 		   (if* (pcache-ent-disk-location ent)
@@ -1418,7 +1420,7 @@
 		    (pcache-dead-ent pcache) pcache-ent)
 	      
 	      ; if currently not in use, then make sure it's never used
-	      (if* (zerop (pcache-ent-use pcache-ent))
+	      (if* (eql 0 (pcache-ent-use pcache-ent))
 		 then (setf (pcache-ent-use pcache-ent) nil))
 		
 	      ;; stats
@@ -1538,11 +1540,9 @@
 	      
 	      (if* *entry-cached-hook*
 		 then (if* (lock-pcache-ent pcache-ent)
-			 then (unwind-protect
+			 then ; it will be unlocked by the hook fcn
 				  (funcall *entry-cached-hook* 
-					   pcache-ent level)
-				(unlock-pcache-ent pcache-ent))))
-	      )
+					   pcache-ent level))))
 		       
      elseif (eql response-code 304)
        then ; just set that so the reader of the response will know
