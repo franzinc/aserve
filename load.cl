@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.51 2001/09/29 18:03:51 jkf Exp $
+;; $Id: load.cl,v 1.52 2001/10/16 18:27:47 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -47,6 +47,7 @@
       "doc/aserve.html"
       "doc/tutorial.html"
       "doc/htmlgen.html"
+      "doc/cvs.html"
       ))
 
 (defparameter *aserve-examples*
@@ -155,6 +156,7 @@
 		  "doc/aserve.html"
 		  "doc/tutorial.html"
 		  "doc/htmlgen.html"
+		  "doc/cvs.html"
 		  "readme.txt"
 		  "examples/examples.cl"
 		  "examples/examples.fasl"
