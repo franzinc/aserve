@@ -1,6 +1,6 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.26 2000/04/17 16:00:29 jkf Exp $
+;; $Id: load.cl,v 1.27 2000/04/17 20:05:10 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -214,7 +214,7 @@
 (defun publish-docs ()
   ;; copy documentation to the external web site
   (run-shell-command
-   (format nil "cp ~adoc/htmlgen.html ~adoc/iserve.html ~adoc/tutorial.html /net/cobweb/www/people/jkf/iserve"
+   (format nil "cp ~adoc/htmlgen.html ~adoc/iserve.html ~adoc/tutorial.html /net/cobweb/www/opensource/htdocs/iserve"
 	   *iserve-root*
 	   *iserve-root*
 	   *iserve-root*)))
