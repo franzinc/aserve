@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.7 2000/03/21 05:55:55 jkf Exp $
+;; $Id: client.cl,v 1.8 2000/03/21 06:32:46 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -166,6 +166,7 @@
 			cookies ; nil or a cookie-jar
 			(redirect t) ; auto redirect if needed
 			basic-authorization  ; (name . password)
+			keep-alive   ; if true, set con to keep alive
 			
 			      )
   
@@ -179,6 +180,7 @@
 	       :content content
 	       :cookies cookies
 	       :basic-authorization basic-authorization
+	       :keep-alive keep-alive
 	       )))
 
     (unwind-protect

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-iserve.cl,v 1.1 2000/03/21 05:56:50 jkf Exp $
+;; $Id: t-iserve.cl,v 1.2 2000/03/21 06:32:46 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -32,22 +32,32 @@
 ;;-
 
 (eval-when (compile load eval)
-  (require :test))
+  (require :tester))
 
 (defpackage :net.iserve.test
   (:use :common-lisp :excl :net.html.generator :net.iserve 
 	:net.iserve.client
-	:test)
+	:util.test)
   )
 
 (in-package :net.iserve.test)
 
 
-(test-set iserve
-  (let ((port (start-iserve-running)))
-    (unwind-protect 
-	(progn)
-      (stop-iserve-running))))
+(defun test-iserve ()
+  (let ((*test-errors* 0)
+	(*test-successes* 0)
+	(*test-unexpected-failures* 0))
+    (let ((port (start-iserve-running)))
+      (format t "server started on port ~d~%" port)
+      (unwind-protect 
+	  (progn
+	    (test-publish-file port)
+	    )
+	(stop-iserve-running)))
+    (format t "~%succeses: ~d~%errors ~d~%unexpected errors: ~d~%"
+	    *test-successes*
+	    *test-errors*
+	    *test-unexpected-failures*)))
 
 
 (defun start-iserve-running ()
@@ -57,10 +67,52 @@
     (socket::local-port (net.iserve::wserver-socket wserver))
     ))
 
-(defun stop-iserver-running ()
+(defun stop-iserve-running ()
   (shutdown))
 
 
+
+;-------- publish-file tests
+
+(defvar *dummy-file-value* nil)
+(defvar *dummy-file-name*  "iservetest.xx")
+
+(defun build-dummy-file (length)
+  (let ((strp (make-string-output-stream)))
+    (dotimes (i length)
+      (write-char (code-char (+ #.(char-code #\a) (mod i 26))) strp)
+      (if* (zerop (mod i 70))
+	 then (terpri strp)))
+    (terpri strp)
+    (setq *dummy-file-value* (get-output-stream-string strp))
+    (with-open-file (p *dummy-file-name* :direction :output
+		     :if-exists :supersede)
+      (write-sequence *dummy-file-value* p))))
+  
+
+(defun test-publish-file (port)
+  (build-dummy-file 8055)
+  
+  (publish-file :path "/frob" :file *dummy-file-name*
+		:content-type "text/plain")
+  
+  (dolist (protocol '(:http/1.0 :http/1.1))
+    (multiple-value-bind (code headers body)
+	(do-http-request (format nil "http://localhost:~a/frob" port)
+	  :protocol protocol
+	  :keep-alive t)
+      (test 200 code)
+      (test (format nil "text/plain" port)
+	    (cdr (assoc "content-type" headers :test #'equal))
+	    :test #'equal)
+      #+ignore (if* (eq protocol :http/1.1)
+	 then (test "chunked"
+		    (cdr (assoc "transfer-encoding" headers :test #'equal))
+		    :test #'equalp))
+      (test *dummy-file-value* body :test #'equal))))
+
+	
+  
 
   
 
