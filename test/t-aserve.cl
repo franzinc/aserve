@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.15 2000/09/28 16:11:13 jkf Exp $
+;; $Id: t-aserve.cl,v 1.16 2000/09/29 19:03:48 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -910,6 +910,8 @@
 
 
 ;; proxy cache tests
+;; (net.aserve.test::test-proxy-cache)
+;;
 (defun test-proxy-cache ()
   (let ((*wserver* (start :port nil :server :new))
 	(proxy-wserver (start :port nil :server :new :proxy t :cache t))

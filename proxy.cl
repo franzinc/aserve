@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.16 2000/09/28 16:11:12 jkf Exp $
+;; $Id: proxy.cl,v 1.17 2000/09/29 19:03:48 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -48,47 +48,35 @@
   (memory 0)	; total number of bytes in memory
   (disk	  0)	; bytes written to disk
 
-  ; requests thet completely bypass the cache
+  ; requests that completely bypass the cache
   (r-direct 0)
-  
-  
-  ; types of responses to cache requests
-  ; item not in cache, did proxy to get value
-  (r-notpresent  0) 
-  
-  ; ims request made and cached value within constraints, just send 
-  ; not modified response back
-  (r-ims-valid   0) 
-  
-  ; ims request made, while cached value isn't within the ims constraints
-  ; it's within min-freshness contraints. thus we send back a
-  ; not modified response
-  (r-ims-assumed-valid 0)
-  
-  ; ims request made, while cached value isn't within the ims constraints
-  ; it's likely to be valid, we send back a not-modifed response and
-  ; then do a proxy request to update our cache
-  (r-ims-maybe-valid 0)
-  
-  ; ims request made, cached value is way out of date, kill off cached value
-  ; and do a proxy to get the value
-  (r-ims-invalid 0)
-  
 
-  ; non-ims request.  value within the min-freshness contstraints
-  (r-assumed-valid 0)
-  
-  ; non-ims request mde, out of date between min-freshness and likely-fresh
-  ; send back the cached value and also proxy the request to refresh the cache
-  (r-maybe-valid 0)
-  
-  ; non-ims request made, cached value is assumed out of date. proxy
-  ; to get a new value
-  (r-invalid 0)
-  
   ; ims or non-ims where there is no entry that mathes this url
   ; and the request headers
   (r-miss 0)
+
+  ; non-ims request.  value within the min-freshness contstraints
+  ; ims request where we know that the value in the cache is fresh
+  ;  and has been modified since the ims time
+  (r-fast-hit 0)
+  
+  
+  ; ims request made and cached value is fresh and based on that
+  ; we know that the client's version is fresh so send 
+  ; not-modified response back
+  (r-fast-validation   0) 
+
+  ; ims request where we return not-modified after checking with
+  ; the origin server
+  (r-slow-validation 0)
+  
+  
+  ; stale copy in the cache, we check with the origin server
+  ; and find that our copy was inconsistent and get a new copy to cache
+  (r-consistency-miss 0)
+  
+  
+  
   )
 
 
@@ -106,7 +94,7 @@
   comment	; response comment 
 
   ; count of the internal use of this
-  use		; nil - dead entry. >= 0 - current users of this entry
+  use 		; nil - dead entry. >= 0 - current users of this entry
 
   (state :new)	; nil - normal , 
                 ; :dead - trying to kill off, 
@@ -163,7 +151,19 @@
 			     (:body "This url isn't a valid proxy request "
 				    (:princ-safe (net.uri:render-uri uri nil)))))))
        else ; see if it's a local request
-	    (let ((ipaddr (socket:lookup-hostname host)))
+	    (let ((ipaddr (ignore-errors (socket:lookup-hostname host))))
+	      (if* (null ipaddr)
+		 then (with-http-response (req ent :response
+					       *response-not-found*)
+			(with-http-body (req ent)
+			  (html
+			   (:html
+			    (:head (:title "404 - Not Found"))
+			    (:body
+			     (:h1 "Host not found")
+			     "The proxy failed to find the address for host "
+			     (:b (:princ-safe host)))))))
+		      (return-from do-proxy-request))
 	      (if* (and ipaddr
 			(member ipaddr
 				(wserver-ipaddrs *wserver*))
@@ -178,7 +178,8 @@
 		 else ; must really proxy
 		      (proxy-cache-request req ent))))))
 
-		      
+
+  
 		      
 (defmethod unpublish-locator ((locator locator-proxy))
   nil)
@@ -283,12 +284,28 @@
 		   
 		   
 	    ; time to make a call to the server
-	    (setq sock (socket:make-socket :remote-host host
-					   :remote-port (or port 80)
-					   :format :bivalent
-					   :type 
-					   #+hiper-socket :hiper
-					   #-hiper-socket :stream))
+	    (handler-case
+		(setq sock (socket:make-socket :remote-host host
+					       :remote-port (or port 80)
+					       :format :bivalent
+					       :type 
+					       #+hiper-socket :hiper
+					       #-hiper-socket :stream))
+	      (error (cond)
+		(declare (ignore cond))
+		(with-http-response (req ent :response
+					 *response-not-found*)
+		  (with-http-body (req ent)
+		    (html
+		     (:html
+		      (:head (:title "404 - Not Found"))
+		      (:body
+		       (:h1 "404 - Not Found")
+		       "The proxy failed to connect to machine "
+		       (:b (:princ-safe host))
+		       " on port "
+		       (:b (:princ-safe (or port 80))))))))
+		(return-from proxy-request)))
 
 	    (if* *watch-for-open-sockets*
 	       then (schedule-finalization 
@@ -416,15 +433,16 @@
 	      (setq state :post-send)
 	      
 	      (if* respond
-		 then (let ((rsock (request-socket req)))
+		 then (ignore-errors
+		       (let ((rsock (request-socket req)))
 		
-			(format rsock "HTTP/1.1 ~d ~a~a" response comment *crlf*)
+			 (format rsock "HTTP/1.1 ~d ~a~a" response comment *crlf*)
       
-			(write-sequence clibuf rsock :end cliend)
-			(if* body-length 
-			   then (write-body-buffers rsock body-buffers 
-						    body-length))
-			(force-output rsock)))
+			 (write-sequence clibuf rsock :end cliend)
+			 (if* body-length 
+			    then (write-body-buffers rsock body-buffers 
+						     body-length))
+			 (force-output rsock))))
 		
 	      (if* (and pcache-ent 
 			(eq (request-method req) :get))
@@ -685,17 +703,12 @@
 	     (:th "Count"))
 		       
 	    (dolist (ent
-			'(("miss" pcache-r-miss)
-			  ("assumed valid" pcache-r-assumed-valid)
-			  ("maybe valid"   pcache-r-maybe-valid)
-			  ("invalid"       pcache-r-invalid)
-				     
-			  ("assumed valid - ims"
-			   pcache-r-ims-assumed-valid)
-			  ("maybe valid - ims"
-			   pcache-r-ims-maybe-valid)
-			  ("invalid - ims" 
-			   pcache-r-ims-invalid)))
+			'(("direct"   pcache-r-direct)
+			  ("miss"     pcache-r-miss)
+			  ("consistency miss" pcache-r-consistency-miss)
+			  ("fast hit" pcache-r-fast-hit)
+			  ("fast validation" pcache-r-fast-validation)
+			  ("slow validation" pcache-r-slow-validation)))
 	      (html
 	       (:tr 
 		(:td (:princ (car ent)))
@@ -745,14 +758,21 @@
 	     (not (eq (request-method req) :get))
 	     ; don't look in cache if request has cookies
 	     (header-slot-value req :authorization)
+	     (header-slot-value req :cookie)
 	     )
        then (if* pcache then (incf (pcache-r-direct pcache)))
+	    (logmess (format nil "direct for ~a~%" rendered-uri))
 	    (return-from proxy-cache-request
 	      (proxy-request req ent)))
 
     (logmess (format nil "cache: look in cache for ~a~%" rendered-uri))
 
-    (dolist (pcache-ent (gethash rendered-uri (pcache-table pcache)))
+    (dolist (pcache-ent (gethash rendered-uri (pcache-table pcache))
+	      ; not found, must proxy and then cache if the
+	      ; result looks good
+	      (progn
+		(logmess "not in cache, proxy it")
+		(proxy-and-cache-request req ent (get-universal-time) nil)))
       (if* (lock-pcache-ent pcache-ent)
 	 then (unwind-protect
 		  (progn (use-value-from-cache req ent pcache-ent)
@@ -761,6 +781,53 @@
 
 
 
+(defun proxy-and-cache-request (req ent now pcache-ent)
+  ;; must send the request to the net via the proxy.
+  ;; if pcache-ent is non-nil then this is the existing
+  ;; cache entry which may get updated or killed.
+  ;; 
+  (let ((new-ent (make-pcache-ent))
+	(rendered-uri (net.uri:render-uri (request-raw-uri req) nil))
+	(pcache (wserver-pcache *wserver*)))
+    (proxy-request req ent :pcache-ent new-ent)
+    (if* (eq (pcache-ent-code new-ent) 200)
+       then ; turns out it was modified, must
+	    ; make this the new entry
+
+	    (if* pcache-ent
+	       then (logmess (format nil "replace cache entry for ~a"
+				     rendered-uri))
+		    (logmess "consistency miss")
+		    (incf (pcache-r-consistency-miss pcache))
+	       else (logmess "miss")
+		    (incf (pcache-r-miss pcache)))
+	    
+		    
+	    (push new-ent
+		  (gethash rendered-uri
+			   (pcache-table pcache)))
+			      
+	    ; and disable the old entry
+	    (if* pcache-ent
+	       then (setf (pcache-ent-state pcache-ent) :dead))
+     elseif (and pcache-ent
+		 (eq (pcache-ent-code new-ent) 304))
+		 
+       then ; still not modified, recompute the 
+	    ; expiration time since we now know
+	    ; that the item is older
+	    ;* this may end up violation the expiration
+	    ; time in a header from a previous call
+	    (logmess (format nil "change expiration date for ~a"
+			     rendered-uri))      
+	    (incf (pcache-r-slow-validation pcache))
+	    (setf (pcache-ent-expires pcache-ent)
+	      (max (pcache-ent-expires pcache-ent)
+		   (compute-approx-expiration
+		    (pcache-ent-last-modified pcache-ent)
+		    now))))))
+  
+
 
 (defun use-value-from-cache (req ent pcache-ent)
   ;; we've determined that pcache-ent matches the request.
@@ -768,78 +835,54 @@
   (let* ((ims (header-slot-value req :if-modified-since))
 	 (now (get-universal-time))
 	 (pcache (wserver-pcache *wserver*))
-	 (rendered-uri (net.uri:render-uri (request-raw-uri req) nil))
 	 (fresh))
     (logmess (format nil "ims is ~s" ims))
 
-    (flet ((process-proxy-response (pcache-ent)
-	     (let ((new-ent (make-pcache-ent)))
-	       (proxy-request req ent :pcache-ent pcache-ent)
-	       (if* (eq (pcache-ent-code new-ent) 200)
-		  then ; turns out it was modified, must
-		       ; make this the new entry
-
-		       (logmess (format nil "replace cache entry for ~a"
-					rendered-uri))
-		       (push new-ent
-			     (gethash rendered-uri
-				      (pcache-table pcache)))
-			      
-		       ; and disable the old entry
-		       (setf (pcache-ent-state pcache-ent) :dead)
-		elseif (eq (pcache-ent-code new-ent) 304)
-			      
-		  then ; still not modified, recompute the 
-		       ; expiration time since we now know
-		       ; that the item is older
-		       ;* this may end up violation the expiration
-		       ; time in a header from a previous call
-		       (logmess (format nil "change expiration date for ~a"
-					rendered-uri))      
-		       (setf (pcache-ent-expires pcache-ent)
-			 (max (pcache-ent-expires pcache-ent)
-			      (compute-approx-expiration
-			       (pcache-ent-last-modified pcache-ent)
-			       now)))))))
-      ; compute if the entry is fresh or stale
-      (setq fresh (<= now (pcache-ent-expires pcache-ent)))
+    ; compute if the entry is fresh or stale
+    (setq fresh (<= now (pcache-ent-expires pcache-ent)))
     
     
-      (if* (and ims (not (equal "" ims)))
-	 then ; we're in a conditional get situation, where the
-	      ; condition is If-Modified-Since
-	      (setq ims (date-to-universal-time ims))
+    (if* (and ims (not (equal "" ims)))
+       then ; we're in a conditional get situation, where the
+	    ; condition is If-Modified-Since
+	    (setq ims (date-to-universal-time ims))
 	    
-	      (if* (< ims (pcache-ent-last-modified pcache-ent))
-		 then ; it has been modified since the ims time
-		      ; must return the whole thing
-		      (if* fresh
-			 then (send-cached-response req pcache-ent)
-			 else (process-proxy-response pcache-ent))
+	    (if* (< ims (pcache-ent-last-modified pcache-ent))
+	       then ; it has been modified since the ims time
+		    ; must return the whole thing
+		    (if* fresh
+		       then (logmess "validation->fast hit")
+			    (incf (pcache-r-fast-hit pcache))
+			    (send-cached-response req pcache-ent)
+		       else (proxy-and-cache-request req ent now pcache-ent))
 		    
-	       elseif fresh
-		 then ; (>= ims last-modified-time) and the entry
-		      ; is fresh, we we believe the last-modified-time
-		      ; thus we respond that entry is correct
-		      (send-not-modified-response req ent)
-		 else ; (>= ims last-modified-time) butthe entry
-		      ;  stale, so we can't trust the last modified time
-		      ;
-		      (process-proxy-response pcache-ent))
-	 else ; unconditional get
-	      (if* fresh
-		 then (send-cached-response req pcache-ent)
-		 else ; issue a validating send
+	     elseif fresh
+	       then ; (>= ims last-modified-time) and the entry
+		    ; is fresh, we we believe the last-modified-time
+		    ; thus we respond that entry is correct
+		    (logmess "fast validation")
+		    (incf (pcache-r-fast-validation pcache))
+		    (send-not-modified-response req ent)
+	       else ; (>= ims last-modified-time) butthe entry
+		    ;  stale, so we can't trust the last modified time
+		    ;
+		    (proxy-and-cache-request req ent now pcache-ent))
+       else ; unconditional get
+	    (if* fresh
+	       then (logmess "fast hit")
+		    (incf (pcache-r-fast-hit pcache))
+		    (send-cached-response req pcache-ent)
+	       else ; issue a validating send
 		    
-		      (insert-header 
-		       (request-header-block req)
-		       :if-modified-since
-		       (or (pcache-ent-last-modified-string pcache-ent) 
-			   (setf (pcache-ent-last-modified-string pcache-ent)
-			     (universal-time-to-date
-			      (pcache-ent-last-modified pcache-ent)))))
+		    (insert-header 
+		     (request-header-block req)
+		     :if-modified-since
+		     (or (pcache-ent-last-modified-string pcache-ent) 
+			 (setf (pcache-ent-last-modified-string pcache-ent)
+			   (universal-time-to-date
+			    (pcache-ent-last-modified pcache-ent)))))
 
-		      (process-proxy-response pcache-ent))))))
+		    (proxy-and-cache-request req ent now pcache-ent)))))
 		      
 		    
 (defun compute-approx-expiration (changed  now)
@@ -968,10 +1011,10 @@
 	      (cons client-response-header body-buffers))
 	    (setf (pcache-ent-data-length pcache-ent) body-length)
 	  
-	    (setq client-response-header nil
-		  body-buffers nil)
+	    
 	  
-	    (setf (pcache-ent-state pcache-ent) nil) ; means valid data
+	    (setf (pcache-ent-state pcache-ent) nil ; means valid data
+		  (pcache-ent-use  pcache-ent) 0)
 	  
 	    (let* ((last-mod (header-buffer-header-value 
 			      client-response-header
@@ -983,6 +1026,10 @@
 			     :expires))
 		   (expires-val (and expires
 				     (date-to-universal-time expires))))
+	      
+	      
+	      (setq client-response-header nil
+		    body-buffers nil)
 	    
 	      (if* last-mod-val
 		 then (setf (pcache-ent-last-modified-string pcache-ent) last-mod
@@ -991,18 +1038,18 @@
 		      ; second to account for the transit time
 		    
 		      (setf (pcache-ent-last-modified pcache-ent)  
-			(- (setq now (get-universal-time)) 2))
+			(- (setq now (get-universal-time)) 2)))
 	    
-		      (if* expires-val
-			 then ; given expiration date, use it
-			      ;* it may be bogus since people doing ads use this
-			      ;  to force cache reloads
-			      (setf (pcache-ent-expires pcache-ent) expires-val)
-			 else ; must compute expiration
-			      (setf (pcache-ent-expires pcache-ent)
-				(compute-approx-expiration
-				 (pcache-ent-last-modified pcache-ent)
-				 (or now (get-universal-time)))))))
+	      (if* expires-val
+		 then ; given expiration date, use it
+		      ;* it may be bogus since people doing ads use this
+		      ;  to force cache reloads
+		      (setf (pcache-ent-expires pcache-ent) expires-val)
+		 else ; must compute expiration
+		      (setf (pcache-ent-expires pcache-ent)
+			(compute-approx-expiration
+			 (pcache-ent-last-modified pcache-ent)
+			 (or now (get-universal-time))))))
 		       
      elseif (eql response-code 304)
        then ; just set that so the reader of the response will know
