@@ -1,4 +1,10 @@
-2005-01-13  John Foderaro  <jkf@tiger.franz.com>
+2005-01-13 John Foderaro  <jkf@tiger.franz.com>
+1.2.42
+	* main.cl - track whether characters have been read in a 
+          request in order determine whether a "400 Bad Request"
+	  response should be made.
+	
+2005-01-13 John Foderaro  <jkf@tiger.franz.com>
 1.2.41
 	* htmlgen/htmlgen.cl - fix call to macroexpand for acl7.0
 	  where the use of the compiler's environment can cause
