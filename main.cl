@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.136 2002/02/28 14:29:19 jkf Exp $
+;; $Id: main.cl,v 1.137 2002/04/10 16:06:50 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -2089,7 +2089,6 @@ by keyword symbols and not by strings"
 		     
 
 
-
 (defmethod get-multipart-sequence ((req http-request)
 				   buffer
 				   &key (start 0)
@@ -2119,6 +2118,7 @@ in get-multipart-sequence"))
 	 text-mode
 	 after)
 
+    
     (typecase buffer
       ((array (unsigned-byte 8) (*))
        )
@@ -2150,6 +2150,7 @@ in get-multipart-sequence"))
 		 (setf (mp-info-after mp-info) after)
 		 (setq cur (mp-info-cur mp-info)) ; scan-forward can change
 		 )
+	 
 	 (if* (> pos cur)
 	    then ; got something to return
 		 (let* ((tocopy (min (- end start) (- pos cur)))
@@ -2164,7 +2165,7 @@ in get-multipart-sequence"))
 			      mpbuffer
 			      :string buffer
 			      :start cur
-			      :end (+ cur tocopy)
+			      :end pos 
 			      :string-start start
 			      :string-end (length buffer)
 			      :external-format external-format
@@ -2177,8 +2178,16 @@ in get-multipart-sequence"))
 			   (dotimes (i tocopy)
 			     (setf (aref buffer (+ start i))
 			       (aref mpbuffer (+ cur i)))))
-		   (setf (mp-info-cur mp-info) (+ cur tocopy))
-		   (return-from get-multipart-sequence (+ start items)))
+		   (if* (zerop items)
+		      then ; didn't find enough bytes to make 
+			   ; a character
+			   (if* (null (shift-buffer-up-and-read mp-info))
+			      then ; no more bytes available
+				   (return-from get-multipart-sequence nil))
+			   ; loop around
+		      else (setf (mp-info-cur mp-info) (+ cur tocopy))
+			   (return-from get-multipart-sequence 
+			     (+ start items))))
 	  elseif (eq kind :partial)
 	    then  ; may be a boundary, can't tell
 		 (if* (null (shift-buffer-up-and-read mp-info))

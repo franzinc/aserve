@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.39 2002/02/28 14:29:19 jkf Exp $
+;; $Id: client.cl,v 1.40 2002/04/10 16:06:50 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -524,12 +524,15 @@ or \"foo.com:8000\", not ~s" proxy))
     ; going to block doing the write we start another process do the
     ; the write.  
     (if* content
-       then (net.aserve::if-debug-action 
-	     :xmit
-	     (format net.aserve::*debug-stream*
-		     "client sending content of ~d bytes"
-		     (length content)))
-	    (write-sequence content sock))
+       then ; content can be a vector a list of vectors
+	    (if* (atom content) then (setq content (list content)))
+	    (dolist (cont content)
+	      (net.aserve::if-debug-action 
+	       :xmit
+	       (format net.aserve::*debug-stream*
+		       "client sending content of ~d bytes"
+		       (length cont)))
+	      (write-sequence cont sock)))
     
     
     (force-output sock)

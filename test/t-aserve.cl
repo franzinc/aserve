@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.43 2002/02/28 14:29:19 jkf Exp $
+;; $Id: t-aserve.cl,v 1.44 2002/04/10 16:06:50 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -1464,19 +1464,19 @@
     (publish :path "/cgi-0"
 	     :function #'(lambda (req ent)
 			   (net.aserve:run-cgi-program 
-			    req ent "aserve/examples/cgitest.sh")))
+			    req ent "sh aserve/examples/cgitest.sh")))
     (publish :path "/cgi-1"
 	     :function #'(lambda (req ent)
 			   (net.aserve:run-cgi-program 
-			    req ent "aserve/examples/cgitest.sh 1")))
+			    req ent "sh aserve/examples/cgitest.sh 1")))
     (publish :path "/cgi-2"
 	     :function #'(lambda (req ent)
 			   (net.aserve:run-cgi-program 
-			    req ent "aserve/examples/cgitest.sh 2")))
+			    req ent "sh aserve/examples/cgitest.sh 2")))
     (publish :path "/cgi-3"
 	     :function #'(lambda (req ent)
 			   (net.aserve:run-cgi-program 
-			    req ent "aserve/examples/cgitest.sh 3")))
+			    req ent "sh aserve/examples/cgitest.sh 3")))
     
     ;; verify that the various headers work
     (test 200 (values2 
@@ -1509,7 +1509,7 @@
     (publish :path "/cgi-4"
 	     :function #'(lambda (req ent)
 			   (net.aserve:run-cgi-program 
-			    req ent "aserve/examples/cgitest.sh 4"
+			    req ent "sh aserve/examples/cgitest.sh 4"
 			    :error-output
 			    #'(lambda (req ent stream)
 				(declare (ignore req ent))

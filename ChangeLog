@@ -1,3 +1,14 @@
+2002-04-10  John Foderaro  <jkf@tiger.franz.com>
+
+	* main.cl - fix bug in get-multipart-sequence when used
+	  in an International Lisp with multibyte character input.
+	  In certain rare cases it could get stuck decoding the last
+	  bits of a buffer.
+	* client.cl - if the content passed to do-http-request
+	   is a list of vectors, each vector in the list will
+	   be sent to the server.
+	  
+
 2002-02-28  John Foderaro  <jkf@tiger.franz.com>
 1.2.23
 >>>	*  incompatible change:
