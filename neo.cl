@@ -159,7 +159,7 @@
     :reader protocol-string)
    (alist ;; alist of headers not stored in slots
     :initform nil
-r    :accessor alist)
+    :accessor alist)
    (socket ;; the socket we're communicating throgh
     :initarg :socket
     :reader socket)

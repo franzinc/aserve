@@ -330,6 +330,58 @@ with-http-body ((req ent) &rest body)
 
     
 
+----------- notes 7/6/99
+
+further discussion of the web server loop
+
+[assumed done]: compute the entity object that is the target of the 
+                 http command.
+
+[with-http-response2]
+1. call function to determine if we'll keep the connection alive
+   assuming that was requested
+
+2. check to see if there is an 'if' check in the request header
+   and if the entity is up to date based on that check.  If so 
+   shortcut things and put put a not modified response
+
+3. start a timer to control the creation of a response to this 
+   request.
+[end with-http-response2]
+
+
+[with-http-body]
+
+4. compute-response-headers 
+    sets the transfer encoding to 'chunked' if that's appropriate
+
+5. send response-headers
+     writes out all response headers.
+     If the http request was a 'head' then throw out right now to
+     complete the response.
+
+6. compute-response-stream
+    put into a slot in the request object a stream appropriate for
+    writing to that the user code can use to write the body of the
+    response to this request.  
+    possibilities;
+     we're doing chunking
+        we can use the socket stream itself to write to.
+
+     no chunking but keep alive is true
+        we can create a string output stream object to capture
+        the data and then compute its length and put out a content
+        length (hmm... are the headers already written by now??).
+        problem: there are only text stream output streams.
+
+     no chunking and no keep alive
+        we can write to the socket and then close it after we're done.
+        
+7. finish-response-stream
+
+[end with-http-body]
+
+
 
 
 
