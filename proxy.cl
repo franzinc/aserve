@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.28 2000/10/31 19:00:56 jkf Exp $
+;; $Id: proxy.cl,v 1.29 2000/11/22 16:04:58 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -163,6 +163,12 @@
   queueobj  ; queue  object we're stored in
   prev
   next
+
+  ; scanning for links
+  links	    ; list of uris
+  links-left ; list of uris still to scan
+  level	    ; level at which to scan these links
+  scan-next ; next pcache-ent to scan
   
   )
 
