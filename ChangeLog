@@ -1,8 +1,18 @@
 *******************************************************************************
+merge from trunk to acl62 branch on 10/22/03
+command:
+join.sh trunk trunk_to_acl62_merge_092403 trunk_to_acl62_merge_102203 aserve
+*******************************************************************************
+
+*******************************************************************************
 merge from trunk to acl62 branch on 9/24/03
 command:
 join.sh trunk trunk_to_acl62_merge_070703 trunk_to_acl62_merge_092403 aserve
 *******************************************************************************
+
+2003-10-22  John Foderaro  <jkf@tiger.franz.com>
+
+	* add webactions subdirectory of code
 
 2003-09-22  John Foderaro  <jkf@tiger.franz.com>
 1.2.31

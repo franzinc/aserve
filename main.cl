@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.48.2.10.2.5 2003/09/24 17:12:02 layer Exp $
+;; $Id: main.cl,v 1.48.2.10.2.6 2003/10/22 21:12:33 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1262,7 +1262,7 @@ by keyword symbols and not by strings"
 		  (if* (> fd *max-socket-fd*)
 		     then (setq *max-socket-fd* fd)
 			  (logmess (format nil 
-					   "Maximum socket file desciptor number is now ~d" fd))))
+					   "Maximum socket file descriptor number is now ~d" fd))))
 		
 		
 		(setq error-count 0) ; reset count
