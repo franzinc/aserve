@@ -9,6 +9,8 @@
 
 <h1 align="center">Allegro iServe Tutorial</h1>
 
+<p align="left"><strong><small>copyright (c) 2000 Franz Inc</small></strong></p>
+
 <p>This document is a companion to the iServe reference manual.&nbsp;&nbsp; Here we will
 take you through various examples and demonstrate how to use the facilities of the iServe
 web server.&nbsp;&nbsp; Refer to the reference manual for more details on the functions we
@@ -112,7 +114,7 @@ determined by the &quot;<strong>txt</strong>&quot; file type, which is associate
 &quot;<strong>text/plain</strong>&quot; content-type.</p>
 
 <p>Because we didn't specify a <strong>:host</strong> argument to <strong>publish-file </strong>iServe
-will return this page to any brower regardless of the host name used to name the machine.
+will return this page to any browser regardless of the host name used to name the machine.
 &nbsp; So iServe will respond to requests for <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>
 and <a href="http://test/foo">http://test:8000/foo</a> and <a href="http://localhost/foo">http://localhost:8000/foo</a>.
 &nbsp;&nbsp; </p>
@@ -179,8 +181,8 @@ simplest response function is published here:</p>
 the request).&nbsp; The request object is also used to store information about the
 response that is made to the request.&nbsp;&nbsp; The entity object contains the
 information passed to the <strong>publish</strong> function.&nbsp; One important item in
-the entity is the <strong>content-type</strong> which which serve as the default
-content-type for the response (it can be overridden by an argument to <strong>with-http-response</strong>).</p>
+the entity is the <strong>content-type</strong> which serve as the default content-type
+for the response (it can be overridden by an argument to <strong>with-http-response</strong>).</p>
 
 <p>A response function must use the <strong>with-http-response</strong> and <strong>with-http-body
 </strong>macros and then send any additional data to the stream <strong>*html-stream*</strong>.
@@ -471,7 +473,7 @@ authentication in the HTTP/1.1 protocol.</p>
 is that most web browsers will continue to send the entered name and password along with
 future requests to the server until the web browser is restarted.&nbsp;&nbsp; Thus you can
 simultaneously unlock a whole group of pages.&nbsp; If you choose to handle the
-authentication in a form you must use a cookie to make a record that this web brower is
+authentication in a form you must use a cookie to make a record that this web browser is
 now qualified to access a certain group of pages.&nbsp; Cookies aren't hard to store, but
 some users turn off cookie saving thus you will&nbsp; make your site inaccessible to these
 people.</p>
