@@ -1,3 +1,7 @@
+2003-10-22  Kevin Layer  <layer@crikey>
+
+	* packages.cl: update defpatch
+
 *******************************************************************************
 2nd merge from trunk to acl62 branch on 10/22/03
 command:

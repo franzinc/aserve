@@ -1,3 +1,9 @@
+(sys:defpatch "webactions" 2
+  "v1: add extended maps and authorizers;
+v2: webactions 1.4: add flags to map entries."
+  :type :system
+  :post-loadable t)
+
 ;; -*- mode: common-lisp; package: net.aserve -*-
 ;;
 ;; clpage.cl
@@ -19,7 +25,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: clpage.cl,v 1.1.2.1 2003/10/22 21:12:33 layer Exp $
+;; $Id: clpage.cl,v 1.1.2.2 2003/10/22 23:05:15 layer Exp $
 
 
 (eval-when (compile load eval) (require :aserve))
