@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.3 2000/03/16 17:54:55 jkf Exp $
+;; $Id: client.cl,v 1.4 2000/03/16 19:19:44 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -906,6 +906,7 @@
 
     
 (defun  doit ()
+  ;;test function
   (setq xx 
     (net.iserve.client::make-http-client-request "http://www.franz.com"))
   (net.iserve.client::read-client-response-headers xx))
