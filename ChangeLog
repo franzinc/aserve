@@ -1,3 +1,10 @@
+2001-08-08  John Foderaro  <jkf@tiger.franz.com>
+
+	*  publish.cl - allow list of index files to be specified in
+		for each directory-entity.
+	    - specify a catch-all compute-response-stream method so 
+	      users adding new entity type don't have to do so.
+
 2001-08-08  jkf  <jkf@main.verada.com>
 
 	* publish.cl - fix for when no body is given with-http-body

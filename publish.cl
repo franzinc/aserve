@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.48 2001/08/08 15:35:10 jkf Exp $
+;; $Id: publish.cl,v 1.49 2001/08/08 17:13:44 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -119,6 +119,10 @@
     :initarg :cache-p
     :initform nil
     :accessor cache-p)   
+   
+   (indexes   :initarg :indexes
+	      :initform '("index.html" "index.htm")
+	      :reader indexes)
     
    
    )
@@ -506,6 +510,7 @@
 			       locator
 			       remove
 			       authorizer
+			       indexes
 			       )
   
   ;; make a whole directory available
@@ -522,6 +527,7 @@
 		       :host host
 		       :port port
 		       :authorizer authorizer
+		       :indexes indexes
 		       )))
     
   (dolist (entpair (locator-info locator))
@@ -966,11 +972,9 @@
   t	; we've handled it
   )
 
-	      
-		
 (defmethod process-entity ((req http-request) (ent directory-entity))
   ;; search for a file in the directory and then create a file
-  ;; entity for it so we can track last modified and stu
+  ;; entity for it so we can track last modified.
   
   ; remove the prefix and tack and append to the given directory
   
@@ -999,18 +1003,19 @@
 	 then ; not present
 	      (return-from process-entity nil)
        elseif (eq :directory type)
-	 then ; we have to try index.html and index.htm
+	 then ; Try the indexes (index.html, index.htm, or user-defined).
+	      ; tack on a trailing slash if there isn't one already.
 	      (if* (not (eq #\/ (schar realname (1- (length realname)))))
 		 then (setq realname (concatenate 'string realname "/")))
+
+	      (setf redir-to 
+		(dolist (index (indexes ent) 
+			  ; no match to index file, give up
+			  (return-from process-entity nil))
+		  (if* (eq :file (excl::filesys-type
+				  (concatenate 'string realname index)))
+		     then (return index))))
 	      
-	      (if* (eq :file (excl::filesys-type
-			      (concatenate 'string realname "index.html")))
-		 then (setq redir-to "index.html")
-	       elseif (eq :file (excl::filesys-type
-				 (concatenate 'string realname "index.htm")))
-		 then (setq redir-to "index.htm")
-		 else ; failure
-		      (return-from process-entity nil))
        elseif (not (eq :file type))
 	 then  ; bizarre object
 	      (return-from process-entity nil)))
@@ -1317,7 +1322,7 @@
   ;;
   (setf (request-reply-stream req) (request-socket req)))
 
-(defmethod compute-response-stream ((req http-request) (ent computed-entity))
+(defmethod compute-response-stream ((req http-request) (ent entity))
   ;; may have to build a string-output-stream
   (if* (member :string-output-stream (request-reply-strategy req) :test #'eq)
      then (setf (request-reply-stream req) (make-string-output-stream))
