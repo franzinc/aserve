@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.51 2004/01/16 19:31:14 layer Exp $
+;; $Id: t-aserve.cl,v 1.51.26.1 2004/10/19 20:09:04 layer Exp $
 
 ;; Description:
 ;;   test iserve
@@ -1573,7 +1573,13 @@
 	(x-do-http-request (format nil "~a/cgi-2"
 				   prefix-local)
 			   :redirect nil)
-      (test "go to franz" body :test #'equal)
+      
+      ; some /bin/sh's don't' support "-n" so accept either one.
+      ; We don't want to search for something exact since if -n
+      ; fails we get an appened lf, or cllf and we don't want to
+      ; conditionalize on the machine's line ending convention.
+      (test t (not (null (search "go to franz" body))))
+      
       (test 301 code)
       (test "http://www.franz.com" (cdr (assoc :location headers))
 	    :test #'equal)
@@ -1609,9 +1615,9 @@
 				  eof
 				  )))))
     (setq error-buffer (make-array 10 
-				  :element-type 'character
-				  :adjustable t
-				  :fill-pointer 0))
+				   :element-type 'character
+				   :adjustable t
+				   :fill-pointer 0))
         
     (multiple-value-bind (body rescode)
 	(x-do-http-request (format nil "~a/cgi-4" prefix-local))

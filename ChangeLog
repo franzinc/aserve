@@ -1,3 +1,8 @@
+2004-10-19  John Foderaro  <jkf@tiger.franz.com>
+
+	* cgi.cl (parse-cgi-script-data): fix bug where find
+	  was used instead of position.
+
 2004-08-31  Kevin Layer  <layer@gemini>
 
 	* makefile: use := instead of = with $(shell ...)
