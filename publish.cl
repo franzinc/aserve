@@ -20,7 +20,9 @@
    (last-modified :initarg :last-modified
 		  :accessor last-modified
 		  :initform nil ; means always considered new
-		  ))
+		  )
+   
+   )
   )
 
 
@@ -57,6 +59,43 @@
 (defvar *exact-url* (make-hash-table :test #'equal))
 (defvar *prefix-url* (make-hash-table :test #'equal))
 
+
+
+
+;; methods on entity objects
+
+;-- content-length -- how long is the body of the response, if we know
+
+(defmethod content-length ((ent entity))
+  ;; by default we don't know, and that's what nil mean
+  nil)
+
+(defmethod content-length ((ent file-entity))
+  (let ((contents (contents ent)))
+    (if* contents
+       then (length contents)
+       else ; may be a file on the disk, we could
+	    ; compute it.. this is
+	    ;** to be done
+	    nil)))
+
+
+
+;- transfer-mode - will the body be sent in :text or :binary mode.
+;  use :binary if you're not sure
+
+(defmethod transfer-mode ((ent entity))
+  :binary   ; the default
+  )
+
+
+
+
+
+
+
+
+  
 
 
 ;; url exporting
@@ -245,7 +284,8 @@
 	   (,g-timeout ,timeout)
 	   (,g-check-modified ,check-modified))
        (catch 'with-http-response
-	 (keep-alive-check ,g-req ,g-ent)
+	 (compute-strategy ,g-req ,g-ent)
+	 ;(keep-alive-check ,g-req ,g-ent)
 	 (up-to-date-check ,g-check-modified ,g-req ,g-ent)
 	 (mp::with-timeout ((if* (> ,g-timeout 0)
 			       then ,g-timeout
@@ -264,14 +304,13 @@
 	     (,g-ent ,ent)
 	     (,g-format ,format))
 	 (declare (ignore-if-unused ,g-req ,g-ent ,g-format))
-	 (compute-response-headers ,g-req ,g-ent)
-	 (send-response-headers ,g-req ,g-ent)
-	 ,(if* body
-	     then `(progn (compute-response-stream ,g-req ,g-ent)
-			 ,@body
-			 (finish-response-stream  ,g-req ,g-ent)
-			 )))))
-		  
+	 ; (compute-response-headers ,g-req ,g-ent)
+	 ,(if* body 
+	     then `(compute-response-stream ,g-req ,g-ent))
+	 (send-response-headers ,g-req ,g-ent :pre)
+	 (if* (not (member :omit-body (resp-strategy ,g-req)))
+	    then (progn ,@body))
+	 (send-response-headers ,g-req ,g-ent :post))))
 			  
 	 
 	       
@@ -291,8 +330,7 @@
 	    ; for now we'll send it all
 	    (with-http-response2 (req ent)
 	      (setf (resp-code req) *response-ok*)
-	      (push (cons "Content-Length" (length contents))
-		    (resp-headers req))
+	      (setf (resp-content-length req) (length contents))
 	      (setf (resp-content-type req) (mime-type ent))
 	      (push (cons "Last-Modified"
 			  (universal-time-to-date 
@@ -333,7 +371,7 @@
 		      (with-http-response2 (req ent)
 
 			(setf (resp-code req) *response-ok*)
-			(push (cons "Content-Length" size) (resp-headers req))
+			(setf (resp-content-length req) size)
 			(push (cons "Last-Modified"
 				    (universal-time-to-date 
 				     (min (resp-date req) lastmod)))
@@ -398,6 +436,7 @@
 
 (defvar *enable-keep-alive* t)
 
+#+ignore
 (defmethod keep-alive-check ((req xhttp-request) (ent entity))
   ;; check to see if our response should be a keep alive
   ;; kinda response
@@ -420,6 +459,7 @@
 
 (defvar *enable-chunking* t) ; until we can figure it out
 
+#+ignore 
 (defmethod compute-response-headers ((req xhttp-request) (ent entity))
   ;; may fill this in later on
   (if* (and ; (resp-keep-alive req) 
@@ -431,27 +471,108 @@
 
 
 
-(defmethod send-response-headers ((req xhttp-request) (ent entity))
+(defmethod compute-strategy ((req xhttp-request) (ent entity))
+  ;; determine how we'll respond to this request
+  
+  (let ((strategy nil))
+    (if* (eq (command req) :head)
+       then ; head commands are particularly easy to reply to
+	    (setq strategy '(:use-socket-stream
+			     :omit-body))
+	    
+	    (if* (and *enable-keep-alive*
+		      (equalp "keep-alive" 
+			      (header-slot-value "connection" req)))
+	       then (push :keep-alive strategy))
+	    
+     elseif (and  ;; assert: get command
+	     *enable-chunking* 
+	     (eq (protocol req) :http/1.1)
+	     (null (content-length ent)))
+       then (setq strategy '(:chunked :use-socket-stream))
+       else ; can't chunk, let's see if keep alive is requested
+	    (if* (and *enable-keep-alive*
+		      (equalp "keep-alive" 
+			      (header-slot-value "connection" req)))
+	       then ; a keep alive is requested..
+		    ; we may want reject this if we are running
+		    ; short of processes to handle requests.
+		    ; For now we'll accept it if we can.
+		    
+		    (if* (eq (transfer-mode ent) :binary)
+		       then ; can't create binary stream string
+			    ; must not keep alive
+			    (setq strategy
+			      '(:use-socket-stream
+				; no keep alive
+				))
+		       else ; can build string stream
+			    (setq strategy
+			      '(:string-output-stream
+				:keep-alive
+				:post-headers)))
+		    
+		    ; keep alive not requested
+		    (setq strategy '(:use-socket-stream
+				     ))))
+    
+    ;;  save it
+    
+    (setf (resp-strategy req) strategy)
+    
+    ))
+			     
+		    
+		    
+		    
+		    
+    
+    
+	    
+
+(defmethod send-response-headers ((req xhttp-request) (ent entity) time)
   ;; we have all the info to send out the headers of our response
+    
   (mp:with-timeout (60 (logmess "timeout during header send")
 		       (setf (resp-keep-alive req) nil)
 		       (throw 'with-http-response nil))
-    (let ((sock (socket req))
-	  (chunked-p nil))
-      (let ((code (resp-code req)))
-	(format sock "~a ~d  ~a~a"
-		(protocol-string req)
-		(response-number code)
-		(response-desc   code)
-		*crlf*))
+    (let* ((sock (socket req))
+	   (strategy (resp-strategy req))
+	   (post-headers (member :post-headers strategy :test #'eq))
+	   (content)
+	   (chunked-p nil)
+	   (send-headers
+	    (if* post-headers
+	       then (eq time :post)
+	       else (eq time :pre))
+	    ))
       
-      (if* (not (eq (protocol req) :http/0.9))
+      
+      
+      (if* send-headers
+	 then (let ((code (resp-code req)))
+		(format sock "~a ~d  ~a~a"
+			(protocol-string req)
+			(response-number code)
+			(response-desc   code)
+			*crlf*)))
+      
+      (if* (and post-headers
+		(eq time :post)
+		(member :string-output-stream strategy :test #'eq))
+	 then ; must get data to send from the string output stream
+	      (setq content (get-output-stream-string 
+			     (resp-stream req)))
+	      (setf (resp-content-length req) (length content)))
+      	
+      (if* (and send-headers
+		(not (eq (protocol req) :http/0.9)))
 	 then ; can put out headers
 	      (format sock "Date: ~a~a" 
 		      (universal-time-to-date (resp-date req))
 		      *crlf*)
 
-	      (if* (resp-keep-alive req)
+	      (if* (member :keep-alive strategy :test #'eq)
 		 then (format sock "Connection: Keep-Alive~aKeep-Alive: timeout=~d~a"
 			      *crlf*
 			      *read-request-timeout*
@@ -465,28 +586,37 @@
 			      (resp-content-type req)
 			      *crlf*))
 
-	      (let ((enc (resp-transfer-encoding req)))
-		(if* (not (eq :identity enc))
-		   then (format sock "Transfer-Encoding: ~a~a"
-				enc
-				*crlf*)
-			(if* (eq :chunked enc)
-			   then (setq chunked-p t))))
+	      (if* (member :chunked strategy :test #'eq)
+		 then (format sock "Transfer-Encoding: Chunked~a"
+			      *crlf*)
+		      (setq chunked-p t))
+	      
+	      (if* (and (not chunked-p)
+			(resp-content-length req))
+		 then (format sock "Content-Length: ~d~a"
+			      (resp-content-length req)      
+			      *crlf*))
 	      
 	      (dolist (head (resp-headers req))
-		(if* (and chunked-p
-			  (equalp "content-length" (car head)))
-		   thenret ; don't send it
-		   else (format sock "~a: ~a~a"
-				(car head)
-				(cdr head)
-				*crlf*)))
-	      (write-string *crlf* sock)))
-    
-    (if* (eq :head (command req))
-       then ; we've done all we should do, end the request
-	    (throw 'with-http-response nil))
-    ))
+		(format sock "~a: ~a~a"
+			(car head)
+			(cdr head)
+			*crlf*))
+	      (write-string *crlf* sock))
+      
+      (if* (and send-headers chunk-p)
+	      (if* (eq time :pre))
+	 then (force-output sock)
+	      (socket:socket-control sock :output-chunking t)
+	 else ; shut down chunking
+	      (socket:socket-control sock :output-chunking-eof t)
+	      (write-sequence *crlf* sock))
+      
+      
+      ; if we did post-headers then there's a string input
+      ; stream to dump out.
+      (if* content
+	 then (write-sequence content sock)))))
 
       	
       

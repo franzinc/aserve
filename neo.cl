@@ -182,12 +182,19 @@
    (resp-stream   ;; stream to which to send response
     :initform nil
     :accessor resp-stream)
-   (resp-keep-alive   ;; true if we are not shutting down the connection
+   #+ignore (resp-keep-alive   ;; true if we are not shutting down the connection
     :initform nil
     :accessor resp-keep-alive)
+   #+ignore
    (resp-transfer-encoding ;; encoding for sending the body
     :initform :identity
     :accessor resp-transfer-encoding)
+   (resp-content-length
+    :initform nil  ;; nil means "i don't know"
+    :accessor resp-content-length)
+   (resp-strategy  ;; list of strategy objects
+    :initform nil
+    :accessor resp-strategy)
    )
   
   

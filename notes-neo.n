@@ -382,9 +382,29 @@ further discussion of the web server loop
 [end with-http-body]
 
 
+--7/8/99
+    we have to combine send-response-headers and compute-response
+stream since there are cases where we can't sent the headers until
+the body has been written to a string-output-stream.
 
 
+strategies:
+    
+    :use-socket-stream - just write directly to the bivalent socket stream
+    :string-output-stream - create string output stream for the response
+            (assert if command is 'get' then :use-socket-stream will be true)
 
+    :chunked          - do chunked output
+    <not present>     - don't chunk
+
+    :keep-alive  - turn on keep alive 
+    <not present>    - close connection after response
+
+    :post-headers - send headers after body is computed
+    <not present>  - send headers before the body 
+
+    :omit-body    - asking for a head, so don't send body
+    <not present> - send body
 
 
 
