@@ -1,8 +1,3 @@
-(sys:defpatch "htmlgen" 1
-  "v1: from aserve version 1.2.42."
-  :type :system
-  :post-loadable t)
-
 ;; -*- mode: common-lisp; package: net.html.generator -*-
 ;;
 ;; htmlgen.cl
@@ -30,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.23.84.2 2005/01/14 21:26:46 layer Exp $
+;; $Id: htmlgen.cl,v 1.23.84.3 2005/01/14 22:55:46 layer Exp $
 
 ;; Description:
 ;;   html generator
