@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.5 2000/08/24 14:53:39 jkf Exp $
+;; $Id: headers.cl,v 1.6 2000/09/07 19:48:04 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -49,9 +49,9 @@
     ;; the header-number is in index into..
     )
 
-(defvar *header-keyword-array*
-    ;; indexed by header-number, holds the keyword naming this header
-    )
+
+;; *header-keyword-array* defvar'ed in main.cl
+;; indexed by header-number, holds the keyword naming this header
 
 (defvar *header-name-array*
     ;; indexed by header-number, holds the string containing the 'pretty'

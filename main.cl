@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.67 2000/08/29 01:51:09 jkf Exp $
+;; $Id: main.cl,v 1.68 2000/09/07 19:48:04 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -131,7 +131,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 1 28))
+(defparameter *aserve-version* '(1 1 29))
 
 
 (provide :aserve)
@@ -259,7 +259,9 @@
 ;; specials from other files
 (defvar *header-block-sresource*)
 (defvar *header-index-sresource*)
-(defvar *header-keyword-array*)
+(defvar *header-keyword-array*
+    ;; indexed by header-number, holds the keyword naming this header
+    )
     
 
 	
@@ -393,19 +395,32 @@
 	   )))))
 
 
-(defmacro with-http-body ((req ent &key format headers)
+#+(and allegro (version>= 6 0 pre-final 1))
+(defun warn-if-crlf (external-format)
+  (let ((ef (find-external-format external-format)))
+    (if* (not (eq (crlf-base-ef ef) ef))
+       then (warn "~
+External-format `~s' passed to make-http-client-request filters line endings.
+Problems with protocol may occur." (ef-name ef)))))
+
+(defmacro with-http-body ((req ent
+			   &key format headers (external-format :latin1-base))
 			  &rest body)
+  (declare (ignorable external-format))
   (let ((g-req (gensym))
 	(g-ent (gensym))
 	(g-format (gensym))
 	(g-headers (gensym))
+	(g-external-format (gensym))
 	)
     `(let ((,g-req ,req)
 	   (,g-ent ,ent)
 	   (,g-format ,format)
 	   (,g-headers ,headers)
+	   #+(and allegro (version>= 6 0 pre-final 1))
+	   (,g-external-format (find-external-format ,external-format))
 	   )
-       (declare (ignore-if-unused ,g-req ,g-ent ,g-format))
+       (declare (ignore-if-unused ,g-req ,g-ent ,g-format ,g-external-format))
        ,(if* body 
 	   then `(compute-response-stream ,g-req ,g-ent))
        (if* ,g-headers
@@ -413,6 +428,13 @@
        (send-response-headers ,g-req ,g-ent :pre)
        (if* (not (member :omit-body (request-reply-strategy ,g-req)))
 	  then (let ((*html-stream* (request-reply-stream ,g-req)))
+		 #+(and allegro (version>= 6 0 pre-final 1))
+		 (if* (and (streamp *html-stream*)
+			   (not (eq ,g-external-format
+				    (stream-external-format *html-stream*))))
+		    then (warn-if-crlf ,g-external-format)
+			 (setf (stream-external-format *html-stream*)
+			   ,g-external-format))
 		 (progn ,@body)))
        
        (if* (member :keep-alive (request-reply-strategy ,g-req))
@@ -1625,12 +1647,22 @@ by keyword symbols and not by strings"
 (defmethod get-multipart-sequence ((req http-request)
 				   buffer
 				   &key (start 0)
-					(end (length buffer)))
+					(end (length buffer))
+					(external-format :latin1-base ef-spec))
   ;; fill the buffer with the chunk of data.
   ;; start at 'start' and go no farther than (1- end) in the buffer
   ;; return the index of the first character not placed in the buffer.
   
   
+  ;; Since external-format not used in all versions
+  (declare (ignorable external-format ef-spec))
+
+  #-(and allegro (version>= 6 0 pre-final 1))
+  (if* ef-spec
+     then (warn "~
+For this version of Lisp, external-format is ignored ~
+in get-multipart-sequence"))
+
   (let* ((mp-info (getf (request-reply-plist req) 'mp-info))
 	 mpbuffer 
 	 cur
@@ -1670,10 +1702,24 @@ by keyword symbols and not by strings"
 		 )
 	 (if* (> pos cur)
 	    then ; got something to return
-		 (let ((tocopy (min (- end start) (- pos cur))))
+		 (let* ((tocopy (min (- end start) (- pos cur)))
+			(items tocopy))
 		   (if* text-mode
-		      then ; here is where we should do
+		      then 
+			   ; here is where we should do
 			   ; external format processing
+			   #+(and allegro (version>= 6 0 pre-final 1))
+			   (multiple-value-setq (buffer items tocopy)
+			     (octets-to-string
+			      mpbuffer
+			      :string buffer
+			      :start cur
+			      :end (+ cur tocopy)
+			      :string-start start
+			      :string-end (length buffer)
+			      :external-format external-format
+			      :truncate t))
+			   #-(and allegro (version>= 6 0 pre-final 1))
 			   (dotimes (i tocopy)
 			     (setf (aref buffer (+ start i))
 			       (code-char (aref mpbuffer (+ cur i)))))
@@ -1682,7 +1728,7 @@ by keyword symbols and not by strings"
 			     (setf (aref buffer (+ start i))
 			       (aref mpbuffer (+ cur i)))))
 		   (setf (mp-info-cur mp-info) (+ cur tocopy))
-		   (return-from get-multipart-sequence (+ start tocopy)))
+		   (return-from get-multipart-sequence (+ start items)))
 	  elseif (eq kind :partial)
 	    then  ; may be a boundary, can't tell
 		 (if* (null (shift-buffer-up-and-read mp-info))
@@ -1784,7 +1830,9 @@ by keyword symbols and not by strings"
       
 		      
 				  
-(defmethod request-query ((req http-request) &key (post t) (uri t))
+(defmethod request-query ((req http-request) &key (post t) (uri t)
+						  (external-format
+						   :latin1-base))
   ;; decode if necessary and return the alist holding the
   ;; args to this url.  In the alist items the value is the 
   ;; cdr of the alist item.
@@ -1810,14 +1858,17 @@ by keyword symbols and not by strings"
       (if* uri
 	 then (let ((arg (uri-query (request-uri req))))
 		(if* arg
-		   then (setq res (form-urlencoded-to-query arg)))))
+		   then (setq res (form-urlencoded-to-query
+				   arg
+				   :external-format external-format)))))
 	      
       (if* post
 	 then (if* (eq (request-method req) :post)
 		 then (setf res
 			(append res
 				(form-urlencoded-to-query
-				 (get-request-body req))))))
+				 (get-request-body req)
+				 :external-format external-format)))))
       (setf (getf (request-reply-plist req) 'request-query-sig)
 	signature)
       (setf (request-query-alist req) res))))

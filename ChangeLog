@@ -1,3 +1,26 @@
+2000-09-07  Charles A. Cox  <cox@delta>
+1.1.29
+	
+>>>	Note: Many of the functions listed in this log entry have had
+	the :external-format argument added.  Documentation has been
+	updated
+
+	Note 2:  All changes intended to be upward compatible.  Allegro
+	specific changes are marked with #+(and allegro (version>= 6 0)).
+	
+	*  client.cl: make-http-client-request: add/use external-format
+	argument.
+	*  decode.cl: uridecode-string, query-to-form-urlencoded,
+	encode-form-urlencode, form-urlencoded-to-query: add/use
+	external-format argument.
+	*  main.cl: with-http-body, request-query: add/use external-format
+	argument.
+	*  publish.cl: get-cookie-values: add/use external-format
+	argument.
+	*  examples/examples.cl: Add new international character examples.
+	*  test/t-aserve.cl: Add tests for external-format additions.
+
+
 2000-08-28  John Foderaro  <jkf@tiger.franz.com>
 1.1.28
 	* client.cl - before doing a redirect close down the existing

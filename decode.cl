@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: decode.cl,v 1.9 2000/08/10 15:48:50 jkf Exp $
+;; $Id: decode.cl,v 1.10 2000/09/07 19:48:04 jkf Exp $
 
 ;; Description:
 ;;   decode/encode code
@@ -159,11 +159,11 @@
 	      newstr))))
 
 
-(defun uridecode-string (str)
+(defun uridecode-string (str &key (external-format :latin1-base))
   ;; decoded the uriencoded string, returning possibly the
   ;; same string
   ;;
-  (un-hex-escape str nil)
+  (un-hex-escape str nil :external-format external-format)
   )
 
 
@@ -202,7 +202,7 @@
       res))
 
 
-(defun query-to-form-urlencoded (query)
+(defun query-to-form-urlencoded (query &key (external-format :latin1-base))
   ;; query is a list of conses, each of which has as its 
   ;; car the query name and as its cdr the value.  A value of
   ;; nil means we encode  name=   and nothing else
@@ -212,15 +212,36 @@
       (if* res
 	 then (push "&" res) ; separator
 	      )
-      (push (encode-form-urlencoded (car ent)) res)
+      (push (encode-form-urlencoded (car ent) :external-format external-format)
+	    res)
       (push "=" res)
-      (if* (cdr ent) then (push (encode-form-urlencoded (cdr ent)) res)))
+      (if* (cdr ent)
+	 then (push (encode-form-urlencoded (cdr ent)
+					    :external-format external-format)
+		    res)))
     
     (apply #'concatenate 'string (nreverse res))))
       
 
 
-(defun encode-form-urlencoded (str)
+(defmacro with-tohex-cvt-buffer ((buffer-var str) &body body)
+
+  #-(and allegro (version>= 6 0))
+  ;; Not using a separate buffer
+  `(let ((,buffer-var ,str))
+     (macrolet ((buf-elt (buf i)
+		  `(char-code (char ,buf ,i))))
+       ,@body))
+
+  #+(and allegro (version>= 6 0))
+  `(let ((,buffer-var (string-to-octets ,str
+					:external-format external-format
+					:null-terminate nil)))
+     (macrolet ((buf-elt (buf i)
+		  `(aref ,buf ,i)))
+       ,@body)))
+
+(defun encode-form-urlencoded (str &key (external-format :latin1-base))
   ;; encode the given string using form-urlencoding
   
   ;; a x-www-form-urlencoded string consists of a sequence 
@@ -233,61 +254,63 @@
   ; first compute if encoding has to be done and what it will
   ; cost in space
   
+  (declare (ignorable external-format))
+
   (if* (not (stringp str))
      then (setq str (format nil "~a" str)))
   
-  (let (extra)
-    (dotimes (i (length str))
-      (let ((code (char-code (char str i))))
-	(let ((this-extra (if* (< code 128)
-			     then (svref *url-form-encode* code)
-			     else 2 ; encode as %xy
-				  )))
-	  (if* this-extra
-	     then (setq extra (+ (or extra 0) this-extra))))))
+  (with-tohex-cvt-buffer (buf str)
+    (let (extra)
+      (dotimes (i (length buf))
+	(let ((code (buf-elt buf i)))
+	  (let ((this-extra (if* (< code 128)
+			       then (svref *url-form-encode* code)
+			       else 2	; encode as %xy
+				    )))
+	    (if* this-extra
+	       then (setq extra (+ (or extra 0) this-extra))))))
     
-    (if* (null extra)
-       then ; great, no encoding necessary
-	    str
-       else ; we have to encode
-	    (let ((ret (make-string (+ (length str) extra))))
-	      (do ((from 0 (1+ from))
-		   (end (length str))
-		   (to 0))
-		  ((>= from end))
-		(let* ((ch (char str from))
-		       (code (char-code ch)))
-		  (if* (eq ch #\space)
-		     then ; space -> +
-			  (setf (schar ret to) #\+)
-			  (incf to)
-		   elseif (eq ch #\newline)
-		     then (dolist (nch '(#\% #\0 #\d #\% #\0 #\a))
-			    (setf (schar ret to) nch)
-			    (incf to))
-		   elseif (or (>= code 128)
-			      (svref *url-form-encode* code))
-		     then ; char -> %xx
-			  (macrolet ((hex-digit-char (num)
-				       ; number to hex char
-				       `(let ((xnum ,num))
-					  (if* (> xnum 9)
-					     then (code-char
-						   (+ #.(char-code #\a)
-						      (- xnum 10)))
-					     else (code-char
-						   (+ #.(char-code #\0)
-						      xnum))))))
-			    (setf (schar ret to) #\%)
-			    (setf (schar ret (+ to 1)) 
-			      (hex-digit-char (logand #xf (ash code -4))))
-			    (setf (schar ret (+ to 2)) 
-			      (hex-digit-char (logand #xf code))))
-			  (incf to 3)
-		     else ; normal char
-			  (setf (schar ret to) ch)
-			  (incf to))))
-	      ret))))
+      (if* (null extra)
+	 then ; great, no encoding necessary
+	      str
+	 else ; we have to encode
+	      (let ((ret (make-string (+ (length buf) extra))))
+		(do ((from 0 (1+ from))
+		     (end (length buf))
+		     (to 0))
+		    ((>= from end))
+		  (let* ((code (buf-elt buf from)))
+		    (if* (eq code #.(char-code #\space))
+		       then ; space -> +
+			    (setf (schar ret to) #\+)
+			    (incf to)
+		     elseif (eq code #.(char-code #\newline))
+		       then (dolist (nch '(#\% #\0 #\d #\% #\0 #\a))
+			      (setf (schar ret to) nch)
+			      (incf to))
+		     elseif (or (>= code 128)
+				(svref *url-form-encode* code))
+		       then ; char -> %xx
+			    (macrolet ((hex-digit-char (num)
+					 ; number to hex char
+					 `(let ((xnum ,num))
+					    (if* (> xnum 9)
+					       then (code-char
+						     (+ #.(char-code #\a)
+							(- xnum 10)))
+					       else (code-char
+						     (+ #.(char-code #\0)
+							xnum))))))
+			      (setf (schar ret to) #\%)
+			      (setf (schar ret (+ to 1)) 
+				(hex-digit-char (logand #xf (ash code -4))))
+			      (setf (schar ret (+ to 2)) 
+				(hex-digit-char (logand #xf code))))
+			    (incf to 3)
+		       else ; normal char
+			    (setf (schar ret to) (code-char code))
+			    (incf to))))
+		ret)))))
 
 			  
 			  
@@ -296,7 +319,7 @@
   
   
 
-(defun form-urlencoded-to-query (str)
+(defun form-urlencoded-to-query (str &key (external-format :latin1-base))
   ;; decode the x-www-form-urlencoded string returning a list
   ;; of conses, the car being the name and the cdr the value, for
   ;; each form element.  This list is called a query list.
@@ -326,7 +349,9 @@
       
 	(if* obj
 	   then (if* seenpct
-		   then (setq obj (un-hex-escape obj t)
+		   then (setq obj (un-hex-escape
+				   obj t
+				   :external-format external-format)
 			      seenpct nil))
 	      
 		(if* name
@@ -343,10 +368,38 @@
     
     (nreverse res)))
 
-(defun un-hex-escape (given spacep)
+(defmacro with-unhex-cvt-buffer ((buffer-var size)
+				 &body body)
+  #-(and allegro (version>= 6 0))
+  ;; Buffer is a string, which gets returned
+  `(let ((,buffer-var (make-string ,size)))
+     (macrolet ((cvt-buf-to-string (x &key external-format end)
+		  (declare (ignore external-format))
+		  x)
+		(set-buf-elt (buf i char)
+		  `(setf (schar ,buf ,i) ,char))
+		(buf-elt (buf i)
+		  `(schar ,buf ,i)))
+       ,@body))
+
+  #+(and allegro (version>= 6 0))
+  ;; Buffer is a static octet array, which gets converted to a string.
+  `(excl::with-dynamic-extent-usb8-array (,buffer-var ,size)
+     (macrolet ((cvt-buf-to-string (x &key external-format end)
+		  `(octets-to-string ,x :end ,end
+				     :external-format ,external-format))
+		(set-buf-elt (buf i char)
+		  `(setf (aref ,buf ,i) (char-code ,char)))
+		(buf-elt (buf i)
+		  `(code-char (aref ,buf ,i))))
+       ,@body)))
+
+(defun un-hex-escape (given spacep
+		      &key (external-format :latin1-base))
   ;; convert a string with %xx hex escapes into a string without
   ;; if spacep it true then also convert +'s to spaces
   ;;
+  (declare (ignorable external-format))
   (let ((count 0)
 	(seenplus nil)
 	(len (length given)))
@@ -357,7 +410,7 @@
       (let ((ch (schar given i)))
 	(if* (eq ch #\%) 
 	   then ; check for %0a%0d which is to be converted to #\newline
-		(if* (and (< (+ i 5) len)  ; enough chars left
+		(if* (and (< (+ i 5) len) ; enough chars left
 			  (do ((xi (+ i 1) (+ xi 1))
 			       (end (+ i 6))
 			       (pattern '(#\0 #\d #\% #\0 #\a)
@@ -368,7 +421,7 @@
 			       then (return nil))))
 		   then ; we are looking at crlf, turn into
 			; newline
-			(incf count 5) ; 5 char shrinkage
+			(incf count 5)	; 5 char shrinkage
 			(incf i 5)
 		   else (incf count 2) 
 			(incf i 2))
@@ -387,10 +440,11 @@
 		       then (- mych #.(char-code #\0))
 		       else (+ 9 (logand mych 7))))))
 			    
-      (let ((str (make-string (- len count))))
+      (with-unhex-cvt-buffer (str (- len count))
 	(do ((to 0 (1+ to))
 	     (from 0 (1+ from)))
-	    ((>= from len))
+	    ((>= from len)
+	     (cvt-buf-to-string str :end to :external-format external-format))
 	  (let ((ch (schar given from)))
 	    (if* (eq ch #\%)
 	       then (let ((newchar 
@@ -399,19 +453,16 @@
 					 (cvt-ch (schar given (+ 2 from)))))))
 		      (if* (and (eq newchar #\linefeed)
 				(> to 0)
-				(eq (schar str (1- to)) #\return))
+				(eq (buf-elt str (1- to)) #\return))
 			 then ; replace return by newline
 			      (decf to))
 		      
-		      (setf (schar str to) newchar))
+		      (set-buf-elt str to newchar))
 		    
 		    (incf from 2)
 	     elseif (and spacep (eq ch #\+))
-	       then (setf (schar str to) #\space)
-	       else (setf (schar str to) ch))))
-      
-	str))))
-
+	       then (set-buf-elt str to #\space)
+	       else (set-buf-elt str to ch))))))))
 
 
 

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.11 2000/08/22 05:32:27 jkf Exp $
+;; $Id: t-aserve.cl,v 1.12 2000/09/07 19:48:04 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -603,7 +603,29 @@
 		   (,str1 . "a b c d")
 		   ("efffg" . ,str2))))
       (test (form-urlencoded-to-query
-	     (query-to-form-urlencoded query))
+	     (query-to-form-urlencoded query :external-format :latin1-base)
+	     :external-format :latin1-base)
+	    query
+	    :test #'equal)))
+  #+(and allegro ics (version>= 6 0))
+  (let* ((str1 (coerce '(#\hiragana_letter_a #\hiragana_letter_i
+			 #\hiragana_letter_u)
+		       'string))
+	 (str2 (coerce '(#\katakana_letter_a #\katakana_letter_i
+			 #\katakana_letter_u)
+		       'string))
+	 (query `(("bazzer" . ,str1)
+		  (,str2 . "berry"))))
+    (dolist (ef (list (find-external-format :utf8)
+		      (find-external-format :shiftjis)
+		      ;; 6.0 beta didn't have an ef for unicode.
+		      (if* (find-external-format :unicode :errorp nil)
+			 thenret
+			 else (find-external-format :utf8))
+		      (find-external-format :euc)))
+      (test (form-urlencoded-to-query
+	     (query-to-form-urlencoded query :external-format ef)
+	     :external-format ef)
 	    query
 	    :test #'equal))))
 		       

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.13 2000/08/24 18:18:32 jkf Exp $
+;; $Id: examples.cl,v 1.14 2000/09/07 19:48:04 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -91,6 +91,14 @@
 			 :br
 			 ((:a :href "missing-link") "Missing Link")
 			 " should get an error when clicked"
+			 
+			 :br
+			 ((:a :href "ichars")
+			  "International Character Display")
+
+			 :br
+			 ((:a :href "icharcount")
+			  "(International) Character Counter")
 			 )
 		  
 		  )))))
@@ -416,7 +424,7 @@
 ;; presentation to separate the two.
 ;;
 (publish :path "/getfile"
-	 :content-type "text/html"
+	 :content-type "text/html; charset=utf-8"
 	 :function
 	 #'(lambda (req ent)
 	     (with-http-response (req ent)
@@ -463,7 +471,7 @@
 
 ;; this called with the file from 
 (publish :path "/getfile-got"
-	 :content-type "text/html"
+	 :content-type "text/html; charset=utf-8"
 	 :function
 	 #'(lambda (req ent)
 	     
@@ -521,20 +529,22 @@
 			     ; string
 			     (let ((buffer (make-string 1024)))
 			       (loop
-			       (let ((count (get-multipart-sequence
-					     req buffer)))
-				 (if* count
-				    then (push (subseq buffer 0 count)
-					       text-strings)
-				    else (return))))))))
+				 (let ((count (get-multipart-sequence
+					       req buffer
+					       :external-format :utf8-base)))
+				   (if* count
+				      then (push (subseq buffer 0 count)
+						 text-strings)
+				      else (return))))))))
 		 
 	       
 	       
 		 ;; now send back a response for the browser
 	       
-		 (with-http-body (req ent)
+		 (with-http-body (req ent
+				      :external-format :utf8-base)
 		   (html (:html (:head (:title "form example"))
-				(:body "-- proceessed the form, files written --"
+				(:body "-- processed the form, files written --"
 				       (dolist (file (nreverse files-written))
 					 (html :br "file: "
 					       (:b (:prin1-safe file))))
@@ -630,3 +640,346 @@
 		   :prefix "/"
 		   :destination "/home/httpd/html/")
 
+;;
+;; International Characters
+;;
+
+(publish
+ :path "/icharcount"
+ :content-type "text/html; charset=utf-8"
+ :function
+
+ #-(and allegro ics (version>= 6 0 pre-final 1))
+ #'(lambda (req ent)
+     (with-http-response (req ent)
+       (with-http-body (req ent)
+	 (princ #.(format nil "~
+This page available only with International Allegro CL post 6.0 beta")
+		*html-stream*))))
+
+ #+(and allegro ics (version>= 6 0 pre-final 1))
+ #'(lambda (req ent)
+     (let* ((body (get-request-body req))
+	    (text (if* body
+		     then (cdr (assoc "quotation"
+				      (form-urlencoded-to-query
+				       body
+				       :external-format :utf8-base)
+				      :test #'equal)))))
+
+       (with-http-response (req ent)
+	 (with-http-body (req ent
+			      :external-format :utf8-base)
+	   (if* text
+	      then ;; got the quotation, analyze it
+		   (let ((results (analyze-text text)))
+		     (html (:html (:head
+				   (:title "Character Counts"))
+				  (:body
+				   (html (:pre (:princ-safe text)))
+				   (:p "Quote by Character Names:")
+				   (:table
+				    (dotimes (i (length text))
+				      (html (:tr
+					     (:td (:princ (schar text i)))
+					     (:td (:prin1 (schar text i)))))))
+				   (:p "Sorted by occurrence:")
+				   ((:table :border 1)
+				    (dolist (r results)
+				      (html (:tr
+					     (:td
+					      (:princ
+					       (format nil "u+~4,'0x"
+						       (char-code (car r)))))
+					     (:td (:princ (car r)))
+					     (:td (:prin1 (car r)))
+					     (:td (:princ (cdr r)))))))))))
+	      else ;; ask for quotation
+		   (html (:html
+			  (:head (:title "Character Counter"))
+			  (:body
+			   ((:form :action "icharcount"
+				   :method "POST")
+			    (:h1 "AllegroServe Demo")
+			    (:p #.(format nil "~
+Below are links containing international character samples you can use to copy
+and paste into the following form.
+Note that even characters that don't display (due to missing fonts) can still
+be copied and pasted into the form below."))
+			    (:ul (:li ((:a href #.(format nil "~
+http://www.columbia.edu/kermit/utf8.html")
+					   target "_blank")
+				       "UTF-8 Sampler"))
+				 (:li ((:a href #.(format nil "~
+http://www.trigeminal.com/samples/provincial.html")
+					   target "_blank")
+				       #.(format nil "~
+The \"anyone can be provincial!\" page"))))
+			    "Enter your favorite quote:"
+			    :br
+			    ((:textarea :name "quotation" :rows 15
+					:cols 50))
+			    :br
+			    ((:input :type "submit"
+				     :value "count it"))))))))))))
+
+(defun analyze-text (text)
+  (let ((char-ht (make-hash-table))
+	(results nil))
+    (dotimes (i (length text))
+      (let ((ch (schar text i)))
+	(if* (gethash ch char-ht)
+	   then (incf (gethash ch char-ht))
+	   else (setf (gethash ch char-ht) 1))))
+    (maphash #'(lambda (k v)
+		 (push (cons k v) results))
+	     char-ht)
+    (sort results #'(lambda (x y) (> (cdr x) (cdr y))))))
+
+(publish
+ :path "/ichars"
+ :content-type "text/html"
+ :function
+
+ #-(and allegro ics (version>= 6 0 pre-final 1))
+ #'(lambda (req ent)
+     (with-http-response (req ent)
+       (with-http-body (req ent)
+	 (princ #.(format nil "~
+This page available only with International Allegro CL post 6.0 beta")
+		*html-stream*))))
+
+ ;; Need pre-final.1's :try-variant change to find-external-format
+ #+(and allegro ics (version>= 6 0 pre-final 1))
+ #'(lambda (req ent)
+     (let* ((body (get-request-body req))
+	    (query (if* body
+		      then (form-urlencoded-to-query body)))
+	    (lisp-ef (or (if* query
+			    then (cdr (assoc "lisp-ef" query :test #'equal)))
+			 ":utf8"))
+	    (http-charset (or (if* query
+				 then (cdr (assoc "http-charset" query
+						  :test #'equal)))
+			      "utf-8"))
+	    (http-content-type (format nil "text/html; charset=~a"
+				       http-charset)))
+
+       (setq lisp-ef
+	 (or (read-from-string lisp-ef)
+	     :latin1-base))
+       (with-http-response (req ent)
+	 (with-http-body (req ent
+			      :external-format (crlf-base-ef
+						(find-external-format
+						 lisp-ef
+						 :try-variant t)))
+	   (html
+	    (:html
+	     (:head (:title (:princ-safe
+			     (format nil "Character Display: ~a / ~a"
+				     lisp-ef http-charset)))
+		    ((:meta http-equiv "content-type"
+			    content http-content-type)))
+	     (:body
+	      ((:form :action "ichars" :method "POST")
+	       "HTTP content-type:  " (:strong (:prin1 http-content-type))
+	       :br
+	       "with-http-body's external-format:  " (:strong (:prin1 lisp-ef))
+	       :br
+	       :br
+	       "Note that the way characters are displayed depends upon "
+	       "the browser's fonts, and how the browser interprets "
+	       "the HTTP content-type."
+	       :br
+	       :br
+	       (:center
+		((:table :border 1
+			 :cellpadding 2)
+		 (:tr (:th "Charset") (:th "Lisp Character") (:th "Display"))
+		 (:tr (:td "Latin-1"))
+		 (:tr (:td "Latin-1")
+		      (:td (:prin1 #\a))
+		      (:td (:princ #\a)))
+		 (:tr (:td "Latin-1")
+		      (:td (:prin1 #\b))
+		      (:td (:princ #\b)))
+		 (:tr (:td "Latin-1")
+		      (:td (:prin1 #\c))
+		      (:td (:princ #\c)))
+		 (:tr (:td "Latin-1")
+		      (:td (:prin1 #\cent_sign))
+		      (:td (:princ #\cent_sign)))
+		 (:tr (:td "Latin-1")
+		      (:td (:prin1 #\pound_sign))
+		      (:td (:princ #\pound_sign)))
+		 (:tr (:td "Latin-1")
+		      (:td (:prin1 #\latin_small_letter_thorn))
+		      (:td (:princ #\latin_small_letter_thorn)))
+		 (:tr (:td "Latin-1")
+		      (:td (:prin1 #\latin_capital_letter_ae))
+		      (:td (:princ #\latin_capital_letter_ae)))
+		 (:tr (:td "Latin-1")
+		      (:td (:prin1 #\latin_capital_letter_thorn))
+		      (:td (:princ #\latin_capital_letter_thorn)))
+		 (:tr (:td "Latin-1")
+		      (:td (:prin1 #\latin_capital_letter_i_with_circumflex))
+		      (:td (:princ #\latin_capital_letter_i_with_circumflex)))
+		 (:tr (:td "Latin-2"))
+		 (:tr (:td "Latin-2")
+		      (:td (:prin1 #\latin_small_letter_u_with_ring_above))
+		      (:td (:princ #\latin_small_letter_u_with_ring_above)))
+		 (:tr (:td "Latin-2")
+		      (:td (:prin1 #\latin_capital_letter_n_with_caron))
+		      (:td (:princ #\latin_capital_letter_n_with_caron)))
+		 (:tr (:td "Latin-2")
+		      (:td (:prin1 #\latin_capital_letter_l_with_stroke))
+		      (:td (:princ #\latin_capital_letter_l_with_stroke)))
+		 (:tr (:td "Latin-3"))
+		 (:tr (:td "Latin-3")
+		      (:td (:prin1 #\latin_small_letter_j_with_circumflex))
+		      (:td (:princ #\latin_small_letter_j_with_circumflex)))
+		 (:tr (:td "Latin-3")
+		      (:td (:prin1 #\latin_capital_letter_h_with_stroke))
+		      (:td (:princ #\latin_capital_letter_h_with_stroke)))
+		 (:tr (:td "Latin-3")
+		      (:td (:prin1 #\latin_capital_letter_c_with_circumflex))
+		      (:td (:princ #\latin_capital_letter_c_with_circumflex)))
+		 (:tr (:td "Latin-4"))
+		 (:tr (:td "Latin-4")
+		      (:td (:prin1 #\latin_small_letter_u_with_ogonek))
+		      (:td (:princ #\latin_small_letter_u_with_ogonek)))
+		 (:tr (:td "Latin-4")
+		      (:td (:prin1 #\latin_capital_letter_i_with_macron))
+		      (:td (:princ #\latin_capital_letter_i_with_macron)))
+		 (:tr (:td "Latin-4")
+		      (:td (:prin1 #\latin_capital_letter_g_with_cedilla))
+		      (:td (:princ #\latin_capital_letter_g_with_cedilla)))
+		 (:tr (:td "Latin-5"))
+		 (:tr (:td "Latin-5")
+		      (:td (:prin1 #\cyrillic_capital_letter_ukrainian_ie))
+		      (:td (:princ #\cyrillic_capital_letter_ukrainian_ie)))
+		 (:tr (:td "Latin-5")
+		      (:td (:prin1 #\cyrillic_small_letter_nje))
+		      (:td (:princ #\cyrillic_small_letter_nje)))
+		 (:tr (:td "Latin-5")
+		      (:td (:prin1 #\cyrillic_capital_letter_ya))
+		      (:td (:princ #\cyrillic_capital_letter_ya)))
+		 (:tr (:td "Latin-6"))
+		 (:tr (:td "Latin-6")
+		      (:td (:prin1 #\arabic_letter_feh))
+		      (:td (:princ #\arabic_letter_feh)))
+		 (:tr (:td "Latin-6")
+		      (:td (:prin1 #\arabic_letter_hah))
+		      (:td (:princ #\arabic_letter_hah)))
+		 (:tr (:td "Latin-6")
+		      (:td (:prin1 #\arabic_letter_yeh_with_hamza_above))
+		      (:td (:princ #\arabic_letter_yeh_with_hamza_above)))
+		 (:tr (:td "Latin-7"))
+		 (:tr (:td "Latin-7")
+		      (:td (:prin1 #\greek_capital_letter_delta))
+		      (:td (:princ #\greek_capital_letter_delta)))
+		 (:tr (:td "Latin-7")
+		      (:td (:prin1 #\greek_small_letter_eta))
+		      (:td (:princ #\greek_small_letter_eta)))
+		 (:tr (:td "Latin-7")
+		      (:td (:prin1 #\greek_capital_letter_sigma))
+		      (:td (:princ #\greek_capital_letter_sigma)))
+		 (:tr (:td "Latin-8"))
+		 (:tr (:td "Latin-8")
+		      (:td (:prin1 #\hebrew_letter_alef))
+		      (:td (:princ #\hebrew_letter_alef)))
+		 (:tr (:td "Latin-8")
+		      (:td (:prin1 #\hebrew_letter_bet))
+		      (:td (:princ #\hebrew_letter_bet)))
+		 (:tr (:td "Latin-8")
+		      (:td (:prin1 #\hebrew_letter_gimel))
+		      (:td (:princ #\hebrew_letter_gimel)))
+		 (:tr (:td "Latin-15"))
+		 (:tr (:td "Latin-15")
+		      (:td (:prin1 #\latin_small_ligature_oe))
+		      (:td (:princ #\latin_small_ligature_oe)))
+		 (:tr (:td "Latin-15")
+		      (:td (:prin1 #\latin_capital_ligature_oe))
+		      (:td (:princ #\latin_capital_ligature_oe)))
+		 (:tr (:td "Japanese"))
+		 (:tr (:td "Japanese")
+		      (:td (:prin1 #\hiragana_letter_a))
+		      (:td (:princ #\hiragana_letter_a)))
+		 (:tr (:td "Japanese")
+		      (:td (:prin1 #\hiragana_letter_i))
+		      (:td (:princ #\hiragana_letter_i)))
+		 (:tr (:td "CJK"))
+		 (:tr (:td "CJK")
+		      (:td (:prin1 #\cjk_compatibility_ideograph-f900))
+		      (:td (:princ #\cjk_compatibility_ideograph-f900)))
+		 (:tr (:td "CJK")
+		      (:td (:prin1 #\cjk_compatibility_ideograph-f901))
+		      (:td (:princ #\cjk_compatibility_ideograph-f901)))
+		 (:tr (:td "CJK")
+		      (:td (:prin1 #\cjk_compatibility_ideograph-f902))
+		      (:td (:princ #\cjk_compatibility_ideograph-f902)))
+		 (:tr (:td "Ligature"))
+		 (:tr (:td "Ligature")
+		      (:td (:prin1 #\latin_small_ligature_fi))
+		      (:td (:princ #\latin_small_ligature_fi)))
+		 (:tr (:td "Ligature")
+		      (:td (:prin1 #\latin_small_ligature_fl))
+		      (:td (:princ #\latin_small_ligature_fl)))
+		 ))
+	       :br
+	       :br
+	       (:princ-safe (format nil "~
+Switch Lisp External-Format (Current is ~s): "
+				    (ef-name (find-external-format lisp-ef))))
+	       ((:select name "lisp-ef")
+		((:option value ":utf8-base" :selected "selected")
+		 ":utf8-base")
+		((:option value ":iso8859-1") ":iso8859-1")
+		((:option value ":iso8859-2") ":iso8859-2")
+		((:option value ":iso8859-3") ":iso8859-3")
+		((:option value ":iso8859-4") ":iso8859-4")
+		((:option value ":iso8859-5") ":iso8859-5")
+		((:option value ":iso8859-6") ":iso8859-6")
+		((:option value ":iso8859-7") ":iso8859-7")
+		((:option value ":iso8859-8") ":iso8859-8")
+		((:option value ":iso8859-15")":iso8859-15")
+		((:option value ":shiftjis") ":shiftjis")
+		((:option value ":euc") ":euc")
+		((:option value ":932") ":932 (Windows 932)")
+		((:option value ":1250") ":1250 (Windows 1250)")
+		((:option value ":1254") ":1254 (Windows 1254)")
+		((:option value ":1251") ":1251 (Windows 1251)")
+		((:option value ":1255") ":1255 (Windows 1255)")
+		)
+	       :br
+	       (:princ-safe (format nil "~
+Switch HTTP Charset: (Current is ~s): "
+				    http-charset))
+	       ((:select name "http-charset")
+		((:option value "utf-8" :selected "selected") "utf-8")
+		((:option value "iso-8859-1") "iso-8859-1")
+		((:option value "iso-8859-2") "iso-8859-2")
+		((:option value "iso-8859-3") "iso-8859-3")
+		((:option value "iso-8859-4") "iso-8859-4")
+		((:option value "iso-8859-5") "iso-8859-5")
+		((:option value "iso-8859-6") "iso-8859-6")
+		((:option value "iso-8859-7") "iso-8859-7")
+		((:option value "iso-8859-8") "iso-8859-8")
+		((:option value "iso-8859-15") "iso-8859-15")
+		((:option value "shift_jis") "shift_jis")
+		((:option value "euc-jp") "euc-jp")
+		((:option value "windows-932") "windows-932")
+		((:option value "windows-1250")
+		 "windows-1250")
+		((:option value "windows-1254")
+		 "windows-1254")
+		((:option value "windows-1251")
+		 "windows-1251")
+		((:option value "windows-1255")
+		 "windows-1255")
+		)
+	       :br
+	       :br
+	       ((:input :type "submit" :value "Redisplay")))))))
+	 ))))

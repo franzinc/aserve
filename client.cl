@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.25 2000/08/29 01:51:09 jkf Exp $
+;; $Id: client.cl,v 1.26 2000/09/07 19:48:04 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -193,6 +193,7 @@
 			headers	    ; extra header lines, alist
 			proxy	    ; naming proxy server to access through
 			user-agent
+			(external-format :latin1-base)
 			)
   
   ;; send an http request and return the result as four values:
@@ -211,6 +212,7 @@
 	       :headers headers
 	       :proxy proxy
 	       :user-agent user-agent
+	       :external-format external-format
 	       )))
 
     (unwind-protect
@@ -333,6 +335,8 @@
 				     headers
 				     proxy
 				     user-agent
+				     ;; :utf8-base might be better
+				     (external-format :latin1-base)
 				     )
   
 
@@ -378,6 +382,12 @@
 	      (socket:make-socket :remote-host host
 				  :remote-port port
 				  :format :bivalent)))
+
+    #+(and allegro (version>= 6 0))
+    ;; cac 28aug00
+    (let ((ef (find-external-format external-format)))
+      #+(version>= 6 0 pre-final 1) (net.aserve::warn-if-crlf ef)
+      (setf (stream-external-format sock) ef))
     
     (if* net.aserve::*watch-for-open-sockets*
        then (schedule-finalization 
@@ -391,12 +401,15 @@
 	       (if* (not fresh-uri)
 		  then (setq uri (net.uri:copy-uri uri)))
 	       (setf (net.uri:uri-query uri) (query-to-form-urlencoded
-					      query)))
+					      query
+					      :external-format
+					      external-format)))
 	      (:post 	; make the content
 	       (if* content
 		  then (error "Can't specify both query ~s and content ~s"
 			      query content))
-	       (setq content (query-to-form-urlencoded query)
+	       (setq content (query-to-form-urlencoded
+			      query :external-format external-format)
 		     content-type "application/x-www-form-urlencoded"))))
 		 
     

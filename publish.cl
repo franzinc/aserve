@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.37 2000/08/17 14:03:35 jkf Exp $
+;; $Id: publish.cl,v 1.38 2000/09/07 19:48:04 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -1326,7 +1326,7 @@
     res))
 
 
-(defun get-cookie-values (req)
+(defun get-cookie-values (req &key (external-format :latin1-base))
   ;; return the set of cookie name value pairs from the current
   ;; request as conses  (name . value) 
   ;;
@@ -1348,8 +1348,11 @@
 		 then ; the correct format, must decode pieces
 		      (mapcar #'(lambda (ent)
 				  (cons 
-				   (uridecode-string (car ent))
-				   (uridecode-string (cdr ent))))
+				   (uridecode-string
+				    (car ent) :external-format external-format)
+				   (uridecode-string
+				    (cdr ent)
+				    :external-format external-format)))
 			      (cddr (car res))))))))
 			
 
