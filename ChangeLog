@@ -1,3 +1,7 @@
+2005-02-21  John Foderaro  <jkf@max.verada.com>
+1.2.43
+	* add digest-authorization to the aserve client code
+
 2005-01-13 John Foderaro  <jkf@tiger.franz.com>
 1.2.42
 	* main.cl - track whether characters have been read in a 
