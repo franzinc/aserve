@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.33 2001/01/03 18:25:49 jkf Exp $
+;; $Id: proxy.cl,v 1.34 2001/01/11 15:17:28 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -87,7 +87,11 @@
   queueobj	; queue object holding in-memory cache objects
   
   dead-ent	; linked list of dead pcache-ents, linked by next field only
+
+  ; hash table of handlers for uris, keyed by host
+  uri-info-table
   
+
   ; requests that completely bypass the cache
   (r-direct 0)
 
@@ -158,7 +162,8 @@
 
 
 (defstruct pcache-ent
-  key		; copy of the key for debugging purposes
+  key		; the string form of the uri 
+  uri		; the actual uri
   last-modified-string  ; last modified time from the header
   last-modified  ; universal time entry was last modified
   expires	; universal time when this entry expires
@@ -208,7 +213,8 @@
   links-left ; list of uris still to scan
   level	    ; level at which to scan these links
   scan-next ; next pcache-ent to scan
-  
+
+  (autoscan-time 0) ; univeral time when last scanned by the link scanner
   )
 
 
@@ -221,6 +227,28 @@
   
   )
   
+
+(defstruct uri-info
+  ;; information on how to handle a uri or set of uris
+  host	; string naming the host of the uri
+  path  ; string in regexp form denoting the path. nil means all
+  path-regexp ; compiled regular expression for the path (or nil)
+  
+  ; nil or number of extra seconds of lifetime to add to uri
+  ; nil means use systemwide default
+  extra-lifetime
+  
+  ; nil or default depth for link scanning
+  ; nil means use systemwide default
+  scan-depth 
+  exclude ; list of regexps for links to not scan
+  exclude-regexp ; compiled regexp versions of dont-follow
+  
+  ; called on links to determine at which level they should be followed
+  scan-function 
+  )
+
+
   
 
 
@@ -293,7 +321,8 @@
 			(net.uri:copy-uri uri :scheme nil :host nil))
 		      (handle-request req)
 		 else ; must really proxy
-		      (proxy-cache-request req ent t *browser-level*))))))
+		      (check-cache-then-proxy-request 
+		       req ent t *browser-level*))))))
 
 
   
@@ -332,33 +361,34 @@
     (unwind-protect
 	(tagbody
 	  
-	  retry-proxy
+	 retry-proxy
 
-	  (handler-bind ((error #'(lambda (cond)
-				    (logmess
-				     (format nil "error during proxy: ~a ~% with cached connection = ~s~%" cond cached-connection))
-				    (if* cached-connection
-				       then ; retry
-					    (logmess "retry proxy")
-					    (if* sock
-					       then (ignore-errors
-						     (close sock 
-							    :abort t)))
-					    (go retry-proxy))
+	  (handler-bind ((error 
+			  #'(lambda (cond)
+			      (logmess
+			       (format nil "error during proxy: ~a ~% with ~
+cached connection = ~s~%" cond cached-connection))
+			      (if* cached-connection
+				 then ; retry
+				      (logmess "retry proxy")
+				      (if* sock
+					 then (ignore-errors
+					       (close sock :abort t)))
+				      (go retry-proxy))
 				    
-				    (if* pcache-ent
-				       then (kill-pcache-ent pcache-ent))
+			      (if* pcache-ent
+				 then (kill-pcache-ent pcache-ent))
 				    
 						   
-				    (if* (not (member :notrap *debug-current* 
-						      :test #'eq))
-				       then ; we want to auto-handle the error
-					    (if* (eq state :pre-send)
-					       then ; haven't sent anything
-						    ; so send failed response
-						    (ignore-errors
-						     (proxy-failure-response req ent)))
-					    (return-from proxy-request nil)))))
+			      (if* (not (member :notrap *debug-current*
+						:test #'eq))
+				 then ; we want to auto-handle the error
+				      (if* (eq state :pre-send)
+					 then ; haven't sent anything
+					      ; so send failed response
+					      (ignore-errors
+					       (proxy-failure-response req ent)))
+				      (return-from proxy-request nil)))))
 	    
 
 
@@ -421,8 +451,8 @@
 					       :remote-port (or port 80)
 					       :format :bivalent
 					       :type *socket-stream-type*)
-		      (get-possibly-cached-connection
-		       host (or port 80)))
+		  (get-possibly-cached-connection
+		   host (or port 80)))
 	      (error (cond)
 		(declare (ignore cond))
 		(if* respond
@@ -1022,7 +1052,9 @@
     (setf (wserver-pcache server)
       (setq pcache (make-pcache 
 		    :table (make-hash-table :size 1000 :test #'equal)
-		    :queueobj (make-and-init-queueobj))))
+		    :queueobj (make-and-init-queueobj)
+		    :uri-info-table (make-hash-table :test #'equalp)
+		    )))
     
     (configure-memory-cache :server server :size size)
     (start-proxy-cache-processes server pcache)))
@@ -1058,6 +1090,20 @@
 	   :function
 	   #'(lambda (req ent)
 	       (display-proxy-cache-entries req ent pcache)))
+  
+  (publish :path "/cache-entries-gc"
+	   :function
+	   #'(lambda (req ent)
+	       (gc)
+	       (display-proxy-cache-statistics req ent pcache)))
+  
+  (publish :path "/cache-entries-global-gc"
+	   :function
+	   #'(lambda (req ent)
+	       (gc t)
+	       (display-proxy-cache-statistics req ent pcache)))
+  
+	       
   )
 
 
@@ -1176,8 +1222,11 @@
 	  (:body 
 	   (:h1 "AllegroServe Proxy Cache Statistics")
 	   :p
-	   "Here are details on existing " ((:a :href "cache-entries")
-					    "Cache Entries.")
+	   "Show " ((:a :href "cache-entries") "Cache Entries,")
+	   " Refresh " ((:a :href "cache-stats") "this page")
+	   :br
+	   "Perform a " ((:a :href "cache-entries-gc") "normal gc,")
+	   " Perform a " ((:a :href "cache-entries-global-gc") "global gc")
 	   :br
 	   ((:table :border 2)
 	    (:tr
@@ -1282,6 +1331,11 @@
 					  pcache-disk)))
 		       (:td (:princ-safe (pcache-disk-free-list
 					  pcache-disk))))))))
+	   :br
+	   "Current memory usage"
+	   :br
+	   (:pre (:princ-safe (with-output-to-string (*standard-output*)
+				 (room t))))
 			  
 	   )))))))
 				     
@@ -1393,8 +1447,9 @@
     ))
   
 
+; was 'proxy-cache-request'
 
-(defun proxy-cache-request (req ent respond level)
+(defun check-cache-then-proxy-request (req ent respond level)
   ;; if we've got a proxy cache then retrieve it from there
   ;; else just proxy the request
   
@@ -1415,7 +1470,7 @@
 		    t))
 	     )
        then (if* pcache then (incf (pcache-r-direct pcache)))
-	    (return-from proxy-cache-request
+	    (return-from check-cache-then-proxy-request
 	      (proxy-request req ent :respond respond)))
 
     ; clear out the fragment part (after the #) so that we don't match
@@ -1426,10 +1481,10 @@
       
     
     (dlogmess (format nil "cache: look in cache for ~a, level ~d, ents ~d~%" 
-		     rendered-uri
-		     level
-		     (length (gethash rendered-uri (pcache-table pcache)))
-		     ))
+		      rendered-uri
+		      level
+		      (length (gethash rendered-uri (pcache-table pcache)))
+		      ))
 
     (dolist (pcache-ent (gethash rendered-uri (pcache-table pcache))
 	      ; not found, must proxy and then cache if the
@@ -1450,22 +1505,37 @@
 		  (if* (equal (pcache-ent-cookie pcache-ent)
 			      (header-slot-value req :cookie))
 		     then ; can use this one
-			  (if* respond 
-			     then (use-value-from-cache req ent pcache-ent
-							level))
-			  (if* *entry-cached-hook*
-			     then (if* (lock-pcache-ent pcache-ent)
-				     then ; it will be unlocked by the hook fcn
-					  (funcall *entry-cached-hook* 
-						   pcache-ent level)))
+			     
+			  (multiple-value-bind (response new-pcache-ent)
+			      (use-value-from-cache req ent pcache-ent
+						    level respond)
+
+			      
+			    ; run hook only if we're at the browser level
+			    ; (since this will allow us to flush the queue)
+			    ; of if this wasn't a fast hit and thus there
+			    ; is new data to cache
+			    (if* (and *entry-cached-hook* 
+				      (or (eql level *browser-level*)
+					  (not (member response '(:fh :fv :sh)
+						       :test #'eq))))
+			       then ; we want to do link scanning of this
+				    (if* (null new-pcache-ent)
+				       then (setq new-pcache-ent 
+					      pcache-ent))
+				    
+				    (if* (lock-pcache-ent new-pcache-ent)
+				       then ; it will be unlocked by the hook fcn
+					    (funcall *entry-cached-hook* 
+						     new-pcache-ent level))))
 			  (return)
 		     else (dlogmess 
 			   (format nil "can't use cached ~s due to cookie difference~%"
 				   rendered-uri))
 			  (dlogmess (format nil
-					   "cached cookie ~s~%, current cookie: ~s~%" 
-					   (pcache-ent-cookie pcache-ent)
-					   (header-slot-value req :cookie))))
+					    "cached cookie ~s~%, current cookie: ~s~%" 
+					    (pcache-ent-cookie pcache-ent)
+					    (header-slot-value req :cookie))))
 				 
 		(unlock-pcache-ent pcache-ent))
 	 else (logmess "entry could not be locked~%")))))
@@ -1478,13 +1548,17 @@
   ;; cache entry which may get updated or killed.
   ;; 
   ;; return the reponse code from the proxy call
+  ;; return the new pcache-ent that got the new value if the return
+  ;;  code is 200 or 302
+  ;;
   ;;
   (let ((new-ent (make-pcache-ent))
 	(rendered-uri 
 	 (transform-uri (net.uri:render-uri (request-raw-uri req) nil)))
 	(pcache (wserver-pcache *wserver*)))
     
-    (setf (pcache-ent-key new-ent) rendered-uri)
+    (setf (pcache-ent-key new-ent) rendered-uri
+	  (pcache-ent-uri new-ent) (request-raw-uri req))
     
     (proxy-request req ent :pcache-ent new-ent :respond respond :level level)
     (if* (member (pcache-ent-code new-ent) '(200 
@@ -1531,13 +1605,17 @@
 		    (pcache-ent-last-modified pcache-ent)
 		    now))))
     
-    (pcache-ent-code new-ent)))
+    (values (pcache-ent-code new-ent) new-ent)))
   
 
 
-(defun use-value-from-cache (req ent pcache-ent level)
+(defun use-value-from-cache (req ent pcache-ent level respond)
   ;; we've determined that pcache-ent matches the request.
   ;; now deal with the issue of it possibily being out of date
+  ;;
+  ;; return a keyword specifying the kind of access that was
+  ;; done
+  ;;
   (let* ((ims (header-slot-value req :if-modified-since))
 	 (now (get-universal-time))
 	 (pcache (wserver-pcache *wserver*))
@@ -1552,7 +1630,7 @@
     
     
     (dlogmess (format nil "ims is ~s, fresh by ~s seconds" ims 
-		     (-  (pcache-ent-expires pcache-ent) now)))
+		      (-  (pcache-ent-expires pcache-ent) now)))
     
     
     (if* (and ims (not (equal "" ims)))
@@ -1567,56 +1645,61 @@
 			    ; must return the whole thing
 			    (dlogmess "validation->fast hit")
 			    (incf (pcache-r-fast-hit pcache))
-			    (send-cached-response req pcache-ent)
+			    (if* respond
+			       then (send-cached-response req pcache-ent))
 			    (log-proxy (pcache-ent-key pcache-ent)
 				       level
 				       :fh
 				       (- (pcache-ent-last-modified pcache-ent)
 					  ims))
-			    
+			    :fh
 		       else ; it hasn't been modified since the ims time
 			    (dlogmess "fast validation")
 			    (incf (pcache-r-fast-validation pcache))
-			    (send-not-modified-response req ent)
+			    (if* respond
+			       then (send-not-modified-response req ent))
 			    (log-proxy (pcache-ent-key pcache-ent)
 				       level
 				       :fv
 				       (- (pcache-ent-last-modified pcache-ent)
 					  ims))
+			    :fv
 			    )
 	       else ; stale, must revalidate
 		    (let ((code
 			   (proxy-and-cache-request req ent 
-						    now pcache-ent t
+						    now pcache-ent respond
 						    level)))
 		      (if* (eql code 304)
 			 then (dlogmess "slow validation")
 			      (incf (pcache-r-slow-validation pcache))
 			      (log-proxy (pcache-ent-key pcache-ent)
-				       level
-				       :sv
-				       (- (pcache-ent-last-modified pcache-ent)
-					  ims))
-			      
+					 level
+					 :sv
+					 (- (pcache-ent-last-modified pcache-ent)
+					    ims))
+			      :sv 
 			 else (dlogmess "consistency miss")
 			      (incf (pcache-r-consistency-miss
 				     pcache))
 			      (log-proxy (pcache-ent-key pcache-ent)
-				       level
-				       :cm
-				       (- (pcache-ent-last-modified pcache-ent)
-					  ims)))))
+					 level
+					 :cm
+					 (- (pcache-ent-last-modified pcache-ent)
+					    ims))
+			      :cm
+			      )))
 			    
        else ; unconditional get
 	    (if* fresh
 	       then (dlogmess "fast hit")
 		    (incf (pcache-r-fast-hit pcache))
-		    (send-cached-response req pcache-ent)
+		    (if* respond then (send-cached-response req pcache-ent))
 		    (log-proxy (pcache-ent-key pcache-ent)
-				       level
-				       :fh
-				       nil)
-		    
+			       level
+			       :fh
+			       nil)
+		    :fh
 	       else ; issue a validating send
 		    
 		    (insert-header 
@@ -1626,31 +1709,37 @@
 			 (setf (pcache-ent-last-modified-string pcache-ent)
 			   (universal-time-to-date
 			    (pcache-ent-last-modified pcache-ent)))))
-
-		    (let ((code 
+		    
+		    (multiple-value-bind (code new-pcache-ent)
 			   (proxy-and-cache-request req ent now pcache-ent nil
-						    level)))
+						    -1)
 		      ; we didn't respond just sent out a probe
-		      (if* (eql code 304)
-			 then ; hasn't been modified since our 
-			      ; cached entry
-			      (dlogmess "slow hit")
-			      (incf (pcache-r-slow-hit pcache))
-			      (log-proxy (pcache-ent-key pcache-ent)
-				       level
-				       :sh
-				       nil)
-			      
-			 else ; was modified, so new item is cached
-			      (dlogmess "consistency miss")
-			      (incf (pcache-r-consistency-miss pcache))
-			      (log-proxy (pcache-ent-key pcache-ent)
-				       level
-				       :cm
-				       nil)
-			      )
-		      (send-cached-response req pcache-ent))))))
-		      
+		      (multiple-value-prog1
+			  (if* (eql code 304)
+			     then ; hasn't been modified since our 
+				  ; cached entry
+				  (dlogmess "slow hit")
+				  (incf (pcache-r-slow-hit pcache))
+				  (log-proxy (pcache-ent-key pcache-ent)
+					     level
+					     :sh
+					     nil)
+				  :sh
+				  
+			     else ; was modified, so new item is cached
+				  (setq pcache-ent new-pcache-ent)
+				  (dlogmess "consistency miss")
+				  (incf (pcache-r-consistency-miss pcache))
+				  (log-proxy (pcache-ent-key pcache-ent)
+					     level
+					     :cm
+					     nil)
+				  (values :cm pcache-ent)
+				  )
+			(if* respond 
+			   then (send-cached-response req pcache-ent))))))))
+
+
 		    
 (defun compute-approx-expiration (changed  now)
   ;; compute the expires time based on the last time the file was
@@ -1785,6 +1874,10 @@
 						      *wserver*)))
   ; make this entry dead
   (mp::without-scheduling
+    
+    ; stop any scanning of this uri
+    (setf (pcache-ent-level pcache-ent) -1) 
+    
     (let ((state (pcache-ent-state pcache-ent)))
       (if* (not (eq :dead state))
 	 then ; make it dead
@@ -1850,12 +1943,12 @@
   
 	    
   (dlogmess (format nil "cache: caching response to ~a, code ~d, length ~d~%" 
-		   (net.uri:render-uri (request-raw-uri req) nil)
-		   response-code
-		   body-length
-		   ))
+		    (net.uri:render-uri (request-raw-uri req) nil)
+		    response-code
+		    body-length
+		    ))
   
-  (let (now)
+  (let (now uri-info) 
     (if* (or (eql response-code 200)
 	     (eql response-code 302) ; redirect
 	     )
@@ -1878,7 +1971,13 @@
 	  
 	    (setf (pcache-ent-state pcache-ent) nil ; means valid data
 		  (pcache-ent-use  pcache-ent) 0)
-	  
+
+	    (setq uri-info (find-uri-info (request-raw-uri req)))
+	    
+	    (if* uri-info
+	       then (dlogmess (format nil "have uri info for ~a"
+				     (request-raw-uri req))))
+	    
 	    (let* ((last-mod (header-buffer-header-value 
 			      client-response-header
 			      :last-modified))
@@ -1914,15 +2013,17 @@
 			 (pcache-ent-last-modified pcache-ent)
 			 (or now (get-universal-time)))))
 	      
-	      ;; add something while testing caching
+	      ;; add extra lifetime for certain entries
 	      (incf (pcache-ent-expires pcache-ent)
-		    *extra-lifetime*)
+		    (if* (and uri-info (uri-info-extra-lifetime uri-info))
+		       then (uri-info-extra-lifetime uri-info)
+		       else *extra-lifetime*))
 	      
 	      (if* *entry-cached-hook*
 		 then (if* (lock-pcache-ent pcache-ent)
 			 then ; it will be unlocked by the hook fcn
-				  (funcall *entry-cached-hook* 
-					   pcache-ent level))))
+			      (funcall *entry-cached-hook* 
+				       pcache-ent level))))
 		       
      elseif (eql response-code 304)
        then ; just set that so the reader of the response will know
@@ -2076,7 +2177,16 @@
   
 
       
-    
+(defun empty-all-caches (&key (server *wserver*))
+  ;; remove everything from all caches
+  
+  (let ((pcache (wserver-pcache server)))
+    (mp:with-process-lock ((pcache-cleaner-lock pcache))
+      (flush-dead-entries pcache)
+      (flush-memory-cache pcache 0) ; empty memory
+      (dolist (dcache (pcache-disk-caches pcache))
+	(flush-disk-cache pcache dcache 0)))))
+
 
 
 
@@ -2368,6 +2478,85 @@
 
 
 
+;--- specification of uri handling by proxy
+(defun handle-uri (host path
+		   &key (server *wserver*)
+			(extra-lifetime nil el-p)
+			(scan-depth nil sd-p)
+			(exclude nil ex-p)
+			(scan-function nil sf-p))
+  (let ((pcache (wserver-pcache server))
+	(table)
+	(uri-info))
+    (if* (null pcache) then (error "proxying isn't enabled"))
+    (setq table (pcache-uri-info-table pcache))
+    
+    (dolist (ent (gethash host table))
+      (if* (equal path (uri-info-path ent))
+	 then (return (setq uri-info ent))))
+    
+    (if* (null uri-info)
+       then ; add new one
+	    (setq uri-info (make-uri-info 
+			    :host host 
+			    :path path
+			    :path-regexp
+			    (if* path
+			       then (compile-regexp path))))
+	    (push uri-info (gethash host table)))
+    
+    ; set fields
+    (if* el-p
+       then (setf (uri-info-extra-lifetime uri-info) extra-lifetime))
+    
+    (if* sd-p 
+       then (setf (uri-info-scan-depth uri-info) scan-depth))
+    
+    (if* ex-p
+       then (if* (and exclude 
+		      (not (consp exclude)))
+	       then (setq exclude (list exclude)))
+	    
+	    (setf (uri-info-exclude uri-info) exclude
+		  (uri-info-exclude-regexp uri-info) (mapcar #'compile-regexp exclude))
+	    )
+    
+    (if* sf-p
+       then (setf (uri-info-scan-function uri-info) scan-function))
+    
+    uri-info))
+
+	      
+    
+    
+(defmethod find-uri-info ((uri net.uri:uri))
+  ;; locate the uri-info corresponding to this uri, if
+  ;; there is one
+  (let ((pcache (wserver-pcache *wserver*))
+	(path (net.uri:uri-path uri)))
+    (if* pcache
+       then (dolist (ent (gethash (net.uri:uri-host uri) 
+				  (pcache-uri-info-table pcache)))
+	      (let ((pregexp (uri-info-path-regexp ent)))
+		(if* (null pregexp)
+		   then ; matches everything
+			(return ent)
+		 elseif (match-regexp pregexp path :return nil)
+		   then (return ent)))))))
+
+
+	      
+	    
+    
+    
+	    
+      
+  
+			
+
+
+
+
 
 ;-------- state save/restore
 
@@ -2423,6 +2612,7 @@
     ; don't save the hash table since we can recreate it as since
     ; saving it is very expensive due to the fasl-circle check
     (setf (pcache-table pcache) nil)
+    
     
     (dolist (pcache-disk (pcache-disk-caches pcache))
       ; for each disk cache
