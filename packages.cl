@@ -1,5 +1,6 @@
 (sys:defpatch "aserve" 1
-  "version 1.2.25, various fixes from 1.2.24 released with 6.2"
+  "aserve version 1.2.25, various fixes from 1.2.24 released with 6.2;
+htmlgen fix :comment and :prin1-safe when html-print'ing."
   :type :system
   :post-loadable t)
 
@@ -28,7 +29,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: packages.cl,v 1.1.4.2 2003/01/29 22:06:33 layer Exp $
+;; $Id: packages.cl,v 1.1.4.3 2003/01/30 17:56:05 layer Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe
