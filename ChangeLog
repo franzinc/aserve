@@ -1,5 +1,5 @@
 2003-02-24  Charles A. Cox  <cox@ultra>
-
+1.2.26
 	New file: aserve/examples/locale.cl.
 	
 	* aserve/load.cl: add locale example.
