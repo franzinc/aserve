@@ -1,3 +1,10 @@
+2001-11-05  John Foderaro  <jkf@tiger.franz.com>
+1.2.16
+	* failed request now identifies AllegroServe as the server
+	  and gives its version number
+	* if AllegroServe isn't setup to proxy it will not match proxy
+	  requests with local web pages.
+
 2001-11-05    <jkf@main.verada.com>
 
 	* log.cl - write to log files under the protection of a process

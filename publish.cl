@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.64 2001/10/31 19:43:47 jkf Exp $
+;; $Id: publish.cl,v 1.65 2001/11/05 22:14:14 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -922,12 +922,20 @@
 					  (:body
 					   (:h1 "Not Found")
 					   "The request for "
+					   (:b
 					   (:princ-safe 
 					    (render-uri 
 					     (request-uri req)
 					     nil
-					     ))
-					   " was not found on this server."))))))
+					     )))
+					   " was not found on this server."
+					   :br
+					   :br
+					   :hr
+					   (:i
+					    "AllegroServe "
+					    (:princ-safe *aserve-version-string*))
+					   ))))))
 		:content-type "text/html"))
 	    (setf (wserver-invalid-request *wserver*) entity))
     (process-entity req entity)))
@@ -963,6 +971,11 @@
 			     (locator locator-exact))
   ;; standard function for finding an entity in an exact locator
   ;; return the entity if one is found, else return nil
+  
+  (if* (uri-scheme (request-raw-uri req))
+     then ; ignore proxy requests
+	  (return-from standard-locator nil))
+  
   (let ((ents (gethash (uri-path (request-uri req))
 		       (locator-info locator))))
     (cdr 
@@ -973,6 +986,11 @@
 			     (locator locator-prefix))
   ;; standard function for finding an entity in an exact locator
   ;; return the entity if one is found, else return nil
+  
+  (if* (uri-scheme (request-raw-uri req))
+     then ; ignore proxy requests
+	  (return-from standard-locator nil))
+  
   (let* ((url (uri-path (request-uri req)))
 	 (len-url (length url))
 	 (vhost (request-vhost req)))
