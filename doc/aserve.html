@@ -85,6 +85,7 @@
 <a href="#proxy">Proxy</a><br>
 <a href="#cache">Cache</a><br>
 <a href="#filters">Request Filters</a><br>
+<a href="#virtual_hosts">Virtual Hosts</a><br>
 <a href="#debugging">Debugging</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-debug-on">net.aserve::debug-on</a><br>
 &nbsp; <a href="#f-debug-off">net.aserve::debug-off</a></font><br>
@@ -274,10 +275,7 @@ determine which entity will handle the request are
   <li>the <strong>host</strong> to which the request is directed.&nbsp;&nbsp; This is not
     necessarily the host that is receiving the request due to virtual hosts and proxy
     servers.&nbsp; This value comes from the <strong>Host:</strong> header line, if one is
-    given.&nbsp; If the <strong>Host:</strong> header line isn't given then this value is <em>unspecified</em>
-    for this request.&nbsp;&nbsp;&nbsp; The <strong>Host:</strong> header line also may
-    include a port number, but we ignore that for the purposes of matching requests to
-    entities.</li>
+    given.&nbsp;</li>
 </ul>
 
 <p>&nbsp;</p>
@@ -308,11 +306,8 @@ given, the rest of the arguments are optional..&nbsp; The arguments have these m
 <ul>
   <li><strong>path </strong>-- a string that must match the name part of the url as described
     above in <strong>Components of a Request</strong></li>
-  <li><strong>host -- </strong>a string that must match (in a case insensitive manner) the
-    host part of the request.&nbsp;&nbsp; If this argument is not given then it will match the
-    host part of any request.&nbsp; If this argument is given and the request does not have a
-    host part specified, then it will not match.&nbsp; The host can also be a list of strings
-    to specify a list of hosts for this entity.</li>
+  <li><strong>host -- </strong>normally <strong>nil</strong>.&nbsp; If you wish to do virtual
+    hosting read <a href="#virtual_hosts">this section</a> describing how it's done.a</li>
   <li><strong>port</strong> -- this argument is currently unused and will likely be removed in
     future versions.</li>
   <li><strong>file </strong>-- the name of the file to return when a request to this entity is
@@ -2024,6 +2019,138 @@ values mentioned above are set appropriately for the destination. If the new des
 is not served by the current allegroserve wserver, then the filter will have to make sure
 to turn it into a proxy request (and this will only work if this AllegroServe was started
 with proxying enabled).</p>
+
+<p>&nbsp;</p>
+
+<hr>
+
+<h2><a name="virtual_hosts"></a>Virtual Hosts</h2>
+
+<p>It is possible for a single web sever to act like two or more indepenent web servers.
+&nbsp; This is known as <em>virtual hosting</em>.&nbsp; AllegroServe supports the ability
+to run any number of virtual hosts in a single instance of AllegroServe.</p>
+
+<p>AllegroServe runs on a single machine and listens for requests on one port on one or
+more more IP addresses.&nbsp;&nbsp; When a request arrives there is usually a header line
+labelled <font face="Courier New">Host</font> whose value is the specific hostname typed
+into the browser by the user.&nbsp;&nbsp; Thus if hostnames <font face="Courier New">www.foo.com</font>
+and <font face="Courier New">www.bar.com </font>both point to the same machine then it's
+possible for the webserver on that machine to distinguish a request for <font
+face="Courier New">http://www.foo.com</font> from a request for <font face="Courier New">http://www.bar.com</font>
+by looking at the <font face="Courier New">Host</font> header.</p>
+
+<p>In order to make AllegroServe easy to use you can ignore the virtual hosting facility
+until you plan to use it.&nbsp;&nbsp; As long as you don't specify a <strong>:host</strong>
+argument to any of the publish functions when adding content to your site, everything you
+publish will be visible from your web server no matter which hostname the web browser uses
+to access your site.&nbsp; If you decide you want to make use of virtual hosting, then
+read on.</p>
+
+<h3>vhost class</h3>
+
+<p>In AllegroServe a virtual host is denoted by a instance of class <strong>vhost</strong>.
+&nbsp;&nbsp; The contents of a vhost object are:</p>
+
+<table border="1" width="83%">
+  <tr>
+    <th width="26%">Accessor Function</th>
+    <th width="57%">What</th>
+    <th width="17%">initarg</th>
+  </tr>
+  <tr>
+    <td width="26%">vhost-log-stream</td>
+    <td width="57%">Stream to which to write logging information on requests to this virtual
+    host</td>
+    <td width="17%">:log-stream</td>
+  </tr>
+  <tr>
+    <td width="26%">vhost-error-stream</td>
+    <td width="57%">Unused by AllegroServe but applications may wish to store here a stream to
+    which to write a log of errors</td>
+    <td width="17%">:error-stream</td>
+  </tr>
+  <tr>
+    <td width="26%">vhost-names</td>
+    <td width="57%">A list of all the names for this virtual host.&nbsp; </td>
+    <td width="17%">:names</td>
+  </tr>
+</table>
+
+<p>The defaults values for the two streams in a vhost object is the <strong>wserver-log-stream</strong>
+from the server object.</p>
+
+<p>Every instance of AllegroServe has a default vhost object that can be retrieved from
+the <strong>wserver </strong>object via the function <strong>wserver-default-vhost.
+&nbsp;&nbsp; </strong>If a request comes in for a virtual host that's not known, then it's
+assumed to be for the default virtual host.</p>
+
+<p>There are two ways to create virtual hosts in AllegroServe: implicitly or explicitly.
+&nbsp;&nbsp; If a publish function is called with a <strong>:host</strong> value that
+names a host not known to be a virtual host then a <strong>vhost</strong> instance will be
+created automatically and stored in the <strong>wserver</strong>'s hash table that maps
+names to <strong>vhost </strong>objects.&nbsp; This is implicit virtual host creation.</p>
+
+<p>If you know ahead of time the virtual hosts you'll be serving then it's better to setup
+all the virtual hosts explicitly.&nbsp;&nbsp; You create a <strong>vhost</strong> instance
+with <strong>make-instance</strong> and you register each virtual host in the <strong>wserver-vhosts</strong>
+table using <strong>gethash.</strong>&nbsp;&nbsp;&nbsp;&nbsp; Following is an example of
+setting up a server to have two virtual hosts, one that responds to three names and one
+that responds to two names.&nbsp;&nbsp; Since we are using the default vhost to represent
+the first virtual host, this virtual host will also receive requests for names we haven't
+mentioned explicitly.</p>
+
+<p>&nbsp;</p>
+
+<pre>(defun setup-virtual-hosts (server)
+  (let ((vhost-table (wserver-vhosts server))
+	(foo-names '(&quot;localhost&quot; &quot;www.foo.com&quot; &quot;foo.com&quot;))
+	(bar-names '(&quot;www.bar.com&quot; &quot;store.bar.com&quot;)))
+    
+    (let ((default-vhost (wserver-default-vhost server)))
+      (setf (vhost-names default-vhost) foo-names)
+      (dolist (name foo-names)
+	(setf (gethash name vhost-table) default-vhost)))
+    
+    (let ((bar-vhost (make-instance 'vhost :names bar-names)))
+      (dolist (name bar-names)
+	(setf (gethash name vhost-table) bar-vhost)))))
+
+</pre>
+
+<p>When a request comes in, AllegroServe will determine which vhost is the intended target
+and if none is found it will select the default vhost as the intended target.&nbsp; The
+vhost so determined will be stored in the<strong> http-request </strong>object in the slot
+accessed by <strong>request-vhost</strong> function.</p>
+
+<h3><a name="host_arg"></a>host argument to publish functions</h3>
+
+<p>We now are in a position to describe what values the <strong>:host</strong> argument to
+the publish functions can take on.&nbsp;&nbsp; The <strong>:host</strong> argument can be <strong>nil</strong>
+or one of:
+
+<ol>
+  <li>a string naming a virtual host.&nbsp; If there is no virtual host with this name a new
+    virtual host object is created. </li>
+  <li>a vhost object</li>
+  <li>the symbol <strong>:wild</strong></li>
+  <li>a list of items of the above items</li>
+</ol>
+
+<p>If the value of the <strong>:host </strong>argument is <strong>nil</strong>, then its
+value is assumed to be <strong>:wild</strong>.</p>
+
+<p>The value of the <strong>:host </strong>argument is converted into a list of one or
+more vhost objects and/or the symbol <strong>:wild.</strong>&nbsp;&nbsp;&nbsp; The meaning
+of a vhost is clear: it means that this entity will be visible on this virtual host.
+&nbsp; The meaning of <strong>:wild </strong> is that this entity will be visible on <em>all</em>
+virtual hosts, except it can be shadowed by a entity specified for a particular virtual
+host.&nbsp; Thus you could publish an entity for<strong> :path &quot;/&quot; </strong>and <strong>:host
+:wild</strong> and it will be used for all virtual hosts that don't specify a entity for <strong>:path
+&quot;/&quot;</strong>.&nbsp; Note that when a request comes in and the search is done for
+an entity to match the request every step of the way we look first for a vhost specific
+handler and then a <strong>:wild</strong> handler&nbsp;&nbsp; It is <em>not</em> the case
+that we first do a complete search for a vhost specific handler and then restart the
+search this time looking for a <strong>:wild</strong> handler.</p>
 
 <p>&nbsp;</p>
 
