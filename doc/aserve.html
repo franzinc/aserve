@@ -499,12 +499,30 @@ specify headers and values to be sent with a reply.</p>
 
 <hr>
 
-<p><a name="f-request-query"></a><strong><font face="Courier New">(request-query request)</font></strong></p>
+<p><a name="f-request-query"></a><strong><font face="Courier New">(request-query request
+&amp;key uri post)</font></strong></p>
 
-<p>Decode and return an alist of the query values in the request.&nbsp;&nbsp; The query
-string begins at the first question mark and continues until the end of the
-url.&nbsp;&nbsp; Each item in the alist is a cons where the car is a string giving the
-name of the argument and the cdr is a string giving the value of the argument.</p>
+<p>Decode and return an alist of the query values in the request.&nbsp;&nbsp; Each item in
+the alist is a cons where the car is a string giving the name of the argument and the cdr
+is a string giving the value of the argument.</p>
+
+<p>The query string is in one or both of two places:
+
+<ul>
+  <li>it begins at the first question mark in the uri and continues until the end of the uri
+    or a sharp sign (#), whichever comes first.</li>
+  <li>it is in the body of a POST request from a web client.</li>
+</ul>
+
+<p><strong>request-query</strong> will by default look in both locations for the query
+string and concatenate the results of decoding both query strings.&nbsp; If you would like
+it to not check one or both of the locations you can use the <strong>:uri</strong> and <strong>:post</strong>
+keyword arguments.&nbsp;&nbsp; If <strong>uri</strong> is true (and true is the default
+value) then the query string in the uri is checked.&nbsp; If <strong>post</strong> is true
+(and true is the default value) and if the request is a POST then the body of the post
+form will be decoded for query values.</p>
+
+<p>.&nbsp;&nbsp; </p>
 
 <hr>
 
@@ -730,13 +748,13 @@ so program should be sure to make use of the index returned by <strong>get-multi
 
 <p>In AllegroServe the information sent to the web server as a result of filling out a
 form&nbsp; is called a <strong>query</strong>.&nbsp; We store a query as a list of <strong>cons</strong>es,
-where the <strong>car</strong> of the <strong>cons </strong> is the name (a string) and
-the <strong>cdr</strong> of the cons is the value (another string).&nbsp;&nbsp;&nbsp; When
-a query is transmitted by the web browser to AllegroServe it is sent as string using the
+where the <strong>car</strong> of the <strong>cons </strong>is the name (a string) and the
+<strong>cdr</strong> of the cons is the value (another string).&nbsp;&nbsp;&nbsp; When a
+query is transmitted by the web browser to AllegroServe it is sent as string using the
 encoding <strong>application/x-www-form-urlencoded.&nbsp; </strong>We provide the
 following functions to convert between the encoding and the query list:</p>
 
-<p><font face="Courier New"><strong>&nbsp;</strong></font></p>
+<p>&nbsp;</p>
 
 <p><a name="f-form-urlencoded-"></a><font face="Courier New"><strong>(form-urlencoded-to-query
 string)</strong></font></p>
