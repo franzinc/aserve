@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.72 2003/01/10 15:31:49 jkf Exp $
+;; $Id: publish.cl,v 1.73 2003/05/09 13:49:24 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -112,9 +112,26 @@
   ;; entity computed each time it's called
   ((function :initarg :function :reader entity-function)))
 
+(defclass access-file-mixin ()
+  ;; slots needed if you want to use access files during
+  ;; the handling of this entity
+  ; if non-nil the name of the file to look for in directories to
+  ; personalize the creation of file entities
+  ((access-file :initarg :access-file
+		:initform nil
+		:accessor directory-entity-access-file)
+   
+   ; internal slot used to cache the files we've read
+   ; is a list of
+   ; (whole-access-filename last-write-dat cached-value)
+   ;
+   (access-file-cache :initform nil
+		      :accessor directory-entity-access-file-cache)
+   ))
+  
 
 
-(defclass directory-entity (entity)
+(defclass directory-entity (entity access-file-mixin)
   ;; entity that displays the contents of a directory
   ((directory :initarg :directory ; directory to display
 	      :reader entity-directory)
@@ -148,21 +165,9 @@
    ;  it should create and publish an entity and return it
    (publisher :initarg :publisher
 	      :initform nil
-	      :accessor directory-entity-publisher)
+	      :accessor directory-entity-publisher))
    
-   ; if non-nil the name of the file to look for in directories to
-   ; personalize the creation of file entities
-   (access-file :initarg :access-file
-		:initform nil
-		:accessor directory-entity-access-file)
    
-   ; internal slot used to cache the files we've read
-   ; is a list of
-   ; (whole-access-filename last-write-dat cached-value)
-   ;
-   (access-file-cache :initform nil
-		      :accessor directory-entity-access-file-cache)
-   )
   )
 
 
@@ -1460,8 +1465,28 @@
 (defun standard-directory-entity-publisher (req ent realname info)
   ;; the default publisher used when directory entity finds
   ;; a file it needs to publish
-  
-  ; check to see if there is an applicable mime type
+
+  (multiple-value-bind (content-type local-authorizer)
+      (standard-access-file-reader realname info)
+
+    ; now publish a file with all the knowledge
+    (publish-file :path (request-decoded-uri-path req)
+		  :host (host ent)
+		  :file realname
+		  :authorizer (or local-authorizer
+				  (entity-authorizer ent))
+		  :content-type content-type
+		  :timeout (entity-timeout ent)
+		  :plist (list :parent ent) ; who spawned us
+		  )))
+      
+
+(defun standard-access-file-reader (realname info)
+  ;; gather the relevant information from the access file
+  ;; information 'info' and return two values
+  ;;  content-type  - if specific content type was specified
+  ;;  authorizers - list of authorization objects
+  ;;
   (let (content-type
 	local-authorizer
 	pswd-authorizer
@@ -1508,18 +1533,9 @@
     (if* ip-authorizer
        then (push ip-authorizer local-authorizer))
     
+    (values content-type local-authorizer)
 
-    ; now publish a file with all the knowledge
-    (publish-file :path (request-decoded-uri-path req)
-		  :host (host ent)
-		  :file realname
-		  :authorizer (or local-authorizer
-				  (entity-authorizer ent))
-		  :content-type content-type
-		  :timeout (entity-timeout ent)
-		  :plist (list :parent ent) ; who spawned us
-		  )))
-      
+    ))
 
 
 (defun read-access-files (ent realname postfix)

@@ -1,3 +1,11 @@
+2003-05-08  John Foderaro  <jkf@tiger.franz.com>
+
+	* doc/aserve.html - clarify that you can have a list of
+	    authorization objects in an entity.
+
+	* main.cl - make the uri-scheme of (request-uri req) correctly
+	        reflect if this is an https or http request.
+
 2003-02-26  John Foderaro  <jkf@tiger.franz.com>
 1.2.26
 	* doc/aserve.html - new get-request-body argument
