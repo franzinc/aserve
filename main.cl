@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.82 2000/10/31 19:00:55 jkf Exp $
+;; $Id: main.cl,v 1.83 2000/11/06 17:20:34 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1111,7 +1111,7 @@ by keyword symbols and not by strings"
 		    (pop workers))))
 	  
 	    (error (cond)
-	      (logmess (format nil "accept: error on accept ~s" cond))
+	      (logmess (format nil "accept: error on accept ~a" cond))
 	      (if* (> (incf error-count) 4)
 		 then (logmess "accept: too many errors, bailing")
 		      (return-from http-accept-thread nil)))))
