@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: webact.cl,v 1.4 2004/01/16 19:31:14 layer Exp $
+;; $Id: webact.cl,v 1.5 2004/01/23 17:22:59 jkf Exp $
 
 
 
@@ -99,7 +99,7 @@
    
    ))
 
-(defparameter *webactions-version* "1.5")
+(defparameter *webactions-version* "1.6")
 	      
 (defvar *name-to-webaction* (make-hash-table :test #'equal))
 
@@ -576,7 +576,8 @@
 (defun relative-to-absolute-path (prefix relative-path)
   ;; add on the project prefix so that the resulting path
   ;; is reachable via a browser
-  (if* (not (eq #\/ (aref relative-path 0)))
+  (if* (or (zerop (length relative-path))
+	   (not (eq #\/ (aref relative-path 0))))
      then ; relative path
 	  (concatenate 'string prefix relative-path)
      else relative-path))

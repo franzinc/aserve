@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: clp.cl,v 1.4 2004/01/16 19:31:14 layer Exp $
+;; $Id: clp.cl,v 1.5 2004/01/23 17:22:59 jkf Exp $
 
 
 (in-package :net.aserve)
@@ -200,6 +200,30 @@
        then ; process the body
 	    (emit-clp-entity req ent body))))
 
+(def-clp-function clp_ifneq (req ent args body)
+  ;; name=varname
+  ;; value=val
+  ;;
+  ;; compare the value of varname against the value.  If it's
+  ;; not eq then then process the body.
+  ;;
+  ;; if name or value cannot be turned into an integer value then
+  ;; it's assume to not be greater than.
+  ;;
+  (let ((name  (cdr (assoc "name" args  :test #'equal)))
+	(value (cdr (assoc "value" args :test #'equal))))
+    (setq name (if* name
+		  then (cvt-to-integer
+			(locate-any-value req args name)))
+	  value (cvt-to-integer value))
+    ;(format   t "name ~s ... value ~s~%" name value)
+    (if* (and name value
+	      (not (eql name value)))
+       then ; process the body
+	    (emit-clp-entity req ent body))))
+
+
+
 
 
 (def-clp-function clp_ifdef (req ent args body)
@@ -238,6 +262,23 @@
 		  then (locate-any-value req args name)))
     ;(format   t "name ~s ... value ~s~%" name value)
     (if* (equal name value)
+       then ; process the body
+	    (emit-clp-entity req ent body))))
+
+(def-clp-function clp_ifnequal (req ent args body)
+  ;; name=varname
+  ;; value=val
+  ;;
+  ;; compare the value of varname against the value, which
+  ;; are both strings
+  ;;
+  ;;
+  (let ((name  (cdr (assoc "name" args  :test #'equal)))
+	(value (cdr (assoc "value" args :test #'equal))))
+    (setq name (if* name
+		  then (locate-any-value req args name)))
+    ;(format   t "name ~s ... value ~s~%" name value)
+    (if* (not (equal name value))
        then ; process the body
 	    (emit-clp-entity req ent body))))
 
