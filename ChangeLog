@@ -1,3 +1,7 @@
+2003-10-27  John Foderaro  <jkf@tiger.franz.com>
+1.2.33
+	* webactions/ files - change headers to include lgpl copyright info
+
 2003-10-22  John Foderaro  <jkf@tiger.franz.com>
 1.2.32
 	* add webactions subdirectory of code
