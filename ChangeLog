@@ -1,3 +1,12 @@
+2001-08-16  John Foderaro  <jkf@tiger.franz.com>
+1.2.6
+	* main.cl - try harder to prevent debug output from multiple
+	    threads from getting jumbled up on the console
+	* publish.cl - do a keep-alive connection if the data is a binary
+	    stream as long as we know the content length.
+	    Add a new internal entity type so that returns of 
+	    "304 - Not Modified" can do keep alives too.
+
 2001-08-15  John Foderaro  <jkf@tiger.franz.com>
 1.2.5
 	* main.cl - incf version number for new release

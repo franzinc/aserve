@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.50 2001/08/09 17:31:19 jkf Exp $
+;; $Id: publish.cl,v 1.51 2001/08/16 17:38:54 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -135,6 +135,15 @@
    )
   )
 
+
+(defclass special-entity (entity)
+  ;; used to hold a certain body we want to always return
+  ;; nil means we'll return no body
+  ((content :initform nil
+	    :initarg :content
+	    :reader special-entity-content)))
+
+(setq *not-modified-entity* (make-instance 'special-entity))
 
 
 
@@ -370,6 +379,12 @@
 	    nil)))
 
 
+(defmethod content-length ((ent special-entity))
+  (let ((body (special-entity-content ent)))
+    (if* body 
+       then (length body) 
+       else 0)))
+  
 
 ;- transfer-mode - will the body be sent in :text or :binary mode.
 ;  use :binary if you're not sure
@@ -1094,13 +1109,18 @@
 		      (<= (last-modified ent) if-modified-since))
 	       then ; send back a message that it is already
 		    ; up to date
-		    (debug-format :info "entity is up to date~%")
-		    (setf (request-reply-code req) *response-not-modified*)
-		    (with-http-body (req ent)
-		      ;; force out the header
-		      )
-		    (throw 'with-http-response nil) ; and quick exit
-		    ))))
+		    (let ((nm-ent *not-modified-entity*))
+		      (debug-format :info "entity is up to date~%")
+		      ; recompute strategy based on simple 0 length
+		      ; thing to return
+		      (compute-strategy req nm-ent)
+		      
+		      (setf (request-reply-code req) *response-not-modified*)
+		      (with-http-body (req nm-ent)
+			;; force out the header
+			)
+		      (throw 'with-http-response nil) ; and quick exit
+		      )))))
 
     
 
@@ -1111,9 +1131,9 @@
   (let ((strategy nil)
 	(keep-alive-possible
 	 (and (wserver-enable-keep-alive *wserver*)
-		      (>= (wserver-free-workers *wserver*) 2)
-		      (header-value-member "keep-alive" 
-			      (header-slot-value req :connection )))))
+	      (>= (wserver-free-workers *wserver*) 2)
+	      (header-value-member "keep-alive" 
+				   (header-slot-value req :connection )))))
     (if* (eq (request-method req) :head)
        then ; head commands are particularly easy to reply to
 	    (setq strategy '(:use-socket-stream
@@ -1139,11 +1159,15 @@
 		    
 		    (if* (eq (transfer-mode ent) :binary)
 		       then ; can't create binary stream string
-			    ; must not keep alive
-			    (setq strategy
-			      '(:use-socket-stream
-				; no keep alive
-				))
+			    ; see if we know the content length ahead of time
+			    (if* (content-length ent)
+			       then (setq strategy
+				      '(:keep-alive :use-socket-stream))
+			       else ; must not keep alive
+				    (setq strategy
+				      '(:use-socket-stream
+					; no keep alive
+					)))
 		       else ; can build string stream
 			    (setq strategy
 			      '(:string-output-stream

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.106 2001/08/15 17:53:12 jkf Exp $
+;; $Id: main.cl,v 1.107 2001/08/16 17:38:54 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -133,7 +133,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 5))
+(defparameter *aserve-version* '(1 2 6))
 
 (eval-when (eval load)
     (require :sock)
@@ -221,8 +221,11 @@
   ;; do the format to *debug-stream* if the kind of this info
   ;; is matched by the value of *debug-current*
   `(if* (member ,kind *debug-current* :test #'eq)
-      then (format *debug-stream* "d> (~a): " (mp:process-name sys:*current-process*))
-	   (format *debug-stream* ,@args)))
+      then (write-sequence 
+	    (concatenate 'string
+	      (format nil "d> (~a): " (mp:process-name sys:*current-process*))
+	      (format nil ,@args))
+	    *debug-stream*)))
 
 
 (defmacro format-dif (debug-key &rest args)
@@ -231,9 +234,14 @@
   ;; do the format and then send to *initial-terminal-io*
   `(progn (format ,@args)
 	  (if* (member ,debug-key *debug-current* :test #'eq)
-	     then (format *debug-stream* "x>(~a): " 
-			  (mp:process-name sys:*current-process*))
-		  (format *debug-stream* ,@(cdr args)))))
+	     then ; do extra consing to ensure that it all be written out 
+		  ; at once
+		  (write-sequence
+		   (concatenate 'string 
+		     (format nil "x>(~a): " 
+			     (mp:process-name sys:*current-process*))
+		     (format nil ,@(cdr args)))
+		   *debug-stream*))))
 
 (defmacro if-debug-action (kind &rest body)
   ;; only do if the debug value is high enough
@@ -282,7 +290,8 @@
 (defvar *header-keyword-array*
     ;; indexed by header-number, holds the keyword naming this header
     )
-    
+
+(defvar *not-modified-entity*) ; used to send back not-modified message
 
 	
 ;;;;;;;;;;;;;  end special vars
