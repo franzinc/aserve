@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-iserve.cl,v 1.3 2000/03/21 17:12:23 jkf Exp $
+;; $Id: t-iserve.cl,v 1.4 2000/03/21 17:20:14 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -87,8 +87,9 @@
     (dotimes (i length)
       (write-char (code-char (+ #.(char-code #\a) (mod i 26))) strp)
       (if* (zerop (mod (1+ i) line-length))
-	 then (terpri strp)))
-    (terpri strp)
+	 then ; newlines cause a problem due to dos/unix differences.
+	      ; so let's just use space
+	      (write-char #\space strp)))
     (setq result (get-output-stream-string strp))
     (if* name
        then (with-open-file (p name :direction :output
