@@ -624,7 +624,7 @@ defines the form
     that may not be desirable.&nbsp; </li>
   <li><strong>&lt;form method=&quot;post&quot;&gt; - </strong>The data is send in the body of
     the request.&nbsp;&nbsp;&nbsp; The AllegroServe url handler code calls <strong>(get-request-body
-    req)</strong> to retrieve the body from the web browser and then <strong>(decode-form-urlencoded
+    req)</strong> to retrieve the body from the web browser and then <strong>(form-urlencoded-to-query
     body) </strong>to turn it into an alist that associates form field names with values.</li>
   <li><strong>&lt;form method=&quot;post&quot; enctype=&quot;multipart/form-data&quot;&gt; - </strong>The
     data is sent in the body of the request in MIME format, with each field in its own

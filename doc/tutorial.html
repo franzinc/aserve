@@ -359,7 +359,7 @@ the form.&nbsp;&nbsp; In this case the data for the form appears in the body of 
 request.&nbsp; There are two supported encodings of the form data in the body.&nbsp; In
 this section we'll describe how to handle&nbsp; the default encoding, called:
 &quot;application/x-www-form-urlencoded&quot;.&nbsp; First you must call <strong>get-request-body
-</strong>to read and return the body of the request.&nbsp;&nbsp; Second you must call <strong>decode-form-urlencoded</strong>
+</strong>to read and return the body of the request.&nbsp;&nbsp; Second you must call <strong>form-urlencoded-to-query</strong>
 to convert the encoded body into an assoc list, where every entry is a cons consisting of
 a string naming the value and then the string containing the value.</p>
 
@@ -379,7 +379,7 @@ through <strong>z</strong> are found in the text selection.</p>
         (let* ((body (get-request-body req))
                (text (if* body
                       then (cdr (assoc &quot;quotation&quot;
-                                  (decode-form-urlencoded body)
+                                  (form-urlencoded-to-query body)
                                   :test #'equal)))))
          (with-http-response (req ent)
            (with-http-body (req ent)
