@@ -45,7 +45,9 @@
 &nbsp; <a href="#f-request-reply-plist">request-reply-plist</a><br>
 &nbsp; <a href="#f-request-reply-strategy">request-reply-strategy</a><br>
 &nbsp; <a href="#f-request-reply-stream">request-reply-stream</a></font><br>
-<a href="#form-processing">Form Processing</a><br>
+<a href="#cgi-program">CGI Program Execution</a><br>
+<font face="Courier New">&nbsp; <a href="#f-run-cgi-program">run-cgi-program</a><br>
+</font><a href="#form-processing">Form Processing</a><br>
 <font face="Courier New">&nbsp; <a href="#f-get-multipart-header">get-multipart-header</a><br>
 &nbsp; <a href="#f-get-multipart-sequence">get-multipart-sequence</a></font> <br>
 &nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-form-urlencoded-">form-urlencoded-to-query</a><br>
@@ -730,11 +732,51 @@ This stream must&nbsp; be used instead of the value of <strong>request-socket</s
 
 <p>&nbsp;</p>
 
-<p>&nbsp;</p>
+<hr>
+
+<h2><a name="cgi-program"></a>CGI Program Execution</h2>
+
+<p>The <a href="http://hoohoo.ncsa.uiuc.edu/cgi/interface.html">Common Gateway Interface</a>
+(CGI) specification allows web servers to run programs in response to http requests and to
+send the results of&nbsp; the execution of those programs back the web client.
+&nbsp;&nbsp; The CGI programs finds information about the request in its environment
+variables and, in the case of a <strong>put</strong> or <strong>post</strong> request, the
+body of the request is sent to standard input of the program.</p>
+
+<p>CGI is a clumy and slow protocol for extending the behavior or a web server and is
+falling out of favor.&nbsp; However there are legacy CGI applications you may need to call
+from AllegroServe.&nbsp;&nbsp; You invoke an external program using the CGI protocol with
+the <strong>run-cgi-program</strong> function.</p>
+
+<p><a name="f-run-cgi-program"></a><font face="Courier New"><strong>(run-cgi-program req
+ent program &amp;key path-info path-translated<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+script-name query-string auth-type timeout)</strong></font></p>
+
+<p>In response to an http request, this runs <strong>program</strong> which must be a
+string naming an exectuable program or script followed optionally by command line
+arguments to pass to that program.&nbsp; Before the <strong>program </strong>is run the
+environment variables are set according the the CGI protocol.&nbsp; The <strong>timeout</strong>
+argument is how long AllegroServe should wait for a response from the <strong>program </strong>before
+giving up.&nbsp;&nbsp; The default is 200 seconds.&nbsp;&nbsp; The other keyword arguments
+allow the caller to specify values for the CGI environment variables that can't be
+computed automatically.&nbsp; <strong>path-info</strong> specifies the PATH_INFO
+environment variable, and similarly for<strong> path-translated, script-name, query-string</strong>
+and <strong>auth-type.</strong>&nbsp;&nbsp; If <strong>query-string</strong> is <em>not</em>
+given and the <strong>uri</strong> that invoked this request contains a query part then
+that query part is passed in the QUERY_STRING environment variable.</p>
 
 <p>&nbsp;</p>
 
-<p>&nbsp;</p>
+<p>A typical way of publishing a CGI page is this:</p>
+
+<pre>(publish :path &quot;/cgi/myprog&quot;
+         :function #'(lambda (req ent) 
+                        (run-cgi-program req ent &quot;/server/cgi-bin/myprog&quot;)))</pre>
+
+<p><strong>Note: </strong>The ability to run CGI programs from AllegroServe was due to
+features added in Allegro Common Lisp version 6.1.&nbsp;&nbsp; This will not work in
+earlier versions of Allegro CL.</p>
 
 <hr>
 
@@ -1380,7 +1422,8 @@ content content-type query format cookies <br>
 redirect redirect-methods basic-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 keep-alive headers proxy user-agent external-format ssl<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; skip-body)</font></strong></p>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+skip-body)</font></strong></p>
 
 <p>Sends a request to <strong>uri</strong> and returns four values: 
 

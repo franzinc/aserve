@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.6.6.5.4.2 2001/09/17 04:49:23 layer Exp $
+;; $Id: t-aserve.cl,v 1.6.6.5.4.3 2001/09/21 21:49:14 layer Exp $
 
 ;; Description:
 ;;   test iserve
@@ -76,6 +76,7 @@
 		   (test-encoding)
 		   (test-forms port)
 		   (test-client port)
+		   (test-cgi port)
 		   ))
 	    (format t "~%~%===== test direct ~%~%")
 	    (do-tests)
@@ -1148,7 +1149,60 @@
 
 			 
 		       
+(defun test-cgi (port)
+  ;; currently we only have a test program on unix since
+  ;; that where our shell script works
+  ;;
+  #+(and unix (version>= 6 1))
+  (let ((prefix-local (format nil "http://localhost:~a" port)))
+    (publish :path "/cgi-0"
+	    :function #'(lambda (req ent)
+			  (net.aserve:run-cgi-program 
+			   req ent "aserve/examples/cgitest.sh")))
+    (publish :path "/cgi-1"
+	    :function #'(lambda (req ent)
+			  (net.aserve:run-cgi-program 
+			   req ent "aserve/examples/cgitest.sh 1")))
+    (publish :path "/cgi-2"
+	    :function #'(lambda (req ent)
+			  (net.aserve:run-cgi-program 
+			   req ent "aserve/examples/cgitest.sh 2")))
+    (publish :path "/cgi-3"
+	    :function #'(lambda (req ent)
+			  (net.aserve:run-cgi-program 
+			   req ent "aserve/examples/cgitest.sh 3")))
+    
+    ;; verify that the various headers work
+    (test 200 (values2 
+	       (x-do-http-request (format nil "~a/cgi-0"
+					  prefix-local))))
+    
+    (test 200 (values2 
+	       (x-do-http-request (format nil "~a/cgi-1"
+					  prefix-local))))
+    
+    ; verify that a redirect is requested
+    (multiple-value-bind (body code headers)
+	       (x-do-http-request (format nil "~a/cgi-2"
+					  prefix-local)
+				  :redirect nil)
+      (test "go to franz" body :test #'equal)
+      (test 301 code)
+      (test "http://www.franz.com" (cdr (assoc :location headers))
+	    :test #'equal)
+      (test "123hellomac" (cdr (assoc :etag headers))
+	    :test #'equal)
+      )
 
+    ; verify that the unauthorized response is made
+    (test 401 (values2 
+	       (x-do-http-request (format nil "~a/cgi-3"
+					  prefix-local))))))
+   
+	    
+	
+	
+  
 
 
     

@@ -1,5 +1,8 @@
 *******************************************************************************
 merge from trunk to acl61 branch
+command: ../../join.sh trunk trunk_to_acl61_merge6 trunk_to_acl61_merge7 aserve
+*******************************************************************************
+merge from trunk to acl61 branch
 command: ../../join.sh trunk trunk_to_acl61_merge5 trunk_to_acl61_merge6 aserve
 *******************************************************************************
 merge from trunk to acl61 branch
@@ -17,6 +20,11 @@ command: ../../join.sh trunk trunk_to_acl61_merge1 trunk_to_acl61_merge2 aserve
 merge from trunk to acl61 branch
 command: ../../join.sh trunk acl61 trunk_to_acl61_merge1 aserve
 *******************************************************************************
+
+2001-09-21  John Foderaro  <jkf@tiger.franz.com>
+1.2.10
+	* added ability to run cgi programs
+	  new file cgi.cl
 
 2001-09-20  John Foderaro  <jkf@tiger.franz.com>
 
