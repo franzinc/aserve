@@ -117,7 +117,7 @@
 				 ((:input :type "text"
 					  :maxlength 10
 					  :size 10
-					  :name "username"))))))))))
+n					  :name "username"))))))))))
 
 			      
 				    
@@ -223,6 +223,38 @@
 
 
 
+
+(publish :url "/getfile"
+	 :content-type "text/html"
+	 :function
+	 #'(lambda (req ent)
+	     (with-http-response (req ent)
+	       (with-http-body (req ent)
+		 (html (:head "get file")
+		       (:body
+			((:form :enctype "multipart/form-data"
+				:method "post"
+				:action "/getfile-got")
+			 "Let me know what file to grab"
+			 ((:input :type "file" 
+				  :name "thefile"
+				  :value "foo.txt"))
+			  ((:input :type "submit")))))))))
+
+;; this called with the file from 
+(publish :url "/getfile-got"
+	 :content-type "text/html"
+	 :function
+	 #'(lambda (req ent)
+	     
+	     (with-http-response (req ent)
+	       (format t "mp headers: ~s~%"
+		       (neo::get-multipart-header req))
+	       (with-http-body (req ent)
+		 (html "foo")))))
+
+	     
+	     
 ;;;;;;  directory publishing.  These will only work on a particular
 ;; set of machines so you'll have to modify them to point to an
 ;; existing tree of pages on your machine if you want to see this work.

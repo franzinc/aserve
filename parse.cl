@@ -556,6 +556,8 @@
 (defun trimmed-parseobj (str po index)
   ;; return the string pointed to by the given index in 
   ;; the parseobj -- trimming blanks around both sides
+  ;;
+  ;; if surrounded by double quotes, trim them off too
   
   (let ((start (svref (parseobj-start po) index))
 	(end   (svref (parseobj-end   po) index)))
@@ -574,9 +576,16 @@
     (loop
       (decf end)
       (let ((ch (schar str end)))
-	(if* (not (eq ch-sep (svref *syntax-table* (char-code ch))))
+	(if* (not (eq ch-space (svref *syntax-table* (char-code ch))))
 	   then (incf end)
 		(return))))
+    
+    ; trim matching double quotes
+    (if* (and (> end (1+ start))
+	      (eq #\" (schar str start))
+	      (eq #\" (schar str (1- end))))
+       then (incf start)
+	    (decf end))
     
     ; make string
     (let ((newstr (make-string (- end start))))
