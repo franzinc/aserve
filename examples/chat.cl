@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.9 2001/01/12 17:44:41 jkf Exp $
+;; $Id: chat.cl,v 1.10 2001/06/26 21:16:49 jkf Exp $
 
 ;; Description:
 ;;   aserve chat program
@@ -43,9 +43,17 @@
 (defvar *default-count* 10)
 (defvar *default-secs*  10)
 
+; secret path to get back to admin control
+(defvar *quick-return-path* "/xyzz") 
+
+(defvar *idle-timeout* (* 30 60)) ; 30 minutes
+
 (defvar *do-dnscheck* nil) ; translate ip to dns names
 
 (defvar *chat-hook* nil) ; invoked when the chat page is accessed
+
+(defparameter *initial-msg-size* 100)  ; size of initial message array
+(defparameter *msg-increment* 200)  ; how much to grow array each time
 
 ;; parameters
 ;
@@ -124,6 +132,23 @@
 ; of just the owner
 (defvar *show-machine-name-to-all* t)
 
+;; sample building command to create a standalone chat serve
+#|
+(generate-application "allegrochat"
+		      "allegrochat/"
+		      '(:sock :process :seq2 :acldns 
+			"aserve/aserve.fasl"
+			"aserve/examples/chat.fasl"
+			)
+		      :restart-init-function
+		      'start-chat-standalone
+		      :include-compiler nil
+		      :read-init-files nil
+		      :include-debugger t
+		      :ignore-command-line-arguments t)
+
+|#
+			  
 
 
 ;
@@ -228,7 +253,7 @@
 			    :reader chat-owner-query-string)
    
    
-   (messages :initform (make-array 100)
+   (messages :initform (make-array *initial-msg-size*)
 	     :accessor chat-messages)
    (message-next :initform 0
 		 ;; index in the messages array of place
@@ -241,7 +266,12 @@
    (message-archive :initform 0
 		    :initarg :message-archive
 		     ;; 1+ last message number archived so far
-		     :accessor chat-message-archive)
+		    :accessor chat-message-archive)
+   
+   ; list of deleted message numbers since the last archive
+   (messages-deleted :initform nil
+		     :initarg :messages-deleted
+		     :accessor chat-messages-deleted)
    
    
    (message-lock :initform (mp:make-process-lock :name "chat-message")
@@ -252,6 +282,16 @@
    ;; list of people monitoring this chat
    (viewers :initform (make-viewers)
 	    :accessor chat-viewers)
+   
+   ; used as index value in the redirect struct
+   (redirect-counter :initform 0
+		     :initarg :redirect-counter
+		     :accessor redirect-counter)
+   
+   ; list of redirect structures
+   (redirects :initform nil
+	      :initarg :redirects
+	      :accessor chat-redirects)
    ))
 
 (defstruct user 
@@ -259,6 +299,8 @@
   password	; password string
   ustring		; unique string of this user
   level      ; nil - novice, 1 - higher privs
+  (time	0)	;  time of last user activity
+  to-users     ; string holding comma sep list of users to send to (nil=all)
   )
 
 
@@ -289,6 +331,24 @@
   body)
 
 
+
+(defstruct redirect
+  index		; unique name for each redirect
+  
+  ;; structure describing the redirection of a group of ip addresses
+  ipaddr	; bits not under the mask are ignored
+  maskbits	; bits from 0 to 32
+  mask		; the actual mask
+  
+  to		; where to send the redirect
+  before	; true if we check before seeing if they are logged in
+  info		; string describing this redirect
+  (use	0)	; use count 
+  active	; true if active
+  )
+
+  
+  
 ;; roles
 ; master-controller - can create controllers.  has a secret key (s)
 ; controller - can create chats, each has a public key (u) and
@@ -323,6 +383,10 @@
 ;				string (secret key)
 ; chat		u,c,[s]		build frameset for the given chat.
 ;				s is the chat secret key [if given.]
+;  chattop      u,c,[s],count,secs,y,z,b  display count messsage and refresh in secs
+;  chaviewers   u,c,[s]         list who is watching the chat
+;  chatenter    u,c,[s],pp,purl		box into which to enter a message
+;  chatcontrol  u,c,[s]		specify message count and refresh seconds
 ; chatlogin	u,c,x,[s]	login to a existing user or create a new user
 ;
 ; chatloginnew  u,c,[s],handle,password,password2
@@ -331,7 +395,7 @@
 ; chatlogincurrent u,c,[s],handle,password
 ;				login as an existing user
 ;
-; 
+; chatmaster	u,c,s		control elements of the chat.
 ;
 ;
 
@@ -383,10 +447,32 @@
   (if* port then (net.aserve:start :port port :listeners listeners))
   )
 
+
+(defun start-chat-standalone ()
+  ;; useful function for starting chat standalone where the 
+  ;; port and home arguments are required
+  
+  (if* (not (eql 5 (length (sys:command-line-arguments))))
+     then (format t "use: ~s  port  home~%" (sys:command-line-argument 0))
+          (exit 1))
+
+  (let ((port (read-from-string (nth 3 (sys:command-line-arguments))))
+        (home (nth 4 (sys:command-line-arguments))))
+    (start-chat :port port :home home)
+    (loop (sleep 9999999))))
+
+(defun shutdown-chat ()
+  ;; stop the chat
+  (net.aserve:shutdown)
+  (setq *master-controller* nil)
+  (sleep 10)
+  (exit 0 :quiet t))
+
+  
 (defun publish-chat-links ()
 
   ; debugging only.  builds link to the master controller page 
-  (publish :path "/xyzz" :function 'quick-return-master)
+  (publish :path *quick-return-path* :function 'quick-return-master)
   
   
   ; post'ed from form in setup-chat
@@ -413,6 +499,8 @@
 	   :function 'chat-login-current)
   
   (publish :path "/chatviewers" :function 'chatviewers)
+  
+  (publish :path "/chatmaster" :function 'chatmaster)
   )
 
 
@@ -429,16 +517,39 @@
 	      ;; now read in chat data
 	      (dolist (controller (controllers *master-controller*))
 		(dolist (chat (chats controller))
-		  (with-open-file (p (archive-filename chat)
-				   :direction :input)
-		    (do ((message (read p nil :eof) (read p nil :eof)))
-			((eq message :eof)
-			 ; use everything is archived we've read
-			 (setf (chat-message-archive chat) 
-			   (chat-message-number chat))
-			 )
-		      (if* message
-			 then (add-chat-message chat message))))))))))
+		  (let (did-delete)
+		    (with-open-file (p (archive-filename chat)
+				     :direction :input)
+		      (do ((message (read p nil :eof) (read p nil :eof)))
+			  ((eq message :eof)
+			   ; use everything is archived we've read
+			   (setf (chat-message-archive chat) 
+			     (chat-message-number chat))
+			   ; remove those put back on redundantly 
+			   ; by delete-chat-message
+			   (setf (chat-messages-deleted chat) nil))
+			(if* message
+			   then (if* (and (consp message)
+					  (eq :delete (car message)))
+				   then (mapcar #'(lambda (num)
+						    (delete-chat-message chat
+									 num))
+						(cdr message))
+					(setq did-delete t)
+				   else (add-chat-message chat message)))))
+		    
+		    (if* did-delete
+		       then ; write out archive again this time
+			    ; without the deleted messages
+			    (format t "Rewriting ~s~%" (archive-filename chat))
+			    (let ((messages (chat-messages chat)))
+			      (with-open-file (p (archive-filename chat)
+					       :direction :output
+					       :if-exists :supersede)
+				(dotimes (i (chat-message-next chat))
+				  (let ((message (svref messages i)))
+				    (if* (message-to message)
+				       then (pprint (svref messages i) p))))))))))))))
     
 (defun dump-existing-chat (home)
   (mp:with-process-lock ((master-lock *master-controller*))
@@ -474,6 +585,8 @@
 		  :secret-key ',(secret-key chat)
 		  :chat-query-string ',(chat-query-string chat)
 		  :chat-owner-query-string ',(chat-owner-query-string chat)
+		  :redirect-counter ',(redirect-counter chat)
+		  :redirects ',(chat-redirects chat)
 		  ))
 	     
 	     )
@@ -523,7 +636,14 @@
 				    (secret-key *master-controller*)))
 			"here"))))))))
 			   
-
+(defun illegal-access (req ent)
+  (with-http-response (req ent)
+	    (with-http-body (req ent)
+	      (html
+	       (:html 
+		(:head (:title "illegal access"))
+		(:body "You are attempting to gain illegal access to this "
+		       "chat control.  Stop doing this."))))))
 
 (defun setup-chat (req ent)
   ;; this is the first function called to start a whole chat
@@ -537,14 +657,7 @@
 	  (start-chat-archiver *master-controller*)
    elseif (not (equal (secret-key *master-controller*) 
 		      (request-query-value "s" req)))
-     then (with-http-response (req ent)
-	    (with-http-body (req ent)
-	      (html
-	       (:html 
-		(:head (:title "illegal access"))
-		(:body "You are attempting to gain illegal access to this "
-		       "chat control.  Stop doing this.")))))
-		       
+     then (illegal-access req ent)
 	    
      else (with-http-response (req ent)
 	    (with-http-body (req ent)
@@ -863,6 +976,15 @@
   (find ustring (users *master-controller*)
 	:key #'user-ustring :test #'equal))
 
+(defun users-from-ustring (ustring)
+  ;; ustring may be a comma separated value
+  (let (res)
+    (dolist (usr (net.aserve::split-on-character ustring #\,))
+      (let ((u (user-from-ustring usr)))
+	(if* u then (pushnew u res :test #'eq))))
+    (nreverse res)))
+
+
 (defun user-from-handle (handle)
   ;; locate the user object given the handle
   (find handle (users *master-controller*)
@@ -899,6 +1021,23 @@
   (let ((chat (chat-from-req req))
 	(user (user-from-req req))
 	(qstring))
+
+    (if* user then (setf (user-time user) (get-universal-time)))
+    
+    ; do redirect check
+    (if* (null user)
+       then ; do not logged in check
+	    (if* (redir-check req ent chat t)
+	       then (return-from chat)))
+
+    ; now the logged in or not logged in check
+    (if* (redir-check req ent chat nil)
+       then (return-from chat))
+    
+    
+    
+    
+	    
     
     (if* *chat-hook*
        then (if* (funcall *chat-hook* req ent)
@@ -922,7 +1061,7 @@
 		  
 		  ((:frameset :rows "*,160")
 		   ((:frame :src 
-			    (format nil "chattop?~a&count=~d&secs=~d"
+			    (format nil "chattop?~a&count=~d&secs=~d&hitbut=did"
 				    qstring
 				    *default-count*
 				    *default-secs*)
@@ -999,7 +1138,17 @@
     (if* (null chat)
 
        then (return-from chattop (ancient-link-error req ent)))
-    
+
+    ; do redirect check
+    (if* (null user)
+       then ; do not logged in check
+	    (if* (redir-check req ent chat t)
+	       then (return-from chattop)))
+
+    ; now the logged in or not logged in check
+    (if* (redir-check req ent chat nil)
+       then (return-from chattop))
+
 
     (let ((delete (request-query-value "y" req)))
       (if* delete
@@ -1021,8 +1170,32 @@
       
       (if* (null (request-query-value "z" req))
 	 then (track-viewer chat user req))
+
+      (if* user
+	 then 
+	      (if* (zerop (user-time user))
+		 then (setf (user-time user) (get-universal-time)))
       
-      (with-http-response (req ent)
+      
+	      (if* (equal (request-query-value "hitbut" req) "did")
+		 then ; user hit button in the chatcontrol frame
+		      (setf (user-time user) (get-universal-time))
+		 else ; test to see if time has expired
+		      (if* (> (- (get-universal-time) (user-time user))
+			      *idle-timeout*)
+			 then (do-idle-timedout req ent
+						(format nil
+							"chat?~a"
+							(add-lurk
+							 req
+							 (add-secret
+							  req
+							  (add-user
+							   req
+							   (chat-query-string chat))))))
+			      (return-from chattop))))
+      
+      (with-http-response (req ent :timeout 500)
 	(setq qstring 
 	  (format nil "~a&count=~d&secs=~d"
 		  (add-lurk
@@ -1058,6 +1231,12 @@
 		     :vlink *top-frame-vlink-color*
 		     :alink *top-frame-alink-color*
 		     )
+	      (if* (or (null secs) (zerop secs))
+		 then ; indicate frozen
+		      (html (:center (:b ((:font :color "green")
+					  "--*-- Frozen --*--")))
+			    :br))
+		     
 	      (show-chat-info chat count 
 			      (not (equal "1" (request-query-value
 					       "rv"
@@ -1073,9 +1252,10 @@
   (let* ((chat (chat-from-req req))
 	 (user (user-from-req req))
 	 (pp (or (request-query-value "pp" req) "*")) ; who to send to
+	 (ppp (request-query-value "ppp" req)) ; add a user to the dest
 	 (purl (request-query-value "purl" req))
 	 (kind :multiline)
-	 (to-user (user-from-ustring pp))
+	 (to-users (users-from-ustring pp))
 	 (qstring))
     (if* (null chat)
        then (return-from chatenter 
@@ -1090,17 +1270,45 @@
 			      (chat-query-string chat))))
       
 
+      (if* user
+	 then (setf (user-time user) (get-universal-time))
+	      
+	      (if* ppp
+		 then ; add this user
+		      (format t "tu ~s ... ppp ~s~%" (user-to-users user)
+			      ppp)
+		      (setq pp (setf (user-to-users user)
+				 (concatenate 'string
+				   (or (user-to-users user) "")
+				   ","
+				   ppp)))
+		      (setq to-users (users-from-ustring pp))
+	       elseif (equal pp "*")
+		 then (setf (user-to-users user) nil)
+		 else (setf (user-to-users user) pp)))
+
+      (format t "pp ~s~%" pp)
+      ; do redirect check
+      (if* (null user)
+	 then ; do not logged in check
+	      (if* (redir-check req ent chat t)
+		 then (return-from chatenter)))
+
+      ; now the logged in or not logged in check
+      (if* (redir-check req ent chat nil)
+	 then (return-from chatenter))
+
 	      
       (if* (and body (not (equal "" body)))
 	 then ; user added content to the chat
-	      (add-chat-data chat req handle body user to-user purl))
+	      (add-chat-data chat req handle body user to-users purl))
       
       (with-http-response (req ent)
 	(with-http-body (req ent)
 	  (html
 	   (:html
 	    ((:body :bgcolor 
-		    (if* to-user 
+		    (if* to-users 
 		       then *bottom-frames-private*
 		       else *bottom-frames-bgcolor*))
 	     ((:form :action (concatenate 'string
@@ -1114,9 +1322,13 @@
 			 (:tr
 			  (:td
 			   (:center
+			    ((:input :name "send"
+				     :value "Send"
+				     :type "submit"))
+			    " "
 			    (if* user
 			       then (html 
-				     (if* to-user
+				     (if* to-users
 					then (html 
 					      "Private msg from: ")
 					else (html "From: "))
@@ -1124,12 +1336,15 @@
 				      (:princ-safe
 				       (user-handle user)))
 				     " to "
-				     ((:font :size "+2")
-				      (if* to-user
-					 then (html
-					       (:princ-safe
-						(user-handle
-						 to-user)))
+				     (:b
+				      (if* to-users
+					 then (dolist (to-user to-users)
+						(html
+						 (:princ-safe
+						  (user-handle
+						   to-user))
+						 " "
+						 ))
 					 else (html "all"))))
 				    
 			       else (html
@@ -1165,8 +1380,8 @@
 				     :size 40
 				     :maxlength 100
 				     :value (or purl "")
-				    :name "purl"))
-			   " Picture Url")))))
+				     :name "purl"))
+			    " Picture Url")))))
 		  else ; single line
 		       (html 
 			(:table
@@ -1191,6 +1406,17 @@
 	     ))))))))
 
 
+(defun do-idle-timedout (req ent goback)
+  (with-http-response (req ent)
+    (with-http-body (req ent)
+      (html (:head (:title "timed out"))
+	    (:body "due to inactivity you have been timed out"
+		   :br
+		   (if* goback
+		      then (html "To return to the chat click "
+				 ((:a :href goback
+				      :target "_top")
+				  "here"))))))))
 
 
 (defun chatcontrol (req ent)
@@ -1238,7 +1464,14 @@
 		       :value "1"))
 	      " Reversed"
 	      :br
-		       
+
+	      ; use to distinguish a call to chattop from
+	      ; a user button click from a refresh one
+	      
+	      ((:input :type "hidden"
+		       :name "hitbut"
+		       :value "did"))
+	      
 	      ((:input :type "submit"
 		       :name "submit"
 		       :value "Update Messages")))))))))))
@@ -1267,7 +1500,7 @@
 
   
     
-(defun add-chat-data (chat req handle body user to-user purl)
+(defun add-chat-data (chat req handle body user to-users purl)
   ;; chat is chat object
   ;; req is http request object
   ;; handle is handle typed by user (only matters  if user not logged in)
@@ -1279,6 +1512,10 @@
       (if* (and (stringp purl) (not (equal "" purl)))
 	 then (scan-for-http purl))
     (declare (ignore prefix))
+
+    (if* (stringp to-users) 
+       then ; just one user, turn it into a list
+	    (setq to-users (list to-users)))
     
     (if* link
        then (if* (and (consp link)
@@ -1299,7 +1536,9 @@
 	     :ipaddr ipaddr
 	     :dns dns
 	     :handle (if* user then (user-handle user) else handle)
-	     :to (if* to-user then (list (user-handle to-user)) else t)
+	     :to (if* to-users
+		    then (mapcar #'user-handle to-users)
+		    else t)
 	     :real (if* user then t else nil)
 	     :time (compute-chat-date)
 	     :body (if* link
@@ -1312,9 +1551,16 @@
 (defun compute-chat-date ()
   ; return string to use as time for this message
   ; quick hack - hardwire in pdt
-  (multiple-value-bind (sec min hour)
+  (multiple-value-bind (sec min hour day month)
       (decode-universal-time (get-universal-time))
-    (format nil "~d:~2,'0d:~2,'0d PDT" hour min sec)))
+    (format nil "~d:~2,'0d:~2,'0d Pacific Time, ~a ~d" hour min sec
+	    (month-name month) day
+	    )))
+
+(defun month-name (month)
+  (svref '#("" "Jan" "Feb" "Mar" "Apr" "May" "June" "July"
+	    "Aug" "Sep" "Oct" "Nov" "Dec")
+	 month))
 
 (defun add-chat-message (chat message)
   ;; add the message to the messages of the chat.
@@ -1324,11 +1570,18 @@
 	    
     (if* (>= message-next (length messages))
        then ; must grow messages
-	    (let ((nmessages (make-array (+ (length messages) 200))))
-	      (dotimes (i (length messages))
-		(setf (svref nmessages i) (svref messages i)))
-	      (setf (chat-messages chat) nmessages)
-	      (setq messages nmessages)))
+	    (let ((nmessages (make-array (+ (length messages) 
+					    *msg-increment*))))
+	      ;; copy only non-deleted messages
+	      (let ((to 0))
+		(dotimes (i (length messages))
+		  (let ((message (svref messages i)))
+		    (if* (message-to message)
+		       then (setf (svref nmessages to) message)
+			    (incf to))))
+		(setq message-next to)
+		(setf (chat-messages chat) nmessages)
+		(setq messages nmessages))))
     (setf (svref messages message-next)  message)
     (setf (chat-message-next chat) (1+ message-next))
     (setf (chat-message-number chat) 
@@ -1337,11 +1590,20 @@
 
 
 (defun delete-chat-message (chat messagenum)
-  ;; remove the given message by setting the to field to nil
-  (let ((message (find-chat-message chat messagenum)))
-    (if* message
-       then (setf (message-to message) nil))))
+  ;; remove the  message numbered messagenumy setting the to field to nil
+  (mp:with-process-lock ((chat-message-lock chat))
+    (let ((message (find-chat-message chat messagenum)))
+      (if* message
+	 then (setf (message-to message) nil)
+	      (push messagenum (chat-messages-deleted chat))))))
 
+(defun delete-chat-message-by-message (chat message)
+  ;; remove the given message by setting the to field to nil
+  (mp:with-process-lock ((chat-message-lock chat))
+    (if* message
+       then (setf (message-to message) nil)
+	    (push (message-number message)
+		  (chat-messages-deleted chat)))))
 
 (defun find-chat-message (chat number)
   ;; find the message with the given number
@@ -1390,6 +1652,54 @@
       (if* (show-message-p message handle)
 	 then (if* (<= (decf count) 0) then (return start)))
       (decf start))))
+
+
+(defun compute-chat-statistics (chat)
+  ;; compute information about this chat
+  (mp::with-process-lock ((chat-message-lock chat))
+    (let ((messages (chat-messages chat))
+	  (message-next (chat-message-next chat)))
+      (let ((total-messages 0)
+	    (private-messages 0))
+	(dotimes (i message-next)
+	  (let ((message (svref messages i)))
+	    (if* message
+	       then (if* (message-to message)
+		       then (incf total-messages)
+			    (if* (not (eq t (message-to message)))
+			       then (incf private-messages))))))
+      
+	(values total-messages private-messages)))))
+
+
+
+(defun set-saved-chat-messages (chat count)	
+  ;; set to save approx 'count' messages
+  (mp::with-process-lock ((chat-message-lock chat))
+    (let ((messages (chat-messages chat))
+	  (message-next (chat-message-next chat)))
+      ; count backwards until we've passed 'count' messages
+      (do ((i (1- message-next) (1- i)))
+	  ((< i 0)
+	   ; no messages to remove
+	   nil)
+	
+	(let ((message (svref messages i)))
+	  (if* message
+	     then (if* (<= count 0)
+		     then ; remove all messages at this point
+			  (delete-chat-message-by-message  chat message)
+		     else (if* (message-to message)
+			     then (decf count)))))))))
+	
+		  
+
+  
+		  
+		    
+      
+  
+  
   
 (defun show-chat-info (chat count recent-first handle ownerp)
   ;; show the messages for all and those private ones for handle
@@ -1590,12 +1900,17 @@
 
 (defun chat-login-current (req ent)
   ;; handle a post to  chatlogincurrent 
+  
+  ; guard aginst
+  (if* (not (eq :post (request-method req)))
+     then (return-from chat-login-current (ancient-link-error req ent)))
+  
   (let ((chat (chat-from-req req))
 	(handle (request-query-value "handle" req))
 	(password (request-query-value "password" req)))
     ; locate the handle
     (let ((user (find handle (users *master-controller*)
-		      :key #'user-handle :test #'equal)))
+		      :key #'user-handle :test #'equalp)))
       (if* (null user)
 	 then (return-from chat-login-current
 		(do-chat-login req ent 
@@ -1625,6 +1940,11 @@
       
 (defun chatloginnew (req ent)
   ;; response function when a new user is being defined
+  
+  
+  (if* (not (eq :post (request-method req)))
+     then (return-from chatloginnew (ancient-link-error req ent)))
+  
   (let* ((handle (request-query-value "handle" req))
 	 (password (request-query-value "password" req))
 	 (password2 (request-query-value "password2" req))
@@ -1644,7 +1964,7 @@
 	      (do-chat-login req ent qstring "Passwords don't match")))
     
     (dolist (user (users *master-controller*))
-      (if* (equal (user-handle user) handle)
+      (if* (equalp (user-handle user) handle)
 	 then (return-from chatloginnew
 		(do-chat-login req ent qstring "That user name exists"))))
     
@@ -1799,6 +2119,304 @@
 	       (subseq line (cdr whole))))
        else line)))
 
+
+;; chatmaster page
+
+(defun chatmaster (req ent)
+  ;; commands
+  ;;  
+  (let* ((chat (chat-from-req req))
+	 (is-owner
+	  (equal (and chat (secret-key chat)) 
+		 (request-query-value "s" req)))
+	 (act (request-query-value "act" req)))
+    (if* (not is-owner)
+       then (illegal-access req ent)
+	    (return-from chatmaster nil))
+    
+    (if* (equal act "set-msg-count")
+       then ; set the message count to the given value
+	    (let ((val (compute-integer-value
+			(request-query-value "val" req))))
+	      (if* (>= val 0)
+		 then (format t " set msg count to ~d~%" val)
+		      (set-saved-chat-messages chat val)))
+     elseif (equal act "set-idle")
+       then (let ((val (compute-integer-value
+			(request-query-value "val" req))))
+	      (if* (> val 0)
+		 then (format t " set idle timeout ~d mins~%" val)
+		      (setq *idle-timeout* (* 60 val))))
+     elseif (equal act "set-redirects")
+       then (set-redirects req chat))
+    
+    (if* (equal "yes" (request-query-value "shut" req))
+       then ; shutting down the chat
+	    (with-http-response (req ent)
+	      (with-http-body (req ent)
+		(html (:body (:h1 "Shutdown")))))
+	    (mp:process-run-function "killer" #'shutdown-chat)
+	    (sleep 10)
+	    (exit 0)
+	    (return-from chatmaster nil))
+	    
+    
+    (multiple-value-bind (total-messages private-messages)
+	(compute-chat-statistics chat)
+    
+      (with-http-response  (req ent)
+	(with-http-body (req ent)
+	  (html (:html
+		 (:head (:title "Chat Master"))
+		 (:body
+		  (:h2 "Statistics")
+		  "There are " (:princ total-messages) 
+		  " messages in the chat and " 
+		  (:princ private-messages)
+		  " of those are private"
+		  :br
+		  
+		  ((:form :method "POST")
+		   "Reduce the number of stored messages to "
+		   ((:input :type "text" :name "val" :value total-messages
+			    :size 6))
+		   ((:input :type "hidden" :name "act" :value "set-msg-count"))
+		   ((:input :type "submit" :value "do it")))
+		  :br
+		  
+		  
+		  
+		  (:h2 "Control")
+		  ((:form :method "POST")
+		   "Idle timeout in minutes: "
+		   ((:input :type "text"
+			    :name "val"
+			    :value (truncate *idle-timeout* 60)
+			    :size 4))
+		   ((:input :type "hidden"
+			    :name "act"
+			    :value "set-idle"))
+		   ((:input :type "submit"
+			    :value "Set It")))
+		  :br
+
+		  ((:form :method "POST")
+		   ((:input :type "checkbox"
+			    :name "shut"
+			    :value "yes"))
+		   "Shut down the chat "
+		   ((:input :type "submit"
+			    :value "really kill it")))
+		  :br
+
+		  (show-redirects chat)
+		   
+		  )))))
+    
+      )))
+
+
+(defun show-redirects (chat)
+  ;; display redirect dialog
+  (html 
+   (:h2 "Redirects")
+   
+   ((:form :method "POST")
+    ((:input :type "hidden"
+	     :name "act"
+	     :value "set-redirects"))
+    ((:table :border 1)
+	
+     ; show current ones
+     (dolist (redir (chat-redirects chat))
+       (html
+	:newline
+	(:tr
+	 (:td
+	  ((:input :type "text" :size 50 
+		   :name (redir-info-name redir)
+		   :value (redirect-info redir)))
+	  :br
+	  "ipaddr: " 
+	  ((:input :type "text" :size 50
+		   :name (redir-ipaddr-name redir)
+		   :value (socket:ipaddr-to-dotted
+			   (redirect-ipaddr redir))))
+	  ", mask bits: " 
+	  ((:input :type "text" :size 4
+		   :name (redir-maskbits-name redir)
+		   :value (redirect-maskbits redir)))
+	  :br
+	  "to: " 
+	  ((:input :type "text" :size 50
+		   :name (redir-to-name redir)
+		   :value (redirect-to redir)))
+	  
+	  :br
+	  ((:input :type "checkbox"
+		   :if* (redirect-before redir)
+		   :checked "checked"
+		   :name (redir-before-name redir)
+		   :value "xxxx"))
+	  "applies only to people not logged on"
+	   
+	  
+	  :br
+	  ((:input :type "radio"
+		   :name (redir-state-name redir)
+		   :value "active"
+		   :if* (redirect-active redir) :checked "checked"))
+	  "On, "
+	  ((:input :type "radio"
+		   :name (redir-state-name redir)
+		   :value "disabled"
+		   :if* (not (redirect-active redir)) :checked "checked"))
+	  "Disabled, "
+	  ((:input :type "radio"
+		   :name (redir-state-name redir)
+		   :value "disrem"))
+	     
+	  "Disable then remove"
+	  :br
+	  "this rule used " (:princ-safe (redirect-use redir)) " time(s)"
+	  :br
+	  ((:input :type "checkbox"
+		   :name (redir-change-name redir)
+		   :value 0)) 
+	  ((:font :color "red") "Make Changes")
+	  ))))
+	
+     ; show new one
+     (html
+      :newline
+      (:tr
+       (:td
+	"info: " ((:input :type "text" :size 50 :name "newinfo"))
+	:br
+	"ipaddr:" ((:input :type "text" :size 50 :name "newipaddr"))
+	", mask bits" ((:input :type "text" :size 4 :name "newmask"))
+	:br
+	"redirect to: " ((:input :type "text" :size 50 :name "newto"))
+	:br
+	((:input :type "checkbox"
+		 :name "newredirbefore"
+		 :value 0))
+	"applies only to people not logged on"
+	:br
+	((:input :type "checkbox" :name "newdo" :value "1")) 
+	((:font :color "red") "Add this entry")))))
+       
+    ((:input :type "submit" :value "Change Redirects")))))
+
+
+(defun set-redirects (req chat)
+  ;; change the redirect information for this chat
+
+  (let (changed)
+    (dolist (redir (chat-redirects chat))
+      (if* (request-query-value (redir-change-name redir) req)
+	 then ; something changed in here
+	      (set-redir-info chat 
+			      redir
+			      req
+			      (redir-info-name redir)
+			      (redir-ipaddr-name redir)
+			      (redir-maskbits-name redir)
+			      (redir-to-name redir)
+			      (redir-before-name redir)
+			      (redir-state-name redir))
+	      (setq changed t)))
+    (if* (request-query-value "newdo" req)
+       then ; add a new entry
+	    (let ((redir (make-redirect)))
+	      (setf (redirect-index redir)
+		(incf (redirect-counter chat)))
+	      (set-redir-info chat 
+			      redir
+			      req
+			      "newinfo"
+			      "newipaddr"
+			      "newmask"
+			      "newto"
+			      "newredirbefore"
+			      "newxxxxxx")
+	      (setf (redirect-active redir) t)
+	    
+	      (setf (chat-redirects chat)
+		(append (chat-redirects chat) (list redir)))
+	    
+	      (setq changed t)
+	    
+	      ))
+  
+    (if* changed then (dump-existing-chat *chat-home*))))
+
+	
+
+(defun set-redir-info (chat redir req ninfo nipaddr nmask nto nbefore nstate)
+  (setf (redirect-info redir) (request-query-value ninfo req))
+  (let ((ipaddr (or 
+		 (ignore-errors (socket:lookup-hostname
+				 (request-query-value nipaddr req)))
+		 0)))
+    (setf (redirect-ipaddr redir) ipaddr))
+  
+  (let ((maskbits (or (compute-integer-value
+		   (request-query-value nmask req))
+		  32)))
+    (setf (redirect-maskbits redir) maskbits)
+    (setf (redirect-mask redir)
+      (logand #xffffffff (ash -1 (- 32 maskbits))))
+    )
+  
+  (setf (redirect-to redir) (request-query-value nto req))
+  (setf (redirect-before redir) (request-query-value nbefore req))
+  
+  (let ((state (request-query-value nstate req)))
+    (if* (equal state "active")
+       then (setf (redirect-active redir) t)
+     elseif (equal state "disabled")
+       then (setf (redirect-active redir) nil)
+     elseif (equal state "disrem")
+       then ; eliminate
+	    (setf (chat-redirects chat)
+	      (delete redir (chat-redirects chat))))))
+  
+  
+	
+  
+    
+    
+    
+  
+  
+
+;; generate temp names for form objects
+
+(defun redir-info-name (redir)
+  (format nil "~a-info" (redirect-index redir)))
+
+(defun redir-ipaddr-name (redir)
+  (format nil "~a-ipaddr" (redirect-index redir)))
+
+(defun redir-maskbits-name (redir)
+  (format nil "~a-maskbits" (redirect-index redir)))
+
+(defun redir-before-name (redir)
+  (format nil "~a-before" (redirect-index redir)))
+
+(defun redir-to-name (redir)
+  (format nil "~a-to" (redirect-index redir)))
+			   
+(defun redir-change-name (redir)
+  (format nil "~a-change" (redirect-index redir)))
+	 
+(defun redir-state-name (redir)
+  (format nil "~a-state" (redirect-index redir)))  
+  
+
+
+
 	     
 ;; Chat archiver
 ;;
@@ -1830,8 +2448,9 @@
 	    (format t " arch ~d   num ~d~%"
 		    (chat-message-archive chat)
 		    (chat-message-number  chat))
-	    (if* (< (chat-message-archive chat)
-		    (chat-message-number  chat))
+	    (if* (or (< (chat-message-archive chat)
+			(chat-message-number  chat))
+		     (chat-messages-deleted chat))
 	       then ; must do work
 		    (archive-chat chat)
 		    (setq did-work t)))))
@@ -1862,11 +2481,24 @@
     (if* (> message-next 0)
        then ; it better be greater than 0 since to be zero
 	    ; would be no messages stored
-	    (let* ((last-message (svref messages (1- message-next)))
-		   (last-mnum (message-number last-message))
-		   (start-to-save
-		    (+ (1- message-next) ; index of last message
-		       (- message-archive last-mnum)))) ; amt to skip down
+	    
+	    ; locate the message numbered message-archive
+	    (let ((start-to-save 0))
+	      (do ((i (1- message-next) (1- i)))
+		  ((< i 0))
+		(let* ((message (svref messages i))
+		       (num (message-number message)))
+		  (if* (and num
+			    (< num message-archive))
+		     then (setq start-to-save (1+ i))
+			  (return)
+		   elseif (eq num message-archive)
+		     then (setq start-to-save i)
+			  (return))))
+		
+	
+	    
+	    
 	      (with-open-file (archive-port (archive-filename chat)
 			       :direction :output
 			       :if-exists :append
@@ -1876,10 +2508,15 @@
 		    ((>= i message-next))
 		  (if* (eq t (message-to (svref messages i)))
 		     then ; a public message, archive it
-			  (pprint (svref messages i) archive-port))))
+			  (pprint (svref messages i) archive-port))
+		  )
+		(if* (chat-messages-deleted chat)
+		   then (pprint `(:delete ,@(chat-messages-deleted chat))
+				archive-port)
+			(setf (chat-messages-deleted chat) nil)))
 	      
-	      (setf (chat-message-archive chat) (1+ last-mnum))))))
-	      
+	      (setf (chat-message-archive chat) 
+		(1+ (message-number (svref messages (1- message-next)))))))))
 
 (defun archive-filename (chat)
   (format nil "~a/~a" *chat-home* (chat-filename chat)))
@@ -1889,6 +2526,7 @@
 (defmethod set-style ((style color-style))
   (setq *top-frame-bgcolor*     (color-style-bgcolor style)
 	*top-frame-font-color*  (color-style-font-color style)
+	*public-font-color*     (color-style-font-color style)
 	*top-frame-vlink-color* (color-style-vlink-color style)
 	*top-frame-link-color*  (color-style-link-color style)
 	*top-frame-alink-color* (color-style-alink-color style)))
@@ -1896,8 +2534,10 @@
 (if* (not (boundp '*top-frame-bgcolor*))
    then (set-style *normal-style*))
 
-
-
+;; for franz chats uncomment this since some people like this style better
+;(set-style *white-style*)
+;(setq *quick-return-path* "/xyzzy")
+;-------- 
 
 (defun chat-transcript (uc-string filename)
   ;; generate a transcript of the chat with the given uc-string
@@ -1994,15 +2634,26 @@
 	  (equal (and chat (secret-key chat)) 
 		 (request-query-value "s" req)))
 	 (qstring)
-	 (viewers))
+	 (viewers)
+	 (idletime)
+	 )
     (if* (null chat)
        then (return-from chatviewers (ancient-link-error req ent)))
     
+    (if* (and user (zerop (user-time user)))
+       then (setf (user-time user) (get-universal-time)))
+    
+    (if* (> (setq idletime (- (get-universal-time) (user-time user)))
+	    (+ 10 *idle-timeout*))
+       then (do-idle-timedout req ent nil)
+	    (return-from chatviewers))
     (setq qstring
       (add-secret req
 		  (add-user req
 			    (chat-query-string chat))))
     (setq viewers (chat-viewers chat))
+
+    (setq idletime (truncate idletime 60)) ; cvt to minutes
     
     (with-http-response (req ent)
       (with-http-body (req ent)
@@ -2027,67 +2678,115 @@
 		 (let* ((vtime (viewent-time viewent))
 			(vuser (viewent-user viewent))
 			(alive-time (if* vtime then (- time vtime)))
-			)
+			(idle-time (if* vuser
+				      then (- time (or (user-time vuser) 0))
+				      else 0)))
+		   
 		  
-		   (if* (and alive-time
-			     (> alive-time *max-active-time*))
-		      then (setq vtime nil)
-			   (setf (viewent-time viewent) nil))
-		  
-		   (if* vtime
-		      then ; fill in the hostname if it's not there yet
-			   #+(version>= 6 0)
-			   (if* (null (viewent-hostname viewent))
-			      then (setf (viewent-hostname
-					  viewent)
-				     (socket::dns-query
-				      (viewent-ipaddr
-				       viewent)
-				      :type :ptr
-				      :repeat 1
-				      :timeout 0)))
-					      
-			   (if* (not (eq vuser user))
-			      then ; list this one
-				   (if* vuser
-				      then ; link to create a private message
-					   (html
-					    ((:a :href 
-						 (format nil
-							 "chatenter?pp=~a&~a"
-							 (user-ustring vuser)
-							 qstring)
-						 :target "chatenter"
-						 )
-					     (:princ-safe
-					      (user-handle vuser))))
-					  
-				      else ; ip address
-						    
-					   (html
-					    (:princ
-					     (or (viewent-hostname viewent)
-						 (socket:ipaddr-to-dotted
-						  (viewent-ipaddr viewent))))))
-				   (html 
-				    " ("
-				    (:princ (- time vtime))
-				    "s)")
+		 (if* (and alive-time
+			   (> alive-time *max-active-time*))
+		    then (setq vtime nil)
+			 (setf (viewent-time viewent) nil))
 
-				   (if* (or *show-machine-name-to-all* 
-					    is-owner)
-				      then ; name then ip address
-					   (if* (viewent-hostname viewent)
-					      then 
-						   (html " @" 
-							 (:princ-safe
-							  (viewent-hostname viewent)))))
-				   (html :newline)))))))))))))))
+		 ; cvt to minutes
+		 (setq idle-time (min 120 (truncate idle-time 60)))
+		   
+		 (if* vtime
+		    then ; fill in the hostname if it's not there yet
+			 #+(version>= 6 0)
+			 (if* (null (viewent-hostname viewent))
+			    then (setf (viewent-hostname
+					viewent)
+				   (socket::dns-query 
+				    (viewent-ipaddr viewent)
+				    :type :ptr
+				    :repeat 1
+				    :timeout 0)))
+					      
+			 (if* (not (eq vuser user))
+			    then ; list this one
+				 (if* vuser
+				    then 
+					 (html
+					  ; link to add a user
+					  ((:a :href
+					       (format nil
+						       "chatenter?ppp=~a&~a"
+						       (user-ustring vuser)
+						       qstring)
+					       :target "chatenter")
+					   "(+)")
+					  
+					  " "
+					       
+					  
+					 ; link to create a private message 
+					  ((:a :href 
+					       (format nil
+						       "chatenter?pp=~a&~a"
+						       (user-ustring vuser)
+						       qstring)
+					       :target "chatenter"
+					       )
+					   (:princ-safe
+					    (user-handle vuser))))
+					  
+				    else ; ip address
+						    
+					 (html
+					  (:princ
+					   (or (viewent-hostname viewent)
+					       (socket:ipaddr-to-dotted
+						(viewent-ipaddr viewent))))))
+				 (html 
+				  " ("
+				  (:princ (- time vtime))
+				  "s)")
+				   
+				 (if* (> idle-time 2)
+				    then (html
+					  " [idle: "
+					  (:princ idle-time)
+					  "m] "))
+
+				 (if* (or *show-machine-name-to-all* 
+					  is-owner)
+				    then ; name then ip address
+					 (html 
+					  " @" 
+					  (:princ-safe 
+					   (or (viewent-hostname viewent)
+					       (socket:ipaddr-to-dotted
+						(viewent-ipaddr viewent))))))
+				 (html :newline)))))))))))))))
 						
 					  
 	    
 		   
-    
+(defun redir-check (req ent chat before)
+  ;; check if this request should be redirected
+  ;; before is true if we are in the before login state
+  (let ((redirects (chat-redirects chat)))
+    (if* redirects
+       then (let ((ipaddr (socket:remote-host (request-socket req))))
+	      (dolist (redir redirects)
+		(if* (and (redirect-active redir)
+			  (eq before (redirect-before redir))
+			  (eql (logand (redirect-ipaddr redir)
+				       (redirect-mask redir))
+			       (logand ipaddr
+				       (redirect-mask redir))))
+		   then ; a match!
+			(incf (redirect-use redir))
+			(with-http-response (req ent
+						 :response 
+						 *response-moved-permanently*)
+			  (setf (reply-header-slot-value req :location) 
+			    (redirect-to redir))
+			  (with-http-body (req ent)
+			    (html "redirect")))
+			(return t)))))))
+			     
   
       
 			

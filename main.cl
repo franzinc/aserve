@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.101 2001/06/05 17:45:37 jkf Exp $
+;; $Id: main.cl,v 1.102 2001/06/26 21:16:48 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -132,7 +132,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 0))
+(defparameter *aserve-version* '(1 2 1))
 
 (eval-when (eval load)
     (require :sock)
@@ -841,7 +841,10 @@ by keyword symbols and not by strings"
 
 (defvar *thread-index*  0)      ; globalcounter to gen process names
 
-(defvar *wserver*)   ; set to last server created
+; usually set to the default server object created when aserve is loaded.
+; users may wish to set or bind this variable to a different server
+; object so it is the default for publish calls.
+(defvar *wserver*)   
 
 				    
 			      
@@ -1278,7 +1281,7 @@ by keyword symbols and not by strings"
 		  (return-from process-connection nil)
 	     else ;; got a request
 		  (handle-request req)
-		  (force-output (request-socket req))
+		  (force-output-noblock (request-socket req))
 		  
 		  (log-request req)
 		  
@@ -1290,13 +1293,21 @@ by keyword symbols and not by strings"
 				 :test #'eq)
 		       then ; continue to use it
 			    (debug-format :info "request over, keep socket alive~%")
-			    (force-output sock)
+			    (force-output-noblock sock)
 		       else (return))))))
     ;; do it in two stages since each one could error and both have
     ;; to be attempted
-    (ignore-errors (force-output sock))
+    (ignore-errors (force-output-noblock sock))
     (ignore-errors (close sock :abort t))))
 
+(defun force-output-noblock (stream)
+  ;; do a force-output but don't get hung up if we get blocked on output
+  ;; this happens enough with sockets that it's a real concern
+  ; 30 seconds is enough time to wait
+  (mp:with-timeout (30) 
+    (force-output stream)))
+
+  
 
 (defun read-http-request (sock)
   ;; read the request from the socket and return and http-request

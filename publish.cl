@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.43 2001/04/04 16:00:40 jkf Exp $
+;; $Id: publish.cl,v 1.44 2001/06/26 21:16:48 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -160,7 +160,7 @@
 	 :initarg :info
 	 :accessor locator-info)
    
-   ; for random extra nifo
+   ; for random extra info
    (extra    :initarg :extra  :reader locator-extra)
    ))
 
