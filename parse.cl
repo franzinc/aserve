@@ -161,15 +161,15 @@
 
 
 (defparameter *header-to-slot*
-    ;; headers that are stored in specific slots
-    '((#.(dual-caseify "date:") . date)
-      (#.(dual-caseify "user-agent:") . user-agent)
-      (#.(dual-caseify "host:")  . host)
-      (#.(dual-caseify "connection:") . connection)
-      (#.(dual-caseify "transfer-encoding:") . transfer-encoding)
-      (#.(dual-caseify "accept:") . accept)
-      (#.(dual-caseify "content-length") . content-length)
-      ))
+    ;; headers that are stored in specific slots, we create
+    ;; a list of objects to help quickly parse those slots
+    '#.(let (res)
+	(dolist (head *fast-headers*)
+	  (push (cons
+		 (dual-caseify (concatenate 'string head ":"))
+		 (read-from-string head))
+		res))
+	res))
       
 (defun read-request-headers (req sock buffer)
   ;; read in the headers following the command and put the

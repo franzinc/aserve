@@ -14,18 +14,43 @@
 
 (defvar *ndebug* t)   ; print debugging stuff
 
+(eval-when (compile load eval)
+  ;; these are the common headers and are stored in slots in 
+  ;; the objects
+  (defparameter *fast-headers*
+      '("connection" 
+	"date" 
+	"transfer-encoding"
+	"accept"
+	"host"
+	"user-agent"
+	"content-length")))
+
+
+(defmacro header-slot-value (name obj)
+  ;; name is a string naming the header value (all lower case)
+  ;; retrive the slot's value from the http-request obj obj.
+  (if* (assoc name *fast-headers* :test #'equal)
+	  then ; has as
+  )
+
+
+    
 
 
 (defclass http-header-mixin ()
   ;; List of all the important headers we can see in any of the protocols.
   ;; 
-  ((connection :accessor connection :initform nil)
-   (date :accessor date :initform nil)
-   (transfer-encoding :accessor transfer-encoding :initform nil)
-   (accept :accessor accept :initform nil)
-   (host :accessor host :initform nil :initarg :host)
-   (user-agent :accessor user-agent :initform nil)
-   (content-length :accessor content-length :initform nil)))
+  #.(let (res)
+      ;; generate a list of slot descriptors for all of the 
+      ;; fast header slots
+      (dolist (head *fast-headers*)
+	(let ((name (read-from-string head))) ; use read for case mode compat
+	  (push `(,name :accessor ,name :initform nil
+			:initarg
+			,(intern (symbol-name name) :keyword))
+		res)))
+      res))
    
 	   
 	   

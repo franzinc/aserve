@@ -319,6 +319,14 @@
   
   ; to be done
   (declare (ignore doit req ent))
+  
+  (if* (not doit)
+     then ; we dont' even care
+	  (return-from up-to-date-check nil))
+  
+  
+  
+  
   nil)
 
 
@@ -377,12 +385,13 @@
 	      (format sock "Date: ~a~a" 
 		      (universal-time-to-date (resp-date req))
 		      *crlf*)
-      
-	      (format sock "Connection: ~a~a"
-		      (if* (resp-keep-alive req)
-			 then "Keep-Alive"
-			 else "Close")
-		      *crlf*)
+
+	      (if* (resp-keep-alive req)
+		 then (format sock "Connection: Keep-Alive~aKeep-Alive: timeout=~d~a"
+			      *crlf*
+			      *read-request-timeout*
+			      *crlf*)
+		 else (format sock "Connection: Close~a" *crlf*))
       
 	      (format sock "Server: neo/0.1~a" *crlf*)
       
