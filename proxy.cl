@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.40 2001/10/12 21:51:29 jkf Exp $
+;; $Id: proxy.cl,v 1.41 2002/02/28 14:29:19 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -1025,7 +1025,8 @@ cached connection = ~s~%" cond cached-connection))
 	  (socket:make-socket :remote-host host
 			      :remote-port port
 			      :format :bivalent
-			      :type *socket-stream-type*)))))
+			      :type *socket-stream-type*
+			      :nodelay t)))))
 
 	
 	

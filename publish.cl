@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.70 2002/01/15 20:06:46 jkf Exp $
+;; $Id: publish.cl,v 1.71 2002/02/28 14:29:19 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -1055,7 +1055,7 @@
      then ; ignore proxy requests
 	  (return-from standard-locator nil))
   
-  (let ((ents (gethash (uri-path (request-uri req))
+  (let ((ents (gethash (request-decoded-uri-path req)
 		       (locator-info locator))))
     (cdr 
      (or (assoc (request-vhost req) ents :test #'eq)
@@ -1070,7 +1070,7 @@
      then ; ignore proxy requests
 	  (return-from standard-locator nil))
   
-  (let* ((url (uri-path (request-uri req)))
+  (let* ((url (request-decoded-uri-path req))
 	 (len-url (length url))
 	 (vhost (request-vhost req)))
 	     
@@ -1369,7 +1369,7 @@
   (let* ((postfix nil)
 	 (realname (concatenate 'string
 		     (entity-directory ent)
-		     (setq postfix (subseq (uri-path (request-uri req))
+		     (setq postfix (subseq (request-decoded-uri-path req)
 					   (length (prefix ent))))))
 	 (redir-to)
 	 (info)
@@ -1510,7 +1510,7 @@
     
 
     ; now publish a file with all the knowledge
-    (publish-file :path (uri-path (request-uri req))
+    (publish-file :path (request-decoded-uri-path req)
 		  :host (host ent)
 		  :file realname
 		  :authorizer (or local-authorizer

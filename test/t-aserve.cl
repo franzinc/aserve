@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.42 2002/02/13 22:35:44 jkf Exp $
+;; $Id: t-aserve.cl,v 1.43 2002/02/28 14:29:19 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -499,7 +499,23 @@
 			  (cdr (assoc :transfer-encoding headers 
 				      :test #'eq))
 			  :test #'equalp))
-	    (test (cadr pair) body :test #'equal)))))))
+	    (test (cadr pair) body :test #'equal)))))
+    
+    
+    ;; test whether we can read urls with space in them
+    (publish :path "/foo bar baz"
+	     :content-type "text/plain"
+	     :function
+	     #'(lambda (req ent)
+		 (with-http-response (req ent)
+		       (with-http-body (req ent)
+			 (write-sequence "foo" *html-stream*)))))
+    (multiple-value-bind (body code)
+	(x-do-http-request (format nil "~a/foo%20bar%20baz" prefix-local))
+      (test 200 code)
+      (test "foo" body :test #'equal))
+			   
+    ))
 
 
 (defun test-authorization (port)

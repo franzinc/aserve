@@ -1,3 +1,19 @@
+2002-02-28  John Foderaro  <jkf@tiger.franz.com>
+1.2.23
+>>>	*  incompatible change:
+	    The path part of a uri can't contain certain characters
+	    unless they are escaped like %xx.  Even characters that
+	    needn't be escaped *can* be escaped.  Thus to canonicalize
+	    the uri path and to allow it to be easily mapped to filenames
+	    we now decode the uri path (convert %xx to the actual character)
+	    before processing it (looking for matches in the published
+	    entities).   If you had published a path like "foo%20bar"
+	    then you must change it to "foo bar".
+	 * cgi.cl - add default for :script-name arg
+	 * various - open socket in nodelay mode to maximize performance
+	    
+	
+
 2002-02-13  John Foderaro  <jkf@tiger.franz.com>
 1.2.22
 	* authorize.cl - add new authorizer: function-authorizer

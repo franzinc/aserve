@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: cgi.cl,v 1.6 2002/02/13 22:35:44 jkf Exp $
+;; $Id: cgi.cl,v 1.7 2002/02/28 14:29:19 jkf Exp $
 
 ;; Description:
 ;;   common gateway interface (running external programs)
@@ -39,7 +39,7 @@
 			&key
 			path-info
 			path-translated
-			script-name
+			(script-name (net.uri:uri-path (request-uri req)))
 			(query-string nil query-string-p)
 			auth-type
 			(timeout 200)

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.135 2002/02/13 22:35:44 jkf Exp $
+;; $Id: main.cl,v 1.136 2002/02/28 14:29:19 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -156,7 +156,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 22))
+(defparameter *aserve-version* '(1 2 23))
 
 (eval-when (eval load)
     (require :sock)
@@ -827,6 +827,10 @@ by keyword symbols and not by strings"
    (raw-uri  ;; uri object holding the actual uri from the command
     :initarg :raw-uri
     :accessor request-raw-uri)
+
+   (decoded-uri-path
+    :initarg :decoded-uri-path
+    :accessor request-decoded-uri-path)
    
    (protocol ;; symbol naming the http protocol  (e.g. :http/1.0)
     :initarg :protocol
@@ -1208,6 +1212,9 @@ by keyword symbols and not by strings"
 			 sock 
 			 #'check-for-open-socket-before-gc))
 		
+		; disable the nagle alorithm
+		(socket:set-socket-options sock :nodelay t)
+		
 		#+io-timeout
 		(socket:socket-control 
 		 sock 
@@ -1552,6 +1559,9 @@ by keyword symbols and not by strings"
 			:method cmd
 			:uri (net.uri:copy-uri uri)
 			:raw-uri uri
+			:decoded-uri-path
+			(uridecode-string (net.uri:uri-path uri))
+					  
 			:protocol protocol
 			:protocol-string (case protocol
 					   (:http/1.0 "HTTP/1.0")
