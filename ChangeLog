@@ -11,6 +11,8 @@
 		 uri and post values.
 	* examples.cl - add redirect test
 	* t-aserve.cl - test redirection
+	* doc/aserve.html  - update for changes above
+	* doc/tutorial.html - don't be so cookie centric
 
 2000-05-30  John Foderaro  <jkf@tiger.franz.com>
 1.1.20
