@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.15 2000/03/16 17:53:28 layer Exp $
+;; $Id: parse.cl,v 1.16 2000/03/21 05:55:55 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -328,6 +328,11 @@
 ;	 so    A; b=c; d=e, F
 ;           is two values, A and F, with A having parameters b=c and d=e.
 ;
+;        A header value that doesn't follow the above rules in 
+;	 the one for set-cookie
+;	    set-cookie: val=yes; expires=Fri, 01-Jan-2010 08:00:00 GMT; path=/
+;        note how it starts off with param=val, and then the value
+;	 can have commas in it, thus we don't use comm as a separator
 
 (defconstant ch-alpha 0)
 (defconstant ch-space 1)
@@ -458,7 +463,21 @@
     
     (nreverse res)))
     
-	
+
+(defun assoc-paramval (key paramvals)
+  ;; search the paramvals for the given key.
+  ;; this takes into account that paramvals isn't an assoc
+  ;; list since the items my be strings or (string . string)
+  ;; Also we use equalp as the test
+  ;;
+  (dolist (val paramvals)
+    (if* (stringp val)
+       then (if* (equalp key val)
+	       then (return val))
+     elseif (equal (car val) key)
+       then (return val))))
+
+  
 		
 		
 (defun trimmed-parseobj (str po index)
@@ -632,7 +651,28 @@
     (nreverse res)))
   
   
-					 
+(defun match-head-p (val1 val2)
+  ;; return t if val1 is a prefix of val2
+  ;; val1 and val2 are simple strings
+  (let ((len1 (length val1))
+	(len2 (length val2)))
+    (if* (<= len1 len2)
+       then (dotimes (i len1 t)
+	      (if* (not (eq (schar val1 i) (schar val2 i)))
+		 then (return nil))))))
+	    
+(defun match-tail-p (val1 val2)
+  ;; return t if val1 is a suffix of val2
+  ;; val1 and val2 are simple strings
+  (let ((len1 (length val1))
+	(len2 (length val2)))
+    (if* (<= len1 len2)
+       then (let ((diff (- len2 len1)))
+	      (dotimes (i len1 t)
+		(if* (not (eq (schar val1 i) (schar val2 (+ diff i))))
+		   then (return nil)))))))
+		
+  
 			     
 
     

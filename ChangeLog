@@ -1,4 +1,8 @@
 2000-03-20  John Foderaro  <jkf@tiger.franz.com>
+	* add cookies and authorization to client module
+	* load client module into iserve
+	
+2000-03-20  John Foderaro  <jkf@tiger.franz.com>
 1.1.6
 	* convert references to neo to iserve
 	* minor fixups in tutorial

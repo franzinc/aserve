@@ -1,6 +1,6 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.17 2000/03/20 17:25:32 jkf Exp $
+;; $Id: load.cl,v 1.18 2000/03/21 05:55:55 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -14,7 +14,9 @@
       "decode"
       "publish"
       "authorize"
-      "log" ))
+      "log" 
+      "client"
+      ))
 
 (defparameter *iserve-other-files*
     ;; other files that make up the iserve dist
@@ -117,10 +119,11 @@
 ;; checklist for publishing iserve source for source-master:
 ;; 1. incf version number, edit ChangeLog and commit
 ;; 2. start lisp and load iserve/load to compile all files
-;; 3. cd to the iserve directory
+;; 3. start the server and run through the samples
 ;; 4. (make-src-distribution)
 ;; 5. (ftp-publish-src)
-;; 6. on beast run /fi/sa/bin/iserve-sync
+;; 6. (publish-docs)   ;  to put latest docs on iserve web page
+;; 7. on beast run /fi/sa/bin/iserve-sync
 ;; 
 
 
@@ -185,7 +188,15 @@
 	   *iserve-root*
 	   iserve-version-name)))
 
-  
+(defun publish-docs ()
+  ;; copy documentation to the external web site
+  (run-shell-command
+   (format nil "cp ~ahtmlgen/htmlgen.html ~adoc/iserve.html ~adoc/tutorial.html /net/cobweb/www/people/jkf/iserve"
+	   *iserve-root*
+	   *iserve-root*
+	   *iserve-root*)))
+	   
+	    
   
 
 (defun copy-files-to (files dest &key (root ""))

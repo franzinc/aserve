@@ -23,7 +23,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.2 2000/03/16 17:53:32 layer Exp $
+;; $Id: htmlgen.cl,v 1.3 2000/03/21 05:55:55 jkf Exp $
 
 ;; Description:
 ;;   html generator
@@ -63,9 +63,17 @@
   ;; just emit html to the curfent stream
   (process-html-forms forms))
 
+(defmacro html-out-stream-cvt (stream)
+  ;; converts pseudo streams symbols to real streams
+  `(cond ((eq ,stream t) *terminal-io*)
+	 (,stream)
+ 	 (t *standard-output*)))
+
 (defmacro html-stream (stream &rest forms)
   ;; set output stream and emit html
-  `(let ((*html-stream* ,stream)) (html ,@forms)))
+  `(let ((*html-stream* (html-out-stream-cvt ,stream))) (html ,@forms)))
+
+
 
 (defun process-html-forms (forms)
   (let (res)

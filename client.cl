@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.6 2000/03/20 15:52:26 jkf Exp $
+;; $Id: client.cl,v 1.7 2000/03/21 05:55:55 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -41,563 +41,33 @@
 (defpackage :net.iserve.client 
   (:use :net.iserve :excl :common-lisp)
   (:export 
-   #:send-request
-   #:post-request
-   #:parse-response
+   #:client-request  ; class
+   #:client-request-close
+   #:client-request-read-sequence
+   #:client-response-header-value
+   #:cookie-jar     ; class
+   #:do-http-request
+   #:make-http-client-request
+   #:read-client-response-headers
    ))
+
+
 
 (in-package :net.iserve.client)
 
 
 
-(defmacro with-scan-macros (&rest body)
-  ;; define the macros for scanning characters in a string
-  `(macrolet ((collect-to (ch &optional downcasep)
-		;; return a string containing up to the given char
-		`(let ((start i))
-		   (loop
-		     (if* (>= i max) then (fail))
-		     (if* (eql ,ch (schar buffer i)) 
-			then (return (buf-substr start i ,downcasep)))
-		     (incf i)
-		     )))
-	      (collect-to-eol ()
-		;; return a string containing up to the given char
-		`(let ((start i))
-		   (loop
-		     (if* (>= i max) then (return (buf-substr start i)))
-		     (let ((thisch (schar buffer i)))
-		       (if* (eq thisch #\return)
-			  then (let ((ans (buf-substr start i)))
-				 (incf i)  ; skip to newline
-				 (return ans))
-			elseif (eq thisch #\newline)
-			  then (return (buf-substr start i))))
-		     (incf i)
-		     )))
-	      (fail ()
-		`(return-from parse-response nil))
-	      (skip-to-not (ch)
-		;; skip to first char not ch
-		`(loop
-		   (if* (>= i max) then (fail))
-		   (if* (not (eq ,ch (schar buffer i)))
-		      then (return))
-		   (incf i)))
-	      (buf-substr (from to &optional downcasep)
-		;; create a string containing [from to }
-		;;
-		`(let ((res (make-string (- ,to ,from))))
-		   (do ((ii ,from (1+ ii))
-			(ind 0 (1+ ind)))
-		       ((>= ii ,to))
-		     (setf (schar res ind)
-		       ,(if* downcasep
-			   then `(char-downcase (schar buffer ii))
-			   else `(schar buffer ii))))
-		   res)))
-     ,@body))
-
-(defparameter *debug* nil)
-
-(defmacro dformat (&rest args)
-  `(progn (if* *debug*
-	     then (format t ,@(cdr args)))
-	  (format ,@args)))
-
-(defmacro dwrite-sequence (seq stream)
-  `(progn (if* *debug*
-	     then (write-sequence ,seq *standard-output*))
-	  (write-sequence ,seq ,stream)))
-		  
 
 
 
-
-(defvar crlf (make-array 2 :element-type 'character
-			 :initial-contents '(#\return #\newline)))
-
-(defun send-request (stream
-		     kind ;; "GET" "POST" "HEAD"  or :get :post :head
-		     url  ;; string that's the url
-		     &key (protocol  "HTTP/1.0")
-			  (accept "*/*")
-			  (close t)
-			  content-type
-			  body
-			  host
-			  authorization
-			  )
-  
-  (dformat stream "~a ~a ~a~aAccept: ~a~a"
-	  (if* (stringp kind)
-	     then kind
-	     else (ecase kind
-		    (:get "GET")
-		    (:post "POST")
-		    (:head "HEAD")))
-	  url protocol crlf
-	  accept crlf)
-  (if* content-type
-     then (dformat stream "Content-type: ~a~a" content-type crlf))
-  
-  (if* authorization
-     then (dformat stream "Authorization: Basic ~a~a"
-		   authorization crlf))
-  
-  (send-cookies stream url (or host
-			       (socket:ipaddr-to-hostname 
-				(socket:remote-host stream))))
-  (if* body
-     then (dformat stream "Content-length: ~d~a"
-		   (length body)
-		   crlf))
-  (if* host
-     then (dformat stream "Host: ~a~a" host crlf))
-  
-
-  (dwrite-sequence crlf stream)
-  (if* body then (dwrite-sequence body stream))
-  (force-output stream)
-  (if* close then (socket:shutdown stream :direction :output))
-  )
-
-
-(defun post-request (stream url values &key host)
-  ;; do a post to the given url of the given values which
-  ;; is a list of  (propname . value)  all strings
-  (let (res)
-    (dolist (val values)
-      (if* res
-	 then (push "&" res))
-      
-      (push (urlencode (cdr val)) res)
-      (push "=" res)
-      (push (car val) res))
-    
-    (send-request stream
-		  :post
-		  url
-		  :host host
-		  :content-type "application/x-www-form-urlencoded"
-		  :body (apply #'concatenate 'string res))))
-
-
-		     
-(defun get-response (stream &key string)
-  ;; get the http response from the stream and return 
-  ;; either the buffer and character count (if string is nil)
-  ;; or a newly created string holding the whole response (if string is t)
-  ;;
-  (let* ((buff (get-response-buffer))
-	 (max 0))
-    (multiple-value-setq (buff max)
-      (read-response stream buff))
-    
-    
-    (if* string
-       then ; create  a string for the response
-	    (let ((str (make-string max)))
-	      (dotimes (i max)
-		(setf (schar str i) (schar buff i)))
-	      (return-response-buffer buff)
-	      str)
-       else (values buff max))))
-
-   
-(defun simple-get (host url &key authorization)
-  (let ((sock (socket:make-socket :remote-host host
-				  :remote-port 80)))
-    (unwind-protect
-	(progn (send-request sock :get url :host host 
-			     :authorization authorization)
-	       (get-response sock :string t))
-      (close sock))))
-
-(defun simple-post (host url values)
-  (let ((sock (socket:make-socket :remote-host host
-				  :remote-port 80)))
-    (unwind-protect
-	(progn (post-request sock url values :host host)
-	       (get-response sock :string t))
-      (close sock))))
-
-(defvar .bufs. (list (make-string 50000)))
-
-(defun get-response-buffer ()
-  ;; return the first (largest) response buffer
-  (let (buff)
-    (mp:without-scheduling
-      (if* (setq buff (pop .bufs.))
-	 then buff
-	 else (setq buff (make-string 5000))))))
-
-(defun return-response-buffer (buff)
-  ;; return the given buffer to the list
-  ;; keep the list sorted from biggest to smallest
-  (mp:without-scheduling
-    (if* (null .bufs.)
-       then (push buff .bufs.)
-       else (let ((size (length buff)))
-	      (do ((prev nil cur)
-		   (cur  .bufs. (cdr cur)))
-		  ((null cur)
-		   (setf (cdr prev) (list buff)))
-		(if* (>= size (length (car cur)))
-		   then ; insert between prev and cur
-			(if* (null prev)
-			   then ; first one
-				(push buff .bufs.)
-			   else (setf (cdr prev)
-				  (cons buff cur)))
-			(return)))))))
-
-
-(defun read-response (stream buffer)
-  ;; read into the buffer starting at max
-  ;; get a bigger buffer if necessary
-  ;; return the final buffer and the number of characters read
-  ;; into the buffer.
-  
-  (let ((size (length buffer))
-	(index 0))
-    
-    (loop
-      (let ((count (read-sequence buffer stream :start index)))
-	(if* (eql count index)
-	   then ; end of file
-		(return (values buffer count))
-	 elseif (eql count size)
-	   then ; buffer exahusted
-		(let ((newbuf (get-response-buffer)))
-		  (if* (<= (length newbuf) size)
-		     then ; put it back
-			  (return-response-buffer newbuf)
-			  (setq newbuf (make-string (+ size 10000))))
-		  (dotimes (i count)
-		    (setf (schar newbuf i) (schar buffer i)))
-
-		  (return-response-buffer buffer)
-		  (setq buffer newbuf
-			size   (length buffer)
-			index  count))
-	   else ; read partial buffer
-		(setq index count))))))
-
-
-(defstruct httpr 
-  protocol
-  response 
-  comment
-  headers  ; list (header . value)
-  body
-  )
-
-(defun parse-response (buffer &optional (max (length buffer)))
-  ;; scan for headers, returning a http-response structure
-  (let ((httpr (make-httpr))
-	(i 0))
-    
-    (with-scan-macros
-	(macrolet ((fail ()
-		     `(return-from parse-response nil)))
-      
-	  (setf (httpr-protocol httpr) (collect-to #\space))
-	  (incf i)
-	  (skip-to-not #\space)
-	  (setf (httpr-response httpr) (read-from-string (collect-to #\space)))
-	  (incf i)
-	  (setf (httpr-comment httpr) (collect-to-eol))
-      
-	  ; now read the header lines
-
-	  (let ((headers))
-	    (loop
-	      (incf i)  ; past eol on first line
-	      (if* (>= i max) then (return)) ; nothing more left
-	      (case (schar buffer i)
-		((#\return #\newline)
-		  ; blank line, end of headers
-		  (setf (httpr-body httpr)
-		    (subseq buffer i max))
-		  (return))
-		((#\space #\tab)
-		 ; continuation line of previous header
-		 (let ((continue (collect-to-eol)))
-		   (setf (cdr (car headers))
-		     (concatenate 'string (cdr (car headers))
-				  continue))))
-		(t (push (cons (collect-to #\: :downcase)
-			       (progn (incf i)
-				      (skip-to-not #\space)
-				      (collect-to-eol)))
-			 headers))))
-	    (setf (httpr-headers httpr) headers))
-		   
-	  
-	  httpr))))
-
-      
-	       
-		    
-(defun header-value (header httpr &optional (errorp t))
-  ;; get the header value and signal an error if header not found 
-  ;; unless errorp is nil
-  (let ((ent (assoc header (httpr-headers httpr) :test #'equal)))
-    (if* (null ent)
-       then (if* errorp
-	       then (error "header ~s not found in ~s" header httpr)
-	       else nil)
-       else (cdr ent))))
-
-(defun header-values (header httpr)
-  ;; returen a list of all the values for the given name, this is
-  ;; used when the header name may be present more than
-  ;; once (like in Set-Cookie)
-  ;;
-  (let (res)
-    (dolist (headent (httpr-headers httpr))
-      (if* (equal header (car headent))
-	 then (push (cdr headent) res)))
-    res))
-  
-
-(defun split-url (url)
-  ;; return values
-  ;;  host  url  
-  ;;
-  (multiple-value-bind (match whole hostx urlx)
-      (match-regexp "^http://\\(.*\\)\\(/.*\\)$" url :shortest t)
-    (declare (ignore whole))
-    (if* match
-       then ; start past the http thing
-	    (return-from split-url
-	      (values hostx urlx))
-       else ; all is after host part
-	    (values nil url))))
-				      
-  
-		    
-(defun hexout (int target)
-  (vector-push-extend #\% target)
-  (let ((hival (logand #xf (ash int -4)))
-	(loval (logand #xf int)))
-    (vector-push-extend
-     (code-char (+ (if* (> hival 9)
-		     then (decf hival 10)
-			  #.(char-int #\A)
-		     else #.(char-int #\0))
-		  hival))
-     target)
-    (vector-push-extend 
-     (code-char (+ (if* (> loval 9)
-		     then (decf loval 10)
-			  #.(char-int #\A)
-		     else #.(char-int #\0))
-		  loval)) 
-     target)))
-
-(defun needs-hex-escape (ch)
-  (member ch '(#\+ #\#	#\; #\/	#\? #\:	#\@ #\=	#\&
-	       #\< #\>	#\space	#\%
-	       )
-	  :test #'eq))
-
-(defun urlencode (string)
-  ;;
-  ;; convert string to the x-www-form-urlencode form
-  ;; returns an adjustable fill pointer string
-  ;;
-  (let ((target (make-array (+ 10 (length string) )
-			    :adjustable t
-			    :fill-pointer 0
-			    :element-type 'character
-			    )))
-    (dotimes (i (length string))
-      (let ((ch (aref string i)))
-	(if* (eq ch #\space)
-	   then (vector-push-extend #\+ target)
-	 elseif (eq ch #\newline)
-	   then (hexout #.(char-int #\return) target)
-		(hexout #.(char-int #\linefeed) target)
-	 elseif (needs-hex-escape ch)
-	   then (hexout (char-int ch) target)
-	   else (vector-push-extend ch target))))
-    target))
-
-  
-(defun parse-multi-value (str)
-  ;; parse a header multiple value which looks like  foo=bar; baz=bof
-  ;; and return (("foo" . "bar") ("baz" . "bof"))
-  ;;
-  (let (res)
-    (loop
-      (multiple-value-bind (match whole key value rest)
-	  (match-regexp "[; ]*\\([^ ;=]+\\)=\\([^;]+\\)\\(;.*\\| *\\)$" str
-			:shortest t)
-	(declare (ignore whole))
-	(if* match
-	   then (push (cons key value) res)
-		(setq str rest)
-	   else (return res))))))
-    
-
-;; we keep a cookie list to simulate a cookie aware browser
-;; form of *cookies* is a list of
-;; (hostname (path (var value) ...) ...)
-;; 
-(defvar *cookies* nil)
-
-(defun save-cookie (host httpr)
-  (flet ((all-but-path (vals)
-	   ;; return a list of all in the assoc list except the one
-	   ;; with the key path , also domain
-	   (let (res)
-	     (dolist (val vals)
-	       (if* (or (equal "path" (car val)) 
-			(equal "domain" (car val)))
-		  thenret
-		  else (push val res)))
-	     res)))
-	   
-    (dolist (val (header-values "set-cookie" httpr))
-	  
-      (let ((vals)
-	    (ent))
-	(if* val
-	   then (setq vals (parse-multi-value val))
-	      
-		(if* (setq ent (assoc "domain" vals :test #'equal))
-		   then (setq host (list (cdr ent)))) ; indicate a group
-		      
-		(let ((ent (assoc host *cookies* :test #'equal)))
-		  (if* (null ent)
-		     then (push (setq ent (list host)) *cookies*))
-	      
-		  (format t "got cookies ~s for host ~s~%"
-			  vals host)
-	      
-		  ; find applicable path
-		  (let ((pathent (assoc "path" vals :test #'equal)))
-		    (if* (null pathent)
-		       then (warn "no path for cookie")
-		       else ;; note: it seems ok to have duplicates
-			    ;; for a given path 
-			    (push (cons (cdr pathent)
-					(all-but-path vals))
-				  (cdr ent))))))))))
-
-(defun send-cookies (stream url host)
-  ;; send out appropriate cookies for this host and url
-  (let ((cookievalue (compute-cookies url host)))
-    (if* cookievalue
-       then (dformat stream "Cookie: ~a~a" cookievalue crlf))))
-
-(defun compute-cookies (url host)
-  (let ((vals (find-applicable-cookies host))
-	(cookies))
-    (if* vals
-       then (dolist (pathvals (cdr vals))
-	      (let ((path (car pathvals)))
-		(if* (<= (length path) (length url))
-		   then ;  is path the initial part of url
-			(if* (dotimes (i (length path) t)
-			       (if* (not (eq (schar path i) (schar url i)))
-				  then (return nil)))
-			   then (setq cookies (append (cdr pathvals)
-						      cookies)))))))
-    (if* cookies
-       then ; build a big string holding cookie values
-	    (let (res)
-	      (dolist (cookie cookies)
-		(if* res
-		   then (push "; " res))
-		
-		(push (cdr cookie) res)
-		(push "=" res)
-		(push (car cookie) res))
-	      
-	      (apply #'concatenate 'string res)))))
-
-(defun find-applicable-cookies (host)
-  ;; look for those cookies that match this host
-  (let (res)
-    (dolist (cookie *cookies*)
-      (let ((chost (car cookie)))
-	(if* (stringp chost)
-	   then (if* (equal chost host)
-		   then (setq res (append res (cdr cookie))))
-	 elseif (consp chost)
-	   then (setq chost (car chost))
-		; test against the tail
-		(if* (>= (length host) (length chost))
-		   then (do ((ci (1- (length chost)) (1- ci))
-			     (hi (1- (length host)) (1- hi)))
-			    ((< ci 0) 
-			     (setq res (append res (cdr cookie)))
-			     (return))
-			  (if* (not (eql (schar host hi)
-					 (schar chost ci)))
-			     then (return nil)))))))
-    (if* res 
-       then ; make it look like  cookie
-	    (cons nil res))))
-
-
-      
-;-----------------------------------------------------------------
-;
-; desired client interface
-;
-; (make-http-client-request uri &key protocol keep-alive chunking
-;				    cookies basic-authorization
-;				    content-length content)
-;
-;   
-;    uri is string or uri object.
-;    it must be an http uri
-;    open a connection to the given port on the given host and 
-;	send the given request
-;
-;    protocol  - what to put in the request
-;	either
-;		:http/1.0
-;		:http/1.1
-;    keep-alive - if true, request that the connection remain open
-;		after this request.
-;    chunking - if true, say that we'll accept a chunked response
-;		(should only do this for http/1.1 requests).
-;
-;    cookies - list of cookies, from which applicable ones to this
-;	       request will be extracted and sent along
-;    basic-authorization - if non nil then it should be a cons 
-;		of the form ("name" . "password") which we'll send along
-;    content-length - the length of the content we will send after 
-;		the headers
-;    content - the actual content to send, in which case the content-length
-;		should not be specified as we'll figure it out.
-;
-;  This returns a client-request object containing the stream, after
-;  the request line and all headers and the crlf after the headers 
-;  have been sent.  If the content is given then it will be sent too.
-;
-;  
-; (read-client-response-headers  client-request)
-;
-;   read the response to the client request and the headers for it, parsing
-;  the headers and storing them in the client-request object.
-;
-; (read-client-request-sequence client-request buffer start end)
-;   read the next (end-start) bytes from the body of client request, handling
-;   turning on chunking if needed
-;   return index after last byte read.
-;   return 0 if eof
-;
-;
 
 
 (defclass client-request ()
-  ((headers ; alist of  ("headername" . "value")
+  ((uri   	;; uri we're accessing
+    :initarg :uri
+    :accessor client-request-uri)
+   
+   (headers ; alist of  ("headername" . "value")
     :initform nil
     :initarg :headers
     :accessor client-request-headers)
@@ -622,8 +92,16 @@
     ;		:chunking - read until chunking eof
     :accessor client-request-bytes-left
     :initform nil)
+   
+   (cookies  ;; optionally a cookie jar for hold received and sent cookies
+    :accessor client-request-cookies
+    :initarg :cookies
+    :initform nil)
    ))
 
+
+(defvar crlf (make-array 2 :element-type 'character
+			 :initial-contents '(#\return #\newline)))
 
 (defmacro with-better-scan-macros (&rest body)
   ;; define the macros for scanning characters in a string
@@ -678,13 +156,18 @@
 
 
 (defun do-http-request (uri 
+			&rest args
 			&key 
 			(method  :get)
 			(protocol  :http/1.1)
 			(accept "*/*")
 			content
 			(format :text) ; or :binary
-			)
+			cookies ; nil or a cookie-jar
+			(redirect t) ; auto redirect if needed
+			basic-authorization  ; (name . password)
+			
+			      )
   
   ;; send an http request and return the result as three values:
   ;; the response code, the headers and the body
@@ -693,7 +176,10 @@
 	       :method method
 	       :protocol protocol
 	       :accept  accept
-	       :content content)))
+	       :content content
+	       :cookies cookies
+	       :basic-authorization basic-authorization
+	       )))
 
     (unwind-protect
 	(progn 
@@ -746,13 +232,23 @@
 		       then ; nothing returned
 			    (setq body nil)
 		       else (setq body (subseq ans 0 start))))
-      
-      
-	    ; return the values
-	    (values 
-	     (client-request-response-code creq)
-	     (client-request-headers  creq)
-	     body)))
+
+	    (if* (and redirect
+		      (eql 302 (client-request-response-code creq)))
+	       then ; must do a redirect to get to the read site
+		    (format t "doing redirect~%")
+		    
+		    (apply #'do-http-request
+			   (net.uri:merge-uris
+			    (cdr (assoc "location" (client-request-headers creq)
+					:test #'equal))
+			    uri)
+			   args)
+	       else ; return the values
+		    (values 
+		     (client-request-response-code creq)
+		     (client-request-headers  creq)
+		     body))))
       
       ; protected form:
       (client-request-close creq))))
@@ -774,13 +270,11 @@
 				     (protocol  :http/1.1)
 				     keep-alive 
 				     (accept "*/*") 
-				     cookies 
+				     cookies  ; nil or a cookie-jar
 				     basic-authorization
 				     content-length 
 				     content)
   
-  ;; to be done:
-  (declare (ignore basic-authorization cookies))
    
   ;; start a request 
   
@@ -836,7 +330,19 @@
        then (format sock "Content-Length: ~s~a" content-length crlf))
     
 	    
-    ; cookies ?
+    (if* cookies 
+       then (let ((str (compute-cookie-string uri
+					      cookies)))
+	      (if* str
+		 then (format sock "Cookie: ~a~a" str crlf))))
+
+    (if* basic-authorization
+       then (format sock "Authorization: Basic ~a~a"
+		    (base64-encode
+		     (format nil "~a:~a" 
+			     (car basic-authorization)
+			     (cdr basic-authorization)))
+		    crlf))
     
 
     (write-string crlf sock)  ; final crlf
@@ -852,7 +358,10 @@
     (force-output sock)
     
     (make-instance 'client-request
-      :socket sock)))
+      :uri uri
+      :socket sock
+      :cookies cookies
+      )))
 
 
     
@@ -960,6 +469,18 @@
 	      (push (cons headername headervalue) headers)))
       
 	  (setf (client-request-headers creq) headers)
+	  
+	  ;; do cookie processing
+	  (let ((jar (client-request-cookies creq)))
+	    (if* jar
+	       then ; do all set-cookie requests
+		    (dolist (headval headers)
+		      (if* (equal "set-cookie" (car headval))
+			 then (save-cookie
+			       (client-request-uri creq)
+			       jar
+			       (cdr headval))))))
+	  
 	  
 	  (if* (equalp "chunked" (client-response-header-value 
 				  creq "transfer-encoding"))
@@ -1129,7 +650,167 @@
 ;;;;; cookies
 
 (defclass cookie-jar ()
-  ())
+  ;; holds all the cookies we've received
+  ;; items is a alist where each item has the following form:
+  ;; (hostname cookie-item ...)
+  ;; 
+  ;; where hostname is a string that must be the suffix
+  ;;	of the requesting host to match
+  ;; path is a string that must be the prefix of the requesting host
+  ;;	to match
+  ;;  
+  ;;
+  ((items :initform nil
+	  :accessor cookie-jar-items)))
+
+;* for a given hostname, there will be only one cookie with
+; a given (path,name) pair
+;
+(defstruct cookie-item 
+  path      ; a string that must be the prefix of the requesting host to match
+  name	    ; the name of this cookie
+  value	    ; the value of this cookie
+  expires   ; when this cookie expires
+  secure    ; t if can only be sent over a secure server
+  )
+
+
+(defmethod save-cookie (uri (jar cookie-jar) cookie)
+  ;; we've made a request to the given host and gotten back
+  ;; a set-cookie header with cookie as the value 
+  ;; jar is the cookie jar into which we want to store the cookie
+  
+  (let* ((pval (car (net.iserve::parse-header-value cookie t)))
+	 namevalue
+	 others
+	 path
+	 domain
+	 )
+    (if* (consp pval)
+       then ; (:param namevalue . etc)
+	    (setq namevalue (cadr pval)
+		  others (cddr pval))
+     elseif (stringp pval)
+       then (setq namevalue pval)
+       else ; nothing here
+	    (return-from save-cookie nil))
+    
+    ;; namevalue has the form name=value
+    (setq namevalue (net.iserve::split-on-character namevalue #\=))
+    
+    ;; compute path
+    (setq path (cdr (net.iserve::assoc-paramval "path" others)))
+    (if* (null path)
+       then (setq path (or (net.uri:uri-path uri) "/"))
+       else ; make sure it's a prefix
+	    (if* (not (net.iserve::match-head-p 
+		       path (or (net.uri:uri-path uri) "/")))
+	       then ; not a prefix, don't save
+		    (return-from save-cookie nil)))
+    
+    ;; compute domain
+    (setq domain (cdr (net.iserve::assoc-paramval "domain" others)))
+    
+    (if* domain
+       then ; one is given, test to see if it's a substring
+	    ; of the host we used
+	    (if* (null (net.iserve::match-tail-p domain 
+						 (net.uri:uri-host uri)))
+	       then (return-from save-cookie nil))
+       else (setq domain (net.uri:uri-host uri)))
+    
+    
+    (let ((item (make-cookie-item
+		 :path path
+		 :name  (car namevalue)
+		 :value (or (cadr namevalue) "")
+		 :secure (net.iserve::assoc-paramval "secure" others)
+		 :expires (cdr (net.iserve::assoc-paramval "expires" others))
+		 )))
+      ; now put in the cookie jar
+      (let ((domain-vals (assoc domain (cookie-jar-items jar) :test #'equal)))
+	(if* (null domain-vals)
+	   then ; this it the first time for this host
+		(push (list domain item) (cookie-jar-items jar))
+	   else ; this isn't the first
+		; check for matching path and name
+		(do* ((xx (cdr domain-vals) (cdr xx))
+		     (thisitem (car xx) (car xx)))
+		    ((null xx)
+		     )
+		  (if* (and (equal (cookie-item-path thisitem)
+				   path)
+			    (equal (cookie-item-name thisitem)
+				   (car namevalue)))
+		     then ; replace this one
+			  (setf (car xx) item)
+			  (return-from save-cookie nil)))
+		
+		; no match, must insert based on the path length
+		(do* ((prev nil xx)
+		      (xx (cdr domain-vals) (cdr xx))
+		      (thisitem (car xx) (car xx))
+		      (length (length path)))
+		    ((null xx)
+		     ; put at end
+		     (if* (null prev) then (setq prev domain-vals))
+		     (setf (cdr prev) (cons item nil)))
+		  (if* (>= (length (cookie-item-path thisitem)) length)
+		     then ; can insert here
+			  (if* prev
+			     then (setf (cdr prev)
+				    (cons item xx))
+				  
+			     else ; at the beginning
+				  (setf (cdr domain-vals)
+				    (cons item (cdr domain-vals))))
+			  (return-from save-cookie nil))))))))
+		  
+      
+
+(defparameter semicrlf 
+    ;; useful for separating cookies, one per line
+    (make-array 4 :element-type 'character
+		:initial-contents '(#\; #\return
+				    #\linefeed #\space)))
+
+(defmethod compute-cookie-string (uri (jar cookie-jar))
+  ;; compute a string of the applicable cookies.
+  ;;
+  (let ((host (net.uri:uri-host uri))
+	(path (or (net.uri:uri-path uri) "/"))
+	res
+	rres)
+    
+    (dolist (hostval (cookie-jar-items jar))
+      (if* (net.iserve::match-tail-p (car hostval)
+				     host)
+	 then ; ok for this host
+	      (dolist (item (cdr hostval))
+		(if* (net.iserve::match-head-p (cookie-item-path item)
+					       path)
+		   then ; this one matches
+			(push item res)))))
+    
+    (if* res
+       then ; have some cookies to return
+	    (dolist (item res)
+	      (push (cookie-item-value item) rres)
+	      (push "=" rres)
+	      (push (cookie-item-name item) rres)
+	      (push semicrlf rres))
+	    
+	    (pop rres) ; remove first semicrlf
+	    (apply #'concatenate 'string  rres))))
+
+			   
+			   
+   
+    
+    
+  
+
+
 
 
 
