@@ -122,7 +122,7 @@ displayable with the client (e.g., browser) fonts.")))
 	   (:td (:princ (format nil "~a"
 				(locale-attribute *locale* :nostr))))))
      :br
-     ((:a :href "/locales") "To Locale Demo Home Page")))))
+     ((:a :href "/locale") "To Locale Demo Home Page")))))
 
 (defun html-locale-display-home-page (req ent)
   (with-http-response (req ent)
