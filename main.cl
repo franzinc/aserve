@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.112 2001/09/21 19:02:40 jkf Exp $
+;; $Id: main.cl,v 1.113 2001/10/10 16:32:57 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -72,6 +72,10 @@
    #:set-basic-authorization
    #:standard-locator
    #:unpublish-locator
+   #:vhost
+   #:vhost-log-stream
+   #:vhost-error-stream
+   #:vhost-names
 
    #:request-method
    #:request-protocol
@@ -107,6 +111,7 @@
    #:with-http-body
    
    #:wserver
+   #:wserver-default-vhost
    #:wserver-enable-chunking
    #:wserver-enable-keep-alive
    #:wserver-external-format
@@ -115,6 +120,7 @@
    #:wserver-log-function
    #:wserver-log-stream
    #:wserver-socket
+   #:wserver-vhosts
 
    #:*aserve-version*
    #:*default-aserve-external-format*
@@ -137,7 +143,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 10))
+(defparameter *aserve-version* '(1 2 11))
 
 (eval-when (eval load)
     (require :sock)
@@ -347,10 +353,10 @@
     :initarg :log-function
     :initform nil	; no logging initially
     :accessor wserver-log-function)
-   
+
    (log-stream
     ;; place for log-function to store stream to log to if
-    ;; it makes sense to do so
+    ;; it makes sense to do so.  
     :initarg :log-stream
     :initform  t 	; initially to *standard-output*
     :accessor wserver-log-stream)
@@ -368,7 +374,18 @@
     :initarg :external-format
     :initform :latin1-base
     :accessor wserver-external-format)
+
+   (vhosts
+    ;; map names to vhost objects
+    :initform (make-hash-table :test #'equalp)
+    :accessor wserver-vhosts)
    
+   (default-vhost
+       ;; vhost representing situations with no virtual host
+       :initarg :default-vhost
+     :initform (make-instance 'vhost)
+     :accessor wserver-default-vhost)
+       
    ;;
    ;; -- internal slots --
    ;;
@@ -437,8 +454,18 @@
 		 then (socket:local-port sock)
 		 else "-no socket-")))))
      
-     
-     
+
+;;;;; virtual host class
+(defclass vhost ()
+  ((log-stream :accessor vhost-log-stream
+	       :initarg :log-stream
+	       :initform *standard-output*)
+   (error-stream :accessor vhost-error-stream
+		 :initarg :error-stream
+		 :initform *standard-output*)
+   (names :accessor vhost-names
+	  :initarg :names
+	  :initform nil)))     
 
 
 ;;;;;; macros 
@@ -748,6 +775,10 @@ by keyword symbols and not by strings"
    (raw-request  ;; the actual command line from the browser
     :initarg :raw-request
     :reader request-raw-request)
+   
+   (vhost  ;; the virtual host to which this request is directed
+    :initarg :vhost
+    :accessor request-vhost)
    
    ;;
    ;; -- internal slots --
@@ -1452,6 +1483,13 @@ by keyword symbols and not by strings"
 				   then (setf (uri-port uri) port)))
 			
 			(setf (uri-scheme uri) :http)  ; always http
+			
+			;; set virtual host in the request
+			(let ((vhost 
+			       (gethash host (wserver-vhosts *wserver*))))
+			  (setf (request-vhost req)
+			    (or vhost (wserver-default-vhost *wserver*))))
+					      
 			))))
 	  
 	    

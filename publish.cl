@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.53 2001/10/08 17:15:06 jkf Exp $
+;; $Id: publish.cl,v 1.54 2001/10/10 16:32:57 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -187,7 +187,7 @@
   )
 
 (defstruct (host-handler  (:type list))
-  host	  ;; list of host names to match.  nil means match anything
+  host	  ;; vhost object to match or  :wild meaning match anything
   entity  ;; entity object to handle this request
   )
 
@@ -426,16 +426,18 @@
     (if* (null locator) 
        then (setq locator (find-locator :exact server)))
 
+    (setq hval (convert-to-vhosts (if* (and host (atom host))
+				     then (list host)
+				     else host)
+				  server))
+    
     (if* remove
        then ; eliminate the entity if it exists
-	    (unpublish-entity locator path host host-p)
+	    (unpublish-entity locator path hval host-p)
        else
 	     
 	    (let ((ent (make-instance (or class 'computed-entity)
-			 :host (setq hval (if* host
-					     then (if* (atom host)
-						     then (list host)
-						     else host)))
+			 :host hval 
 			 :port port
 			 :path path
 			 :function function
@@ -457,22 +459,25 @@
   ;; return the given file as the value of the url
   ;; for the given host.
   ;; If host is nil then return for any host
-  
-  (if* (null locator) 
-     then (setq locator (find-locator :exact server)))
+  (let (ent got c-type hval)
+    (if* (null locator) 
+       then (setq locator (find-locator :exact server)))
 
-  (if* remove
-     then (unpublish-entity locator path
-			    host
-			    host-p)
-	  (return-from publish-file nil))
+    (setq hval (convert-to-vhosts (if* (and host (atom host))
+				     then (list host)
+				     else host)
+				  server))
+    (if* remove
+       then (unpublish-entity locator path
+			      hval
+			      host-p)
+	    (return-from publish-file nil))
   
   
-  (let (ent got hval
-	(c-type (or content-type
-		    (gethash (pathname-type (pathname file))
-			     *mime-types*)
-		    "application/octet-stream")))
+    (setq c-type (or content-type
+		     (gethash (pathname-type (pathname file))
+			      *mime-types*)
+		     "application/octet-stream"))
     (if* preload
        then ; keep the content in core for fast display
 	    (with-open-file (p file :element-type '(unsigned-byte 8))
@@ -487,10 +492,7 @@
 			       size
 			       got))
 		(setq ent (make-instance (or class 'file-entity)
-			    :host (setq hval (if* host 
-						then (if* (atom host)
-							then (list host)
-							else host)))
+			    :host hval 
 			    :port port
 			    :path path
 			    :file file
@@ -504,10 +506,7 @@
 			    :authorizer authorizer
 			    ))))
        else (setq ent (make-instance (or class 'file-entity)
-			:host (setq hval (if* host 
-					    then (if* (atom host)
-						    then (list host)
-						    else host)))
+			:host hval 
 			:port port
 			:path path
 			:file file
@@ -544,141 +543,113 @@
   (if* (and host (atom host))
      then (setq host (list host)))
   
+  (setq host (convert-to-vhosts host server))  ; now a list of vhosts
+  
   (let ((ent (make-instance 'directory-entity 
-		       :directory destination
-		       :prefix prefix
-		       :host host
-		       :port port
-		       :authorizer authorizer
-		       :indexes indexes
-		       :filter filter
-		       )))
+	       :directory destination
+	       :prefix prefix
+	       :host host
+	       :port port
+	       :authorizer authorizer
+	       :indexes indexes
+	       :filter filter
+	       )))
     
-  (dolist (entpair (locator-info locator))
-    (if* (equal (prefix-handler-path entpair) prefix)
-       then ; match, prefix
-	    (if* (and remove (not host-p))
-	       then ; remove all entries for all hosts
-		    (setf (locator-info locator)
-		      (remove entpair (locator-info locator)))
-		    (return-from publish-directory nil))
+    (dolist (entpair (locator-info locator))
+      (if* (equal (prefix-handler-path entpair) prefix)
+	 then ; match, prefix
+	      (if* (and remove (not host-p))
+		 then ; remove all entries for all hosts
+		      (setf (locator-info locator)
+			(remove entpair (locator-info locator)))
+		      (return-from publish-directory nil))
 	    
-	    ; scan for particular host
-	    (dolist (hostpair (prefix-handler-host-handlers entpair))
-	      (if* (null (set-exclusive-or (host-handler-host hostpair) 
-					   host
-					   :test #'equalp))
-		 then ; match existing one
-		      (if* remove
-			 then ; make it go away
-			      (setf (prefix-handler-host-handlers entpair)
-				(remove hostpair 
-					(prefix-handler-host-handlers 
-					 entpair)))
-			 else (setf (host-handler-entity hostpair) ent))
-		      (return-from publish-directory ent)))
-	    
-	    ; no match, must add it
-	    (if* remove 
-	       then ; no work to do
-		    (return-from publish-directory nil))
-		    
-	    (if* (null host)
-	       then ; add at end
-		    (setf (prefix-handler-host-handlers entpair)
-		      (append (prefix-handler-host-handlers entpair) 
-			      (list (make-host-handler :host host 
-						       :entity ent))))
-	       else ; add at beginning
-		    (setf (prefix-handler-host-handlers entpair)
-		      (cons (make-host-handler :host host :entity ent) 
-			    (prefix-handler-host-handlers entpair))))
-	    (return-from publish-directory ent)))
 
-  ; prefix not present, must add.
-  ; keep prefixes in order, with max length first, so we match
-  ; more specific before less specific
+	      (let ((handlers (prefix-handler-host-handlers entpair)))
+		(dolist (host host)
+		  (dolist (hostpair handlers
+			    ; not found, add it if we're not removing
+			    (if* (not remove)
+			       then (setq handlers
+				      (list (make-host-handler :host host
+							 :entity ent)))))
+		    (if* (eq host (host-handler-host hostpair))
+		       then ; a match
+			    (if* remove
+			       then (setq handlers
+				      (remove hostpair handlers :test #'eq))
+			       else ; change
+				    (setf (host-handler-entity hostpair) ent))
+			    (return))))
+		(setf (prefix-handler-host-handlers entpair) handlers))
+	    
+	      ; has been processed, time to leave
+	      (return-from publish-directory ent)))
+
+    ; prefix not present, must add.
+    ; keep prefixes in order, with max length first, so we match
+    ; more specific before less specific
   
-  (if* remove 
-     then ; no work to do
-	  (return-from publish-directory nil))
+    (if* remove 
+       then ; no work to do
+	    (return-from publish-directory nil))
   
-  (let ((len (length prefix))
-	(list (locator-info locator))
-	(new-ent (make-prefix-handler
-		     :path prefix
-		     :host-handlers (list (make-host-handler :host host 
-					      :entity ent)))))
-    (if* (null list)
-       then ; this is the first
-	    (setf (locator-info locator) (list new-ent))
-     elseif (>= len
-		(length (caar list)))
-       then ; this one should preceed all other ones
-	    (setf (locator-info locator) (cons new-ent list))
-       else ; must fit somewhere in the list
-	    (do* ((back list (cdr back))
-		  (cur  (cdr back) (cdr cur)))
-		((null cur)
-		 ; put at end
-		 (setf (cdr back) `((,prefix ((,host ,ent))))))
-	      (if* (>= len (length (caar cur)))
-		 then (setf (cdr back)
-			`(,new-ent ,@cur))
-		      (return)))))
+    (let ((len (length prefix))
+	  (list (locator-info locator))
+	  (new-ent (make-prefix-handler
+		    :path prefix
+		    :host-handlers (mapcar #'(lambda (host)
+					       (make-host-handler 
+						:host host 
+						:entity ent))
+					   host))))
+      (if* (null list)
+	 then ; this is the first
+	      (setf (locator-info locator) (list new-ent))
+       elseif (>= len (length (caar list)))
+	 then ; this one should preceed all other ones
+	      (setf (locator-info locator) (cons new-ent list))
+	 else ; must fit somewhere in the list
+	      (do* ((back list (cdr back))
+		    (cur  (cdr back) (cdr cur)))
+		  ((null cur)
+		   ; put at end
+		   (setf (cdr back) (list new-ent)))
+		(if* (>= len (length (caar cur)))
+		   then (setf (cdr back) `(,new-ent ,@cur))
+			(return)))))
   
-  ent
-  ))
+    ent
+    ))
 		 
 
 
 (defmethod publish-entity ((ent entity) 
 			   (locator locator-exact)
 			   path
-			   host)
-  ;; handle the tricky case of putting an entity in hash
+			   hosts)
+  ;; handle  putting an entity in hash
   ;; table of a locator-exact.
-  ;; We have to store a list of entities for each path due
-  ;; to virtual hosts.  We always store the no host specified
-  ;; case last (if there is one).
+  ;;
+  ;; assert: hosts is a non-null list of vhosts
   ;;
   (let ((ents (gethash path (locator-info locator))))
     ;; must replace entry with matching host parameter
-    (if* (null ents)
-       then ; nothing for this path yet, just store
-	    ; this one
-	    (setq ents (list ent))
-       else (if* (null host)
-	       then ; no host specified, if there's a matching
-		    ; entity, it will be the last
-		    (let ((lents (last ents)))
-		      (if* (null (host (car lents)))
-			 then ; is a null one, just blast it
-			      (setf (car lents) ent)
-			 else ; not null, so add to end
-			      (nconc ents (list ent))))
-	       else ; entity specifies a host, must look for
-		    ; a match
-		    (do ((xents ents (cdr xents)))
-			((null xents)
-			 ; no match, add to the front
-			 (setq ents (cons ent ents)))
-		      (if* (null (set-exclusive-or 
-				  host
-				  (host (car xents))
-				  :test #'equalp))
-			 then ; match
-			      (setf (car xents) ent)
-			      (return)))))
-		      
-    (setf (gethash path (locator-info locator)) ents))
+    (dolist (host hosts)
+      (let ((xent (assoc host ents :test #'eq)))
+	(if* (null xent)
+	   then ; add new one
+		(push (cons host ent) ents)
+	   else ; replace
+		(setf (cdr xent) ent))))
+    (setf (gethash path (locator-info locator)) ents)
   
-  ent)
+    ent))
 
 
 (defmethod unpublish-entity ((locator locator-exact)
 			     path
-			     host
+			     hosts
 			     host-p)
   ;; remove any entities matching the host and path.
   ;; if host-p is nil then remove all entities, don't match the host
@@ -686,23 +657,45 @@
     (if* ents
        then (if* host-p
 	       then ; must patch the hosts
-		    
-		    ; ensure that host is a list
-		    (if* (and host (atom host))
-		       then (setq host (list host)))
-		    
-		    (let (res)
-		      (dolist (ent ents)
-			(if* (set-exclusive-or host
-					       (host ent)
-					       :test #'equalp)
-			   then ; no match
-				(push ent res)))
-		      (setf (gethash path (locator-info locator))
-			(nreverse res)))
+		    (dolist (host hosts)
+		      (let ((xent (assoc host ents :test #'eq)))
+			(if* xent
+			   then (setq ents
+				  (delete xent ents :test #'eq)))))
+		    (if* (null ents)
+		       then (remhash path (locator-info locator))
+		       else (setf (gethash path (locator-info locator)) ents))
 	       else ; throw away everything
 		    (remhash path (locator-info locator))))))
 
+
+(defun convert-to-vhosts (hosts server)
+  ;; host is a list or nil
+  ;; if an element is a string lookup the virtual host
+  ;; and create one of none is specified
+  (if* (null hosts)
+     then ; specify the wild card host
+	  (list :wild)
+     else ; convert strings to vhosts
+	  (mapcar #'(lambda (host)
+		      (if* (stringp host)
+			 then (let ((vhost (gethash host
+						    (wserver-vhosts server))))
+				(if* (null vhost)
+				   then ; not defined yet, must define
+					(setq vhost
+					  (setf (gethash host
+							 (wserver-vhosts server))
+					    (make-instance 'vhost
+					      :log-stream
+					      (wserver-log-stream server)
+					      :error-stream
+					      (wserver-log-stream server)
+					      :names 
+					      (list host)))))
+				vhost)
+			 else host))
+		  hosts)))
 				
 
 (defmethod handle-request ((req http-request))
@@ -798,27 +791,11 @@
 			     (locator locator-exact))
   ;; standard function for finding an entity in an exact locator
   ;; return the entity if one is found, else return nil
-  (let ((entities (gethash (uri-path (request-uri req))
-			   (locator-info locator))))
-    (dolist (entity entities)
-      (let ((entity-host (host entity)))
-	(if* entity-host
-	   then ; must do a host match
-		(let ((req-host (header-slot-value req :host)))
-		  (if* req-host 
-		     then ; name may be foo.com:8000
-			  ; need to just use the foo.com part:
-			  (setq req-host (car (split-on-character 
-					       req-host
-					       #\:)))
-				
-			  (if* (member req-host entity-host
-				       :test #'equalp)
-			     then (return entity))
-		     else ; no host given, don't do it
-			  nil))
-	   else ; no host specified in entity, so do it
-		(return entity))))))
+  (let ((ents (gethash (uri-path (request-uri req))
+		       (locator-info locator))))
+    (cdr 
+     (or (assoc (request-vhost req) ents :test #'eq)
+	 (assoc :wild ents :test #'eq)))))
 
 (defmethod standard-locator ((req http-request)
 			     (locator locator-prefix))
@@ -826,30 +803,22 @@
   ;; return the entity if one is found, else return nil
   (let* ((url (uri-path (request-uri req)))
 	 (len-url (length url))
-	 (req-host (header-slot-value req :host)))
-    
-    (setq req-host (car (split-on-character req-host #\:)))
+	 (vhost (request-vhost req)))
 	     
     (dolist (entpair (locator-info locator))
       (if* (and (>= len-url (length (prefix-handler-path entpair)))
 		(buffer-match url 0 (prefix-handler-path entpair)))
 	 then ; we may already be a wiener
-	      (dolist (host-h (prefix-handler-host-handlers entpair))
-		(let ((host (host-handler-host host-h)))
-		  (if* host
-		     then ; host specified, must match it
-			  (if* req-host
-			     then ; host passed in 
-				  (if* (member req-host host
-					       :test #'equalp)
-				     then (return-from standard-locator
-					    (host-handler-entity
-					     host-h)))
-			     else ; no host passed in, can't work
-				  nil)
-		     else ; no host specified, it always wins
-			  (return-from standard-locator
-			    (host-handler-entity host-h)))))))))
+	      (let ((hh (or (assoc vhost (prefix-handler-host-handlers
+					   entpair)
+				    :test #'eq)
+			     (assoc :wild (prefix-handler-host-handlers
+					   entpair)
+				    :test #'eq))))
+		(if* hh
+		   then (return (host-handler-entity hh))))))))
+    
+					   
 					  
   
 

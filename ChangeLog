@@ -1,3 +1,10 @@
+2001-10-10  John Foderaro  <jkf@tiger.franz.com>
+1.2.11
+	* upgraded support for virtual hosts, introducting
+	  an object to denote a virtual host so that each
+	  virtual host can do its own logging.
+	  See aserve.html for details on Virtual Hosts.
+
 2001-10-08  John Foderaro  <jkf@tiger.franz.com>
 
 	* publish.cl - publish-directory must pass on host info

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.29 2001/09/21 19:02:40 jkf Exp $
+;; $Id: t-aserve.cl,v 1.30 2001/10/10 16:32:57 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -1110,6 +1110,9 @@
 
 (defun test-publish-directory (port)
   (let ((prefix-local (format nil "http://localhost:~a" port))
+	(prefix-dns   (format nil "http://~a:~a" 
+			      (long-site-name)
+			      port))
 	(step 0))
     (multiple-value-bind (ok whole dir)
 	(match-regexp "\\(.*[/\\]\\).*" (namestring *load-truename*))
@@ -1145,6 +1148,41 @@
       
       ; remove entry so subsequent tests won't see it
       (publish-file :path "/test-pd/server.pem" :remove t)
+      
+      ; remove directory publish and see if that worked
+      (publish-directory :prefix "/test-pd/" :remove t)
+      
+      ; now it shouldn't exist
+      (test 404 (values2 
+		 (x-do-http-request (format nil "~a/test-pd/server.pem" 
+					    prefix-local))))
+      
+      ; test publish directory with virtual hosts
+      (publish-directory :prefix "/test-foo/"
+			 :destination dir
+			 :host "localhost")
+      ; so it will work with localhost
+      (test 200 (values2
+		 (x-do-http-request (format nil "~a/test-foo/server.pem"
+					    prefix-local))))
+      
+      ; but not the dns name
+      (test 404 (values2
+		 (x-do-http-request (format nil "~a/test-foo/server.pem"
+					    prefix-dns))))
+      ; remove all refs
+      (publish-directory :prefix "/test-foo/"
+			 :host "localhost"
+			 :remove t)
+      (publish-file :path "/test-foo/server.pem" 
+		    :host "localhost"
+		    :remove t)
+      
+      ; now doesn't exist
+      (test 404 (values2
+		 (x-do-http-request (format nil "~a/test-foo/server.pem"
+					    prefix-local))))
+      
       )))
 
 			 
