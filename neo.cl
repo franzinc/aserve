@@ -17,22 +17,50 @@
 (eval-when (compile load eval)
   ;; these are the common headers and are stored in slots in 
   ;; the objects
+  ;; the list consists of  ("name" . name)
+  ;; where name is symbol naming the accessor function
   (defparameter *fast-headers*
-      '("connection" 
-	"date" 
-	"transfer-encoding"
-	"accept"
-	"host"
-	"user-agent"
-	"content-length")))
+      (let (res)
+	(dolist (name '("connection" 
+			"date" 
+			"transfer-encoding"
+			"accept"
+			"host"
+			"user-agent"
+			"content-length"))
+	  (push (cons name (read-from-string name)) res))
+	res)))
+
+    
+	
 
 
 (defmacro header-slot-value (name obj)
   ;; name is a string naming the header value (all lower case)
   ;; retrive the slot's value from the http-request obj obj.
-  (if* (assoc name *fast-headers* :test #'equal)
-	  then ; has as
-  )
+  (let (ent)
+    (if* (setq ent (assoc name *fast-headers* :test #'equal))
+       then ; has a fast accesor
+	    `(,(cdr ent) ,obj)
+       else ; must get it from the alist
+	    `(cdr (assoc ,name (alist ,obj) :test #'equal)))))
+
+(defsetf header-slot-value (name obj) (newval)
+  ;; set the header value regardless of where it is stored
+  (let (ent)
+    (if* (setq ent (assoc name *fast-headers* :test #'equal))
+       then `(setf (,(cdr ent) ,obj) ,newval)
+       else (let ((genvar (gensym))
+		  (nobj (gensym)))
+	      `(let* ((,nobj ,obj)
+		      (,genvar (assoc ,name (alist ,nobj) 
+				      :test #'equal)))
+		 (if* (null ,genvar)
+		    then (push (setq ,genvar (cons ,name nil))
+			       (alist ,nobj)))
+		 (setf (cdr ,genvar) ,newval))))))
+		    
+
 
 
     
@@ -45,11 +73,11 @@
       ;; generate a list of slot descriptors for all of the 
       ;; fast header slots
       (dolist (head *fast-headers*)
-	(let ((name (read-from-string head))) ; use read for case mode compat
-	  (push `(,name :accessor ,name :initform nil
-			:initarg
-			,(intern (symbol-name name) :keyword))
-		res)))
+	(push `(,(cdr head) :accessor ,(cdr head) 
+			    :initform nil
+			    :initarg
+			    ,(intern (symbol-name (cdr head)) :keyword))
+	      res))
       res))
    
 	   
@@ -131,7 +159,7 @@
     :reader protocol-string)
    (alist ;; alist of headers not stored in slots
     :initform nil
-    :accessor alist)
+r    :accessor alist)
    (socket ;; the socket we're communicating throgh
     :initarg :socket
     :reader socket)
@@ -175,6 +203,7 @@
 (defparameter *response-created* (make-resp 201 "Created"))
 (defparameter *response-accepted* (make-resp 202 "Accepted"))
 
+(defparameter *response-not-modified* (make-resp 304 "Not Modified"))
 (defparameter *response-bad-request* (make-resp 400 "Bad Request"))
 (defparameter *response-unauthorized* (make-resp 401 "Unauthorized"))
 (defparameter *response-not-found* (make-resp 404 "Not Found"))

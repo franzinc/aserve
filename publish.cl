@@ -18,7 +18,7 @@
 	   :initform nil
 	   :reader prefix)
    (last-modified :initarg :last-modified
-		  :reader last-modified
+		  :accessor last-modified
 		  :initform nil ; means always considered new
 		  ))
   )
@@ -280,16 +280,16 @@
        
   
 (defmethod process-entity ((req xhttp-request) (ent file-entity))
-  (with-http-response2 (req ent)
     
-    (let ((contents (contents ent)))
-      (if* contents
-	 then ;(preloaded)
-	      ; set the response code and 
-	      ; and header fields then dump the value
+  (let ((contents (contents ent)))
+    (if* contents
+       then ;(preloaded)
+	    ; set the response code and 
+	    ; and header fields then dump the value
 	      
-	      ; * should check for range here
-	      ; for now we'll send it all
+	    ; * should check for range here
+	    ; for now we'll send it all
+	    (with-http-response2 (req ent)
 	      (setf (resp-code req) *response-ok*)
 	      (push (cons "Content-Length" (length contents))
 		    (resp-headers req))
@@ -304,9 +304,57 @@
 		;; at this point the header are out and we have a stream
 		;; to write to 
 		(write-sequence contents (resp-stream req))
-		)
-	 else ; 
-	      (error "this side not done yet")))))
+		))
+       else ; the non-preloaded case
+	    (let (p)
+	      
+	      (setf (last-modified ent) nil) ; forget previous cached value
+	      
+	      (if* (null (errorset 
+			  (setq p (open (file ent) 
+					:direction :input
+					:element-type '(unsigned-byte 8)))))
+		 then ; file not readable
+		      (with-http-response2 (req ent)
+			(setf (resp-code req) *response-not-found*)
+			(with-http-body (req ent)))
+		      (return-from process-entity nil))
+	      
+	      (unwind-protect 
+		  (progn
+		    (let ((size (excl::filesys-size (stream-input-fn p)))
+			  (lastmod (excl::filesys-write-date 
+				    (stream-input-fn p)))
+			  (buffer (make-array 1024 
+					      :element-type '(unsigned-byte 8))))
+		      (declare (dynamic-extent buffer))
+		      
+		      (setf (last-modified ent) lastmod)
+		      (with-http-response2 (req ent)
+
+			(setf (resp-code req) *response-ok*)
+			(push (cons "Content-Length" size) (resp-headers req))
+			(push (cons "Last-Modified"
+				    (universal-time-to-date 
+				     (min (resp-date req) lastmod)))
+			      (resp-headers req))
+			(setf (resp-content-type req) (mime-type ent))
+			
+			(with-http-body (req ent :format :binary)
+			  (loop
+			    (if* (<= size 0) then (return))
+			    (let ((got (read-sequence buffer 
+						      p :end 
+						      (min size 1024))))
+			      (if* (<= got 0) then (return))
+			      (write-sequence buffer (resp-stream req)
+					      :end got)
+			      (decf size got)))))))
+		      
+		      
+		(close p))))))
+	      
+		
 
 
 		
@@ -318,16 +366,33 @@
   ;; throw to abort the rest of the body being run
   
   ; to be done
-  (declare (ignore doit req ent))
   
   (if* (not doit)
      then ; we dont' even care
 	  (return-from up-to-date-check nil))
   
-  
-  
-  
-  nil)
+  (let ((if-modified-since (header-slot-value "if-modified-since" req)))
+    (if* if-modified-since
+       then (setq if-modified-since
+	      (date-to-universal-time if-modified-since)))
+    
+    (if* if-modified-since
+       then ; valid date, do the check
+	    (if* (and (last-modified ent) 
+		      (<= (last-modified ent) if-modified-since))
+	       then ; send back a message that it is already
+		    ; up to date
+		    (setf (resp-code req) *response-not-modified*)
+		    (with-http-body (req ent)
+		      ;; force out the header
+		      )
+		    (throw 'with-http-response nil) ; and quick exit
+		    ))))
+
+    
+		    
+    
+    
 
 
 
@@ -350,7 +415,7 @@
   ;;	we we started to run out of free threads.
   (setf (resp-keep-alive req) 
     (and *enable-keep-alive*
-	 (equalp "keep-alive" (connection req)))))
+	 (equalp "keep-alive" (header-slot-value "connection" req)))))
   
 
 (defvar *enable-chunking* t) ; until we can figure it out

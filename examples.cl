@@ -153,7 +153,10 @@
 	      :mime-type "text/plain"
 	      :preload t)
 
-
+(publish-file :url "/foo.txt"
+	      :file "foo.txt"
+	      :mime-type "text/plain"
+	      :preload nil)
 
 
 

@@ -166,8 +166,8 @@
     '#.(let (res)
 	(dolist (head *fast-headers*)
 	  (push (cons
-		 (dual-caseify (concatenate 'string head ":"))
-		 (read-from-string head))
+		 (dual-caseify (concatenate 'string (car head) ":"))
+		 (cdr head))
 		res))
 	res))
       
