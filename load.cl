@@ -3,13 +3,19 @@
 (defvar *loadswitch* :compile-if-needed)
 ;(require :defftype)
 
-(dolist (file '("../htmlgen/htmlgen"
-		"macs"
-		"neo"
-		"parse"
-		"publish"
-		"log"
-		"examples"))
+(defparameter *neo-files* 
+    '("../htmlgen/htmlgen"
+      "macs"
+      "neo"
+      "parse"
+      "publish"
+      "log" ))
+
+(defparameter *neo-examples*
+    '("examples"))
+
+
+(dolist (file (append *neo-files* *neo-examples*))
   (case *loadswitch*
     (:compile-if-needed (compile-file-if-needed (format nil "~a.cl" file)))
     (:compile (compile-file (format nil "~a.cl" file)))
@@ -43,3 +49,42 @@
  
    :ignore-command-line-arguments t
    :suppress-allegro-cl-banner t))
+
+
+(defun make-distribution ()
+  ;; make a distributable version of neo
+  (run-shell-command "rm -fr neo-dist")
+  (run-shell-command "mkdir neo-dist")
+  (copy-files-to *neo-files* "neodist.fasl")
+  (copy-files-to '("../htmlgen/htmlgen.html")
+		 "neo-dist/htmlgen.fasl")
+  (dolist (file '("neodist.fasl"
+		  "neo.html"
+		  "readme.txt"
+		   "examples.cl"
+		   "examples.fasl"
+		   "foo.txt"
+		   "fresh.jpg"
+		   "prfile9.jpg"))
+    (copy-files-to (list file)
+		   (format nil "neo-dist/~a" file))))
+		
+  
+  
+
+(defun copy-files-to (files dest)
+  ;; copy the contents of all files to the file named dest.
+  ;; append .fasl to the filenames (if no type is present)
+  
+  (let ((buffer (make-array 4096 :element-type '(unsigned-byte 8))))
+    (with-open-file (p dest :direction :output
+		     :if-exists :supersede
+		     :element-type '(unsigned-byte 8))
+      (dolist (file files)
+	(if* (null (pathname-type file))
+	   then (setq file (concatenate 'string file  ".fasl")))
+	(with-open-file (in file :element-type '(unsigned-byte 8))
+	  (loop
+	    (let ((count (read-sequence buffer in)))
+	      (if* (<= count 0) then (return))
+	      (write-sequence buffer p :end count))))))))

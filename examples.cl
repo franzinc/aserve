@@ -4,9 +4,11 @@
 
 (in-package :neoe)
 
+;; flush all publishing done so far:
 (unpublish :all t)
 
-#+ignore (publish :url "/" 
+
+(publish :url "/" 
 	 :content-type "text/html"
 	 :function
 	 #'(lambda (req ent)
@@ -18,10 +20,15 @@
 			 ((:a :href "/gc") "Garbage Collector Stats") :br
 			 ((:a :href "/apropos") "Apropos") :br
 			 ((:a :href "/pic") "Sample jpeg") :br
-			 ))))))
+			 ((:a :href "/secret") "Test authorization")
+ 			 " (name: " (:b "foo") ", password: " (:b "bar") ")")
+			 )))))
 			     
 
 
+;; a very simple page.  This is so simple it doesn't put out the required
+;; tags (like <html>) yet I suspect that most browsers will display it
+;; correctly regardless.
 (publish :url "/hello"
 	 :content-type  "text/html"
 	 :function #'(lambda (req ent)
@@ -29,6 +36,8 @@
 			 (with-http-body (req ent)
 			   (html "Hello World!")))))
 
+;; this is the "/hello" example above modified to put out the correct
+;; html tags around the page.
 (publish :url "/hello2"
 	 :content-type  "text/html"
 	 :function #'(lambda (req ent)
@@ -38,6 +47,7 @@
 			    (:html
 			     (:body "Hello World!")))))))
 
+;; display the current gc statistics.
 (publish :url "/gc"
 	 :content-type "text/html"
 	 :function
@@ -73,14 +83,12 @@
 		       
 
 
-
+;; display a picture from a file.
 (publish-file :url "/pic" :file "prfile9.jpg"
 	      :content-type "image/jpeg")
 
 
 
-(publish-file :url "/sampx" :file "c:/acl/cl/doc/newfspec.htm"
-	      :content-type "text/html")
 
 
 ;;
@@ -172,12 +180,14 @@
 		     else (html "Enter name and type enter")))
 		 :newline))))))
 
-				  
+
+;; a preloaded picture file
 (publish-file :url "/neoweb/fresh.jpg"
 	      :file "fresh.jpg"
 	      :content-type "image/jpeg"
 	      :preload t)
 
+;; a preloaded text file
 (publish-file :url "/foo"
 	      :file "foo.txt"
 	      :content-type "text/plain"
@@ -188,6 +198,9 @@
 	      :content-type "text/plain"
 	      :preload nil)
 
+;; an example which causes the web browser to put up the
+;; name/password box and if you enter the name "foo" and password "bar"
+;; then you get access to the secret info.
 (publish :url "/secret"
 	 :content-type "text/html"
 	 :function
@@ -208,13 +221,19 @@
 					      '(("WWW-Authenticate" 
 						 . "Basic realm=\"secretserver\"")))))))))
 
+
+
+;;;;;;  directory publishing.  These will only work on a particular
+;; set of machines so you'll have to modify them to point to an
+;; existing tree of pages on your machine if you want to see this work.
+
 ;; the franz home page
 #+ignore (publish-directory :prefix "/"
 		   :destination "/net/tanya/home/httpd/html/"
 		   )
 
- 
-(publish-directory :prefix "/"
+
+(publish-directory :prefix "/int"
 		   :destination "/net/tanya/www/internal/htdocs/")
 
 #+ignore (publish-directory :prefix "/"
