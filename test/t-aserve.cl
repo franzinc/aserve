@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.17 2000/10/06 15:16:16 jkf Exp $
+;; $Id: t-aserve.cl,v 1.18 2000/10/10 15:46:14 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -43,7 +43,7 @@
 (in-package :net.aserve.test)
 
 ; set to nil before loading the test to prevent the test from auto-running
-(defvar user::*do-aserve-test* t)
+(defvar user::*do-aserve-test* nil)
 (defvar *x-proxy* nil) ; when true x-do-http-request will go through a proxy
 (defvar *proxy-wserver* nil)
 
@@ -913,15 +913,16 @@
 ;; (net.aserve.test::test-proxy-cache)
 ;;
 (defun test-proxy-cache ()
-  (let ((*wserver* (start :port nil :server :new))
-	(proxy-wserver (start :port nil :server :new :proxy t :cache t))
-	(proxy-host)
-	(origin-server))
+  (let* ((*wserver* (start :port nil :server :new))
+	 (proxy-wserver (start :port nil :server :new :proxy t :cache t))
+	 (proxy-host)
+	 (origin-server)
+	 (pcache (net.aserve::wserver-pcache proxy-wserver)))
     
     (macrolet ((test-2 (res1 res2 form &key (test #'eql))
 		 `(multiple-value-bind (v1 v2) ,form
-		    (test ,res1 (and `(:first ,',form) v1) :test ,test)
-		    (test ,res2 (and `(:second ,',form) v2) :test ,test))))
+		    (test ,res1 (and '(:first ,form) v1) :test ,test)
+		    (test ,res2 (and '(:second ,form) v2) :test ,test))))
 		 
 		      
 		 
@@ -940,51 +941,68 @@
 	      (socket:local-port
 	       (net.aserve::wserver-socket proxy-wserver)))
 
+      (with-open-file (p "aservetest.xx" :direction :output
+		       :if-exists :supersede)
+	(format p "foo"))
+      
       (with-tests (:name "aserve-proxy-cache")
 	(unwind-protect
 	    (progn
-	      (publish :path "/foo"
-		       :function #'(lambda (req ent)
-				     (with-http-response (req ent)
-				       (with-http-body (req ent)
-					 (html "foo")))))
-	  
+	      (publish-file  :path "/foo" :file "aservetest.xx" :cache-p t)
+
+	      ; a miss
 	      (test-2 "foo" 200
-		    (do-http-request 
-				(format nil "~a/foo" origin-server)
-			      :proxy proxy-host)
-		    :test #'equal)
+		      (do-http-request 
+			  (format nil "~a/foo" origin-server)
+			:proxy proxy-host)
+		      :test #'equal)
+	      
+	      (test 1 (net.aserve::pcache-r-miss pcache))
+	      
+	      ; a fast hit
 	      (test-2 "foo" 200
-		    (do-http-request 
-				(format nil "~a/foo" origin-server)
-			      :proxy proxy-host)
-		    :test #'equal)
+		      (do-http-request 
+			  (format nil "~a/foo" origin-server)
+			:proxy proxy-host)
+		      :test #'equal)
+	      (test 1 (net.aserve::pcache-r-fast-hit pcache))
+	      
+	      ; another fast hit
 	      (test-2 "foo" 200
-		     (do-http-request 
-				(format nil "~a/foo" origin-server)
-			      :proxy proxy-host)
-		    :test #'equal)
+		      (do-http-request 
+			  (format nil "~a/foo" origin-server)
+			:proxy proxy-host)
+		      :test #'equal)
+	      (test 2 (net.aserve::pcache-r-fast-hit pcache))
 	  
-	  
+
+	      (format t "sleeping for 15 secs.....~%")(force-output)
 	      (sleep 15)
+	      
+	      ; entry no longer fresh so get a slow hit
 	      (test-2 "foo" 200
-		    (do-http-request 
-				(format nil "~a/foo" origin-server)
-			      :proxy proxy-host)
-		    :test #'equal)
-	  
+		      (do-http-request 
+			  (format nil "~a/foo" origin-server)
+			:proxy proxy-host)
+		      :test #'equal)
+	      (test 1 (net.aserve::pcache-r-slow-hit pcache))
+
+	      ; entry now updated so we get a fast hit 
 	      (test-2 "foo"  200
-		     (do-http-request 
-				(format nil "~a/foo" origin-server)
-			      :proxy proxy-host)
-		    :test #'equal)
+		      (do-http-request 
+			  (format nil "~a/foo" origin-server)
+			:proxy proxy-host)
+		      :test #'equal)
+	      
+	      (test 3 (net.aserve::pcache-r-fast-hit pcache))
 	  
 		
 	      )
 	    
 	  
       
-      
+
+	  (ignore-errors (delete-file "aservetest.xx"))
 	  (shutdown  proxy-wserver)
 	  (shutdown  *wserver*))))))
 

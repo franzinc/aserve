@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.18 2000/10/06 15:16:16 jkf Exp $
+;; $Id: proxy.cl,v 1.19 2000/10/10 15:46:14 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -40,14 +40,21 @@
 (defstruct pcache 
   ;; proxy cache
   table		; hash table mapping to pcache-ent objects
-  file		; file in which to store the cache info
-  (probes 0)	; cache problems
-  (hits	  0)	; number of times we could send something from the cache
-  (items  0)	; total number of objects cached
-  (bytes  0)	; total number of bytes cached
-  (memory 0)	; total number of bytes in memory
-  (disk	  0)	; bytes written to disk
-
+  disk-caches   ; list of pcache-disk items
+  
+  ; memory cache statistics
+  (items  0)	 ; total number of objects cached (on the mru/lru list)
+  (bytes  0)	 ; total number of bytes of real data cached
+  (blocks 0) ; total number of blocks in memory
+  
+  (dead-items 0) ; total number of objects on the dead-ent list
+  
+  ; double linked by next and prev
+  mru-ent	; most recently used  pcache-ent dummy block
+  lru-ent	; least recently used pcache-ent dummy block
+  
+  dead-ent	; linked list of dead pcache-ents, linked by next field only
+  
   ; requests that completely bypass the cache
   (r-direct 0)
 
@@ -59,7 +66,10 @@
   ; ims request where we know that the value in the cache is fresh
   ;  and has been modified since the ims time
   (r-fast-hit 0)
-  
+
+  ; non-ims request.  value is stale but after checking with the
+  ; origin server we find that our value is up to date
+  (r-slow-hit 0)
   
   ; ims request made and cached value is fresh and based on that
   ; we know that the client's version is fresh so send 
@@ -75,13 +85,40 @@
   ; and find that our copy was inconsistent and get a new copy to cache
   (r-consistency-miss 0)
   
-  
-  
   )
 
 
 
+(defstruct pcache-disk
+  ;; for each disk file on which we are caching
+  filename
+  stream
+  free-blocks   ; number of blocks remaining
+  free-list ; list of (start . end) blocks that are free
+
+  (lock (mp:make-process-lock :name "disk pcache"))
+  ; doubly linked list of pcache-ents in this cache
+  mru-ent
+  lru-ent
+  )
+
+
+
+
+
+; each pcache entry holds the information on a 200 response
+; use  state
+; --- ------
+; >=0  nil	in memory cache entry.  linked to mru-ent
+; >0   :dead	in memory entry in use but which will no longer be used
+;		after the uses are over.  linked to dead-ent
+; nil  :dead	in memory entry which is ready to be reclaimed along
+;		with all the blocks it points to.  linked to dead-ent
+; 
+
+
 (defstruct pcache-ent
+  key		; copy of the key for debugging purposes
   last-modified-string  ; last modified time from the header
   last-modified  ; universal time entry was last modified
   expires	; universal time when this entry expires
@@ -90,6 +127,7 @@
   request	; request header block 
   data		; data blocks (first is the response header block)
   data-length	; number of octets of data
+  blocks	; number of cache blocks (length of the value in data slot)
   code		; response code
   comment	; response comment 
 
@@ -102,6 +140,15 @@
   
   ; number of times this entry was returned due to a request
   (returned 0)
+  
+  ; if cached to the disk this tells where
+  disk-location
+  pcache-disk
+  
+  ; linked list of pcache-ents
+  prev
+  next
+  
   )
 
 
@@ -220,9 +267,8 @@
 					    "error during proxy: ~a~%" cond)
 				    
 				    (if* pcache-ent
-				       then (setf (pcache-ent-state 
-						   pcache-ent)
-					      :dead))
+				       then (kill-pcache-ent pcache-ent))
+				    
 						   
 				    (if* (not (member :notrap *debug-current* 
 						      :test #'eq))
@@ -650,43 +696,70 @@
     (setf (wserver-pcache server)
       (setq pcache (make-pcache 
 		    :table (make-hash-table :test #'equal))))
+    
+    ; create initial link entries
+    (let ((mru (make-pcache-ent))
+	  (lru (make-pcache-ent)))
+      (setf (pcache-ent-next mru) lru
+	    (pcache-ent-prev lru) mru
+	    
+	    (pcache-mru-ent pcache) mru
+	    (pcache-lru-ent pcache) lru))
+    
+    ; create a sample 10mb cache disk for testing
+    ; purposes
+    (let ((pdisk (make-pcache-disk
+		  :filename "aserve-cache.asv")))
+      (push pdisk (pcache-disk-caches pcache))
+      (setf (pcache-disk-stream pdisk)
+		  (open "aserve-cache.asv" ; need unique names
+				:if-exists :supersede
+				#-(and allegro version>= 6)
+				:element-type
+				#-(and allegro version>= 6)
+				'(unsigned-byte 8)))
+      
+      ; 10mb 
+      (setf (pcache-disk-free-blocks pdisk)
+	(/ #.(* 10 1024 1024) *header-block-size*))
+      
+      (setf (pcache-disk-free-list pdisk)
+	(list (cons 0 (1- (pcache-disk-free-blocks pdisk)))))
+      
+	
+    (let ((mru (make-pcache-ent))
+	  (lru (make-pcache-ent)))
+      (setf (pcache-ent-next mru) lru
+	    (pcache-ent-prev lru) mru
+	    
+	    (pcache-disk-mru-ent pcache) mru
+	    (pcache-disk-lru-ent pcache) lru)))
+      
   
     (publish :path "/cache-stats"
 	     :function
 	     #'(lambda (req ent)
-		 (display-proxy-cache-statistics req ent pcache)))))
+		 (display-proxy-cache-statistics req ent pcache)))
+    (publish :path "/cache-entries"
+	     :function
+	     #'(lambda (req ent)
+		 (display-proxy-cache-entries req ent pcache)))
+    ))
 				
 
 
 (defun display-proxy-cache-statistics (req ent pcache)
-  (let ((dead-count 0)
-	(dead-bytes 0)
-	(new-count 0)
-	(per-age-count (make-array 10 :initial-element 0))
-	(per-age-bytes (make-array 10 :initial-element 0))
-	(other-age-count 0)
-	)
-    (maphash #'(lambda (key vals)
-		 (declare (ignore key))
-		 (dolist (val vals)
-		   (let ((state (pcache-ent-state val))
-			 (use (pcache-ent-use val))
-			 (size (pcache-ent-data-length val)))
-		     (if* (eq state :dead)
-			then (incf dead-count)
-			     (incf dead-bytes
-				   (if* (numberp size) then size else 0))
-		      elseif (eq state :new)
-			then (incf new-count)
-		      elseif (and (null state)
-				  (numberp use)
-				  (<= 0 use 9))
-			then (incf (aref per-age-count use))
-			     (incf (aref per-age-bytes use)
-				   (if* (numberp size) then size else 0))
-			else (incf other-age-count)))))
-					   
-	     (pcache-table pcache))
+	
+	
+    
+  ; count number of memory entries
+  (let ((dead-bytes 0)
+	(dead-blocks 0))
+    (do ((ent (pcache-dead-ent pcache) (pcache-ent-next ent)))
+	((null ent))
+      (incf dead-bytes (pcache-ent-data-length ent))
+      (incf dead-blocks (pcache-ent-blocks ent)))
+      
     
     (with-http-response (req ent)
       (with-http-body (req ent)
@@ -695,6 +768,10 @@
 	  (:head (:title "AllegroServe Proxy Cache Statistics"))
 	  (:body 
 	   (:h1 "AllegroServe Proxy Cache Statistics")
+	   :p
+	   "Here are details on existing " ((:a :href "cache-entries")
+					    "Cache Entries.")
+	   :br
 	   ((:table :border 2)
 	    (:tr
 	     (:th "Cache Action")
@@ -717,29 +794,80 @@
 	    (:tr
 	     (:th "Kind of Entry")
 	     (:th "Count")
-	     (:th "Bytes"))
-	   
+	     (:th "Bytes")
+	     (:th "Blocks"))
+
 	    (:tr
-	     (:td "Dead Entries") 
-	     (:td (:princ dead-count))
-	     (:td (:princ dead-bytes)))
-	   
-	   
+	     (:td "Live entries in memory")
+	     (:td (:princ (pcache-items pcache)))
+	     (:td (:princ (pcache-bytes pcache)))
+	     (:td (:princ (pcache-blocks pcache))
+		  " ("
+		  (:princ (* (pcache-blocks pcache) *header-block-size*))
+		
+		  " bytes)"))
+	    
 	    (:tr
-	     (:td "New Entries") (:td (:princ new-count)) (:td))
-	   
-	    (:tr
-	     (:td "Other Entries") (:td (:princ other-age-count)) (:td))
-	   
-	    (dotimes (i 10)
-	      (html
-	       (:tr
-		(:td (:princ i))
-		(:td (:princ (aref per-age-count i)))
-		(:td (:princ (aref per-age-bytes i))))))))))))))
+	     (:td "Dead entries in memory") 
+	     (:td (:princ (pcache-dead-items pcache)))
+	     (:td (:princ dead-bytes))
+	     (:td (:princ dead-blocks)
+		  " ("
+		  (:princ (* dead-blocks *header-block-size*)) " bytes)"
+		  ))
+	    ))))))))
 				     
 				     
-				   
+(defun display-proxy-cache-entries (req ent pcache)
+  ;; show all the proxy cache entries
+  (let ((now (get-universal-time)))
+    (with-http-response (req ent)
+      (with-http-body (req ent)
+	(html
+	 (:html
+	  (:head (:title "Proxy Cache Entries"))
+	  (:body
+	   (:h1 "Proxy cache entries")
+	   :p
+	   "Here is a summary of " ((:a :href "cache-stats") "Cache Statistics.")
+	   :br
+	   "The current time is " (:princ-safe (universal-time-to-date now))
+	   :br
+	   :br
+
+	   (let ((ent (pcache-ent-next (pcache-mru-ent pcache)))
+		 (last-ent (pcache-lru-ent pcache)))
+	     (loop
+	       (if* (or (null ent)  (eq last-ent ent)) then (return))
+	       (html (:b "uri: ")
+		     (:princ-safe (pcache-ent-key ent))
+		     :br
+		     (if* (>= now (pcache-ent-expires ent))
+			then (html (:b ((:font :color "red")
+					"Stale -- ")))
+			else (html (:b ((:font :color "green")
+					"Fresh -- "))))
+		     (:b "Expires: ")
+		     (:princ-safe 
+		      (universal-time-to-date (pcache-ent-expires ent)))
+				
+				      
+		     :br
+		     (:b ", Last Modified: ")
+		     (:princ-safe 
+		      (universal-time-to-date (pcache-ent-last-modified ent)))
+		     :br
+		     (:b "Size: ")
+		     (:princ (pcache-ent-data-length ent))
+		     (:b ", State: ")
+		     (:princ-safe (pcache-ent-state ent))
+		     :p
+		     :br
+		     )
+	       (setq ent (pcache-ent-next ent)))))))))))
+
+				
+      
   
 
 
@@ -770,7 +898,8 @@
 	      ; result looks good
 	      (progn
 		(logmess "not in cache, proxy it")
-		(proxy-and-cache-request req ent (get-universal-time) nil)))
+		(incf (pcache-r-miss pcache))
+		(proxy-and-cache-request req ent (get-universal-time) nil t)))
       (if* (lock-pcache-ent pcache-ent)
 	 then (unwind-protect
 		  (progn (use-value-from-cache req ent pcache-ent)
@@ -779,35 +908,38 @@
 
 
 
-(defun proxy-and-cache-request (req ent now pcache-ent)
+(defun proxy-and-cache-request (req ent now pcache-ent respond)
   ;; must send the request to the net via the proxy.
   ;; if pcache-ent is non-nil then this is the existing
   ;; cache entry which may get updated or killed.
   ;; 
+  ;; return the reponse code from the proxy call
+  ;;
   (let ((new-ent (make-pcache-ent))
 	(rendered-uri (net.uri:render-uri (request-raw-uri req) nil))
 	(pcache (wserver-pcache *wserver*)))
-    (proxy-request req ent :pcache-ent new-ent)
+    (proxy-request req ent :pcache-ent new-ent :respond respond)
     (if* (eq (pcache-ent-code new-ent) 200)
        then ; turns out it was modified, must
 	    ; make this the new entry
 
 	    (if* pcache-ent
 	       then (logmess (format nil "replace cache entry for ~a"
-				     rendered-uri))
-		    (logmess "consistency miss")
-		    (incf (pcache-r-consistency-miss pcache))
-	       else (logmess "miss")
-		    (incf (pcache-r-miss pcache)))
+				     rendered-uri)))
 	    
-		    
+	    (setf (pcache-ent-key new-ent) rendered-uri)
+	    
 	    (push new-ent
 		  (gethash rendered-uri
 			   (pcache-table pcache)))
+	    (record-new-pcache-ent-stats new-ent pcache)
+	    
+	    (most-recently-used-ent new-ent)  ; link it in.
 			      
 	    ; and disable the old entry
 	    (if* pcache-ent
-	       then (setf (pcache-ent-state pcache-ent) :dead))
+	       then (kill-pcache-ent pcache-ent))
+	    
      elseif (and pcache-ent
 		 (eq (pcache-ent-code new-ent) 304))
 		 
@@ -818,12 +950,13 @@
 	    ; time in a header from a previous call
 	    (logmess (format nil "change expiration date for ~a"
 			     rendered-uri))      
-	    (incf (pcache-r-slow-validation pcache))
 	    (setf (pcache-ent-expires pcache-ent)
 	      (max (pcache-ent-expires pcache-ent)
 		   (compute-approx-expiration
 		    (pcache-ent-last-modified pcache-ent)
-		    now))))))
+		    now))))
+    
+    (pcache-ent-code new-ent)))
   
 
 
@@ -834,6 +967,9 @@
 	 (now (get-universal-time))
 	 (pcache (wserver-pcache *wserver*))
 	 (fresh))
+    
+    (most-recently-used-ent pcache-ent)
+    
     (logmess (format nil "ims is ~s" ims))
 
     ; compute if the entry is fresh or stale
@@ -845,26 +981,29 @@
 	    ; condition is If-Modified-Since
 	    (setq ims (date-to-universal-time ims))
 	    
-	    (if* (< ims (pcache-ent-last-modified pcache-ent))
-	       then ; it has been modified since the ims time
-		    ; must return the whole thing
-		    (if* fresh
-		       then (logmess "validation->fast hit")
+	    
+	    (if* fresh
+	       then (if* (< ims (pcache-ent-last-modified pcache-ent))
+		       then ; it has been modified since the ims time
+			    ; must return the whole thing
+			    (logmess "validation->fast hit")
 			    (incf (pcache-r-fast-hit pcache))
 			    (send-cached-response req pcache-ent)
-		       else (proxy-and-cache-request req ent now pcache-ent))
-		    
-	     elseif fresh
-	       then ; (>= ims last-modified-time) and the entry
-		    ; is fresh, we we believe the last-modified-time
-		    ; thus we respond that entry is correct
-		    (logmess "fast validation")
-		    (incf (pcache-r-fast-validation pcache))
-		    (send-not-modified-response req ent)
-	       else ; (>= ims last-modified-time) butthe entry
-		    ;  stale, so we can't trust the last modified time
-		    ;
-		    (proxy-and-cache-request req ent now pcache-ent))
+		       else ; it hasn't been modified since the ims time
+			    (logmess "fast validation")
+			    (incf (pcache-r-fast-validation pcache))
+			    (send-not-modified-response req ent))
+	       else ; stale, must revalidate
+		    (let ((code
+			   (proxy-and-cache-request req ent 
+						    now pcache-ent t)))
+		      (if* (eql code 304)
+			 then (logmess "slow validation")
+			      (incf (pcache-r-slow-validation pcache))
+			 else (logmess "consistency miss")
+			      (incf (pcache-r-consistency-miss
+				     pcache)))))
+			    
        else ; unconditional get
 	    (if* fresh
 	       then (logmess "fast hit")
@@ -880,7 +1019,18 @@
 			   (universal-time-to-date
 			    (pcache-ent-last-modified pcache-ent)))))
 
-		    (proxy-and-cache-request req ent now pcache-ent)))))
+		    (let ((code 
+			   (proxy-and-cache-request req ent now pcache-ent nil)))
+		      ; we didn't respond just sent out a probe
+		      (if* (eql code 304)
+			 then ; hasn't been modified since our 
+			      ; cached entry
+			      (logmess "slow hit")
+			      (incf (pcache-r-slow-hit pcache))
+			 else ; was modified, so new item is cached
+			      (logmess "consistency miss")
+			      (incf (pcache-r-consistency-miss pcache)))
+		      (send-cached-response req pcache-ent))))))
 		      
 		    
 (defun compute-approx-expiration (changed  now)
@@ -909,6 +1059,8 @@
 		   (net.uri:render-uri (request-raw-uri req) nil)
 		   (pcache-ent-data-length pcache-ent)))
   (incf (pcache-ent-returned pcache-ent))
+
+  
   
   (let ((rsock (request-socket req)))
     (format rsock "HTTP/1.1 ~d ~a~a" 
@@ -938,21 +1090,107 @@
   ;; attempt to increase the use count of this entry by one.
   ;; If successful return true.
   ;; If the entry is dead return nil
-  (mp:without-scheduling
-    (let ((val (pcache-ent-use pcache-ent)))
-      (if* val
-	 then (setf (pcache-ent-use pcache-ent) (1+ val))))))
+  (excl::atomically
+    (excl::fast
+     (let ((val (pcache-ent-use pcache-ent)))
+       (if* val
+	  then (setf (pcache-ent-use pcache-ent) 
+		  (the fixnum (1+ (the fixnum val)))))))))
 
 (defun unlock-pcache-ent (pcache-ent)
   ;; reduce the use count of this entry
   (mp:without-scheduling
     (let ((val (pcache-ent-use pcache-ent)))
       (if* val
-	 then (if* (and (zerop (decf val))
+	 then (if* (and (zerop (excl::fast
+				(decf (the fixnum val))))
 			(eq (pcache-ent-state pcache-ent) :dead))
 		 then (setf (pcache-ent-use pcache-ent) nil)
 		 else (setf (pcache-ent-use pcache-ent) val))))))
 
+(defun most-recently-used-ent (pcache-ent)
+  ;; make this entry the most recently used
+  (mp:without-scheduling
+    (let* ((mru-head  (pcache-mru-ent (wserver-pcache *wserver*)))
+	   (mru  (pcache-ent-next mru-head)))
+
+      (if* (not (eq mru pcache-ent))
+	 then (let ((prev (pcache-ent-prev pcache-ent))
+		    (next (pcache-ent-next pcache-ent)))
+		
+		; unlink it
+		(if* (and prev next)
+		   then (setf (pcache-ent-next prev) next
+			      (pcache-ent-prev next) prev))
+     
+		; link it at the mru spot
+		(setf (pcache-ent-next mru-head) pcache-ent
+		      (pcache-ent-prev pcache-ent) mru-head
+		      (pcache-ent-next pcache-ent) mru
+		      (pcache-ent-prev mru) pcache-ent))))))
+
+
+(defun record-new-pcache-ent-stats (pcache-ent pcache)
+  ;; record what we've added the memory cache
+  ;;
+  (mp:without-scheduling
+    (incf (pcache-items pcache))
+    (incf (pcache-bytes pcache) (pcache-ent-data-length pcache-ent))
+    (incf (pcache-blocks pcache) (pcache-ent-blocks pcache-ent))))
+
+
+(defun kill-pcache-ent (pcache-ent)
+  ; make this entry dead
+  (let ((pcache (wserver-pcache *wserver*)))
+    (mp::without-scheduling
+      (let ((state (pcache-ent-state pcache-ent)))
+	(if* (not (eq :dead state))
+	   then ; make it dead
+		(setf (pcache-ent-state pcache-ent) :dead)
+
+		(remove-from-memory-ru-list pcache-ent pcache)
+	      
+		; link onto the dead list
+		(setf (pcache-ent-next pcache-ent) (pcache-dead-ent pcache)
+		      (pcache-dead-ent pcache) pcache-ent)
+	      
+		; if currently not in use, then make sure it's never used
+		(if* (zerop (pcache-ent-use pcache-ent))
+		   then (setf (pcache-ent-use pcache-ent) nil))
+		
+		;; stats
+		(incf (pcache-dead-items pcache))
+		
+		)))))
+
+(defun remove-from-memory-ru-list (pcache-ent pcache)
+  
+  ;; unlink this entry from the memory recentlyused list
+  ;; and update the counts.
+  ;; it's assumed that were inside a without-scheduling when this
+  ;; is called
+  (let ((prev (pcache-ent-prev pcache-ent))
+	(next (pcache-ent-next pcache-ent)))
+		
+    ; unlink it from the mru/lru list
+    (if* (and prev next)
+       then (setf (pcache-ent-next prev) next
+		  (pcache-ent-prev next) prev)
+			  
+	    ; stats
+	    (decf (pcache-items pcache))
+	    (decf (pcache-bytes pcache)
+		  (pcache-ent-data-length pcache-ent))
+	    (decf (pcache-blocks pcache)
+		  (pcache-ent-blocks pcache-ent))
+	    )))
+
+	      
+	      
+	      
+     
+	      
+     
 
 #+ignore
 (defun match-request-blocks (request-block cache-block)
@@ -994,8 +1232,9 @@
   ;; in the pcache-ent we are passed, which should be blank
   
 	    
-  (logmess (format nil "cache: caching response to ~a, length ~d~%" 
+  (logmess (format nil "cache: caching response to ~a, code ~d, length ~d~%" 
 		   (net.uri:render-uri (request-raw-uri req) nil)
+		   response-code
 		   body-length
 		   ))
   
@@ -1007,7 +1246,11 @@
 	  
 	    (setf (pcache-ent-data pcache-ent) 
 	      (cons client-response-header body-buffers))
-	    (setf (pcache-ent-data-length pcache-ent) body-length)
+	    
+	    (setf (pcache-ent-data-length pcache-ent) body-length
+		  
+		  (pcache-ent-blocks pcache-ent) 
+		  (length (pcache-ent-data pcache-ent)))
 	  
 	    
 	  
@@ -1060,9 +1303,150 @@
     (if* body-buffers
        then (free-header-blocks body-buffers))))
 
-	  
-  
 
+
+(defun clean-memory-cache (&optional pcache)
+  ; clear out the dead entries
+  ; swap least recently used entries to disk
+  ;
+  
+  (let ((pcache (or pcache (wserver-pcache *wserver*))))
+    (let (ent)
+      (excl::atomically
+       (excl::fast
+	(setf ent (pcache-dead-ent pcache)
+	      (pcache-dead-ent pcache) nil)))
+    
+      ; now we have an exclusive link to the dead entries
+      ; which we can free at our leisure
+      (let ((count 0))
+	(loop
+	  (if* (null ent) then (return))
+	  (incf count)
+	  (free-header-blocks (pcache-ent-data ent))
+	  (setq ent (pcache-ent-next ent)))
+	(excl::atomically 
+	 (excl::fast 
+	  (decf (the fixnum (pcache-dead-items pcache)) 
+		(the fixnum count))))))))
+
+
+
+;------------ disk cache
+  
+(defun move-ent-to-disk (pcache-ent pcache-disk pcache)
+  ;; copy the given pcache-ent to the disk
+  ;; assume that we've locked it at this point
+  ;;
+  ;; return t if we suceede and nil if we didn't
+  ;;
+  (let ((to-store-list (get-disk-cache-blocks pcache-disk 
+					      (pcache-ent-blocks)))
+	(buffs))
+    (if* to-store-list
+       then (store-data-on-disk pcache-ent pcache-disk to-store-list)
+	    (let ((ans
+		   (mp:without-scheduling
+		     (if* (and (null (pcache-ent-state pcache-ent))
+			       (eql 1 (pcache-ent-use)))
+			then ; we are tre sole user of this entry so we cna
+			     ; replace the buffers with the disk location
+			     (setf (pcache-ent-disk-location pcache-ent) 
+			       to-store-list
+			       
+			       (pcache-ent-pcache-disk pcache-ent) 
+			       pcache-disk
+			       
+			       buffs (pcache-ent-data pcache-ent)
+			       
+			       (pcache-ent-data pcache-ent) nil)
+		     
+		     
+			     (remove-from-memory-ru-list pcache-ent pcache)
+		
+			     ; put on the disk's ru list
+			     (let* ((mru-head (pcache-disk-mru-ent
+					       pcache-disk))
+				    (mru (pcache-ent-next mru-head)))
+			       (setf (pcache-ent-next pcache-ent) mru
+				     (pcache-ent-prev pcache-ent) mru-head
+			   
+				     (pcache-ent-prev mru) pcache-ent
+				     (pcache-ent-next mru-head) pcache-ent))
+		       
+		       
+		     
+					    
+			     t
+		     
+			else ; someone started using the entry.. so forget we 
+			     ; wrote it
+			     (return-free-blocks pcache-disk to-store-list)
+		     
+			     nil))))
+    
+	      (free-header-blocks buffs)
+	      ans))))
+		    
+(defun get-disk-cache-blocks (pcache-disk count)
+  ;; return the location of count cache blocks
+  
+  (mp:with-process-lock ((pcache-disk-lock pcache-disk))
+    (let ((free (pcache-disk-free-blocks pcache-disk)))
+      (decf free count)
+      (if* (>= free 0)
+	 then (setf (pcache-disk-free-blocks pcache-disk) free)
+	      ; now find that many blocks
+	      (let ((free-list (pcache-disk-free-list pcache-disk))
+		    (toret))
+		(loop
+		  (let ((ent (car free-list)))
+		    (if* (null ent)
+		       then ; should have run out.. this is bad
+			    (return-from get-disk-cache-blocks nil)
+		       else (let ((amt (- (cdr ent) (car ent))))
+			      (if* (< amt count)
+				 then ; need this and more
+				      (push ent toret)
+				      (decf amt count)
+				      (pop free-list)
+			       elseif (eql amt count)
+				      ; perfect
+				 then (push ent toret)
+				      (pop free-list)
+				      (return)
+				 else ; too many, take what we need
+				      (push (cons (car ent)
+						  (+ (car ent)
+						     count 
+						     -1))
+					    toret)
+				      (incf (car ent) count)
+				      (return))))))
+		(setf (pcache-disk-free-list pcache-disk) free-list)
+		toret)))))
+		
+				      
+
+(defun return-free-blocks (pcache-disk list-of-blocks)
+  ;; return the given blocks to the free list
+  pcache-disk list-of-blocks
+  nil)
+
+(defun store-data-on-disk (pcache-ent pcache-disk list-of-blocks)
+  pcache-ent pcache-disk list-of-blocks
+  nil)
+
+				      
+		    
+		    
+		    
+			    
+		
+;--- end disk cache  
+  
+    
+  
 
 
   

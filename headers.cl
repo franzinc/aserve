@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.12 2000/09/28 16:11:12 jkf Exp $
+;; $Id: headers.cl,v 1.13 2000/10/10 15:46:14 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -631,7 +631,7 @@
   ;; return nil if no match
   (let ((size (- end start))
 	(hba *header-byte-array*))
-    (if* (<= 0 size *header-count*)
+    (if* (< 0 size (length *header-lookup-array*))
        then (dolist (header (svref *header-lookup-array* size))
 	      (let ((begin (car header)))
 		(if* (dotimes (i size t)

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.29 2000/10/06 15:16:15 jkf Exp $
+;; $Id: client.cl,v 1.30 2000/10/10 15:46:14 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -760,7 +760,7 @@
 (defun get-header-line-buffer ()
   ;; return the next header line buffer
   (let (buff)
-    (mp:without-scheduling 
+    (excl::atomically
       (setq buff (pop *response-header-buffers*)))
     (if* buff
        thenret
