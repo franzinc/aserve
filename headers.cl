@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.19 2000/10/27 15:40:29 jkf Exp $
+;; $Id: headers.cl,v 1.20 2000/11/07 18:16:35 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -940,6 +940,17 @@
 	      (incf rstart)))))
 
   
+(defun header-empty-p (buff header)
+  ;; test to see if there is no value for this header
+  
+  (if* (symbolp header)
+     then (let ((val (get header 'kwdi)))
+	    (if* (null val)
+	       then (error "no such header as ~s" header))
+	    (setq header val)))
+  
+  (header-buffer-values buff header))
+
   
 	       
 (defun add-trailing-crlf (buff xx)
