@@ -1,3 +1,9 @@
+2005-01-13  John Foderaro  <jkf@tiger.franz.com>
+1.2.41
+	* htmlgen/htmlgen.cl - fix call to macroexpand for acl7.0
+	  where the use of the compiler's environment can cause
+	  infinite macroexpansion loops unless you're careful.
+
 2004-12-15  John Foderaro  <jkf@tiger.franz.com>
 1.2.40
 	*  remove debugging format statement in webactions
