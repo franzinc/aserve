@@ -136,7 +136,7 @@ server running.</p>
 <p><strong><font face="Courier New"><a name="f-start"></a>(start &amp;key port listeners
 chunking keep-alive<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; server setuid setgid
-debug proxy cache accept-hook ssl)</font></strong></p>
+debug proxy cache restore-cache accept-hook ssl)</font></strong></p>
 
 <p>If no arguments are given then <strong>start</strong>&nbsp; starts a multi-threaded web
 server on port 80, which is the standard web server port.&nbsp;&nbsp;&nbsp; If you are
@@ -187,6 +187,13 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
   <li>cache -- if true (and if proxy is true as well) cache locally the work done by the proxy
     server.&nbsp; The value of this variable specifies the size of the caches, both memory and
     disk.&nbsp; See the section on caches for more details on the format of the argument.</li>
+  <li>restore-cache - if given a value then this value should be the name of the file created
+    by <strong>net.aserve:shutdown</strong> when given the <strong>save-cache</strong>
+    argument.&nbsp;&nbsp; The state of the cache is restored as of when it was saved.
+    &nbsp;&nbsp; This will only succeed if the external cache files that were in use when the <strong>shutdown</strong>
+    was done are in exactly the same state they were when the <strong>shutdown </strong>was
+    done.&nbsp;&nbsp; When the <strong>restore-cache</strong> argument is given, the value of
+    the <strong>cache </strong> argument is ignored.</li>
   <li>accept-hook -- this should be a function of one argument, the socket which was created
     when a http request was accepted by AllegroServe.&nbsp; The function should return a
     socket for AllegroServe to use.&nbsp; This hook is normally used to turn a regular socket
@@ -203,11 +210,18 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
 
 <h2><a name="shutting-down-the-server"></a>Shutting down the server</h2>
 
-<p><strong><font face="Courier New"><a name="f-shutdown"></a>(shutdown &amp;optional
-server)</font></strong></p>
+<p><strong><font face="Courier New"><a name="f-shutdown"></a>(shutdown &amp;key server
+save-cache)</font></strong></p>
 
 <p>This shuts down the web server given (or the most recently started web server if no
-argument is passed in).</p>
+argument is passed for <strong>server</strong>).&nbsp; If <strong>save-cache</strong> is
+given then it should be the name of a file to which the current state of the proxy cache
+will be written.&nbsp;&nbsp; The <strong>save-cache</strong> file will only contain
+in-memory information about the cache.&nbsp; The cache usually consists of disk files as
+well and in order to maintain the complete state of the cache these files must be saved by
+the user as well.&nbsp; The information in the <strong>save-cache</strong> file refers to
+the disk cache files so those disk cache files must exist and be in the same state and
+location should the user choose to restore the state of the cache.</p>
 
 <p>&nbsp;</p>
 
@@ -1377,7 +1391,7 @@ keep-alive headers proxy user-agent external-format ssl)</font></strong></p>
     <td width="22%">redirect</td>
     <td width="16%">5</td>
     <td width="62%">If the response is a redirect (code 301, 302, 303), and the method is one
-    given by the value of <strong>redirect-methods </strong> then if this argument is true
+    given by the value of <strong>redirect-methods </strong>then if this argument is true
     (and, if an integer, positive), <strong>do-http-request</strong> will call itself to
     access the page to which the redirection is pointed.&nbsp; If <strong>redirect</strong> is
     an integer then in the recursiive call the valued passed for <strong>redirect</strong>
