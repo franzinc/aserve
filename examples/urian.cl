@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: urian.cl,v 1.3 2001/12/01 00:20:35 jkf Exp $
+;; $Id: urian.cl,v 1.4 2003/02/26 01:16:47 jkf Exp $
 
 ;; Description:
 ;;   urian example
@@ -74,6 +74,7 @@
   (:use :net.html.generator :net.aserve :net.html.parser))
 
 (pushnew :x-sjis (ef-nicknames (find-external-format :shiftjis)))
+(pushnew :shift-jis (ef-nicknames (find-external-format :shiftjis)))
 (pushnew :iso-8859-1 (ef-nicknames (find-external-format :latin1)))
 (pushnew :windows-1252 (ef-nicknames (find-external-format :1252)))
 
@@ -349,15 +350,15 @@
 
 (defun update-ef (lhtml)
   (when (listp lhtml)
-    (let ((html-body (car lhtml)))
+    (dolist (html-body lhtml)
       (when (eq :html (car html-body))
 	(let ((html-component (second html-body)))
 	  (when (eq :head (car html-component))
 	    (dolist (x (cdr html-component))
 	      (let ((charset-string (charset-metatag-p x)))
 		(when charset-string
-		  (return (find-charset-from-content-type
-			   charset-string)))))))))))
+		  (return-from update-ef
+		    (find-charset-from-content-type charset-string)))))))))))
 
 (defun charset-metatag-p (head-component)
   (when (listp head-component)
@@ -366,8 +367,10 @@
 		 (eq :meta (car arg-tag)))
 	(when (equalp '(:http "http" :equiv "content-type" :content)
 		      (subseq arg-tag 1 6))
-	  (elt arg-tag 6))))))
-
+	  (return-from charset-metatag-p (elt arg-tag 6)))
+	(when (equalp '(:http-equiv "content-type" :content)
+		      (subseq arg-tag 1 4))
+	  (return-from charset-metatag-p (elt arg-tag 4)))))))
 
 
 (defmacro cjk-p (code)

@@ -1,3 +1,16 @@
+2003-02-24  Charles A. Cox  <cox@ultra>
+
+	New file: aserve/examples/locale.cl.
+	
+	* aserve/load.cl: add locale example.
+	* aserve/main.cl: add external-format argument to
+	get-request-body for spr27296.
+	* aserve/examples/examples.cl: Minor home page cleanup for ics
+	examples.
+	* aserve/examples/urian.cl: Add extra smarts for determining a
+	page's charset.
+	* aserve/test/t-aserve.cl: Add spr27296 test.
+
 2003-02-06  John Foderaro  <jkf@tiger.franz.com>
 
 	* main.cl  - added (setf request-query-value)
