@@ -1,3 +1,8 @@
+2001-08-08  jkf  <jkf@main.verada.com>
+
+	* publish.cl - fix for when no body is given with-http-body
+		and thus a string-output-stream is not created.
+
 2001-07-30    <jkf@DEEDEE>
 1.2.4
 	* main.cl: fix get-multipart-* to correspond to rfc2046

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.47 2001/07/19 18:55:06 jkf Exp $
+;; $Id: publish.cl,v 1.48 2001/08/08 15:35:10 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -1212,10 +1212,15 @@
       
       (if* (and post-headers
 		(eq time :post)
-		(member :string-output-stream strategy :test #'eq))
+		(member :string-output-stream strategy :test #'eq)
+		)
 	 then ; must get data to send from the string output stream
-	      (setq content (get-output-stream-string 
-			     (request-reply-stream req)))
+	      (setq content 
+		(if* (request-reply-stream req)
+			then (get-output-stream-string 
+			      (request-reply-stream req))
+		   else ; no stream created since no body given
+			""))
 	      (setf (request-reply-content-length req) (length content)))
       	
       (if* (and send-headers
