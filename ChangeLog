@@ -1,7 +1,8 @@
 2001-09-18  Kevin Layer  <layer@crikey>
 1.2.9
 
-	* makefile: add build and srcdist rules
+	* makefile: add build and srcdist rules; have make clean remove
+	aserve-src
 	* load.cl: parameterize make-src-distributions's directory name
 
 2001-09-12  John Foderaro  <jkf@tiger.franz.com>
