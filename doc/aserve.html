@@ -93,6 +93,7 @@
 <font face="Courier New">&nbsp; <a href="#f-wserver-io-timeout">wserver-io-timeout</a><br>
 &nbsp; <a href="#f-wserver-response-timeout">wserver-response-timeout</a></font><br>
 <a href="#miscellaneous">Miscellaneous</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-ensure-stream-lock">ensure-stream-lock</a></font><br>
 &nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-map-entities"><font face="Courier New">map-entities</font></a><br>
 <a href="#asaservice">Running AllegroServe as a Service on Windows NT</a><br>
 <a href="#international-chars-aserve">Using International Characters in AllegroServe</a><br>
@@ -2613,6 +2614,22 @@ the <strong>timeout</strong> argument defaults to a huge number.</p>
 <hr>
 
 <h2><a name="miscellaneous"></a>Miscellaneous</h2>
+
+<p><a name="f-ensure-stream-lock"></a><strong><font face="Courier New">(ensure-stream-lock
+stream)</font></strong></p>
+
+<p>The function adds a <a
+href="http://www.franz.com/support/documentation/6.1/doc/multiprocessing.htm#process-locks-1">process
+lock</a> to <strong>stream</strong>'s property list (under the indicator<strong> :lock</strong>)
+if no such lock is present.&nbsp;&nbsp; Then it returns the object <strong>stream</strong>.</p>
+
+<p>The AllegroServe logging functions make use of the stream's lock to ensure that only
+one thread at a time write log information to the stream.&nbsp;&nbsp; If the logging
+functions find that a a log stream doesn't have a lock associated with it then the log
+information will still be written to the stream but under heavy load the log information
+from multiple threads will become intermixed. </p>
+
+<p>&nbsp;</p>
 
 <p><a name="f-map-entities"></a><font face="Courier New"><strong>(map-entities function
 locator)</strong></font></p>
