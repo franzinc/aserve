@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: cgi.cl,v 1.9 2004/01/16 19:31:14 layer Exp $
+;; $Id: cgi.cl,v 1.10 2004/10/20 20:39:02 jkf Exp $
 
 ;; Description:
 ;;   common gateway interface (running external programs)
@@ -420,7 +420,7 @@
 				     "cgi script return bogus status value: ~s" 
 			     code))
 			    (return-from parse-cgi-script-data nil))
-		    (let ((space (find #\space (cdr status))))
+		    (let ((space (position #\space (cdr status))))
 		      (if* space
 			 then (setq reason
 				(subseq (cdr status) space))))
