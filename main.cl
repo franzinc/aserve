@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.121 2001/10/26 16:38:35 jkf Exp $
+;; $Id: main.cl,v 1.122 2001/10/26 18:55:37 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1261,9 +1261,7 @@ by keyword symbols and not by strings"
 	    (if* (not (member :notrap *debug-current* :test #'eq))
 	       then (handler-case (process-connection sock)
 		      (error (cond)
-			(if* (and (typep cond 'socket-error)
-				  (eq (stream-error-identifier cond)
-				      :connection-reset))
+			(if* (connection-reset-error cond)
 			   thenret ; don't print these errors,
 			   else (logmess 
 				 (format nil "~agot error ~a~%" 
@@ -1285,11 +1283,9 @@ by keyword symbols and not by strings"
 			    #'(lambda (c)
 				(if* (and 
 				      (not *debug-connection-reset-by-peer*)
-				      (eq (stream-error-identifier c)
-					  :connection-reset))
+				      (connection-reset-error c))
 				   then (throw 'out-of-connection nil)))))
 			(process-connection sock)))
-		    
 		      
 		    )
 	  (abandon ()
@@ -1300,7 +1296,15 @@ by keyword symbols and not by strings"
     
       )))
 
+(defun connection-reset-error (c)
+  ;; return true if this is what results from a connection reset
+  ;; by peer 
+  (if* (typep c 'stream-error)
+     then (or (eq (stream-error-identifier c) :connection-reset)
+	      #+unix (eq (stream-error-code c) 32) ; sigpipe
+	      )))
 
+	  
 
   
 (defun http-accept-thread ()
