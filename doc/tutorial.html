@@ -94,7 +94,7 @@ tutorial(7): </pre>
 <p>We've emboldened the threads that are part of AllegroServe.&nbsp;&nbsp;&nbsp; The
 thread named <strong>aserve-accept-6</strong> is waiting for an http request.&nbsp; When
 one arrives it passes it off to one of the <strong>aserve-worker</strong> threads and then
-loops back to wait for the next request.&nbsp; The number of of worker threads is
+loops back to wait for the next request.&nbsp; The number of&nbsp; worker threads is
 determined by the <strong>:listeners</strong> argument to the <strong>start</strong>
 function.</p>
 
@@ -163,7 +163,7 @@ href="http://sales.franz.com/foo">http://sales.franz.com:8000/foo</a>. </p>
 
 <p>The most important reason for using the AllegroServe web server is that you can compute
 a web page when a request comes in.&nbsp;&nbsp; This allows your program to display the
-most up to date information on the page or tailor the page to each browser.
+most up-to-date information on the page or tailor the page to each browser.
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Using the <strong>publish</strong> function, a lisp
 function called a <em>response function</em> is associated with a <strong>url.&nbsp; </strong>When
 a request comes in that matches that url, the response function is run and it must
@@ -187,7 +187,7 @@ simplest response function is published here:</p>
 the request).&nbsp; The request object is also used to store information about the
 response that is made to the request.&nbsp;&nbsp; The entity object contains the
 information passed to the <strong>publish</strong> function.&nbsp; One important item in
-the entity is the <strong>content-type</strong> which serve as the default content-type
+the entity is the <strong>content-type</strong> which serves as the default content-type
 for the response (it can be overridden by an argument to <strong>with-http-response</strong>).</p>
 
 <p>A response function must use the <strong>with-http-response</strong> and <strong>with-http-body
@@ -541,7 +541,7 @@ significant byte, and that is what we test for in the following example:</p>
                                 &quot;from your location&quot;)))))))))
 </pre>
 
-<p>To see how this examples works differently depending on whether the access is through
+<p>To see how this example works differently depending on whether the access is through
 the loopback network or the regular network, try accessing it via <a
 href="http://localhost:8000/local-secret">http://localhost:8000/local-secret</a> and <a
 href="http://test.franz.com:8000/local-secret">http://test.franz.com:8000/local-secret</a>
@@ -565,7 +565,10 @@ they publish entities.</p>
 
 <h1>Debugging a computed response handler</h1>
 
-<p>to be filled in</p>
+<p>We will describe this in detail when the tutorial is updated.&nbsp; For now read the
+documentation on <strong>net.aserve::debug-on</strong> in the AllegroServe manual.</p>
+
+<p>&nbsp;</p>
 
 <p>&nbsp;</p>
 
