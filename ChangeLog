@@ -1,3 +1,7 @@
+2004-03-03    <jkf@main.verada.com>
+1.2.36
+	* main.cl: add request-variable-value (moved from webactions)
+
 2004-01-09  John Foderaro  <jkf@tiger.franz.com>
 1.2.35
 	* publish.cl, main.cl, test/t-aserve.cl: add a slot to 

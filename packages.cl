@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: packages.cl,v 1.4 2004/01/16 19:31:14 layer Exp $
+;; $Id: packages.cl,v 1.5 2004/03/04 01:57:33 jkf Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe
@@ -107,6 +107,7 @@
    #:request-raw-uri
    #:request-socket
    #:request-uri
+   #:request-variable-value
    #:request-wserver
    
    #:request-reply-code

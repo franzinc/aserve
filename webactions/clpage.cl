@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: clpage.cl,v 1.3 2004/01/16 19:31:14 layer Exp $
+;; $Id: clpage.cl,v 1.4 2004/03/04 01:57:33 jkf Exp $
 
 
 (eval-when (compile load eval) (require :aserve))
@@ -39,7 +39,6 @@
 	   #:find-clp-module
 	   #:find-clp-module-function
 	   #:publish-clp
-	   #:request-variable-value
 	   ))
 
 
@@ -724,25 +723,6 @@ to separate the module part from the function name part, ~s doesn't" name))
 
 
 
-;;------- support for storing variables in the request object
-
-(defun request-variable-value (req name)
-  ;; get the value of the named variable in the request variable list
-  ;;
-  (cdr (assoc name (getf (request-reply-plist req) 'variables) 
-	      :test #'equal)))
-
-(defsetf request-variable-value .inv-request-variable-value)
-
-(defun .inv-request-variable-value (req name newvalue)
-  (let ((ent (assoc name (getf (request-reply-plist req) 'variables) 
-		    :test #'equal)))
-    (if* ent
-       then (setf (cdr ent) newvalue)
-       else ; must add an ent
-	    (push (cons name newvalue) 
-		  (getf (request-reply-plist req) 'variables))
-	    newvalue)))
 
 
 (provide :webactions)
