@@ -1,15 +1,18 @@
-2003-02-24  Charles A. Cox  <cox@ultra>
+2003-02-26  John Foderaro  <jkf@tiger.franz.com>
 1.2.26
-	New file: aserve/examples/locale.cl.
+	* doc/aserve.html - new get-request-body argument
+
+2003-02-24  Charles A. Cox  <cox@ultra>
+	New file: examples/locale.cl.
 	
-	* aserve/load.cl: add locale example.
-	* aserve/main.cl: add external-format argument to
+	* load.cl: add locale example.
+	* main.cl: add external-format argument to
 	get-request-body for spr27296.
-	* aserve/examples/examples.cl: Minor home page cleanup for ics
+	* examples/examples.cl: Minor home page cleanup for ics
 	examples.
-	* aserve/examples/urian.cl: Add extra smarts for determining a
+	* examples/urian.cl: Add extra smarts for determining a
 	page's charset.
-	* aserve/test/t-aserve.cl: Add spr27296 test.
+	* test/t-aserve.cl: Add spr27296 test.
 
 2003-02-06  John Foderaro  <jkf@tiger.franz.com>
 
