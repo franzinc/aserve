@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: decode.cl,v 1.16 2002/08/09 22:21:45 jkf Exp $
+;; $Id: decode.cl,v 1.17 2003/09/22 17:27:52 jkf Exp $
 
 ;; Description:
 ;;   decode/encode code
@@ -588,7 +588,7 @@
   ;; given a base64 string, return it decoded.
   ;; beware: the result will not be a simple string
   ;;
-  (let ((res (make-array 20 :element-type 'character
+  (let ((res (make-array (length string) :element-type 'character
 			 :fill-pointer 0
 			 :adjustable t))
 	(arr *base64-decode*))
@@ -597,6 +597,16 @@
 	 (cha)
 	 (chb))
 	((>= i (length string)))
+      
+      ; for multiline decoding, ignore cr and lfs
+      (loop
+	(let ((ch (char string i)))
+	  (if* (or (eq ch #\linefeed) (eq ch #\return))
+	     then (incf i)
+		  (if* (>= i (length string)) 
+		     then (return-from base64-decode res))
+	     else (return))))
+	  
       (let ((val (+ (ash (aref arr (char-code (char string i))) 18)
 		    (ash (aref arr (char-code (char string (+ i 1)))) 12)
 		    (ash (aref arr (char-code 
@@ -619,7 +629,7 @@
   ;; take the given string and encode as a base64 string
   ;; beware: the result will not be a simple string
   ;;
-  (let ((output (make-array 20 
+  (let ((output (make-array (* 1.3 (length str)) 
 			    :element-type 'character  
 			    :fill-pointer 0
 			    :adjustable t))

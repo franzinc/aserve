@@ -1,3 +1,7 @@
+2003-09-22    <jkf@main.verada.com>
+
+	* fix multiline base64 decoding.
+
 2003-09-12    <layer@HOBART>
 1.2.30
 
