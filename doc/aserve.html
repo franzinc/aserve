@@ -469,11 +469,10 @@ req)</strong> to obtain a stream to which it can write to supply the body of the
 request)</font></strong></p>
 
 <p>Return the body of the request as a string.&nbsp; If there is no body the return value
-will be an empty string or nil.&nbsp;&nbsp; If a request has a body you should call this
-function even if you don't plan on using what is in the body.&nbsp; <em>We will fix this
-in future version so that you don't always have to call this function if you don't need
-the value.&nbsp; </em>The typical reason for there to be a body to a request is when a web
-browser sends the result of a form with&nbsp; a POST method.</p>
+will be an empty string.&nbsp;&nbsp; The result is cached inside the request object, so
+this function can be called more than once while processing a request.&nbsp;&nbsp; The
+typical reason for there to be a body to a request is when a web browser sends the result
+of a form with&nbsp; a POST method.</p>
 
 <hr>
 
@@ -1207,7 +1206,7 @@ redirect basic-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 keep-alive headers proxy)</font></strong></p>
 
-<p>Sends a request to <strong>uri</strong> and returns three values: 
+<p>Sends a request to <strong>uri</strong> and returns four values: 
 
 <ol>
   <li>The body of the response.&nbsp; If there is no body the empty string is returned.</li>
@@ -1215,6 +1214,10 @@ keep-alive headers proxy)</font></strong></p>
   <li>an alist of headers where the <strong>car</strong> of each entry is a lowercase string
     with the header name and the <strong>cdr</strong> is a string with the value of that
     header item.</li>
+  <li>the uri object denoting the page accessed.&nbsp; This is normally computed from the <strong>uri</strong>
+    value passed in but if redirection was done then this reflects the target of the
+    redirection.&nbsp; If you plan to interpret relative html links in the <strong>body</strong>
+    returned then you must do so with respect to <em>this</em> uri value </li>
 </ol>
 
 <p>The <strong>uri</strong> can be a uri object or a string.&nbsp;&nbsp; The scheme of the
@@ -1291,9 +1294,13 @@ keep-alive headers proxy)</font></strong></p>
   </tr>
   <tr>
     <td width="22%">redirect</td>
-    <td width="16%">t</td>
-    <td width="62%">If the response is a redirect (code 302) then if this argument is true, <strong>do-http-request</strong>
-    will call itself to access the page to which the redirection is pointed.</td>
+    <td width="16%">5</td>
+    <td width="62%">If the response is a redirect (code 301, 302, 303), and the method is <strong>:get</strong>
+    or <strong>:head,</strong> then if this argument is true (and, if an integer, positive), <strong>do-http-request</strong>
+    will call itself to access the page to which the redirection is pointed.&nbsp; If <strong>redirect</strong>
+    is an integer then in the recursiive call the valued passed for <strong>redirect</strong>
+    will be one less than the current value.&nbsp; This prevents infinite recursion due to
+    redirection loops.</td>
   </tr>
   <tr>
     <td width="22%">basic-authorization</td>
@@ -1333,17 +1340,20 @@ keep-alive headers proxy)</font></strong></p>
 <p>For example:</p>
 
 <pre>user(5): <strong>(do-http-request &quot;http://www.franz.com&quot;)</strong>
-200
-((&quot;content-type&quot; . &quot;text/html&quot;) (&quot;transfer-encoding&quot; . &quot;chunked&quot;)
-(&quot;server&quot; . &quot;Apache/1.3.9 (Unix) PHP/3.0.14&quot;)
-(&quot;date&quot; . &quot;Mon, 24 Apr 2000 11:00:51 GMT&quot;))
-&quot;&lt;HTML&gt;
+</pre>
+
+<pre>&quot;&lt;HTML&gt;
     &lt;HEAD&gt;
         &lt;TITLE&gt;Franz Inc: Allegro Common Lisp and Common Lisp Products&lt;/TITLE&gt;
         &lt;BASE FONTFACE=\&quot;helvetica, arial\&quot; FONTSIZE=\&quot;1\&quot;&gt;
 .....</pre>
 
-<pre>&quot;</pre>
+<pre>&quot;
+200
+((&quot;content-type&quot; . &quot;text/html&quot;) (&quot;transfer-encoding&quot; . &quot;chunked&quot;)
+(&quot;server&quot; . &quot;Apache/1.3.9 (Unix) PHP/3.0.14&quot;)
+(&quot;date&quot; . &quot;Mon, 24 Apr 2000 11:00:51 GMT&quot;))
+</pre>
 
 <p>&nbsp;</p>
 

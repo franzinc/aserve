@@ -475,10 +475,12 @@ do authentication in the HTTP/1.1 protocol.</p>
 is that most web browsers will continue to send the entered name and password along with
 future requests to the server until the web browser is restarted.&nbsp;&nbsp; Thus you can
 simultaneously unlock a whole group of pages.&nbsp; If you choose to handle the
-authentication in a form you must use a cookie to make a record that this web browser is
-now qualified to access a certain group of pages.&nbsp; Cookies aren't hard to store, but
-some users turn off cookie saving thus you will&nbsp; make your site inaccessible to these
-people.</p>
+authentication in a form you may want to use a cookie to make a record that this web
+browser is now qualified to access a certain group of pages.&nbsp; Cookies aren't hard to
+store, but some users turn off cookie saving thus you will&nbsp; make your site
+inaccessible to these people.&nbsp; Another authorization mechanism is to insert hidden
+fields in forms with values that tell the server that this access is authorized for a
+certain amount of time.</p>
 
 <p>This is an example of using the 401 response to do user authorization.&nbsp;&nbsp; </p>
 
