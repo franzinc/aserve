@@ -135,9 +135,9 @@ and after you start the server.</p>
 server running.</p>
 
 <p><strong><font face="Courier New"><a name="f-start"></a>(start &amp;key port listeners
-chunking keep-alive<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; server setuid setgid
-debug proxy proxy-proxy cache restore-cache accept-hook ssl)</font></strong></p>
+chunking keep-alive server setuid setgid <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; debug proxy proxy-proxy
+cache restore-cache accept-hook ssl os-processes)</font></strong></p>
 
 <p>If no arguments are given then <strong>start</strong>&nbsp; starts a multi-threaded web
 server on port 80, which is the standard web server port.&nbsp;&nbsp;&nbsp; If you are
@@ -212,6 +212,10 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
     than 80).&nbsp; This makes use of the <strong>accept-hook</strong> argument so if <strong>ssl</strong>
     is specified then <strong>accept-hook</strong> should not be specified.&nbsp;&nbsp; ssl is
     supported only in certain versions of Allegro CL.</li>
+  <li>os-processes - if given it should be an integer number of operating system processes in
+    which to run AllegroServe.&nbsp; This is available on Unix only at the moment.&nbsp; The
+    AllegroServes in different processes do <strong>not</strong> share a common Lisp heap..
+    &nbsp; </li>
 </ul>
 
 <p>&nbsp;</p>
