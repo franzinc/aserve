@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.81 2004/11/18 22:44:50 jkf Exp $
+;; $Id: publish.cl,v 1.82 2004/12/14 18:48:03 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -2051,140 +2051,140 @@
   (with-timeout-local (60 (logmess "timeout during header send")
 			  ;;(setf (request-reply-keep-alive req) nil)
 			  (throw 'with-http-response nil))
-    (let* ((sock (request-socket req))
-	   (strategy (request-reply-strategy req))
-	   (extra-headers (request-reply-headers req))
-	   (post-headers (member :post-headers strategy :test #'eq))
-	   (content)
-	   (chunked-p (member :chunked strategy :test #'eq))
-	   (code (request-reply-code req))
-	   (send-headers
-	    (if* post-headers
-	       then (eq time :post)
-	       else (eq time :pre))
-	    )
-	   (*print-pretty* nil)
-	   (sos-ef) ; string output stream external format
-	   )
+    (with-standard-io-syntax
+      (let* ((sock (request-socket req))
+	     (strategy (request-reply-strategy req))
+	     (extra-headers (request-reply-headers req))
+	     (post-headers (member :post-headers strategy :test #'eq))
+	     (content)
+	     (chunked-p (member :chunked strategy :test #'eq))
+	     (code (request-reply-code req))
+	     (send-headers
+	      (if* post-headers
+		 then (eq time :post)
+		 else (eq time :pre))
+	      )
+	     (sos-ef) ; string output stream external format
+	     )
       
       
       
-      (if* send-headers
-	 then (format-dif :xmit sock "~a ~d  ~a~a"
-			  (request-reply-protocol-string req)
-			  (response-number code)
-			  (response-desc   code)
-			  *crlf*))
-      
-      (if* (and post-headers
-		(eq time :post)
-		(member :string-output-stream strategy :test #'eq)
-		)
-	 then ; must get data to send from the string output stream
-	      (setq content 
-		(if* (request-reply-stream req)
-		   then (setq sos-ef (stream-external-format 
-				      (request-reply-stream req)))
-			(get-output-stream-string 
-			 (request-reply-stream req))
-			
-		   else ; no stream created since no body given
-			""))
-	      
-	      (if* (and sos-ef (not (eq (stream-external-format sock) sos-ef)))
-		 then ; must do ext format conversion now
-		      ; so we can compute the length
-		      (setq content
-			(string-to-octets content :external-format sos-ef)))
-	      
-	      (setf (request-reply-content-length req) (length content)))
-      	
-      (if* (and send-headers
-		(not (eq (request-protocol req) :http/0.9)))
-	 then ; can put out headers
-	      (format-dif :xmit sock "Date: ~a~a" 
-			  (maybe-universal-time-to-date (request-reply-date req))
-			  *crlf*)
-
-	      (if* (member :keep-alive strategy :test #'eq)
-		 then (format-dif :xmit
-				  sock "Connection: Keep-Alive~aKeep-Alive: timeout=~d~a"
-				  *crlf*
-				  *read-request-timeout*
-				  *crlf*)
-		 else (format-dif :xmit sock "Connection: Close~a" *crlf*))
-
-	      (if* (not (assoc :server extra-headers :test #'eq))
-		 then ; put out default server info
-		      (format-dif :xmit sock "Server: AllegroServe/~a~a" 
-				  *aserve-version-string*
-				  *crlf*))
-      
-	      (if* (request-reply-content-type req)
-		 then (format-dif :xmit
-				  sock "Content-Type: ~a~a" 
-				  (request-reply-content-type req)
-				  *crlf*))
-
-	      (if* chunked-p
-		 then (format-dif :xmit
-				  sock "Transfer-Encoding: chunked~a"
-				  *crlf*))
-	      
-	      (if* (and (not chunked-p)
-			(request-reply-content-length req))
-		 then (format-dif :xmit sock "Content-Length: ~d~a"
-				  (request-reply-content-length req)      
-				  *crlf*)
-		      (debug-format :info
-				    "~d ~s - ~d bytes~%" 
-				    (response-number code)
-				    (response-desc   code)
-				    (request-reply-content-length req))
-	       elseif chunked-p
-		 then (debug-format :info "~d ~s - chunked~%" 
-				    (response-number code)
-				    (response-desc   code)
-				    )
-		 else (debug-format :info
-				    "~d ~s - unknown length~%" 
-				    (response-number code)
-				    (response-desc   code)
-				    ))
-	      
-	      (dolist (head (request-reply-headers req))
-		(format-dif :xmit sock "~a: ~a~a"
-			    (car head)
-			    (cdr head)
+	(if* send-headers
+	   then (format-dif :xmit sock "~a ~d  ~a~a"
+			    (request-reply-protocol-string req)
+			    (response-number code)
+			    (response-desc   code)
 			    *crlf*))
-	      (format-dif :xmit sock "~a" *crlf*)
+      
+	(if* (and post-headers
+		  (eq time :post)
+		  (member :string-output-stream strategy :test #'eq)
+		  )
+	   then ; must get data to send from the string output stream
+		(setq content 
+		  (if* (request-reply-stream req)
+		     then (setq sos-ef (stream-external-format 
+					(request-reply-stream req)))
+			  (get-output-stream-string 
+			   (request-reply-stream req))
+			
+		     else ; no stream created since no body given
+			  ""))
 	      
-	      (force-output sock)
-	      ; clear bytes written count so we can count data bytes
-	      ; transferred
-	      #+(and allegro (version>= 6))
-	      (excl::socket-bytes-written sock 0) 
-	      )
+		(if* (and sos-ef (not (eq (stream-external-format sock) sos-ef)))
+		   then ; must do ext format conversion now
+			; so we can compute the length
+			(setq content
+			  (string-to-octets content :external-format sos-ef)))
+	      
+		(setf (request-reply-content-length req) (length content)))
+      	
+	(if* (and send-headers
+		  (not (eq (request-protocol req) :http/0.9)))
+	   then ; can put out headers
+		(format-dif :xmit sock "Date: ~a~a" 
+			    (maybe-universal-time-to-date (request-reply-date req))
+			    *crlf*)
+
+		(if* (member :keep-alive strategy :test #'eq)
+		   then (format-dif :xmit
+				    sock "Connection: Keep-Alive~aKeep-Alive: timeout=~d~a"
+				    *crlf*
+				    *read-request-timeout*
+				    *crlf*)
+		   else (format-dif :xmit sock "Connection: Close~a" *crlf*))
+
+		(if* (not (assoc :server extra-headers :test #'eq))
+		   then ; put out default server info
+			(format-dif :xmit sock "Server: AllegroServe/~a~a" 
+				    *aserve-version-string*
+				    *crlf*))
       
-      (if* (and send-headers chunked-p (eq time :pre))
-	 then (force-output sock)
-	      (socket:socket-control sock :output-chunking t))
+		(if* (request-reply-content-type req)
+		   then (format-dif :xmit
+				    sock "Content-Type: ~a~a" 
+				    (request-reply-content-type req)
+				    *crlf*))
+
+		(if* chunked-p
+		   then (format-dif :xmit
+				    sock "Transfer-Encoding: chunked~a"
+				    *crlf*))
+	      
+		(if* (and (not chunked-p)
+			  (request-reply-content-length req))
+		   then (format-dif :xmit sock "Content-Length: ~d~a"
+				    (request-reply-content-length req)      
+				    *crlf*)
+			(debug-format :info
+				      "~d ~s - ~d bytes~%" 
+				      (response-number code)
+				      (response-desc   code)
+				      (request-reply-content-length req))
+		 elseif chunked-p
+		   then (debug-format :info "~d ~s - chunked~%" 
+				      (response-number code)
+				      (response-desc   code)
+				      )
+		   else (debug-format :info
+				      "~d ~s - unknown length~%" 
+				      (response-number code)
+				      (response-desc   code)
+				      ))
+	      
+		(dolist (head (request-reply-headers req))
+		  (format-dif :xmit sock "~a: ~a~a"
+			      (car head)
+			      (cdr head)
+			      *crlf*))
+		(format-dif :xmit sock "~a" *crlf*)
+	      
+		(force-output sock)
+		; clear bytes written count so we can count data bytes
+		; transferred
+		#+(and allegro (version>= 6))
+		(excl::socket-bytes-written sock 0) 
+		)
+      
+	(if* (and send-headers chunked-p (eq time :pre))
+	   then (force-output sock)
+		(socket:socket-control sock :output-chunking t))
       
       
-      ; if we did post-headers then there's a string input
-      ; stream to dump out.
-      (if* content
-	 then (write-sequence content sock))
+	; if we did post-headers then there's a string input
+	; stream to dump out.
+	(if* content
+	   then (write-sequence content sock))
       
-      ;; if we're chunking then shut that off
-      (if* (and chunked-p (eq time :post))
-	 then (socket:socket-control sock :output-chunking-eof t)
-	      ; in acl5.0.1 the output chunking eof didn't send 
-	      ; the final crlf, so we do it here
-	      #+(and allegro (not (version>= 6)))
-	      (write-sequence *crlf* sock)
-	      )
-      )))
+	;; if we're chunking then shut that off
+	(if* (and chunked-p (eq time :post))
+	   then (socket:socket-control sock :output-chunking-eof t)
+		; in acl5.0.1 the output chunking eof didn't send 
+		; the final crlf, so we do it here
+		#+(and allegro (not (version>= 6)))
+		(write-sequence *crlf* sock)
+		)
+	))))
 
       	
       

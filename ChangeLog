@@ -1,3 +1,7 @@
+2004-12-14  John Foderaro  <jkf@tiger.franz.com>
+1.2.39
+	* with with-standard-io-syntax to prevent #n= printing.
+	
 2004-11-18  John Foderaro  <jkf@tiger.franz.com>
 
 	* use &body in macro definitions to help indenters

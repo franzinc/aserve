@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.163 2004/11/18 22:44:50 jkf Exp $
+;; $Id: main.cl,v 1.164 2004/12/14 18:48:03 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -38,7 +38,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 38))
+(defparameter *aserve-version* '(1 2 39))
 
 (eval-when (eval load)
     (require :sock)
