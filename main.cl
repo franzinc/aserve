@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: main.cl,v 1.18 2000/01/28 19:44:29 jkf Exp $
+;; $Id: main.cl,v 1.19 2000/02/08 17:09:15 jkf Exp $
 
 ;; Description:
 ;;   neo's main loop
@@ -44,7 +44,11 @@
    #:publish-directory
 
    #:request-method
+   #:request-protocol
+   #:request-protocol-string
    #:request-query
+   #:request-raw-request
+   #:request-socket
    #:request-uri
    #:request-wserver
    
@@ -90,7 +94,7 @@
 (in-package :neo)
 
 
-(defparameter *neo-version* '(1 0 8))
+(defparameter *neo-version* '(1 0 9))
 
 ;;;;;;;  debug support 
 
@@ -1043,8 +1047,6 @@
 					 headers)))))))
 
       (setf (mp-info-seen-end-of-segment mp-info) nil)
-      
-      (format t "Headers is ~s~%" headers)
       
       ; now parse headers
       (dolist (head headers)

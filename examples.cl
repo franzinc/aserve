@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: examples.cl,v 1.22 2000/01/28 19:44:29 jkf Exp $
+;; $Id: examples.cl,v 1.23 2000/02/08 17:09:15 jkf Exp $
 
 ;; Description:
 ;;   neo examples
@@ -57,6 +57,7 @@
 			 ((:a :href "/gc") "Garbage Collector Stats") :br
 			 ((:a :href "/apropos") "Apropos") :br
 			 ((:a :href "/pic") "Sample jpeg") :br
+			 ((:a :href "/pic-gen") "generated jpeg") "- hit reload to switch images" :br
 			 ((:a :href "/cookietest") "test cookies") :br
 			 ((:a :href "/secret") "Test authorization")
  			 " (name: " (:b "foo") ", password: " (:b "bar") ")"
@@ -134,6 +135,40 @@
 (publish-file :path "/pic" :file "prfile9.jpg"
 	      :content-type "image/jpeg")
 
+
+
+;; this is a demonstration of how you can return a jpeg 
+;; image that was created on the fly (rather thsn read from
+;; a file via publish-file). 
+;; We don't want to actually create the image here, so we 
+;; cheat and read it from a file, but it shows that you can
+;; send any stream of bytes and they will be given the correct
+;; mime type.
+;; 
+(publish :path "/pic-gen"
+	 :content-type "image/jpeg"
+	 :function
+	 (let ((selector 0)) ; chose one of two pictures
+	   #'(lambda (req ent)
+	       (with-http-response (req ent)
+		 (with-http-body (req ent :format :binary)
+		   ; here is where you would generate the picture.
+		   ; we're just reading it from a file in this example
+		   (let ((stream (request-reply-stream req)))
+		     (with-open-file (p (nth selector
+					     '("prfile9.jpg" "fresh.jpg"))
+				      :element-type '(unsigned-byte 8))
+
+		       (setq selector (mod (1+ selector) 2))
+		     
+		       (loop
+			 (let ((val (read-byte p nil nil)))
+			   (if* (null val) 
+			      then ;eof 
+				   (return))
+			   (write-byte val stream)
+			   )))))))))
+	 
 
 
 

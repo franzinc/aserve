@@ -308,8 +308,8 @@ timeout check-modified response content-type) <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 &amp;rest body)</font></strong></p>
 
-<p align="left">This macro begins the process of generating a responds to an http request
-and then it runs the code in the <strong>body</strong> which will actually send out the
+<p align="left">This macro begins the process of generating a response to an http request
+and then&nbsp; runs the code in the <strong>body</strong> which will actually send out the
 response.&nbsp; <strong>req</strong> and <strong>ent</strong> are the request and entity
 objects passed into the function designated to compute the response for the request.
 &nbsp;&nbsp;&nbsp; <strong>timeout </strong>sets a time limit for the computation of the
@@ -365,7 +365,7 @@ was called to create the entity.</p>
 is the header name (a string) and the cdr is the header value.&nbsp; These headers are
 added to the headers sent as part of this response.</p>
 
-<p align="left">Within the <strong>body </strong>forms the code calls <strong>(resp-stream
+<p align="left">Within the <strong>body </strong>forms the code calls <strong>(request-reply-stream
 req)</strong> to obtain a stream to which it can write to supply the body of the response.</p>
 
 <hr>
@@ -391,12 +391,12 @@ constant string.</p>
 
 <hr>
 
-<p><strong><font face="Courier New">(url-argument-alist request)</font></strong></p>
+<p><strong><font face="Courier New">(request-query request)</font></strong></p>
 
-<p>Decode and return an alist of the arguments to this url.&nbsp;&nbsp; The arguments
-begin at the first question mark and continue until the end of the url.&nbsp;&nbsp; Each
-item in the alist is a cons where the car is a string giving the name of the argument and
-the cdr is a string giving the value of the argument.</p>
+<p>Decode and return an alist of the query values in the request.&nbsp;&nbsp; The query
+string begins at the first question mark and continues until the end of the
+url.&nbsp;&nbsp; Each item in the alist is a cons where the car is a string giving the
+name of the argument and the cdr is a string giving the value of the argument.</p>
 
 <hr>
 
@@ -407,37 +407,77 @@ the cdr is a string giving the value of the argument.</p>
 <p>The request object contains information about the http request being processed and it
 contains information about the response that is being computed and returned to the
 requestor.&nbsp;&nbsp; The following functions access slots of the request object. &nbsp;
-Those with names beginning with <strong>resp-</strong> are accessing the slots which hold
-information about the response the to request.&nbsp;&nbsp; When a function is listed as an<em>
-accessor<strong> </strong></em>that means that it can be <strong>setf</strong>'ed as well
-as used to read the slot value.</p>
+Those with names beginning with <strong>request-reply-</strong> are accessing the slots
+which hold information about the response the to request.&nbsp;&nbsp; When a function is
+listed as an<em> accessor<strong> </strong></em>that means that it can be <strong>setf</strong>'ed
+as well as used to read the slot value.</p>
 
-<p><strong><font face="Courier New">(resp-code request)</font></strong>
+<p>&nbsp;</p>
+
+<p><font face="Courier New"><strong>(request-method request)</strong></font> - reader - a
+keyword symbol naming the kind of request, typically :get, :put or :post.</p>
+
+<p><strong><font face="Courier New">(request-uri request)</font></strong> - reader - a uri
+object describing the request.&nbsp;&nbsp; If the request contains a &quot;Host:&quot;
+header line then the value of this header is placed in the uri-host and uri-port slots of
+this uri object.</p>
+
+<p><strong><font face="Courier New">(request-protocol request)</font></strong> - reader -
+a keyword symbol naming the http protocol requested.&nbsp; It is either :http/0.9,
+:http/1.0 or :http/1.1.</p>
+
+<p><font face="Courier New"><strong>(request-protocol-string request) </strong></font>-
+reader - a string naming the http protcol requested. It is either &quot;HTTP/0.9&quot;,
+&quot;HTTP/1.0&quot; or &quot;HTTP/1.1&quot;.</p>
+
+<p><strong><font face="Courier New">(request-socket request)</font></strong> - reader -
+the socket object through which the request was made and to which the response must be
+sent.&nbsp;&nbsp;&nbsp; This object can be used to determine the IP address of the
+requestor.</p>
+
+<p><strong><font face="Courier New">(request-wserver request)</font></strong> - reader -
+the wserver object describing the web server taking this request</p>
+
+<p><strong><font face="Courier New">(request-raw-request request)</font></strong> - reader
+-&nbsp; a string holding the exact request made by the client</p>
+
+<p>&nbsp;</p>
+
+<p><strong><font face="Courier New">(request-reply-code request)</font></strong>
 &nbsp;&nbsp;&nbsp;&nbsp; - accessor - the value is describes the response code and string
 we will return for this request.&nbsp;&nbsp; See the value of the argument <strong>response</strong>
 in <strong>with-http-response</strong> for more information.</p>
 
-<p><strong><font face="Courier New">(resp-date request)</font></strong>
+<p><strong><font face="Courier New">(request-reply-date request)</font></strong>
 &nbsp;&nbsp;&nbsp;&nbsp; - accessor - the date the response will be made (in Lisp's
-universal time format)</p>
+universal time format).&nbsp; This defaults to the time when the request arrived.</p>
 
-<p><strong><font face="Courier New">(resp-content-length request) </font></strong>&nbsp;&nbsp;&nbsp;
+<p><strong><font face="Courier New">(request-reply-headers request)</font></strong> -
+accessor - an alist of headers to send out with the reply.&nbsp; Each entry in the alist
+is a cons where the <strong>car</strong> is a string holding the header name and the <strong>cdr</strong>
+is the value (it is printed using the <strong>~a</strong> format directive).
+&nbsp;&nbsp; Typically <strong>request-reply-headers</strong> isn't used, instead the
+headers to be sent are passed as the <strong>:header</strong> argument to <strong>with-http-body</strong>.
+</p>
+
+<p><strong><font face="Courier New">(request-reply-content-length request) </font></strong>&nbsp;&nbsp;&nbsp;
 - accessor -&nbsp; the value to send as the Content-Length of this response.&nbsp;&nbsp;
 This is computed automatically by neo and thus a user program shouldn't have to set this
 slot under normal circumstances.</p>
 
-<p><strong><font face="Courier New">(resp-plist request)</font></strong>
+<p><strong><font face="Courier New">(request-reply-plist request)</font></strong>
 &nbsp;&nbsp;&nbsp;&nbsp; - accessor -&nbsp; this slot holds a property list on which neo
 uses to stores some lesser used information.&nbsp; The user program can use it as well.</p>
 
-<p><font face="Courier New"><strong>(resp-strategy request)</strong></font>&nbsp;&nbsp; -
-accessor - the strategy is a list of symbols which describe how neo will build a response
-stream and will send back a response.&nbsp; More details will be given about the possible
-strategies at a future time.</p>
+<p><font face="Courier New"><strong>(request-reply-strategy request)</strong></font>&nbsp;&nbsp;
+- accessor - the strategy is a list of symbols which describe how neo will build a
+response stream and will send back a response.&nbsp; More details will be given about the
+possible strategies at a future time.</p>
 
-<p><strong><font face="Courier New">(resp-stream request)</font></strong>
+<p><strong><font face="Courier New">(request-reply-stream request)</font></strong>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; - accessor -&nbsp; This is the stream to be used in user
-code to send back the body of the response. </p>
+code to send back the body of the response.&nbsp;&nbsp;&nbsp; This stream must&nbsp; be
+used instead of the value of <strong>request-socket</strong>.</p>
 
 <p>&nbsp;</p>
 
@@ -462,7 +502,7 @@ defines the form
 <ul>
   <li><strong>&lt;form method=&quot;get&quot;&gt; -&nbsp; </strong>The data is made part of
     the <strong>url</strong> that is sent to the web server and is separated from the url
-    itself by a question mark.&nbsp; The neo url handler code uses <strong>(url-argument-alist</strong>
+    itself by a question mark.&nbsp; The neo url handler code uses <strong>(request-query</strong>
     <strong>req)</strong> to retrieve the alist of form names and values.&nbsp;&nbsp; This
     method has a few disadvantages - the amount of data that can be sent is limited since the
     size of urls is limited.&nbsp; Also the data is visible to everyone seeing the url and

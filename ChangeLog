@@ -1,3 +1,9 @@
+2000-02-08  John Foderaro  <jkf@tiger.franz.com>
+1.0.9
+	* main.cl - added exports
+	* examples.cl - show how to publish a generated jpg file
+	* neo.html - more documentation
+
 2000-01-28  John Foderaro  <jkf@tiger.franz.com>
 1.0.8
 	* renamed accessors 
