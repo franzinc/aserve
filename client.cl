@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.4 2000/03/16 19:19:44 jkf Exp $
+;; $Id: client.cl,v 1.5 2000/03/17 15:02:00 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -695,19 +695,28 @@
   
   ; make sure that there's a host
   (let ((host (net.uri:uri-host uri))
-	(sock))
+	(sock)
+	(port))
     (if* (null host)
        then (error "need a host in the client request: ~s" uri))
     
     (setq sock 
       (socket:make-socket :remote-host host
-			  :remote-port (or (net.uri:uri-port uri) 80)))
+			  :remote-port (setq port
+					 (or (net.uri:uri-port uri) 80))
+			  :format :bivalent))
     
     (format sock "~a ~a ~a~a"
 	    (string-upcase (string method))
 	    (or (net.uri:uri-path uri) "/")
 	    (string-upcase (string protocol))
 	    crlf)
+
+    ; always send a Host header, required for http/1.1 and a good idea
+    ; for http/1.0
+    (if* (not (eql 80 port))
+       then (format sock "Host: ~a:~a~a" host port crlf)
+       else (format sock "Host: ~a~a" host crlf))
     
     ; now the headers
     (if* keep-alive
@@ -784,7 +793,7 @@
 		    (error "premature eof in headers"))
 	    
 	    
-	     (if* (eql len 0)
+	    (if* (eql len 0)
 	       then ; last header line
 		    (return))
 	  
@@ -799,9 +808,9 @@
 		       then (let ((buff3 (make-array (+ len len2 50)
 						     :element-type 'character)))
 			      (dotimes (i len)
-				(setf (schar buff3 i) (schar buff i))
-				(put-header-line-buffer buff)
-				(setq buff buff3))))
+				(setf (schar buff3 i) (schar buff i)))
+			      (put-header-line-buffer buff)
+			      (setq buff buff3)))
 		    ; can all fit in buff
 		    (do ((to len (1+ to))
 			 (from 0 (1+ from)))
