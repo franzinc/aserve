@@ -5,21 +5,26 @@
 ;;
 ;; copyright (c) 2003 Franz Inc, Oakland CA  - All rights reserved.
 ;;
-;; The software, data and information contained herein are proprietary
-;; to, and comprise valuable trade secrets of, Franz, Inc.  They are
-;; given in confidence by Franz, Inc. pursuant to a written license
-;; agreement, and may be stored and used only in accordance with the terms
-;; of such license.
+;; This code is free software; you can redistribute it and/or
+;; modify it under the terms of the version 2.1 of
+;; the GNU Lesser General Public License as published by 
+;; the Free Software Foundation, as clarified by the AllegroServe
+;; prequel found in license-allegroserve.txt.
 ;;
-;; Restricted Rights Legend
-;; ------------------------
-;; Use, duplication, and disclosure of the software, data and information
-;; contained herein by any agency, department or entity of the U.S.
-;; Government are subject to restrictions of Restricted Rights for
-;; Commercial Software developed at private expense as specified in
-;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
+;; This code is distributed in the hope that it will be useful,
+;; but without any warranty; without even the implied warranty of
+;; merchantability or fitness for a particular purpose.  See the GNU
+;; Lesser General Public License for more details.
 ;;
-;; $Id: clp.cl,v 1.1.2.1 2003/10/22 21:12:33 layer Exp $
+;; Version 2.1 of the GNU Lesser General Public License is in the file 
+;; license-lgpl.txt that was distributed with this file.
+;; If it is not present, you can access it from
+;; http://www.gnu.org/copyleft/lesser.txt (until superseded by a newer
+;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
+;; Suite 330, Boston, MA  02111-1307  USA
+;;
+;;
+;; $Id: clp.cl,v 1.1.2.2 2003/12/22 21:52:11 layer Exp $
 
 
 (in-package :net.aserve)
@@ -82,19 +87,39 @@
    elseif (stringp value)
      then (parse-integer value :junk-allowed t)))
 
+
 (def-clp-function clp_value (req ent args body)
   ;; name=xxxx
+  ;; safe
+  ;; external-format=fmt
+  ;;
   ;; print the value of the variable
   (declare (ignore ent body))
   (let* ((name (cdr (assoc "name" args :test #'equal)))
 	 
 	 (value (and name
 		     (locate-any-value req args name)))
-	 (safe (assoc "safe" args :test #'equal)))
+	 (safe (assoc "safe" args :test #'equalp))
+	 (external-format 
+	  (cdr (assoc "external-format" args :test #'equalp))))
+    (if* external-format
+       then (setq external-format (find-external-format external-format)))
+    
     (if* value 
-       then (if* safe
-	       then (html (:princ-safe value))
-	       else (html (:princ value))))))
+       then (if* external-format
+	       then (let ((old-ef (stream-external-format *html-stream*)))
+		      (force-output *html-stream*)
+		      (setf (stream-external-format *html-stream*)
+			(find-external-format :octets))
+		      (if* safe
+			 then (html (:princ-safe value))
+			 else (html (:princ value)))
+		      (force-output *html-stream*)
+		      (setf (stream-external-format *html-stream*) old-ef))
+	       else 
+		    (if* safe
+		       then (html (:princ-safe value))
+		       else (html (:princ value)))))))
 
 
 (def-clp-function clp_set (req ent args body)

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: cgi.cl,v 1.5.4.3.2.1 2002/06/17 18:29:03 layer Exp $
+;; $Id: cgi.cl,v 1.5.4.3.2.2 2003/12/22 21:52:10 layer Exp $
 
 ;; Description:
 ;;   common gateway interface (running external programs)
@@ -249,7 +249,7 @@
 		  then ; no more room to read, must be bogus header
 		       (failed-script-response req ent)
 		       (return-from read-script-data)
-		  else (let ((len (read-sequence buff stream
+		  else (let ((len (read-vector buff stream
 						 :start start)))
 			 (if* (<= len start)
 			    then ; eof, meaning no header
@@ -305,7 +305,7 @@
 	     
 	     (data-stream-body ()
 	       ;; process data coming back from the body
-	       (let ((len (read-sequence buff stream)))
+	       (let ((len (read-vector buff stream)))
 		 
 		 (if* (<= len 0)
 		    then ; end of file, remove this stream
@@ -316,7 +316,8 @@
 			 (write-all-vector buff
 					   *html-stream*
 					   :start 0
-					   :end len)))))
+					   :end len)
+			 (force-output *html-stream*)))))
 			       
 
       (setq active-streams

@@ -5,21 +5,25 @@
 ;;
 ;; copyright (c) 2003 Franz Inc, Oakland CA  - All rights reserved.
 ;;
-;; The software, data and information contained herein are proprietary
-;; to, and comprise valuable trade secrets of, Franz, Inc.  They are
-;; given in confidence by Franz, Inc. pursuant to a written license
-;; agreement, and may be stored and used only in accordance with the terms
-;; of such license.
+;; This code is free software; you can redistribute it and/or
+;; modify it under the terms of the version 2.1 of
+;; the GNU Lesser General Public License as published by 
+;; the Free Software Foundation, as clarified by the AllegroServe
+;; prequel found in license-allegroserve.txt.
 ;;
-;; Restricted Rights Legend
-;; ------------------------
-;; Use, duplication, and disclosure of the software, data and information
-;; contained herein by any agency, department or entity of the U.S.
-;; Government are subject to restrictions of Restricted Rights for
-;; Commercial Software developed at private expense as specified in
-;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
+;; This code is distributed in the hope that it will be useful,
+;; but without any warranty; without even the implied warranty of
+;; merchantability or fitness for a particular purpose.  See the GNU
+;; Lesser General Public License for more details.
 ;;
-;; $Id: websession.cl,v 1.1.2.1 2003/10/22 21:12:33 layer Exp $
+;; Version 2.1 of the GNU Lesser General Public License is in the file 
+;; license-lgpl.txt that was distributed with this file.
+;; If it is not present, you can access it from
+;; http://www.gnu.org/copyleft/lesser.txt (until superseded by a newer
+;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
+;; Suite 330, Boston, MA  02111-1307  USA
+;;
+;; $Id: websession.cl,v 1.1.2.2 2003/12/22 21:52:11 layer Exp $
 
 (in-package :net.aserve)
 
@@ -29,14 +33,16 @@
   ;; describes how a set of sessions is managed
   ((prefix :initarg :prefix
 	   ;; string that preceeds all keys
+	   :initform ""
 	   :accessor sm-prefix)
 
    (suffix  :initarg :suffix
 	    ;; number against which the counter will be xored
+	    :initform ""
 	    :accessor sm-suffix)
    
    (counter :initarg :counter
-	    :initform 0
+	    :initform nil
 	    :accessor sm-counter)
    
    ;; how long a session will last if no reference made to it
@@ -44,6 +50,10 @@
 	    :accessor sm-lifetime
 	    :initform #.(* 5 60 60) ; five hours
 	    )
+   
+   (reap-hook-function  :initarg :reap-hook-function
+			:accessor sm-reap-hook-function
+			:initform nil)
    
    (cookie-name :initarg :cookie-name
 		:initform "webaction"
@@ -83,8 +93,15 @@
 
 
 (defmethod initialize-websession-master ((sm websession-master))
-  ;; prepare the session master to emit keys
+  ;; we no longer do this here.. we wait until we start to use
+  ;; the keys that way a saved image will get new info when
+  ;; it starts
+  nil
   
+  )
+
+(defun compute-prefix-suffix (sm)
+  ;; compute the prefix string and suffix value
   ; randomize the random number generator
   (dotimes (i (logand (get-universal-time) #xfff)) (random 256))
   
@@ -100,18 +117,27 @@
     (setq val 0)
     (dotimes (i 4)
       (setq val (+ (ash val 8) (random 255))))
-    (setf (sm-suffix sm) val)
-    
-    (setf (sm-counter sm) (random 255)))
-  
-  )
+    (setf (sm-suffix sm) val))
+)
 
+
+
+(defvar *websession-counter-lock* (mp:make-process-lock))
 
 (defmethod next-websession-id ((sm websession-master))
-  (let ((counterval (incf (sm-counter sm))))
-    (concatenate 'string (sm-prefix sm)
-		 (format nil "~x" (random #xfffffff))
-		 (format nil "~x" (logxor (sm-suffix sm) counterval)))))
+  (mp:with-process-lock (*websession-counter-lock*)
+    
+    (let ((counterval (sm-counter sm)))
+      
+      (if* (null counterval)
+	 then (compute-prefix-suffix sm)
+	      (setq counterval (random 255)))
+      
+      (setf (sm-counter sm) (1+ counterval))
+		  
+      (concatenate 'string (sm-prefix sm)
+		   (format nil "~x" (random #xfffffff))
+		   (format nil "~x" (logxor (sm-suffix sm) counterval))))))
 
     
   
@@ -153,12 +179,17 @@
 (defun reap-unused-sessions (sm)
   (let ((now (excl::cl-internal-real-time))
 	(lifetime (sm-lifetime sm))
+	(reap-fcn (sm-reap-hook-function sm))
 	(toreap))
     (maphash #'(lambda (id websession)
 		 (declare (ignore id))
 		 (if* (> now
 			 (+ (websession-lastref websession) lifetime))
-		    then (push websession toreap)))
+		    then (if* (and reap-fcn
+				   (funcall reap-fcn websession))
+			    then ; keep around this session longer
+				 (setf (websession-lastref websession) now)
+			    else (push websession toreap))))
 	     (sm-websessions sm))
   
     (dolist (websession toreap)

@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.3.10.3.2.1 2002/06/17 18:29:03 layer Exp $
+# $Id: makefile,v 1.3.10.3.2.2 2003/12/22 21:52:10 layer Exp $
 #
 # On Windows, this makefile requires the use of GNU make from Redhat
 # (http://sources.redhat.com/cygwin/).
@@ -9,10 +9,10 @@ on_windows = $(shell if test -d "c:/"; then echo yes; else echo no; fi)
 
 ifndef mlisp
 ifeq ($(on_windows),yes)
-acldir = /cygdrive/c/Program Files/ACL61
+acldir = /cygdrive/c/Program Files/ACL62
 mlisp = "$(acldir)/mlisp.exe" +B +cn
 else
-acldir = /usr/local/acl61
+acldir = /usr/local/bin
 mlisp = $(acldir)/mlisp
 endif
 endif
@@ -21,6 +21,7 @@ build: FORCE
 	rm -f build.tmp
 	echo '(setq excl::*break-on-warnings* t)' >> build.tmp
 	echo '(load "load.cl")' >> build.tmp
+	echo '(make-aserve.fasl)' >> build.tmp
 # -batch must come before -L, since arguments are evaluated from left to right
 	$(mlisp) -batch -L build.tmp -kill
 
@@ -33,7 +34,7 @@ srcdist: FORCE
 	$(mlisp) -batch -L build.tmp -kill
 
 clean:	FORCE
-	rm -fr *.fasl */*.fasl build.tmp
+	rm -fr *.fasl */*.fasl webactions/*.fasl webactions/clpcode/*.fasl build.tmp
 
 cleanall distclean: clean
 	rm -fr aserve-src

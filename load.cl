@@ -1,7 +1,15 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.31.10.6.14.5 2003/09/24 17:12:02 layer Exp $
+;; $Id: load.cl,v 1.31.10.6.14.6 2003/12/22 21:52:10 layer Exp $
 ;;
+
+;
+; loading this file will compile and load AllegroServe and Webactions
+;
+; calling (make-aserve.fasl) will build
+;   aserve.fasl  - just allegroserve
+;   webactions/webactions.fasl  - just webactions 
+;
 
 (defvar *loadswitch* :compile-if-needed)
 (defparameter *aserve-root* (directory-namestring *load-pathname*))
@@ -81,6 +89,32 @@
       ))
 
 
+
+(defparameter *webactions-files*
+    ;; this list of source files that are compiled to make 
+    ;; webactions
+    '("webactions/clpage"
+      "webactions/webact"
+      "webactions/websession"
+      
+      "webactions/clpcode/clp"
+      "webactions/clpcode/wa"
+      "webactions/clpcode/http"
+      "webactions/clpcode/time"))
+
+(defparameter *webactions-other-files*
+    ;; other files to distribute with a source distribution
+    '("webactions/load.cl"
+      "webactions/doc/using-webactions.html"
+      "webactions/doc/webactions.html"
+      "webactions/test/t-webactions.cl"
+      "webactions/test/sitea/project.cl"
+      "webactions/test/sitea/file1.clp"
+      "webactions/test/sitea/file2.clp"
+      "webactions/test/sitea/file3.clp"))
+      
+
+    
 ;; end experimental
 
 (eval-when (compile eval load)
@@ -89,7 +123,8 @@
 ;(setq *features* (delete :hiper-socket *features*))
 
 (with-compilation-unit  nil
-  (dolist (file (append *aserve-files* *aserve-examples*))
+  (dolist (file (append *aserve-files* *aserve-examples*
+			*webactions-files*))
     #+allegro-cl-lite
     (progn
       ;; aServe doesn't work very well under 5.0.1 Lite due to
@@ -189,7 +224,8 @@
 ;;    be no warnings.
 ;; 4. start the server (net.aserve:start :port 8000) 
 ;;	and run through the samples from Netscape and IE
-;; 5. :cl test/t-aserve
+;; 5a. :cl test/t-aserve
+;; 5b: :cl webactions/test/t-webactions
 ;; 6. (make-src-distribution)
 ;; 7. (ftp-publish-src)
 ;; 8. on cobweb in /fi/opensource/src/aserve 
@@ -211,7 +247,13 @@
 
 
 (defun make-aserve.fasl ()
-  (copy-files-to *aserve-files* "aserve.fasl" :root *aserve-root*))
+  ;; make both aserve and webactions
+  (copy-files-to *aserve-files* "aserve.fasl" :root *aserve-root* 
+		 :verbose t)
+  (copy-files-to *webactions-files* "webactions/webactions.fasl" 
+		 :root *aserve-root*
+		 :verbose t)
+  )
 
 
 
@@ -222,8 +264,10 @@
 		     :show-window :hide)
   
   (dolist (file (append (mapcar (lambda (file) (format nil "~a.cl" file))
-				*aserve-files*)
-			*aserve-other-files*))
+				(append *aserve-files*
+					*webactions-files*))
+			*aserve-other-files*
+			*webactions-other-files*))
     (copy-files-to (list file)
 		   (format nil "aserve-src/~a/~a" dist-name file)
 		   :root *aserve-root*)))
@@ -258,7 +302,7 @@
 	    
   
 
-(defun copy-files-to (files dest &key (root ""))
+(defun copy-files-to (files dest &key (root "") verbose)
   ;; copy the contents of all files to the file named dest.
   ;; append .fasl to the filenames (if no type is present)
 
@@ -268,6 +312,8 @@
   (let ((buffer (make-array 4096 :element-type '(unsigned-byte 8))))
     (with-open-file (p dest :direction :output :if-exists :supersede
 		     :element-type '(unsigned-byte 8))
+      (if* verbose
+	 then (format t "Creating ~s~%" dest))
       (dolist (file files)
 	(setq file (concatenate 'string root file))
 	(if* (and (null (pathname-type file))

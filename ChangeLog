@@ -1,3 +1,9 @@
+*******************************************************************************
+merge from trunk to acl62 branch on 12/22/03
+command:
+join.sh trunk trunk_to_acl62_merge_102203_2 trunk_to_acl62_merge_122203 aserve
+*******************************************************************************
+
 2003-10-22  Kevin Layer  <layer@crikey>
 
 	* packages.cl: update defpatch
@@ -19,6 +25,21 @@ merge from trunk to acl62 branch on 9/24/03
 command:
 join.sh trunk trunk_to_acl62_merge_070703 trunk_to_acl62_merge_092403 aserve
 *******************************************************************************
+
+2003-12-12  Kevin Layer  <layer@relay.known.net>
+
+	* makefile: set base version to 6.2
+	* proxy.cl: fix typo in proxy-failure-response, include requested
+	  uri, too
+
+2003-10-31  John Foderaro  <jkf@tiger.franz.com>
+
+	* cgi.cl - transfer data from script back to http client
+	    immediately rather than buffering it up.
+
+2003-10-27  John Foderaro  <jkf@tiger.franz.com>
+1.2.33
+	* webactions/ files - change headers to include lgpl copyright info
 
 2003-10-22  John Foderaro  <jkf@tiger.franz.com>
 1.2.32

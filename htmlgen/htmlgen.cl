@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.8.6.5.2.4 2003/01/30 17:56:05 layer Exp $
+;; $Id: htmlgen.cl,v 1.8.6.5.2.5 2003/12/22 21:52:11 layer Exp $
 
 ;; Description:
 ;;   html generator
@@ -296,7 +296,7 @@
 				:end i)))
 	 
       
-    (let ((ch (schar string i))
+    (let ((ch (char string i))
 	  (cvt ))
       (if* (eql ch #\<)
 	 then (setq cvt "&lt;")

@@ -1,3 +1,7 @@
+2003-10-31  John Foderaro  <jkf@tiger.franz.com>
+
+	* htmlgen.cl: remove restriction on simple-string in :princ code
+
 2003-01-07  John Foderaro  <jkf@tiger.franz.com>
 
 	* fix :comment and :prin1-safe when html-print'ing
