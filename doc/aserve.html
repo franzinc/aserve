@@ -351,8 +351,8 @@ header lines and thus minimizes network traffic. </p>
 
 <p><a name="f-publish-directory"></a><strong><font face="Courier New">(publish-directory
 &amp;key prefix host port destination remove server <br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; indexes
-filter)</font></strong></p>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+indexes filter)</font></strong></p>
 
 <p>This creates a mapping from all urls whose name begins with<strong> prefix</strong> to
 files stored in the directory specified by the destination.&nbsp;&nbsp; The <strong>host</strong>,
@@ -1384,8 +1384,10 @@ keep-alive headers proxy user-agent external-format ssl)</font></strong></p>
   <tr>
     <td width="22%">accept</td>
     <td width="16%">&quot;*/*&quot;</td>
-    <td width="62%">A list of MIME types that are acceptable as a response to this request.
-    &nbsp; The default is to accept anything.</td>
+    <td width="62%">A string listing of MIME types that are acceptable as a response to this
+    request.&nbsp; The type listed can be simple such as &quot;text/html&quot; or more complex
+    like &quot;text/html, audio/*&quot;&nbsp; The default is to accept anything which is
+    expressed &quot;*/*&quot;.</td>
   </tr>
   <tr>
     <td width="22%">content</td>
