@@ -4,9 +4,11 @@ done -- 1. get complete set of mime types by one-time
 	   parsing of /etc/mime.types
 
 1a - add shutdown command  (spr21190)
+    [done 12/3/99]
 
 1b - deal with parameter values that have special characters in them
     (i.e. always do a print-safe)
+    [done 12/3/99]
 
 2. support cookies
 

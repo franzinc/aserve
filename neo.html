@@ -102,6 +102,15 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
 
 <p>&nbsp;</p>
 
+<h2>Shutting down the server</h2>
+
+<p><strong><font face="Courier New">(shutdown &amp;optional server)</font></strong></p>
+
+<p>This shuts down the web server given (or the most recently started web server if no
+argument is passed in).</p>
+
+<p>&nbsp;</p>
+
 <h2>Publishing information</h2>
 
 <p>Once the server is started it will accept requests from http clients, typically web
@@ -400,7 +409,7 @@ fields, check boxes and radio buttons.&nbsp;&nbsp; Each field has a name.&nbsp;&
 the user takes a certain action, the form data is encoded and sent to the web server.
 &nbsp;&nbsp; There are three ways that data can be sent to the web server.&nbsp; The
 method used is determined by the attributes of the <strong>&lt;form&gt;</strong> tag that
-defines the form
+defines the form 
 
 <ul>
   <li><strong>&lt;form method=&quot;get&quot;&gt; -&nbsp; </strong>The data is made part of
@@ -413,13 +422,13 @@ defines the form
   <li><strong>&lt;form method=&quot;post&quot;&gt; - </strong>The data is send in the body of
     the request.&nbsp;&nbsp;&nbsp; The neo url handler code calls <strong>(get-request-body
     req)</strong> to retrieve the body from the web browser and then <strong>(decode-form-urlencoded
-    body) </strong> to turn it into an alist that associates form field names with values.</li>
+    body) </strong>to turn it into an alist that associates form field names with values.</li>
   <li><strong>&lt;form method=&quot;post&quot; enctype=&quot;multipart/form-data&quot;&gt; - </strong>The
     data is sent in the body of the request in MIME format, with each field in its own
     separate MIME entity.&nbsp;&nbsp;&nbsp; This method is only necessary when one of the
     fields in the form is a <strong>&lt;input type=&quot;file&quot;&gt;</strong> ssince that
-    causes the whole contents of a file to be sent from the browser to the web server.
-    &nbsp; When sending a file you would like to include information such as the file name and
+    causes the whole contents of a file to be sent from the browser to the web server. &nbsp;
+    When sending a file you would like to include information such as the file name and
     content-type of the file, and by sending it in MIME format there is room for this
     information in the MIME header.&nbsp;&nbsp; We describe how to retrieve data from such a
     form next.</li>
@@ -429,7 +438,7 @@ defines the form
 
 <p>If you create a form with <strong>&lt;form method=&quot;post&quot;
 enctype=&quot;multipart/form-data&quot;&gt;</strong> then your url handler must do the
-following to retrieve the value of each field in the form:
+following to retrieve the value of each field in the form: 
 
 <ol>
   <li>Call <strong>(get-multipart-header req)</strong> to return the MIME headers of the next
@@ -447,7 +456,7 @@ recognized.&nbsp;&nbsp; </p>
 
 <p>Details on the functions are given next.</p>
 
-<p><strong><font face="Courier New">&nbsp;</font></strong></p>
+<p>&nbsp;</p>
 
 <hr>
 
@@ -493,10 +502,9 @@ the index just after the last index in which to store data.</p>
 <p>The return value is <strong>nil </strong>if there is no more data to return, otherwise
 it is the index one after the last last index filled with data in <strong>buffer.</strong></p>
 
-<p>The buffer can be a one dimensional array of <strong>character</strong> or of <strong>
-(unsigned-byte 8)</strong>.&nbsp;&nbsp; If the buffer is a <strong>character</strong>
-buffer then <strong>raw</strong> defaults to <strong>nil, </strong>otherwise <strong>raw </strong>defaults
-to true.</p>
+<p>The buffer can be a one dimensional array of <strong>character</strong> or of <strong>(unsigned-byte
+8)</strong>.&nbsp;&nbsp; If the buffer is a <strong>character</strong> buffer then <strong>raw</strong>
+defaults to <strong>nil, </strong>otherwise <strong>raw </strong>defaults to true.</p>
 
 <p>If <strong>raw </strong>is true then the buffer is filled with the bytes just as they
 are sent from the web browser.&nbsp; If <strong>raw</strong> is false then the sequence of

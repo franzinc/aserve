@@ -1,7 +1,7 @@
 ;; neo
 ;; url publishing
 ;;
-;; $Id: publish.cl,v 1.14 1999/12/02 23:00:02 jkf Exp $
+;; $Id: publish.cl,v 1.15 1999/12/12 03:15:41 jkf Exp $
 ;;
 
 
@@ -401,7 +401,7 @@
 					  (process-entity req entity)))
 			   else ; no host given, don't do it
 				nil))
-		 else ; no host specified in entity, do so it
+		 else ; no host specified in entity, so do it
 		      (return-from handle-request
 			(process-entity req entity))))))
   
@@ -413,7 +413,7 @@
     (dolist (entpair (wserver-prefix-url *wserver*))
       (if* (and (>= len-url (length (car entpair)))
 		(buffer-match url 0 (car entpair)))
-	 then ; we may already be a weiner
+	 then ; we may already be a wiener
 	      (if* (process-entity req (cdr entpair))
 		 then ; successful
 		      (return-from handle-request nil)))))
@@ -834,9 +834,24 @@
 
 
 
+(defmethod set-cookie-header ((req http-request)
+			  &key name value expires domain path secure)
+  ;; put a set cookie header in the list of header to be sent as
+  ;; a response to this request.
+  ;; name and value are required, they should be strings
+  ;; value will be urlencoded.
+  ;; If expires is nil (the default) then this cookie will expire
+  ;;	when the browser exits.
+  ;; If expires is :never then we'll sent a date so far into the future
+  ;;  that this software is irrelevant
+  ;; domain and path if given should be strings.
+  ;; domain must have at least two periods (i.e. us  ".franz.com" rather
+  ;; than "franz.com".... as netscape why this is important
+  ;; secure is either true or false
+  ;;
+  
 
-
-
+)
   
   
 

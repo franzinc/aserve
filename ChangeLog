@@ -1,3 +1,7 @@
+1999-12-11  John Foderaro  <jkf@tiger.franz.com>
+1.0.5
+	*  add shutdown command
+
 1999-12-02  John Foderaro  <jkf@tiger.franz.com>
 1.0.4
 	*  do case insensitive comparison of mime separation strings.

@@ -15,6 +15,7 @@
    #:publish
    #:publish-file
    #:publish-directory
+   #:shutdown
    #:split-into-words
    #:start
    #:unpublish
@@ -37,7 +38,7 @@
 (in-package :neo)
 
 
-(defparameter *neo-version* '(1 0 4))
+(defparameter *neo-version* '(1 0 5))
 
 ;;;;;;;  debug support 
 
@@ -405,25 +406,10 @@
      then (setq *ndebug* debug))
 
   (build-mime-types-table) 
+
+  ; shut down existing server
+  (shutdown server) 
   
-  ; first kill off old processes if any
-  (let ((proc (wserver-accept-thread server)))
-    (if* proc
-       then ; we want this thread gone and the socket closed 
-	    ; so that we can reopen it if we want to.
-	    (mp:process-kill proc)
-	    (mp:process-allow-schedule)
-	    (let ((oldsock (wserver-socket server)))
-	      (if* oldsock then (ignore-errors (close oldsock))))
-	    (setf (wserver-accept-thread server) nil)))
-  
-  (dolist (th (wserver-worker-threads server))
-    (mp:process-kill th)
-    (mp:process-allow-schedule))
-  
-  (setf (wserver-worker-threads server) nil)
-  
-    
   
   (let* ((main-socket (socket:make-socket :connect :passive
 					  :local-port port
@@ -446,6 +432,27 @@
     
     server
     ))
+
+
+(defun shutdown (&optional (server *wserver*))
+  ;; shutdown the neo server
+  ; first kill off old processes if any
+  (let ((proc (wserver-accept-thread server)))
+    (if* proc
+       then ; we want this thread gone and the socket closed 
+	    ; so that we can reopen it if we want to.
+	    (mp:process-kill proc)
+	    (mp:process-allow-schedule)
+	    (let ((oldsock (wserver-socket server)))
+	      (if* oldsock then (ignore-errors (close oldsock))))
+	    (setf (wserver-accept-thread server) nil)))
+  
+  (dolist (th (wserver-worker-threads server))
+    (mp:process-kill th)
+    (mp:process-allow-schedule))
+  
+  (setf (wserver-worker-threads server) nil)
+  )
 
 
 (defun start-simple-server ()
