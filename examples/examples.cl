@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.14 2000/09/07 19:48:04 jkf Exp $
+;; $Id: examples.cl,v 1.15 2000/10/19 16:37:47 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -39,8 +39,9 @@
 
 (in-package :net.aserve.examples)
 
-;; flush all publishing done so far:
-(unpublish :all t)
+;; don't flush all publishing done so far. since we have other
+;; example files this is bad news.
+; (unpublish :all t)
 
 (defparameter *example-pathname* *load-truename*) ; where this file is
 (defmacro example-file (name)
@@ -92,13 +93,24 @@
 			 ((:a :href "missing-link") "Missing Link")
 			 " should get an error when clicked"
 			 
-			 :br
-			 ((:a :href "ichars")
-			  "International Character Display")
+			 
+			 ;; published in puzzle.cl
+			 ;; run only in an international lisp.
+			 ;; test at runtime since we may switch back
+			 ;; and forth between international and 8 bit
+			 ;; modes
+			 (if* (member :ics *features* :test #'eq)
+			    then (html
+				  :br
+				  ((:a :href "ichars")
+				   "International Character Display")
 
-			 :br
-			 ((:a :href "icharcount")
-			  "(International) Character Counter")
+				  :br
+				  ((:a :href "icharcount")
+				   "(International) Character Counter")
+				  :br
+				  ((:a :href "wordpuzzle")
+				   "Word Puzzle")))
 			 )
 		  
 		  )))))
