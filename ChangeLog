@@ -1,3 +1,11 @@
+2004-01-09  John Foderaro  <jkf@tiger.franz.com>
+1.2.35
+	* publish.cl, main.cl, test/t-aserve.cl: add a slot to 
+	  all entities holding
+	  the extra headers to add to the response.  Add a :headers
+	  argument to all publish functions that allows one
+	  to store a value in the new headers slot.
+
 2003-12-23  John Foderaro  <jkf@tiger.franz.com>
 1.2.34
 	*  fix typo in exports wserver-io-timeout

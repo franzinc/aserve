@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.155 2003/12/23 17:53:35 jkf Exp $
+;; $Id: main.cl,v 1.156 2004/01/09 18:36:46 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -37,7 +37,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 34))
+(defparameter *aserve-version* '(1 2 35))
 
 (eval-when (eval load)
     (require :sock)
@@ -494,6 +494,8 @@ Problems with protocol may occur." (ef-name ef)))))
        (declare (ignore-if-unused ,g-req ,g-ent ,g-external-format))
        ,(if* body 
 	   then `(compute-response-stream ,g-req ,g-ent))
+       (if* (entity-headers ,g-ent)
+	  then (bulk-set-reply-headers ,g-req (entity-headers ,g-ent)))
        (if* ,g-headers
 	  then (bulk-set-reply-headers ,g-req ,g-headers))
        (send-response-headers ,g-req ,g-ent :pre)

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.49 2003/09/10 16:54:14 layer Exp $
+;; $Id: t-aserve.cl,v 1.50 2004/01/09 18:36:46 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -238,6 +238,7 @@
 				       (declare (ignore req ent extra))
 				       (setq got-reps (or got-reps 0))
 				       (incf got-reps))
+			     :headers '((:testhead . "testval"))
 			     )))
       (test nil (net.aserve::contents ent)) ; nothing cached yet
 
@@ -255,6 +256,11 @@
 	      (test (format nil "text/plain")
 		    (cdr (assoc :content-type headers :test #'eq))
 		    :test #'equal)
+	      
+	      (test "testval"
+		    (cdr (assoc "testhead" headers :test #'equal))
+		    :test #'equal)
+	      
 	      #+ignore (if* (eq protocol :http/1.1)
 			  then (test "chunked"
 				     (cdr (assoc :transfer-encoding headers 
@@ -281,7 +287,9 @@
     ;; 
     (publish-file :path "/frob2" :file dummy-2-name
 		  :content-type "text/plain"
-		  :preload t)
+		  :preload t
+		  :headers '((:testhead . "testval"))
+		  )
     
     ;; publish with no preload and no cache
     (publish-file :path "/frob2-npl" :file dummy-2-name
@@ -302,6 +310,9 @@
 	    (test (format nil "text/plain")
 		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
+	    (test "testval"
+		    (cdr (assoc "testhead" headers :test #'equal))
+		    :test #'equal)
 	    #+ignore (if* (eq protocol :http/1.1)
 			then (test "chunked"
 				   (cdr (assoc :transfer-encoding headers 
@@ -485,6 +496,7 @@
 	;; to make a separate binding for each function
 	(publish :path (car pair) 
 		 :content-type "text/plain"
+		 :headers '((:testhead . "testval"))
 		 :function
 		 #'(lambda (req ent)
 		     (with-http-response (req ent)
@@ -497,6 +509,9 @@
 				 :protocol protocol
 				 :keep-alive keep-alive)
 	    (test 200 code)
+	    (test "testval"
+		    (cdr (assoc "testhead" headers :test #'equal))
+		    :test #'equal)
 	    (test (format nil "text/plain" port)
 		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
@@ -1259,6 +1274,7 @@
 				       (declare (ignore req ent extra))
 				       (setq got-reps (or got-reps 0))
 				       (incf got-reps))
+		       :headers '(("testvdir" . "testvval"))
 		       :filter #'(lambda (req ent filename info)
 				   (declare (ignore ent info))
 				   (test t
@@ -1280,9 +1296,15 @@
     
     ; in step 1 we have it return the actual file
     (setq step 1)
-    (test 200 (values2
-	       (x-do-http-request (format nil "~a/test-pd/server.pem"
-					  prefix-local))))
+    (multiple-value-bind (body code headers)
+	(x-do-http-request (format nil "~a/test-pd/server.pem"
+				   prefix-local))
+      (declare (ignore body))
+      (test 200 code)
+      (test "testvval"
+		    (cdr (assoc "testvdir" headers :test #'equal))
+		    :test #'equal))
+    
     (test 1 got-reps)   ; hook fired
     
     ; remove entry so subsequent tests won't see it
@@ -1469,7 +1491,9 @@
 			(incf got-here)
 			(with-http-response (req ent)
 			  (with-http-body (req ent)
-			    (html "foo")))))
+			    (html "foo"))))
+		    :headers '((:testhead . "testval"))
+		    )
     (dolist (prefix (list prefix-local prefix-dns))
       (setq got-here 0)
       (test 200 (values2
@@ -1480,9 +1504,14 @@
 		 (x-do-http-request (format nil "~a/pptest/fred"
 					    prefix))))
       (test 2 got-here)
-      (test 200 (values2
-		 (x-do-http-request (format nil "~a/pptest#asdfasdf"
-					    prefix))))
+      (multiple-value-bind (body code headers)
+	  (x-do-http-request (format nil "~a/pptest#asdfasdf"
+				     prefix))
+	(declare (ignore body))
+	(test 200 code)
+	(test "testval"
+	      (cdr (assoc "testhead" headers :test #'equal))
+	      :test #'equal))
       
       (test 3 got-here)
       (test 200 (values2

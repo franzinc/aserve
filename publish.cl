@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.76 2003/10/31 16:21:37 jkf Exp $
+;; $Id: publish.cl,v 1.77 2004/01/09 18:36:46 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -94,6 +94,11 @@
    (hook     :initarg :hook
 	     :initform nil
 	     :accessor entity-hook)
+   
+   ; cons holding extra headers to send with this entity
+   (headers  :initarg :headers
+	     :initform nil
+	     :accessor entity-headers)
    
    ; extra holds random info we need for a particular entity
    (extra    :initarg :extra  :reader entity-extra)
@@ -514,6 +519,7 @@
 		     timeout
 		     plist
 		     hook
+		     headers
 		     )
   ;; publish the given url
   ;; if file is given then it specifies a file to return
@@ -543,6 +549,7 @@
 			 :plist plist
 			 :timeout timeout
 			 :hook hook
+			 :headers headers
 			 )))
 	      (publish-entity ent locator path hval)))))
 
@@ -555,6 +562,7 @@
 			    authorizer
 			    timeout
 			    plist
+			    headers
 			    )
   ;; publish a handler for all urls with a certain prefix
   ;; 
@@ -582,7 +590,9 @@
 			 :content-type content-type
 			 :authorizer authorizer
 			 :plist plist
-			 :timeout timeout)))
+			 :timeout timeout
+			 :headers headers
+			 )))
 	      (publish-prefix-entity ent prefix locator  hval
 				     host-p nil)
 	      ent))))
@@ -601,6 +611,7 @@
 			  (timeout #+io-timeout #.(* 100 24 60 60)
 				   #-io-timeout nil)
 			  hook
+			  headers
 			  )
 			  
   ;; return the given file as the value of the url
@@ -654,6 +665,7 @@
 			    :timeout  timeout
 			    :plist plist
 			    :hook hook
+			    :headers headers
 			    ))))
        else (setq ent (make-instance (or class 'file-entity)
 			:host hval 
@@ -666,6 +678,7 @@
 			:timeout timeout
 			:plist plist
 			:hook hook
+			:headers headers
 			)))
 
     (publish-entity ent locator path hval)))
@@ -692,6 +705,7 @@
 			       access-file
 			       plist
 			       hook
+			       headers
 			       )
   
   ;; make a whole directory available
@@ -722,6 +736,7 @@
 	       :access-file access-file
 	       :plist plist
 	       :hook hook
+	       :headers headers
 	       )))
     
     (publish-prefix-entity ent prefix locator host host-p nil)
@@ -812,7 +827,8 @@
 			   authorizer
 			   timeout
 			   plist
-			   hook)
+			   hook
+			   headers)
   
   (if* (null locator)
      then (setq locator (find-locator :exact server)))
@@ -868,6 +884,7 @@
 		:authorizer authorizer
 		:timeout timeout
 		:hook hook
+		:headers headers
 		)))
     (publish-entity ent locator path hval)))
 
@@ -1517,6 +1534,7 @@
 		  :timeout (entity-timeout ent)
 		  :plist (list :parent ent) ; who spawned us
 		  :hook (entity-hook ent)
+		  :headers (entity-headers ent)
 		  )))
       
 
