@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.75 2003/09/22 17:30:49 jkf Exp $
+;; $Id: publish.cl,v 1.76 2003/10/31 16:21:37 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -167,7 +167,7 @@
 	      :initform nil
 	      :accessor directory-entity-indexes)
    
-   ; filter is nil or a function of   req ent filename
+   ; filter is nil or a function of   req ent filename info
    ; which can process the request or return nil
    (filter    :initarg :filter
 	      :initform nil
