@@ -1,5 +1,8 @@
 *******************************************************************************
 merge from trunk to acl61 branch
+command: ../../join.sh trunk trunk_to_acl61_merge3 trunk_to_acl61_merge4 aserve
+*******************************************************************************
+merge from trunk to acl61 branch
 command: ../../join.sh trunk trunk_to_acl61_merge2 trunk_to_acl61_merge3 aserve
 *******************************************************************************
 merge from trunk to acl61 branch
@@ -12,7 +15,8 @@ command: ../../join.sh trunk acl61 trunk_to_acl61_merge1 aserve
 2001-09-18  Kevin Layer  <layer@crikey>
 1.2.9
 
-	* makefile: add build and srcdist rules
+	* makefile: add build and srcdist rules; have make clean remove
+	aserve-src
 	* load.cl: parameterize make-src-distributions's directory name
 
 2001-09-12  John Foderaro  <jkf@tiger.franz.com>
