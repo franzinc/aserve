@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.96 2001/02/06 20:46:14 jkf Exp $
+;; $Id: main.cl,v 1.97 2001/02/12 16:53:41 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -132,7 +132,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 1 39))
+(defparameter *aserve-version* '(1 1 40))
 
 
 (provide :aserve)
@@ -843,6 +843,7 @@ by keyword symbols and not by strings"
 		   setuid
 		   setgid
 		   proxy
+		   proxy-proxy ; who if anyone the proxy proxies to
 		   cache       ; enable proxy cache
 		   restore-cache ; restore a proxy cache
 		   debug-stream  ; stream to which to send debug messages
@@ -891,7 +892,7 @@ by keyword symbols and not by strings"
   (shutdown :server server) 
 
   (if* proxy 
-     then (enable-proxy :server server))
+     then (enable-proxy :server server :proxy-proxy proxy-proxy))
 
   (if* restore-cache
      then (restore-proxy-cache restore-cache :server server)

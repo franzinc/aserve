@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.34 2001/02/06 20:46:14 jkf Exp $
+;; $Id: client.cl,v 1.35 2001/02/12 16:53:40 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -398,7 +398,7 @@ or \"foo.com:8000\", not ~s" proxy))
 
     #+(and allegro (version>= 6 0))
     (let ((ef (find-external-format external-format)))
-      #+(version>= 6 0 pre-final 1) (net.aserve::warn-if-crlf ef)
+      #+(version>= 6) (net.aserve::warn-if-crlf ef)
       (setf (stream-external-format sock) ef))
     
     (if* net.aserve::*watch-for-open-sockets*

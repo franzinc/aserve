@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.41 2000/10/06 15:16:16 jkf Exp $
+;; $Id: publish.cl,v 1.42 2001/02/12 16:53:41 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -75,8 +75,10 @@
    (authorizer  :initarg :authorizer  ; authorizer object, if any
 		:accessor entity-authorizer
 		:initform nil)
-   )
-  )
+   
+   ; extra holds random info we need for a particular entity
+   (extra    :initarg :extra  :reader entity-extra)
+   ))
 
 
 (defclass file-entity (entity)
@@ -157,6 +159,9 @@
    (info :initform nil
 	 :initarg :info
 	 :accessor locator-info)
+   
+   ; for random extra nifo
+   (extra    :initarg :extra  :reader locator-extra)
    ))
 
 

@@ -1,3 +1,9 @@
+2001-02-08  John Foderaro  <jkf@tiger.franz.com>
+1.1.40
+	* added the proxy-proxy argument to net.aserve:start that
+	  permits you to specify that the allegroserve proxy should
+	  sent its requests through another proxy. 
+
 2001-02-06  John Foderaro  <jkf@tiger.franz.com>
 1.1.39
 	* proxy and scanning fixes

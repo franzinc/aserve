@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.38 2001/02/06 20:46:15 jkf Exp $
+;; $Id: proxy.cl,v 1.39 2001/02/12 16:53:41 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -264,26 +264,35 @@
   ())
 
 
-(defvar *locator-proxy-obj* nil)  ; the object in the locator chain if proxying
-(defvar *entity-proxy* nil)	  ; the entity denoting we should proxy
 
-(defun enable-proxy (&key (server *wserver*))
-  (if* (null *locator-proxy-obj*)
-     then (setq *locator-proxy-obj* (make-instance 'locator-proxy :name :proxy)
-		*entity-proxy* (make-instance 'computed-entity
-				 :function #'(lambda (req ent)
-					       (do-proxy-request req ent)))))
+(defun enable-proxy (&key (server *wserver*)
+			  proxy-proxy)
+  ;; 
+  (let ((locator-proxy-obj 
+	 (make-instance 'locator-proxy 
+	   :name :proxy
+	   :extra (make-instance 'computed-entity
+		    :function #'(lambda (req ent)
+				  (do-proxy-request req ent))
+		    :extra (if* proxy-proxy
+			      then (multiple-value-bind (host port)
+				       (get-host-port proxy-proxy)
+				     (if* (null host)
+					then (error "bad host port specification: ~s" proxy-proxy))
+				     (cons host port)))))))
+	   
   
-  ; must be first as other locators may not ignore absolute proxy urls
-  (pushnew *locator-proxy-obj* (wserver-locators server))
+    ; must be first as other locators may not ignore absolute proxy urls
+    (pushnew locator-proxy-obj (wserver-locators server))
   
-  )
+    ))
 
 (defmethod standard-locator ((req http-request) (locator locator-proxy))
   ;; see if this is a proxy request and if so return the entity that
   ;; denotes we're proxying
   (if* (uri-scheme (request-raw-uri req))
-     then *entity-proxy*))
+     then ; compute entity object
+	  (locator-extra locator)))
 
 
 (defun do-proxy-request (req ent)
@@ -362,8 +371,13 @@
 	 (state :pre-send)
 	 (keep-alive)
 	 (cached-connection)
-	 )
+	 (phostport (and ent (entity-extra ent))))
 
+    (if* phostport
+       then ; we're proxying to a proxy. yikes
+	    (setq host (car phostport)
+		  port (cdr phostport)))
+    
     (unwind-protect
 	(tagbody
 	  
@@ -453,10 +467,6 @@ cached connection = ~s~%" cond cached-connection))
 	    ; time to make a call to the server
 	    (handler-case
 		(multiple-value-setq (sock cached-connection)
-		  #+ignore (socket:make-socket :remote-host host
-					       :remote-port (or port 80)
-					       :format :bivalent
-					       :type *socket-stream-type*)
 		  (get-possibly-cached-connection
 		   host (or port 80)))
 	      (error (cond)
@@ -557,7 +567,11 @@ cached connection = ~s~%" cond cached-connection))
 		
 		
 		; now the uri
-		(let ((str (net.aserve.client::uri-path-etc uri)))
+		(let ((str (if* phostport
+			      then ; proxying so send http://...
+				   (net.uri:render-uri (request-raw-uri req) 
+						       nil)
+			      else (net.aserve.client::uri-path-etc uri))))
 		  (dotimes (i (length str))
 		    ; should do string-to-octets...
 		    (setf (ausb8 firstbuf ind) 
