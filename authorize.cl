@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: authorize.cl,v 1.6 2002/02/13 22:35:44 jkf Exp $
+;; $Id: authorize.cl,v 1.7 2003/09/22 17:30:49 jkf Exp $
 
 ;; Description:
 ;;   classes and functions for authorizing access to entities
@@ -56,9 +56,10 @@
    ))
 
 
+
 (defmethod authorize ((auth password-authorizer) 
-		  (req http-request)
-		  (ent entity))
+		      (req http-request)
+		      (ent entity))
   ;; check if this is valid request, return t if ok
   ;; and :done if we've sent a request for a  new name and password
   ;;
@@ -71,12 +72,22 @@
 		 then (return-from authorize t))))
 
     ;; valid name/password not given, ask for it 
-    (with-http-response (req ent :response 
-			     *response-unauthorized*)
-      (setf (request-reply-content-length req) 0)
+    (with-http-response (req *dummy-computed-entity* 
+			     :response *response-unauthorized*
+			     :format :text)
       (set-basic-authorization req
 			       (password-authorizer-realm auth))
-      (with-http-body (req ent)))
+      
+      ; this is done to preventing a chunking response which
+      ; confuse the proxy (for now)..
+      (if* (member ':use-socket-stream (request-reply-strategy req))
+	 then (setf (request-reply-strategy req)
+		'(:string-output-stream
+		  :post-headers)))
+
+      (with-http-body (req *dummy-computed-entity*)
+	(html (:html (:body (:h1 "Access is not authorized"))))
+	))
     :done))
 	    
 	    

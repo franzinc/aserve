@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.36 2003/09/10 16:54:14 layer Exp $
+;; $Id: examples.cl,v 1.37 2003/09/22 17:30:49 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -466,7 +466,10 @@
 						*response-unauthorized*)
 			 (set-basic-authorization req
 						   "secretserver")
-			 (with-http-body (req ent)))))))
+			 (with-http-body (req ent)
+			   (html (:h1 "You Failed")
+				 "You failed to enter the correct name/password")
+			   ))))))
 
 
 (publish :path "/local-secret"
