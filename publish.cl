@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.67 2001/11/15 19:40:49 jkf Exp $
+;; $Id: publish.cl,v 1.68 2001/11/27 15:29:25 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -1537,7 +1537,8 @@
 			  (push entry (directory-entity-access-file-cache ent)))
 		  (if* (> file-write-date (cadr entry))
 		     then ; need to refresh
-			  (setf (caddr entry) (read-access-file-contents aname)))
+			  (setf (caddr entry) (read-access-file-contents aname))
+			  (setf (cadr entry) file-write-date))
 		
 		  ; put new info at the beginning of the info list
 		  (setq info (append (caddr entry) info)))))

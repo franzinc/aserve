@@ -1,3 +1,9 @@
+2001-11-26  John Foderaro  <jkf@tiger.franz.com>
+1.2.18
+	* decode.cl - handle character set decoding inside uri queries
+	* publish.cl - access file caching
+	
+
 2001-11-15  John Foderaro  <jkf@tiger.franz.com>
 1.2.17
 	* added new publish fcn: publish-prefix 

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.38 2001/11/15 19:40:49 jkf Exp $
+;; $Id: t-aserve.cl,v 1.39 2001/11/27 15:29:25 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -85,6 +85,8 @@
 		   (test-forms port)
 		   (test-client port)
 		   (test-cgi port)
+		   (if* (member :ics *features*)
+		      then (test-international port))
 		   (if* test-timeouts 
 		      then (test-timeouts port))
 		   ))
@@ -1474,7 +1476,7 @@
 				  :element-type 'character
 				  :adjustable t
 				  :fill-pointer 0))
-    
+        
     (multiple-value-bind (body rescode)
 	(x-do-http-request (format nil "~a/cgi-4" prefix-local))
       (test "okay
@@ -1531,12 +1533,57 @@
 	))
        (ignore-errors (close sock :abort t))))))
        
-	      
-	      
-       
-       
-    
-    
+
+(defun test-international (port)
+  (declare (ignorable port))
+  #+(and allegro ics (version>= 6 1))
+  (let ((prefix-local (format nil "http://localhost:~a" port))
+	(Privyet! (coerce '(#\cyrillic_capital_letter_pe
+			    #\cyrillic_small_letter_er
+			    #\cyrillic_small_letter_i
+			    #\cyrillic_small_letter_ve
+			    #\cyrillic_small_letter_ie
+			    #\cyrillic_small_letter_te
+			    #\!)
+			  'string)))
+    (publish 
+     :path "/simple-form-itest"
+     :function
+     #'(lambda (req ent)
+	 ; simulate starting aserve with :external-format :koi8-r arg
+	 (let ((*default-aserve-external-format* :koi8-r))
+	   (with-http-response (req ent)
+	     (with-http-body (req ent :external-format :koi8-r)
+	       (let ((text (request-query-value "text" req)))
+		 (if* text
+		    then (html
+			  (:html
+			   (:head (:title "result"))
+			   (test Privyet! text :test #'string=)
+			   (:body "test text: {" (:princ text) "}")))
+		    else ;; filler -- test normally doesn't go here
+			 (html
+			  (:html
+			   (:head (:title "foobar"))
+			   (:body))))))))))
+  
+    (let* ((result
+	    (x-do-http-request 
+	     (format nil "~a/simple-form-itest?text=%F0%D2%C9%D7%C5%D4%21"
+		     prefix-local)
+	     :external-format :octets))
+	   (begin (position #\{ result))
+	   (end (position #\} result))
+	   (test-string
+	    (if* begin
+	       then (octets-to-string
+		     (string-to-octets (subseq result (1+ begin) end)
+				       :external-format :octets)
+		     :external-format :koi8-r))))
+      (test t (not (null begin)))  ; verify we found begin 
+      (test t (not (null end)))    ; and end markers
+      (test Privyet! test-string :test #'string=))))
+  
   
   
 

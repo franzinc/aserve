@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.23 2001/10/19 21:25:42 jkf Exp $
+;; $Id: examples.cl,v 1.24 2001/11/27 15:29:25 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -780,7 +780,7 @@
  :content-type "text/html; charset=utf-8"
  :function
 
- #-(and allegro ics (version>= 6 0 pre-final 1))
+ #-(and allegro ics (version>= 6 0))
  #'(lambda (req ent)
      (with-http-response (req ent)
        (with-http-body (req ent)
@@ -788,7 +788,7 @@
 This page available only with International Allegro CL post 6.0 beta")
 		*html-stream*))))
 
- #+(and allegro ics (version>= 6 0 pre-final 1))
+ #+(and allegro ics (version>= 6 0))
  #'(lambda (req ent)
      (let* ((body (get-request-body req))
 	    (text (if* body
@@ -872,7 +872,7 @@ The \"anyone can be provincial!\" page"))))
  :content-type "text/html"
  :function
 
- #-(and allegro ics (version>= 6 0 pre-final 1))
+ #-(and allegro ics (version>= 6 0))
  #'(lambda (req ent)
      (with-http-response (req ent)
        (with-http-body (req ent)
@@ -881,7 +881,7 @@ This page available only with International Allegro CL post 6.0 beta")
 		*html-stream*))))
 
  ;; Need pre-final.1's :try-variant change to find-external-format
- #+(and allegro ics (version>= 6 0 pre-final 1))
+ #+(and allegro ics (version>= 6 0))
  #'(lambda (req ent)
      (let* ((body (get-request-body req))
 	    (query (if* body

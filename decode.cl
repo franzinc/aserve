@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: decode.cl,v 1.14 2001/09/12 19:59:32 jkf Exp $
+;; $Id: decode.cl,v 1.15 2001/11/27 15:29:25 jkf Exp $
 
 ;; Description:
 ;;   decode/encode code
@@ -358,6 +358,12 @@
 	 (name)
 	 (max-minus-1 (1- max))
 	 (seenpct)
+	 ;; The following is a flag which determines whether we should do
+	 ;; external-format processing on the source string.
+	 ;; Note that we are assuming the source string not to be in Unicode,
+	 ;; but to contain one latin1 octet per element.  This is the way
+	 ;; a uri gets returned by parse-uri.
+	 (seen-non-ascii nil)
 	 (ch))
 	((>= i max))
       (setq ch (schar str i))
@@ -371,10 +377,13 @@
 	   then (setq obj (buffer-substr str start (1+ i)))
 	 elseif (and (not seenpct) (or (eq ch #\%)
 				       (eq ch #\+)))
-	   then (setq seenpct t))
+	   then (setq seenpct t)
+	 elseif (and (not seen-non-ascii)
+		     (>= (char-code ch) #.(expt 2 7)))
+	   then (setq seen-non-ascii t))
       
 	(if* obj
-	   then (if* seenpct
+	   then (if* (or seenpct seen-non-ascii)
 		   then (setq obj (un-hex-escape
 				   obj t
 				   :external-format external-format)
@@ -430,6 +439,12 @@
   (declare (ignorable external-format))
   (let ((count 0)
 	(seenplus nil)
+	 ;; The following is a flag which determines whether we should do
+	 ;; external-format processing on the source string.
+	 ;; Note that we are assuming the source string not to be in Unicode,
+	 ;; but to contain one latin1 octet per element.  This is the way
+	 ;; a uri gets returned by parse-uri.
+	(seen-non-ascii nil)
 	(len (length given)))
     
     ; compute the number of %'s (times 2)
@@ -454,9 +469,12 @@
 		   else (incf count 2) 
 			(incf i 2))
 	 elseif (eq ch #\+)
-	   then (setq seenplus t))))
+	   then (setq seenplus t)
+	 elseif (>= (char-code ch) #.(expt 2 7))
+	   then (setq seen-non-ascii t))))
     
     (if* (and (null seenplus)
+	      (null seen-non-ascii)
 	      (eq 0 count))
        then ; move along, nothing to do here
 	    (return-from un-hex-escape given))
