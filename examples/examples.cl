@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.21 2001/09/21 19:02:40 jkf Exp $
+;; $Id: examples.cl,v 1.22 2001/10/16 16:58:20 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -231,8 +231,8 @@
 	 :function
 	 (let ((selector 0)) ; chose one of two pictures
 	   #'(lambda (req ent)
-	       (with-http-response (req ent)
-		 (with-http-body (req ent :format :binary)
+	       (with-http-response (req ent :format :binary)
+		 (with-http-body (req ent)
 		   ; here is where you would generate the picture.
 		   ; we're just reading it from a file in this example
 		   (let ((stream (request-reply-stream req)))

@@ -1,3 +1,17 @@
+2001-10-16  John Foderaro  <jkf@tiger.franz.com>
+1.2.12
+	
+>>>	* incompatible change:  the format argument to with-http-body
+	  has been moved to with-http-response. 
+	  The format argument to with-http-body was ignored, but on
+	  with-http-response it will be obeyed and will override
+	  the format specified in the entity.
+	    
+	  The internal generic function compute-strategy now takes
+	  three arguments.  This function isn't part of the 
+	  external interface to AllegroServe but some users have
+	  specialized it.
+
 2001-10-15  John Foderaro  <jkf@tiger.franz.com>
 
 	* add timeout value to each entity object to serve as a default

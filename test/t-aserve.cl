@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.31 2001/10/12 21:51:29 jkf Exp $
+;; $Id: t-aserve.cl,v 1.32 2001/10/16 16:58:20 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -1250,6 +1250,13 @@
 (defun test-timeouts (port)
   ;; test aserve timing out when the client is non responsive
   (let (#+ignore (prefix-local (format nil "http://localhost:~a" port)))
+    
+    (if* *x-ssl* 
+       then ; we don't get the same timeout behavior since we're
+	    ; not directly connected to the server socket, so
+	    ; don't try the tests
+	    (return-from test-timeouts nil))
+    
     (format t "timeout tests.. expect pauses~%")(force-output)
     
     ;; try making a connection and not sending any headers.
@@ -1264,7 +1271,7 @@
        
        ; try sending data periodically but in enough time to
        ; bypass the timeout
-       (dotimes (i 5)
+       (dotimes (i 3)
 	 (sleep (max 1 (- net.aserve:*http-io-timeout* 10)))
 	 (format t "send packet~%")(force-output)
 	 (format sock "brap: brop~c~c" #\return #\newline)

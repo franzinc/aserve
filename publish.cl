@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.56 2001/10/15 18:30:53 jkf Exp $
+;; $Id: publish.cl,v 1.57 2001/10/16 16:58:20 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -903,13 +903,14 @@
 	      ; * should check for range here
 	      ; for now we'll send it all
 	      (with-http-response (req ent
-				       :content-type (content-type ent))
+				       :content-type (content-type ent)
+				       :format :binary)
 		(setf (request-reply-content-length req) (length contents))
 		(setf (reply-header-slot-value req :last-modified)
 		  (last-modified-string ent))
 	      
 	      
-		(with-http-body (req ent :format :binary)
+		(with-http-body (req ent)
 		  ;; at this point the header are out and we have a stream
 		  ;; to write to 
 		  (write-sequence contents (request-reply-stream req))
@@ -957,7 +958,7 @@
 				
 			      
 		      
-			(with-http-response (req ent)
+			(with-http-response (req ent :format :binary)
 
 			  ;; control will not reach here if the request
 			  ;; included an if-modified-since line and if
@@ -971,7 +972,7 @@
 			
 			
 			
-			  (with-http-body (req ent :format :binary)
+			  (with-http-body (req ent)
 			    (loop
 			      (if* (<= size 0) then (return))
 			      (let ((got (read-sequence buffer 
@@ -1115,7 +1116,7 @@
 		      (debug-format :info "entity is up to date~%")
 		      ; recompute strategy based on simple 0 length
 		      ; thing to return
-		      (compute-strategy req nm-ent)
+		      (compute-strategy req nm-ent nil)
 		      
 		      (setf (request-reply-code req) *response-not-modified*)
 		      (with-http-body (req nm-ent)
@@ -1127,7 +1128,7 @@
     
 
 
-(defmethod compute-strategy ((req http-request) (ent entity))
+(defmethod compute-strategy ((req http-request) (ent entity) format)
   ;; determine how we'll respond to this request
   
   (let ((strategy nil)
@@ -1159,7 +1160,7 @@
 		    ; short of processes to handle requests.
 		    ; For now we'll accept it if we can.
 		    
-		    (if* (eq (transfer-mode ent) :binary)
+		    (if* (eq (or format (transfer-mode ent)) :binary)
 		       then ; can't create binary stream string
 			    ; see if we know the content length ahead of time
 			    (if* (content-length ent)
@@ -1187,10 +1188,10 @@
     ))
 			     
 		    
-(defmethod compute-strategy ((req http-request) (ent file-entity))
+(defmethod compute-strategy ((req http-request) (ent file-entity) format)
   ;; for files we can always use the socket stream and keep alive
   ;; since we konw the file length ahead of time
-  
+  (declare (ignore format))
   (let ((keep-alive (and (wserver-enable-keep-alive *wserver*)
 			 (>= (wserver-free-workers *wserver*) 2)
 			 (equalp "keep-alive" 

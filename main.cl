@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.115 2001/10/15 18:30:53 jkf Exp $
+;; $Id: main.cl,v 1.116 2001/10/16 16:58:20 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -146,7 +146,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 11))
+(defparameter *aserve-version* '(1 2 12))
 
 (eval-when (eval load)
     (require :sock)
@@ -510,6 +510,7 @@
 				    (check-modified t)
 				    (response '*response-ok*)
 				    content-type
+				    format
 				    )
 			      &rest body)
   ;;
@@ -519,9 +520,11 @@
   (let ((g-req (gensym))
 	(g-ent (gensym))
 	(g-timeout (gensym))
+	(g-format (gensym))
 	(g-check-modified (gensym)))
     `(let* ((,g-req ,req)
 	    (,g-ent ,ent)
+	    (,g-format ,format)
 	    (,g-timeout ,(or timeout 
 			     
 			     `(or
@@ -531,7 +534,7 @@
 	    )
        (catch 'with-http-response
 	 ;(format t "timeout is ~d~%" ,g-timeout)
-	 (compute-strategy ,g-req ,g-ent)
+	 (compute-strategy ,g-req ,g-ent ,g-format)
 	 (up-to-date-check ,g-check-modified ,g-req ,g-ent)
 	 (mp::with-timeout ((if* (and (fixnump ,g-timeout)  ; ok w-t
 				      (> ,g-timeout 0))
@@ -556,25 +559,23 @@ External-format `~s' passed to make-http-client-request filters line endings.
 Problems with protocol may occur." (ef-name ef)))))
 
 (defmacro with-http-body ((req ent
-			   &key format headers 
+			   &key headers 
 				(external-format 
 				 *default-aserve-external-format*))
 			  &rest body)
   (declare (ignorable external-format))
   (let ((g-req (gensym))
 	(g-ent (gensym))
-	(g-format (gensym))
 	(g-headers (gensym))
 	(g-external-format (gensym))
 	)
     `(let ((,g-req ,req)
 	   (,g-ent ,ent)
-	   (,g-format ,format)
 	   (,g-headers ,headers)
 	   #+(and allegro (version>= 6 0 pre-final 1))
 	   (,g-external-format (find-external-format ,external-format))
 	   )
-       (declare (ignore-if-unused ,g-req ,g-ent ,g-format ,g-external-format))
+       (declare (ignore-if-unused ,g-req ,g-ent ,g-external-format))
        ,(if* body 
 	   then `(compute-response-stream ,g-req ,g-ent))
        (if* ,g-headers
