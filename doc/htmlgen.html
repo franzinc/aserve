@@ -169,8 +169,8 @@ the <em>form<strong> </strong></em>arguments just like the <strong>html</strong>
 <p>We will show how to build a page containing a table using successively more runtime
 customization of the table.&nbsp; First we show how to build a table of squares.</p>
 
-<pre>(defun simple-table-a ()
-   (with-open-file (p &quot;~/public_html/test.html&quot;
+<pre>defun simple-table-a ()
+   (with-open-file (p &quot;test.html&quot;
         :direction :output
         :if-exists :supersede)
 
@@ -225,7 +225,7 @@ use an integer here we would have had to do <strong>(:td (:princ 1))</strong>.</
 around the elements of the table as shown here:</p>
 
 <pre>(defun simple-table-b ()
-  (with-open-file (p &quot;~/public_html/test.html&quot;
+  (with-open-file (p &quot;test.html&quot;
         :direction :output
         :if-exists :supersede)
 
@@ -277,7 +277,7 @@ Suppose we wanted to make the table include the squares of numbers from zero to 
 function to compute a table of any size:</p>
 
 <pre>(defun simple-table-c (count)
-  (with-open-file (p &quot;~/public_html/test.html&quot;
+  (with-open-file (p &quot;test.html&quot;
         :direction :output
         :if-exists :supersede)
 
@@ -340,7 +340,7 @@ the <strong>html-stream</strong> call.&nbsp; The result of <font face="Courier N
 function allows us to specify parameters of the table being built:</p>
 
 <pre>(defun simple-table-d (count border-width backg-color border-color)
-  (with-open-file (p &quot;~/public_html/test.html&quot;
+  (with-open-file (p &quot;test.html&quot;
         :direction :output
         :if-exists :supersede)
 
@@ -425,7 +425,7 @@ evaluated but the values are.&nbsp;&nbsp; If we evaluate this expression:</p>
 <p>An example of conditional arguments to a markup command is this:</p>
 
 <pre>(defun simple-table-e (count)
-   (with-open-file (p &quot;~/public_html/test.html&quot;
+   (with-open-file (p &quot;test.html&quot;
         :direction :output
         :if-exists :supersede)
 
@@ -519,8 +519,8 @@ on how HTML is written using the <strong>html</strong> macro above.&nbsp; </p>
     macro.&nbsp;&nbsp; This form is rendered as an opening tag, then the rendering of the
     body, and a closing HTML tag if one exists.</li>
   <li>a list beginning with a list beginning with an <strong>lhtml</strong> keyword. &nbsp;
-    This is the form used when arguments are to be supplied with the opening entity tag.&nbsp;
-  </li>
+    This is the form used when attributes are to be supplied with the opening entity
+    tag.&nbsp; </li>
 </ul>
 
 <p>Examples of valid <strong>lhtml</strong>: 
