@@ -8,7 +8,7 @@
 <body>
 
 <h1 align="center">AllegroServe - A Web Application Server<br>
-<small><small><small>version <font face="Courier New">1.2.19</font></small></small></small></h1>
+<small><small><small>version <font face="Courier New">1.2.20</font></small></small></small></h1>
 
 <p align="left"><strong><small>copyright(c) 2000-2001. Franz Inc</small></strong></p>
 
@@ -52,7 +52,9 @@
 <font face="Courier New">&nbsp; <a href="#f-run-cgi-program">run-cgi-program</a><br>
 </font><a href="#form-processing">Form Processing</a><br>
 <font face="Courier New">&nbsp; <a href="#f-get-multipart-header">get-multipart-header</a><br>
+&nbsp; <a href="#f-parse-multipart-header">parse-multipart-header</a><br>
 &nbsp; <a href="#f-get-multipart-sequence">get-multipart-sequence</a></font> <br>
+&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-get-all-multipart-data"><font face="Courier New">get-all-multipart-data</font></a><br>
 &nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-form-urlencoded-">form-urlencoded-to-query</a><br>
 &nbsp; <a href="#f-query-to">query-to-form-urlencoded</a></font><br>
 <a href="#authorization">Authorization</a><br>
@@ -1196,10 +1198,14 @@ following to retrieve the value of each field in the form:
 
 <ol>
   <li>Call <strong>(get-multipart-header req)</strong> to return the MIME headers of the next
-    field.&nbsp; If this returns nil then there are no more fields to retrieve.</li>
+    field.&nbsp; If this returns nil then there are no more fields to retrieve.&nbsp; You'll
+    likely want to call <strong>parse-multipart-header</strong> on the result of <strong>get-multipart-header</strong>
+    in order to extract the imporant information from the header.</li>
   <li>Create a buffer and call <strong>(get-multipart-sequence req buffer)</strong> repeatedly
     to return the next chunk of data.&nbsp; When there is no more data to read for this field,
-    <strong>get-multipart-sequence</strong> will return nil.&nbsp; </li>
+    <strong>get-multipart-sequence</strong> will return nil.&nbsp;&nbsp;&nbsp;&nbsp; If you're
+    willing to store the whole multipart data item in a lisp object in memory you can call <strong>get-all-multipart-data</strong>
+    instead to return the entire item in one Lisp object.</li>
   <li>go back to step 1</li>
 </ol>
 
@@ -1218,24 +1224,24 @@ recognized.&nbsp;&nbsp; </p>
 request)</font></strong></p>
 
 <p>This returns nil or&nbsp; the MIME headers for the next form field in alist form.
-&nbsp;&nbsp;&nbsp; If nil is returned then there is no more form data.&nbsp;&nbsp; </p>
+&nbsp;&nbsp;&nbsp; If nil is returned then there is no more form data.&nbsp;&nbsp; See <strong>parse-multipart-header</strong>
+for a simple way to extratacting information from the header.</p>
 
 <p>For an input field such as <strong>&lt;input type=&quot;text&quot;
 name=&quot;textthing&quot;&gt; </strong>the value returned by <strong>get-multipart-header</strong>
 would be</p>
 
-<pre>((&quot;Content-Disposition&quot;
-
+<pre>((:content-disposition
       (:param &quot;form-data&quot; (&quot;name&quot; . &quot;textthing&quot;))))</pre>
 
 <p>For an input field such as <strong>&lt;input type=&quot;file&quot;
 name=&quot;thefile&quot;&gt; </strong>the value returned by <strong>get-multipart-header</strong>
 would be something like</p>
 
-<pre>((&quot;Content-Disposition&quot;
+<pre>((:content-disposition
       (:param &quot;form-data&quot; (&quot;name&quot; . &quot;thefile&quot;)
                           (&quot;filename&quot; . &quot;C://down//550mhz.gif&quot;)))
- (&quot;Content-Type&quot; &quot;image/gif&quot;))</pre>
+ (:content-type &quot;image/gif&quot;))</pre>
 
 <p>Note that the filename is expressed in the syntax of the operating system on which the
 web browser is running.&nbsp; This syntax may or may not make sense to the Lisp pathname
@@ -1243,6 +1249,39 @@ functions of the AllegroServe web server as it may be running on a totally diffe
 operating system.</p>
 
 <p>&nbsp;</p>
+
+<hr>
+
+<p><a name="f-parse-multipart-header"></a><strong><font face="Courier New">(parse-multipart-header
+header)</font></strong></p>
+
+<p>This take the value of get-multipart-header and returns values that describe the
+important information in the header.</p>
+
+<p>The first value returned is 
+
+<ul>
+  <li><strong>:eof</strong>&nbsp; - this header says that there are no more multipart items.
+    &nbsp; This value is returned when the value of <strong>header </strong>is <strong>nil.</strong></li>
+  <li><strong>:data</strong> - the next multipart item is a simple form value.&nbsp; The
+    second value returned is a string naming the value.&nbsp; You can retrieve the value
+    itself using repeated calls to <strong>get-multipart-sequence</strong> or one call to <strong>get-all-multipart-data</strong>.
+  </li>
+  <li><strong>:file </strong>- the next multipart item is a file the user is uploading to the
+    server.&nbsp;&nbsp;&nbsp; The second value returned in the name of the form item for which
+    this file was given.&nbsp; The third value is the name of the file as specified by the
+    user to his browser.&nbsp; The fourth value returned is the MIME Content-Type that the
+    browser is guessing applies to this contents of the file.&nbsp;&nbsp; The contents of the
+    file can be retrieved using repeated calls to <strong>get-multipart-sequence</strong> or
+    one call to <strong>get-all-multipart-data</strong>. </li>
+  <li><strong>nil</strong> - This header has a form not recognized by <strong>parse-multipart-header</strong>.
+    &nbsp;&nbsp;&nbsp; If you encounter this please let us know about it since we would like
+    enhance <strong>parse-multipart-header</strong> to understand this type of header.
+    &nbsp;&nbsp; If you encounter this&nbsp; type of header you still have to read the
+    contents of the data item that follows the header in order to read the next header.
+    &nbsp;&nbsp; A call to <strong>(get-all-multipart-data req :limit 1000) </strong>will read
+    and throw away the following value so you can then read the next header.</li>
+</ul>
 
 <hr>
 
@@ -1269,6 +1308,35 @@ external-format </strong>(which defaults to<strong> </strong>the value of <stron
 so the program should be sure to make use of the index returned by <strong>get-multipart-sequence</strong>.</p>
 
 <p>&nbsp;</p>
+
+<hr>
+
+<p><a name="f-get-all-multipart-data"></a><font face="Courier New"><strong>(get-all-multipart-data
+request &amp;key&nbsp; type size external-format limit)</strong></font></p>
+
+<p>This retrieves the complete data object following the last multipart header.
+&nbsp;&nbsp; It returns it as a lisp object.&nbsp;&nbsp; If <strong>type</strong> is<strong>
+:text</strong> (the default) then the result is returned as a lisp string.&nbsp;&nbsp; If <strong>type</strong>
+is <strong>:binary</strong> then the result is returned as an array of&nbsp; element-type
+(unsigned-byte 8).&nbsp;&nbsp;&nbsp; <strong>size </strong>(which defaults to 4096) is the
+size of the internal buffers used by this function to retrieve the data.&nbsp;&nbsp; You
+usually won't need to specify a value for this but but if you know the values retrieved
+are either very small or very large it may may the operation run faster to specify an
+appropriate <strong>size</strong>.&nbsp;&nbsp;&nbsp; <strong>external-format</strong> is
+used when <strong>type</strong> is <strong>:text</strong> to convert&nbsp; the octet
+stream into characters.&nbsp; It defaults to the value of <strong>*default-aserve-external-format*</strong>.
+&nbsp; <strong>limit </strong>can be given an integer value that specifies the maximum
+size of data you're willing to retrieve.&nbsp; By default there is no limit.&nbsp; This
+can be dangerous as a user may try to upload a huge data file which will take up so much
+Lisp heap space that it takes down the server.&nbsp;&nbsp; If a <strong>limit</strong> is
+given and that limit is reached, <strong>get-all-multipart-data</strong> will continue to
+read the data from the client until it reaches the end of the data, however it will <em>not</em>
+save it and will return the symbol <strong>:limit</strong> to indicate that the data being
+send to the sever exceeded the limit.&nbsp; It will return a second value which is the
+size of the data the client tried to upload to the server.&nbsp;&nbsp;&nbsp; If your
+application intends to handle very large amounts of data being uploaded to the server you
+would be better off using <strong>get-multipart-sequence</strong> since with that you can
+write the data buffer by buffer to the disk instead of storing it in the Lisp heap.</p>
 
 <hr>
 
