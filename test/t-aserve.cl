@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.37 2001/10/31 19:43:47 jkf Exp $
+;; $Id: t-aserve.cl,v 1.38 2001/11/15 19:40:49 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -79,6 +79,7 @@
 		   (test-publish-directory port)
 		   (test-publish-computed port)
 		   (test-publish-multi port)
+		   (test-publish-prefix port)
 		   (test-authorization port)
 		   (test-encoding)
 		   (test-forms port)
@@ -1240,6 +1241,24 @@
 	  (values2 (x-do-http-request (format nil "~a/acc-test/bbb.ign"
 					      prefix-local))))
     
+    ; and any CVS file in this dir and those below
+    (test 404
+	  (values2 (x-do-http-request (format nil "~a/acc-test/CVS/Root"
+					      prefix-local))))
+    
+    (test 404
+	  (values2 (x-do-http-request (format nil "~a/acc-test/subc/ccc.html"
+					      prefix-local))))
+    
+    ; subdir subd can't be accessed from this or any subdir
+    ; due to :inherit in the access file
+    (test 404
+	  (values2 (x-do-http-request (format nil "~a/acc-test/subd/ddee.html"
+					      prefix-local))))
+    (test 404
+	  (values2 (x-do-http-request (format nil "~a/acc-test/suba/subd/ddd.html"
+					      prefix-local))))
+    
     ; but this one is ok, and has content type specified by access file
     (multiple-value-bind (res code headers)
 	(x-do-http-request (format nil "~a/acc-test/aaa.foo"
@@ -1327,7 +1346,53 @@
     (ignore-errors (delete-file "aservemulti.xx"))
     ))
 		   
-					     
+
+
+;; publish-prefix tests
+;;
+(defun test-publish-prefix (port)
+  (let ((prefix-local (format nil "http://localhost:~a" port))
+	(prefix-dns   (format nil "http://~a:~a" 
+			      (long-site-name)
+			      port))
+	(got-here))
+    (publish-prefix :prefix "/pptest"
+		    :function
+		    #'(lambda (req ent)
+			(incf got-here)
+			(with-http-response (req ent)
+			  (with-http-body (req ent)
+			    (html "foo")))))
+    (dolist (prefix (list prefix-local prefix-dns))
+      (setq got-here 0)
+      (test 200 (values2
+		 (x-do-http-request (format nil "~a/pptest"
+					    prefix))))
+      (test 1 got-here)
+      (test 200 (values2
+		 (x-do-http-request (format nil "~a/pptest/fred"
+					    prefix))))
+      (test 2 got-here)
+      (test 200 (values2
+		 (x-do-http-request (format nil "~a/pptest#asdfasdf"
+					    prefix))))
+      
+      (test 3 got-here)
+      (test 200 (values2
+		 (x-do-http-request (format nil "~a/pptestasdfasdf#asdfasdf"
+					    prefix))))
+      
+      (test 4 got-here)
+      (test 404 (values2
+		 (x-do-http-request (format nil "~a/pptes"
+					    prefix))))
+      (test 4 got-here))))
+    
+    
+    
+			
+
+
 		   
     
 

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.126 2001/11/06 19:18:48 jkf Exp $
+;; $Id: main.cl,v 1.127 2001/11/15 19:40:49 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -69,6 +69,7 @@
    #:publish-file
    #:publish-directory
    #:publish-multi
+   #:publish-prefix
    #:query-to-form-urlencoded
    #:reply-header-slot-value 
    #:run-cgi-program
@@ -150,7 +151,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 16))
+(defparameter *aserve-version* '(1 2 17))
 
 (eval-when (eval load)
     (require :sock)

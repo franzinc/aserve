@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.66 2001/11/06 01:03:14 jkf Exp $
+;; $Id: publish.cl,v 1.67 2001/11/15 19:40:49 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -509,6 +509,47 @@
 			 :timeout timeout)))
 	      (publish-entity ent locator path hval)))))
 
+(defun publish-prefix (&key (host nil host-p) port prefix
+			    function class format
+			    content-type
+			    (server *wserver*)
+			    locator
+			    remove
+			    authorizer
+			    timeout
+			    plist
+			    )
+  ;; publish a handler for all urls with a certain prefix
+  ;; 
+  (let (hval)
+    (if* (null locator) 
+       then (setq locator (find-locator :prefix server)))
+
+    (setq hval (convert-to-vhosts (if* (and host (atom host))
+				     then (list host)
+				     else host)
+				  server))
+    
+    (if* remove
+       then ; eliminate the entity if it exists
+	    (publish-prefix-entity nil prefix locator hval host-p t)
+	    nil
+       else
+	     
+	    (let ((ent (make-instance (or class 'computed-entity)
+			 :host hval 
+			 :port port
+			 :prefix prefix
+			 :function function
+			 :format format
+			 :content-type content-type
+			 :authorizer authorizer
+			 :plist plist
+			 :timeout timeout)))
+	      (publish-prefix-entity ent prefix locator  hval
+				     host-p nil)
+	      ent))))
+
 	     
 
 (defun publish-file (&key (server *wserver*)
@@ -621,6 +662,11 @@
      then (setq host (list host)))
   
   (setq host (convert-to-vhosts host server))  ; now a list of vhosts
+
+  (if* remove
+     then (publish-prefix-entity nil prefix locator
+				 host host-p t)
+	  (return-from publish-directory nil))
   
   (let ((ent (make-instance 'directory-entity 
 	       :directory destination
@@ -636,73 +682,81 @@
 	       :plist plist
 	       )))
     
-    (dolist (entpair (locator-info locator))
-      (if* (equal (prefix-handler-path entpair) prefix)
-	 then ; match, prefix
-	      (if* (and remove (not host-p))
-		 then ; remove all entries for all hosts
-		      (setf (locator-info locator)
-			(remove entpair (locator-info locator)))
-		      (return-from publish-directory nil))
-	    
-
-	      (let ((handlers (prefix-handler-host-handlers entpair)))
-		(dolist (host host)
-		  (dolist (hostpair handlers
-			    ; not found, add it if we're not removing
-			    (if* (not remove)
-			       then (push (make-host-handler :host host
-							:entity ent)
-					  handlers)))
-		    (if* (eq host (host-handler-host hostpair))
-		       then ; a match
-			    (if* remove
-			       then (setq handlers
-				      (remove hostpair handlers :test #'eq))
-			       else ; change
-				    (setf (host-handler-entity hostpair) ent))
-			    (return))))
-		(setf (prefix-handler-host-handlers entpair) handlers))
-	    
-	      ; has been processed, time to leave
-	      (return-from publish-directory ent)))
-
-    ; prefix not present, must add.
-    ; keep prefixes in order, with max length first, so we match
-    ; more specific before less specific
-  
-    (if* remove 
-       then ; no work to do
-	    (return-from publish-directory nil))
-  
-    (let ((len (length prefix))
-	  (list (locator-info locator))
-	  (new-ent (make-prefix-handler
-		    :path prefix
-		    :host-handlers (mapcar #'(lambda (host)
-					       (make-host-handler 
-						:host host 
-						:entity ent))
-					   host))))
-      (if* (null list)
-	 then ; this is the first
-	      (setf (locator-info locator) (list new-ent))
-       elseif (>= len (length (caar list)))
-	 then ; this one should preceed all other ones
-	      (setf (locator-info locator) (cons new-ent list))
-	 else ; must fit somewhere in the list
-	      (do* ((back list (cdr back))
-		    (cur  (cdr back) (cdr cur)))
-		  ((null cur)
-		   ; put at end
-		   (setf (cdr back) (list new-ent)))
-		(if* (>= len (length (caar cur)))
-		   then (setf (cdr back) `(,new-ent ,@cur))
-			(return)))))
-  
+    (publish-prefix-entity ent prefix locator host host-p nil)
+    
     ent
     ))
-		 
+
+
+
+(defun publish-prefix-entity (ent prefix locator host host-p remove)
+  ;; add or remove an entity ent from the locator
+  ;;
+  (dolist (entpair (locator-info locator))
+    (if* (equal (prefix-handler-path entpair) prefix)
+       then ; match, prefix
+	    (if* (and remove (not host-p))
+	       then ; remove all entries for all hosts
+		    (setf (locator-info locator)
+		      (remove entpair (locator-info locator)))
+		    (return-from publish-prefix-entity nil))
+	    
+
+	    (let ((handlers (prefix-handler-host-handlers entpair)))
+	      (dolist (host host)
+		(dolist (hostpair handlers
+			  ; not found, add it if we're not removing
+			  (if* (not remove)
+			     then (push (make-host-handler :host host
+							   :entity ent)
+					handlers)))
+		  (if* (eq host (host-handler-host hostpair))
+		     then ; a match
+			  (if* remove
+			     then (setq handlers
+				    (remove hostpair handlers :test #'eq))
+			     else ; change
+				  (setf (host-handler-entity hostpair) ent))
+			  (return))))
+	      (setf (prefix-handler-host-handlers entpair) handlers))
+	    
+	    ; has been processed, time to leave
+	    (return-from publish-prefix-entity ent)))
+
+  ; prefix not present, must add.
+  ; keep prefixes in order, with max length first, so we match
+  ; more specific before less specific
+  
+  (if* remove 
+     then ; no work to do
+	  (return-from publish-prefix-entity nil))
+  
+  (let ((len (length prefix))
+	(list (locator-info locator))
+	(new-ent (make-prefix-handler
+		  :path prefix
+		  :host-handlers (mapcar #'(lambda (host)
+					     (make-host-handler 
+					      :host host 
+					      :entity ent))
+					 host))))
+    (if* (null list)
+       then ; this is the first
+	    (setf (locator-info locator) (list new-ent))
+     elseif (>= len (length (caar list)))
+       then ; this one should preceed all other ones
+	    (setf (locator-info locator) (cons new-ent list))
+       else ; must fit somewhere in the list
+	    (do* ((back list (cdr back))
+		  (cur  (cdr back) (cdr cur)))
+		((null cur)
+		 ; put at end
+		 (setf (cdr back) (list new-ent)))
+	      (if* (>= len (length (caar cur)))
+		 then (setf (cdr back) `(,new-ent ,@cur))
+		      (return))))))
+
+
 
 (defun publish-multi (&key (server *wserver*)
 			   locator
@@ -794,6 +848,9 @@
   
     ent))
 
+
+
+  
 
 (defmethod unpublish-entity ((locator locator-exact)
 			     path
@@ -1357,7 +1414,7 @@
 			       redir-to))
 			     
 		(with-http-body (req ent))))
-     elseif (and info (file-should-be-ignored-p realname info))
+     elseif (and info (file-should-be-denied-p realname info))
        then ; we should ignore this file
 	    (return-from process-entity nil)
      elseif (and (directory-entity-filter ent)
@@ -1446,6 +1503,7 @@
   (let ((access-file (directory-entity-access-file ent))
 	info
 	pos
+	opos
 	file-write-date
 	root)
     
@@ -1485,21 +1543,30 @@
 		  (setq info (append (caddr entry) info)))))
     
       ; see if we have to descend a directory level
-      (setq pos (position #\/ realname :start (1+ pos)))
+      (setq opos pos
+	    pos (position #\/ realname :start (1+ pos)))
     
       (if* pos
 	 then ; we must go down a directory level
-	      ; see if that's ok
-	      (if* (getf (cdr (assoc :subdirectories info :test #'eq))
-			 :block)
-		 then ; can't descend, so this access is forbidden
-		      (return-from read-access-files (values nil :forbidden)))
-	    
+	      
+	      ; see if we can go down into this subdir
+	      (if* info
+		 then (let ((subdirname (subseq realname (1+ opos)
+						pos)))
+			(if* (eq :deny 
+				 (check-allow-deny-info subdirname
+							:subdirectories
+							info))
+			   then ; give up right away
+				(return-from read-access-files 
+				  (values nil :forbidden)))))
+			      
+		      
 	      ; we can descend.. remove properties that don't get
 	      ; inherited
 	      (let (remove)
 		(dolist (inf info)
-		  (if* (null (getf (cdr inf) :inherit t))
+		  (if* (null (getf (cdr inf) :inherit))
 		     then (push inf remove)))
 		(if* remove
 		   then (dolist (rem remove)
@@ -1530,42 +1597,101 @@
 		
    
 	    
-(defun file-should-be-ignored-p (filename info)
+(defun file-should-be-denied-p (filename info)
   ;; given access info check to see if the given filename
-  ;; should be ignored.
-  ; look for the first :files item
-  (let ((entry (assoc :files info :test #'eq))
-	tailfilename)
-    (if* entry
-       then (let ((pos (position #\/ filename :from-end t)))
-	      (if* (null pos)
-		 then (setq tailfilename filename)
-		 else (setq tailfilename (subseq filename (1+ pos)))))
-		      
-	    (let ((allow (getf (cdr entry) :allow entry)))
-	      (if* (eq allow entry)
-		 thenret ; wasn't present, so we assume "*" is allowed
-		 else ; must check against the allow
-		      (if* (atom allow) then (setq allow (list allow)))
-		      (dolist (all allow 
-				; no match, not allowed
-				(return-from file-should-be-ignored-p t))
-				
-			(if* (match-regexp all tailfilename :return nil)
-			   then (return)))))
-	    (let ((ignore (getf (cdr entry) :ignore entry)))
-	      (if* (eq ignore entry)
-		 thenret ; no ignores, so it's allowed
-		 else (if* (atom ignore) then (setq ignore (list ignore)))
-		      (dolist (ign ignore)
-			(if* (match-regexp ign tailfilename :return nil)
-			   then ; matches, not allowed
-				(return-from file-should-be-ignored-p t))))))
-    nil ; should not be ignored
-				
+  ;; should be denied (not allowed to access)
+  ;; return t to deny access
+  ;;
+  (let (tailfilename)
+    
+    (let ((pos (position #\/ filename :from-end t)))
+      (if* (null pos)
+	 then (setq tailfilename filename)
+	 else (setq tailfilename (subseq filename (1+ pos)))))
+
+    ; :deny only if there are access files present which indicate deny
+    
+    (eq :deny (check-allow-deny-info tailfilename :files info))
+	    
     ))
     
+(defun check-allow-deny (name allow deny)
+  ;; check to see if the name matches the allow/deny list.
+  ;; possible answers
+  ;; :allow  - on the allow list and not the deny
+  ;; :deny - on the deny list
+  ;;  nil    - not mentioned on the allow or deny lists
+  ;;
+  ;; :allow of nil same as ".*" meaning allow all
+  ;; :deny of nil matches nothing 
+  ;;
+  
+  ; clean up common mistakes in access files
+  (let (state)
+    (if* (and allow (atom allow))
+       then (setq allow (list allow))
+     elseif  (and (consp allow)
+		  (eq 'quote (car allow)))
+       then (setq allow (cadr allow)))
+  
+    (if* (and deny (atom deny))
+       then (setq deny (list deny))
+     elseif  (and (consp deny)
+		  (eq 'quote (car deny)))
+       then (setq deny (cadr deny)))
+  
+    (if* allow
+       then ; must check all allows
+	    (dolist (all allow 
+		      ; not explicitly allowed
+		      (setq state nil))
+	      (if* (match-regexp all name :return nil)
+		 then (setq state :allow)
+		      (return)))
+       else ; no allow's given, same as giving ".*" so matches all
+	    (setq state :allow))
+  
+    (if* deny
+       then ; must check all denys
+	    (dolist (ign deny)
+	      (if* (match-regexp ign name :return nil)
+		 then ; matches, not allowed
+		      (return-from check-allow-deny :deny))))
     
+    state))
+	    
+	  
+
+(defun check-allow-deny-info (name key info)
+  ;; search the info under the given key to see if name is allowed
+  ;; or denyd.
+  ;; return :allow or :deny if we found access info in the info
+  ;; else return nil if we didn't find any applicable access info
+  (do* ((inflist info (cdr inflist))
+       (inf (car inflist) (car inflist))
+       (seen-inf)
+       (state nil))
+      ((null inf)
+       (if* seen-inf
+	  then (if* (null state)
+		  then :deny  ; not mentioned as allowed
+		  else state)))
+    (if* (and (consp inf) (eq key (car inf)))
+       then (setq seen-inf t) ; actually processed some info
+	    (let ((new-state (check-allow-deny name
+						 (getf (cdr inf) :allow)
+						 (getf (cdr inf) :deny))))
+	      (case new-state
+		(:allow (setq state :allow))
+		(nil ; state unchanged
+		 )
+		(:deny (return-from check-allow-deny-info :deny)))))))
+
+
+    
+  
+  
+  
   
   
   

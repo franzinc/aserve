@@ -2,5 +2,5 @@
 
 (:files :allow ("foo"))  ; only files with aaa in their name
 
-(:subdirectories :block t)
+(:subdirectories :deny "subsuba") ; block this subdir
 

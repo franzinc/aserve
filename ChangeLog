@@ -1,3 +1,18 @@
+2001-11-15  John Foderaro  <jkf@tiger.franz.com>
+1.2.17
+	* added new publish fcn: publish-prefix 
+>>>	* incompatible changes:
+	  redid the way access files are processed, see the
+	  document for the latest spec.
+	  notable changes:
+	        :ignore is now :deny 
+	        :block is gone from :subdirectories but I've added
+	             :allow and :deny for fine tuned blocking
+	        :inherit now defaults to nil
+	        you can have multiple forms of the same kind of 
+	        information in a single access file and they will
+	        all be used.
+
 2001-11-06  John Foderaro  <jkf@tiger.franz.com>
 
 	* fix bug causing infinite loop when reading truncated form body
