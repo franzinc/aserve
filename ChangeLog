@@ -1,3 +1,13 @@
+2001-10-15  John Foderaro  <jkf@tiger.franz.com>
+
+	* add timeout value to each entity object to serve as a default
+	  that's checked before the wserver-response-timeout.
+	* add a timeout argument to publish functions to set this 
+	  entity timeout value.
+	* add a publisher argument to publish-directory so users can 
+	  control what kind of entity is created when the real file is
+	  eventually found.
+
 2001-10-12  John Foderaro  <jkf@tiger.franz.com>
 
 	* using socket stream i/o timeouts in acl6.1

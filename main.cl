@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.114 2001/10/12 21:51:29 jkf Exp $
+;; $Id: main.cl,v 1.115 2001/10/15 18:30:53 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -523,10 +523,14 @@
     `(let* ((,g-req ,req)
 	    (,g-ent ,ent)
 	    (,g-timeout ,(or timeout 
-			     `(wserver-response-timeout *wserver*)))
+			     
+			     `(or
+			       (entity-timeout ,g-ent)
+			       (wserver-response-timeout *wserver*))))
 	    (,g-check-modified ,check-modified)
 	    )
        (catch 'with-http-response
+	 ;(format t "timeout is ~d~%" ,g-timeout)
 	 (compute-strategy ,g-req ,g-ent)
 	 (up-to-date-check ,g-check-modified ,g-req ,g-ent)
 	 (mp::with-timeout ((if* (and (fixnump ,g-timeout)  ; ok w-t

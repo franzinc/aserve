@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.55 2001/10/12 21:51:29 jkf Exp $
+;; $Id: publish.cl,v 1.56 2001/10/15 18:30:53 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -75,6 +75,12 @@
    (authorizer  :initarg :authorizer  ; authorizer object, if any
 		:accessor entity-authorizer
 		:initform nil)
+   
+   ; if not nil then the timeout to be used in a with-http-response
+   ; for this entity
+   (timeout  :initarg :timeout
+	     :initform nil
+	     :accessor entity-timeout)
    
    ; extra holds random info we need for a particular entity
    (extra    :initarg :extra  :reader entity-extra)
@@ -131,7 +137,12 @@
 	      :initform nil
 	      :accessor directory-entity-filter)
     
-   
+
+   ;: fcn of  req ent realname
+   ;  it should create and publish an entity and return it
+   (publisher :initarg :publisher
+	      :initform nil
+	      :accessor directory-entity-publisher)
    )
   )
 
@@ -418,6 +429,7 @@
 		     locator
 		     remove
 		     authorizer
+		     timeout
 		     )
   ;; publish the given url
   ;; if file is given then it specifies a file to return
@@ -443,7 +455,8 @@
 			 :function function
 			 :format format
 			 :content-type content-type
-			 :authorizer authorizer)))
+			 :authorizer authorizer
+			 :timeout timeout)))
 	      (publish-entity ent locator path hval)))))
 
 	     
@@ -455,7 +468,10 @@
 			  file content-type class preload
 			  cache-p
 			  remove
-			  authorizer)
+			  authorizer
+			  (timeout #+io-timeout #.(* 100 24 60 60)
+				   #-io-timeout nil))
+			  
   ;; return the given file as the value of the url
   ;; for the given host.
   ;; If host is nil then return for any host
@@ -478,6 +494,7 @@
 		     (gethash (pathname-type (pathname file))
 			      *mime-types*)
 		     "application/octet-stream"))
+    
     (if* preload
        then ; keep the content in core for fast display
 	    (with-open-file (p file :element-type '(unsigned-byte 8))
@@ -504,6 +521,7 @@
 			    
 			    :cache-p cache-p
 			    :authorizer authorizer
+			    :timeout  timeout
 			    ))))
        else (setq ent (make-instance (or class 'file-entity)
 			:host hval 
@@ -513,6 +531,7 @@
 			:content-type c-type
 			:cache-p cache-p
 			:authorizer authorizer
+			:timeout timeout
 			)))
 
     (publish-entity ent locator path hval)))
@@ -533,6 +552,9 @@
 			       authorizer
 			       (indexes '("index.html" "index.htm"))
 			       filter
+			       (timeout #+io-timeout #.(* 100 24 60 60)
+					#-io-timeout nil)
+			       publisher
 			       )
   
   ;; make a whole directory available
@@ -553,6 +575,8 @@
 	       :authorizer authorizer
 	       :indexes indexes
 	       :filter filter
+	       :timeout timeout
+	       :publisher publisher
 	       )))
     
     (dolist (entpair (locator-info locator))
@@ -1034,17 +1058,25 @@
        thenret ; processed by the filter
        else ;; ok realname is a file.
 	    ;; create an entity object for it, publish it, and dispatch on it
-      
+
 	    (process-entity req 
-			    (publish-file :path (uri-path 
-						 (request-uri req))
-					  :host (host ent)
-					  :file realname
-					  :authorizer (entity-authorizer ent))))
+			    (funcall 
+			     (or (directory-entity-publisher ent)
+				 #'standard-directory-entity-publisher)
+				       
+			     req ent realname)))
+					   
     t))
 
     
-     
+(defun standard-directory-entity-publisher (req ent realname)
+  ;; the default publisher used when directory entity finds
+  ;; a file it needs to publish
+  (publish-file :path (uri-path (request-uri req))
+		:host (host ent)
+		:file realname
+		:authorizer (entity-authorizer ent)
+		:timeout (entity-timeout ent)))
       
 		      
 		      
