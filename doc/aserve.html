@@ -23,6 +23,8 @@
 <a href="#publishing-information">Publishing Information</a><br>
 <font face="Courier New">&nbsp; <a href="#f-publish-file">publish-file</a><br>
 &nbsp; <a href="#f-publish-directory">publish-directory</a><br>
+&nbsp;&nbsp; </font>&nbsp; <a href="#directory-access-files">Directory Access Files</a><font
+face="Courier New"><br>
 &nbsp; <a href="#f-publish">publish</a></font><br>
 &nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-publish-prefix">publish-prefix</a></font><br>
 &nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-publish-multi"><font face="Courier New">publish-multi</font></a><br>
@@ -1450,11 +1452,15 @@ user(8): <strong>(coerce
 <p>You may want to restrict certain entities to be accessible from only certain machines
 or people.&nbsp;&nbsp; You can put the test for authorization in the entity response
 function using one of the following functions, or you can have the check done
-automatically by storing an <strong>authorizer</strong> object in the entity.</p>
+automatically by storing a list of <strong>authorizer</strong> objects in the entity.</p>
 
 <p>&nbsp;</p>
 
 <h3>functions</h3>
+
+<p>These two functions&nbsp; invoke and process the <em>Basic</em> Authorization Method
+&nbsp; defined by the http specification.&nbsp;&nbsp;&nbsp; The <strong>password-authorizer</strong>
+class described below make use of these functions.</p>
 
 <p><a name="f-get-basic-authorization"></a><strong><font face="Courier New">(get-basic-authorization
 request)</font></strong></p>
@@ -1499,22 +1505,28 @@ and the password is <strong>bar</strong>.</p>
 
 <h3>authorizer classes</h3>
 
-<p>If an entity has an associated <strong>authorizer</strong> object, then before that
-entity's response function is run the authorizer is tested to see if&nbsp; it will accept
-or deny the current request.&nbsp;&nbsp;&nbsp; AllegroServe supplies three &nbsp;
+<p>The authorizer slot of an entity object can contain a <strong>authorizer</strong>
+object or a list of zero or more <strong>authorizer</strong> objects.&nbsp; When a request
+arrives for this entity the <strong>authorizer</strong> objects are consulted to see if
+this request should be permitted.&nbsp;&nbsp; In order for the request to be permitted, <em>all</em>
+authorizer objects must permit the request.&nbsp; AllegroServe supplies three &nbsp;
 interesting subclasses of <strong>authorizer</strong> and users are free to add their own
 subclasses to support their own authorization needs.&nbsp;&nbsp; </p>
 
 <p>The protocol followed during authorization is this: 
 
 <ol>
-  <li>an entity object is selected that matches the request</li>
-  <li>if the entity object's authorizer slot is <strong>nil</strong> then it is considered
+  <li>an entity object is selected that matches the request.&nbsp; The value of the entity's
+    authorizer slot is retrieved from the entity object.</li>
+  <li>if the list of pending authorizer objects is <strong>nil</strong> then it is considered
     authorized.</li>
-  <li>otherwise the <strong>authorize</strong> generic function is called, passing it the
-    authorization object, the http-request object and the entity object</li>
+  <li>otherwise the <strong>authorize</strong> generic function is called on the first <strong>authorizer</strong>
+    object, passing <strong>authorize</strong> the <strong>authorizer</strong> object, the
+    http-request object and the entity object</li>
   <li>the return value from <strong>authorize </strong>can be&nbsp; <br>
-    <strong>t </strong>- meaning this request is authorized to access this entity<br>
+    <strong>t </strong>- meaning this request is authorized to access this entity.&nbsp; In
+    this case the first authorizer object is popped from the list of pending authorizer
+    objects and we go back to step 2.<br>
     <strong>nil - </strong>meaning that this request isn't authorized.&nbsp; The response from
     AllegroServe will be the standard &quot;failed request&quot; response so the user won't be
     able to distinguish this response from one that would be received if the entity didn't
@@ -1532,7 +1544,7 @@ subclasses to support their own authorization needs.&nbsp;&nbsp; </p>
 <p><a name="c-password-authorizer"></a><strong>password-authorizer</strong>&nbsp; [class]</p>
 
 <p>This subclass of <strong>authorizer</strong> is useful if you want to protect an entity
-using the basic authorization scheme that asks for a name and a password.
+using the Basic authorization scheme that asks for a name and a password.
 &nbsp;&nbsp;&nbsp; When you create this class of object you should supply values for the
 two slots:</p>
 
