@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.24 2000/10/26 05:28:37 jkf Exp $
+;; $Id: proxy.cl,v 1.25 2000/10/26 05:43:10 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -1928,64 +1928,4 @@
 ; define sample transform
 (defun add-transform (function)
   (pushnew function *uri-transforms*))
-
-(add-transform 
- #'(lambda (string)
-     (multiple-value-bind (matched whole 
-			   prefix  postfix)
-	 (match-regexp "\\(http://ads\\..*/\\)[0-9]+\\(.*\\)"
-		       string
-		       )
-       (declare (ignore whole))
-       (if* matched
-	  then (concatenate 'simple-string
-		 prefix "--" postfix)))))
-
-
-
-  
-
-
-
-    
-
-		  
-	
-    
-
-    
-    
-	    
-	    
-		    
-	    
-				  
-		    
-	    
-  
-
-  
-  
-
-
-    
-    
-	    
-	    
-	    
-	    
-    
-    
-		  
-
-
-      
-    
-  
-
-
-  
-
-
-
 
