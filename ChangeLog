@@ -1,5 +1,5 @@
 2000-08-04  jkf  <jkf@main.verada.com>
-
+1.1.23
 	*  examples/chat.cl - add user logins and private messages 
 	        between users.
 
