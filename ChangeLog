@@ -1,3 +1,10 @@
+2001-10-18  Jon Howard  <jhoward@cobweb>
+
+	* log.cl: added facility for dynamically binding vhost log stream;
+	changed logging to emulate apache logging.
+	* main.cl: ignoring socket reset by peer errorno 104; more apache
+	log emulation.
+
 2001-10-16  Kevin Layer  <layer@crikey>
 
 	* cgi.cl: use :format :binary in with-http-response in

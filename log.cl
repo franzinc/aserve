@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: log.cl,v 1.20 2001/10/10 16:32:57 jkf Exp $
+;; $Id: log.cl,v 1.20.2.1 2001/10/18 17:36:39 jhoward Exp $
 
 ;; Description:
 ;;   iserve's logging
@@ -44,8 +44,11 @@
 		       (mp:process-name sys:*current-process*)
 		       cmonth cday (mod cyear 100)
 		       chour cmin csec
-		       message)))
-      (write-sequence str (or *aserve-debug-stream* *initial-terminal-io*)))))
+		       message))
+	  (stream (vhost-log-stream
+		   (wserver-default-vhost user::*server*))))
+      (write-sequence str stream)
+      (finish-output stream))))
 
 (defmethod brief-logmess (message)
   ;; omit process name and month, day, year
@@ -54,11 +57,12 @@
     (let ((str (format nil
 		       "~2,'0d:~2,'0d:~2,'0d - ~a~%"
 		       chour cmin csec
-		       message)))
-      (write-sequence str (or *aserve-debug-stream* *initial-terminal-io*)))))
-
-
-
+		       message))
+	  (stream (or *aserve-debug-stream*
+		      (vhost-log-stream
+		       (wserver-default-vhost user::*server*)))))
+      (write-sequence str stream)
+      (finish-output stream))))
 
 
 (defun log-timed-out-request-read (socket)
@@ -85,12 +89,14 @@
 			 (request-vhost req))))
     
 	    (format stream
-		    "~a - - [~a] ~s ~s ~s~%"
+		    "~a - - [~a] ~s ~s ~s ~s ~s~%"
 		    (socket:ipaddr-to-dotted ipaddr)
 		    (maybe-universal-time-to-date time)
 		    (request-raw-request req)
 		    code
-		    (or length -1)))))
+		    (or length -1)
+		    (or (header-slot-value req :referer) "-")
+		    (or (header-slot-value req :user-agent) "-")))))
 
 	    	
     
