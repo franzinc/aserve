@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.24 2000/03/21 17:12:23 jkf Exp $
+;; $Id: main.cl,v 1.25 2000/03/22 04:00:50 jkf Exp $
 
 ;; Description:
 ;;   iserve's main loop
@@ -754,7 +754,7 @@
 	 then (pop args)
 	 else (warn "unknown arg ~s" arg)))
     (dotimes (i 20)
-      (handler-case (start :port port)
+      (handler-case (progn (start :port port) (loop (sleep 100000)))
 	(error (cond)
 	  (format t " got error ~a~%" cond)
 	  (format t "restarting~%"))))))

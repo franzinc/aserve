@@ -1,6 +1,6 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.18 2000/03/21 05:55:55 jkf Exp $
+;; $Id: load.cl,v 1.19 2000/03/22 04:00:50 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -59,10 +59,12 @@
 
 (defun makeapp ()
   (run-shell-command "rm -fr iserveserver")
+  (make-iserve.fasl)
   (generate-application
    "iserveserver"
    "iserveserver/"
-   '(:sock :process :defftype :foreign :ffcompat "loadonly.cl" "load.cl")
+   '(:sock :process :defftype :foreign 
+     :ffcompat "iserve.fasl" "examples/examples.fasl")
    ; strange use of find-symbol below so this form can be read without
    ; the net.iserve package existing
    :restart-init-function (find-symbol (symbol-name :start-cmd) :net.iserve)
