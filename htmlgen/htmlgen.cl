@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.10 2001/03/22 17:30:53 jkf Exp $
+;; $Id: htmlgen.cl,v 1.11 2001/04/03 22:18:43 jkf Exp $
 
 ;; Description:
 ;;   html generator
@@ -345,11 +345,13 @@
 			      (setq name (getf attrs name))
 			      (setq attrs (assoc name subst :test #'equal)))
 		       then
-			    (return-from html-print-subst
-			      (html-print-subst
-			       (cdr attrs)
-			       subst
-			       stream))))
+			    (if* (functionp (cdr attrs))
+			       then (funcall (cdr attrs) stream)
+			       else (return-from html-print-subst
+				      (html-print-subst
+				       (cdr attrs)
+				       subst
+				       stream)))))
 				     
 	    (setq print-handler
 	      (html-process-print ent)))
