@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.33 2000/08/04 16:16:22 jkf Exp $
+;; $Id: load.cl,v 1.34 2000/08/10 15:48:50 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -158,7 +158,7 @@
 ;; 10. ftp download.sourceforge.net and put the tar file in the
 ;;     incoming directory, then go to the aserve sourceforge web page and 
 ;;     select the file manager and publish it.
-;; 11. cd to /www/opensource/htdocs/aserve 
+;; 11. cd /www/opensource/htdocs/aserve 
 ;;     on cobweb and rsync the files with SourceForge
 
 
