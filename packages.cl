@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: packages.cl,v 1.6 2004/06/09 22:01:33 jkf Exp $
+;; $Id: packages.cl,v 1.7 2004/08/27 18:14:50 layer Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe
@@ -41,6 +41,7 @@
 
 (eval-when (compile load eval)
   (require :uri)
+  #-(and allegro (version>= 6))
   (require :streamc))
 
 
