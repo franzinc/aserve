@@ -1,3 +1,7 @@
+2000-04-24  John Foderaro  <jkf@tiger.franz.com>
+1.1.14
+	* verify that it works in acl501 trial (Linux)
+
 2000-04-24    <jkf@CROW>
 
 	* load.cl: make aServe load in acl5.0.1 Lite (Windows) but
