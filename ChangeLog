@@ -1,16 +1,20 @@
 *******************************************************************************
+merge from trunk to acl6 branch (final for 6.0)
+command: ../../join.sh trunk trunk_to_acl6_merge1 trunk_to_acl6_merge2 aserve
+*******************************************************************************
 merge from trunk to acl6 branch
 command: ../../join.sh trunk acl6 trunk_to_acl6_merge1 aserve
-
 *******************************************************************************
 join from layer6 to acl6 branch
-
 *******************************************************************************
 join from trunk to layer6 branch
 command:
   ../../join.sh trunk acl6_branch_point trunk_to_layer6_merge1 aserve
-
 *******************************************************************************
+2000-10-12  John Foderaro  <jkf@tiger.franz.com>
+1.1.30
+	*  proxy and cache facilty added.
+
 2000-09-22  Charles A. Cox  <cox@pie>
 
 	* decode.cl: Add :external-format to to uriencode-string.

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.6.6.2 2000/10/12 05:11:05 layer Exp $
+;; $Id: t-aserve.cl,v 1.6.6.3 2000/10/12 19:14:55 layer Exp $
 
 ;; Description:
 ;;   test iserve
@@ -43,7 +43,7 @@
 (in-package :net.aserve.test)
 
 ; set to nil before loading the test to prevent the test from auto-running
-(defvar user::*do-aserve-test* nil)
+(defvar user::*do-aserve-test* t)
 (defvar *x-proxy* nil) ; when true x-do-http-request will go through a proxy
 (defvar *proxy-wserver* nil)
 
@@ -999,7 +999,7 @@
 	      (test 3 (net.aserve::pcache-r-fast-hit pcache))
 	      
 	      ; try flushing all to disk
-	      (net.aserve::clean-memory-cache pcache)
+	      (net.aserve::flush-memory-cache pcache 0)
 	      
 	      ; and retrieve from the disk
 	      (test-2 "foo"  200
