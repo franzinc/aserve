@@ -26,7 +26,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.38 2004/01/16 19:31:14 layer Exp $
+;; $Id: parse.cl,v 1.39 2005/02/21 23:28:52 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -447,6 +447,48 @@
     
     (nreverse res)))
     
+
+
+
+(defun parse-header-line-equals (str &optional (start 0) (end (length str)))
+  ;; parse a header line consisting of comma separated values
+  ;;
+  ;;  a=b, c="d asd",  e="fff"
+  ;;
+  ;; return (("a" . "b") ("c" . "d asd") ("e" . "fff"))
+  ;;
+  (let ((po (allocate-parseobj))
+	(res))
+    
+    (unwind-protect
+	(progn
+	  (split-string str #\, nil nil po start end)
+	  
+	  (do ((i 0 (1+ i))
+	       (max (parseobj-next po))
+	       (paramkey nil nil)
+	       (paramvalue nil nil))
+	      
+	      ((>= i max))
+	    
+	    (split-string str #\= nil 1 po
+				(svref (parseobj-start po) i)
+				(svref (parseobj-end   po) i))
+	    
+	    (setq paramkey (trimmed-parseobj str po max))
+	    
+	    (if* (> (parseobj-next po) (1+ max))
+		     then ; must have been an equal
+			  (setq paramvalue (trimmed-parseobj str po
+							     (1+ max))))
+	    
+	    (push (cons paramkey paramvalue) res)
+	    
+	    (setf (parseobj-next po) max)))
+      
+      (free-parseobj po))
+      
+    (nreverse res)))
 
 (defun assoc-paramval (key paramvals)
   ;; search the paramvals for the given key.

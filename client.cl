@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.44 2004/11/18 22:44:50 jkf Exp $
+;; $Id: client.cl,v 1.45 2005/02/21 23:28:52 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -58,7 +58,7 @@
     :initarg :method
     :accessor client-request-method)
    
-   (headers ; alist of  ("headername" . "value")
+   (headers ; alist of  ("headername" . "value") or (:headername . "value")
     :initform nil
     :initarg :headers
     :accessor client-request-headers)
@@ -88,6 +88,43 @@
     :accessor client-request-cookies
     :initarg :cookies
     :initform nil)
+   ))
+
+
+(defclass digest-authorization ()
+  ((username :initarg :username
+	     :initform ""
+	     :reader digest-username)
+   
+   (password :initarg :password
+	     :initform ""
+	     :reader digest-password)
+   
+   (realm    :initform ""
+	     :accessor digest-realm)
+   
+   (uri       :initform nil
+	      :accessor digest-uri)
+   
+   (qop	     :initform nil
+	     :accessor digest-qop)
+   
+   (nonce    :initform ""
+	     :accessor digest-nonce)
+   
+   ; we sent unique cnonce each time
+   (nonce-count :initform "1"
+		:reader digest-nonce-count)
+
+   (cnonce   :initform nil
+	     :accessor digest-cnonce)
+   
+   (opaque   :initform nil
+	     :accessor digest-opaque)
+   
+   (response :initform nil
+	     :accessor digest-response)
+   
    ))
 
 
@@ -163,6 +200,7 @@
 			(redirect 5) ; auto redirect if needed
 			(redirect-methods '(:get :head))
 			basic-authorization  ; (name . password)
+			digest-authorization ; digest-authorization object
 			keep-alive   ; if true, set con to keep alive
 			headers	    ; extra header lines, alist
 			proxy	    ; naming proxy server to access through
@@ -170,6 +208,9 @@
 			(external-format *default-aserve-external-format*)
 			ssl		; do an ssl connection
 			skip-body ; fcn of request object
+			
+			;; internal
+			recursing-call ; true if we are calling ourself
 			)
   
   ;; send an http request and return the result as four values:
@@ -184,6 +225,7 @@
 	       :query query
 	       :cookies cookies
 	       :basic-authorization basic-authorization
+	       :digest-authorization digest-authorization
 	       :keep-alive keep-alive
 	       :headers headers
 	       :proxy proxy
@@ -216,6 +258,23 @@
 		  (setq new-location
 		    (cdr (assoc :location (client-request-headers creq)
 				:test #'eq))))
+	
+	  (if* (and digest-authorization
+		    (equal (client-request-response-code creq)
+			   #.(net.aserve::response-number 
+			      *response-unauthorized*))
+		    (not recursing-call))
+	     then ; compute digest info and retry
+		  (if* (compute-digest-authorization 
+			creq digest-authorization)
+		     then (client-request-close creq)
+			  (return-from do-http-request
+			    (apply #'do-http-request
+				   uri
+				   :recursing-call t
+				   args))))
+		  
+		  
 	  
 	  (if* (and (null new-location) 
 		    ; not called when redirecting
@@ -317,6 +376,7 @@
 				     (accept "*/*") 
 				     cookies  ; nil or a cookie-jar
 				     basic-authorization
+				     digest-authorization
 				     content
 				     content-length 
 				     content-type
@@ -485,6 +545,26 @@ or \"foo.com:8000\", not ~s" proxy))
 					     (cdr basic-authorization)))
 				    crlf))
     
+    (if* (and digest-authorization
+	      (digest-response digest-authorization))
+       then ; put out digest info
+	    (net.aserve::format-dif 
+	     :xmit sock
+	     "Authorization: Digest username=~s, realm=~s, nonce=~s, uri=~s, qop=~a, nc=~a, cnonce=~s, response=~s~@[, opaque=~s~]~a"
+	     (digest-username digest-authorization)
+	     (digest-realm digest-authorization)
+	     (digest-nonce digest-authorization)
+	     (digest-uri digest-authorization)
+	     (digest-qop digest-authorization)
+	     (digest-nonce-count digest-authorization)
+	     (digest-cnonce digest-authorization)
+	     (digest-response digest-authorization)
+	     (digest-opaque digest-authorization)
+	     crlf))
+	     
+				    
+				    
+
     (if* user-agent
        then (if* (stringp user-agent)
 	       thenret
@@ -809,6 +889,106 @@ or \"foo.com:8000\", not ~s" proxy))
     (if* buff2 then (push buff2 *response-header-buffers*))))
 
 
+
+
+(defun compute-digest-authorization (creq da)
+  ;; compute the digest authentication info, if such is present
+  ;; return true if did the authentication thing
+  (let ((val (cdr (assoc :www-authenticate (client-request-headers creq))))
+	(params))
+    (format t "auth on ~s~%" val)
+    
+    
+    (if* (not (and val
+		   (null (mismatch "digest " val :end2 7 :test #'char-equal))))
+       then ; not a digest authentication
+	    (return-from compute-digest-authorization nil))
+    
+    (setq params (net.aserve::parse-header-line-equals 
+		  val #.(length "digest ")))
+    
+    
+    (setf (digest-opaque da) (cdr (assoc "opaque" params :test #'equal)))
+    
+    (let ((md (md5-init))
+	  (qop (cdr (assoc "qop" params :test #'equalp)))
+	  (ha1)
+	  (ha2))
+      
+      (setf (digest-qop da) qop)
+      
+      (md5-update md (digest-username da))
+      (md5-update md ":")
+      (md5-update md (setf (digest-realm da)
+		       (or (cdr (assoc "realm" params :test #'equalp)) "")))
+      (md5-update md ":")
+      (md5-update md (digest-password da))
+      (setq ha1 (md5-final md :return :hex))
+      (format t " ha1 is ~s~%" ha1)
+      
+      ; compute a2
+      
+      (setq md (md5-init))
+      (md5-update md (string-upcase
+		      (symbol-name (client-request-method creq))))
+      (md5-update md ":")
+      ; this is just a part of the whole uri but should be enough I hope
+      (md5-update md (setf (digest-uri da) 
+		       (uri-path-etc (client-request-uri creq))))
+
+      (if* (equal "auth-int" qop)
+	 then (error "auth-int digest not supported"))
+      
+      (setq ha2 (md5-final md :return :hex))
+      
+      (format t "ha2 is ~s~%" ha2)
+      
+      
+      
+      ; calculate response
+      
+      (setq md (md5-init))
+      
+      (md5-update md ha1)
+      (md5-update md ":")
+      (md5-update md (setf (digest-nonce da)
+		       (or (cdr (assoc "nonce" params :test #'equalp))
+			   "")))
+      (md5-update md ":")
+      (if* qop
+	 then (md5-update md (digest-nonce-count da))
+	      (md5-update md ":")
+	      (md5-update md (setf (digest-cnonce da)
+			       (format nil "~x" (+ (ash (get-universal-time) 5)
+						 (random 34567)))))
+	      (md5-update md ":")
+	      (md5-update md qop)
+	      (md5-update md ":"))
+      (md5-update md ha2)
+      
+      (setf (digest-response da) (md5-final md :return :hex))
+
+      t
+      )))
+	      
+	      
+	      
+      
+	
+			       
+      
+      
+      
+      
+      
+      
+    
+    
+    
+
+	    
+	    
+    
 
     
 

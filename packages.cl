@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: packages.cl,v 1.7 2004/08/27 18:14:50 layer Exp $
+;; $Id: packages.cl,v 1.8 2005/02/21 23:28:52 jkf Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe
@@ -182,6 +182,7 @@
    #:client-request-socket
    #:client-request-uri
    #:client-response-header-value
+   #:compute-digest-authorization
    #:cookie-item
    #:cookie-item-expires
    #:cookie-item-name
@@ -189,6 +190,10 @@
    #:cookie-item-secure
    #:cookie-item-value
    #:cookie-jar     ; class
+   #:digest-authorization
+   #:digest-password
+   #:digest-realm
+   #:digest-username
    #:do-http-request
    #:make-http-client-request
    #:read-client-response-headers

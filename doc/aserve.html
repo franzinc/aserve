@@ -1,10 +1,13 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<html><head><title>AllegroServe</title>
-  
-  <meta name="GENERATOR" content="Microsoft FrontPage 3.0"></head><body>
+<html>
+<head>
+  <title>AllegroServe</title>
+  <meta name="GENERATOR" content="Microsoft FrontPage 3.0">
+</head>
+<body>
 <h1 align="center">AllegroServe - A Web Application Server<br>
-<small><small><small>version <font face="Courier New">1.2.42</font></small></small></small></h1>
-<p align="left"><strong><small>copyright(c) 2000-2004. Franz Inc</small></strong></p>
+<small><small><small>version <font face="Courier New">1.2.43</font></small></small></small></h1>
+<p align="left"><strong><small>copyright(c) 2000-2005. Franz Inc</small></strong></p>
 <h2 align="left">Table of Contents</h2>
 <p align="left"><a href="#introduction">Introduction</a><br>
 <a href="#running-AllegroServe">Running AllegroServe</a><br>
@@ -20,8 +23,10 @@ function</a><font face="Courier New"><br>
 &nbsp;&nbsp; </font>&nbsp; <a href="#directory-access-files">Directory
 Access Files</a><font face="Courier New"><br>
 &nbsp; <a href="#f-publish">publish</a></font><br>
-&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-publish-prefix">publish-prefix</a></font><br>
-&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-publish-multi"><font face="Courier New">publish-multi</font></a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a
+ href="#f-publish-prefix">publish-prefix</a></font><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-publish-multi"><font
+ face="Courier New">publish-multi</font></a><br>
 <a href="#generating-a-computed-response">Generating a Computed Response</a><br>
 <font face="Courier New">&nbsp; <a href="#f-with-http-response">with-http-response</a><br>
 &nbsp; <a href="#f-with-http-body">with-http-body</a><br>
@@ -29,8 +34,10 @@ Access Files</a><font face="Courier New"><br>
 &nbsp; <a href="#f-header-slot-value">header-slot-value</a><br>
 &nbsp; <a href="#f-reply-header-slot-value">reply-header-slot-value</a><br>
 &nbsp; <a href="#f-request-query">request-query</a></font><br>
-&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-request-query-value">request-query-value</a><br>
-</font><a href="#request-variables">Request Variables</a><font face="Courier New"><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a
+ href="#f-request-query-value">request-query-value</a><br>
+</font><a href="#request-variables">Request Variables</a><font
+ face="Courier New"><br>
 &nbsp; <a href="#f-request-variable-value">request-variable-value</a><br>
 </font>
 <a href="#request-object-readers">Request Object Readers and Accessors</a><br>
@@ -54,20 +61,24 @@ Access Files</a><font face="Courier New"><br>
 &nbsp; <a href="#f-parse-multipart-header">parse-multipart-header</a><br>
 &nbsp; <a href="#f-get-multipart-sequence">get-multipart-sequence</a></font>
 <br>
-&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-get-all-multipart-data"><font face="Courier New">get-all-multipart-data</font></a><br>
-&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-form-urlencoded-">form-urlencoded-to-query</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-get-all-multipart-data"><font
+ face="Courier New">get-all-multipart-data</font></a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a
+ href="#f-form-urlencoded-">form-urlencoded-to-query</a><br>
 &nbsp; <a href="#f-query-to">query-to-form-urlencoded</a></font><br>
 <a href="#authorization">Authorization</a><br>
 <font face="Courier New">&nbsp; <a href="#f-get-basic-authorization">get-basic-authorization</a><br>
 &nbsp; <a href="#f-set-basic-authorization">set-basic-authorization</a><br>
 &nbsp; <a href="#c-password-authorizer">password-authorizer</a><br>
 &nbsp; <a href="#c-location-authorizer">location-authorizer</a></font><br>
-&nbsp;&nbsp;&nbsp;&nbsp; <a href="#c-function-authorizer"><font face="Courier New">function-authorizer</font></a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <a href="#c-function-authorizer"><font
+ face="Courier New">function-authorizer</font></a><br>
 <a href="#cookies">Cookies</a><br>
 <font face="Courier New">&nbsp; <a href="#f-set-cookie-header">set-cookie-header</a><br>
 &nbsp; <a href="#f-get-cookie-values">get-cookie-values</a></font><br>
 <a href="#varaibles">Variables</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#v-aserve-version">*aserve-version*</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a
+ href="#v-aserve-version">*aserve-version*</a><br>
 &nbsp; <a href="#v-default-aserve-external-format">*default-aserve-external-format*</a><br>
 &nbsp; <a href="#v-http-response-timeout">*http-response-timeout*</a><br>
 &nbsp; <a href="#v-mime-types">*mime-types*</a></font><br>
@@ -87,6 +98,7 @@ Access Files</a><font face="Courier New"><br>
 &nbsp; <a href="#f-read-client-response">read-client-response-headers</a><br>
 &nbsp; <a href="#f-client-request-read-sequence">client-request-read-sequence</a><br>
 &nbsp; <a href="#f-client-request-read-close">client-request-close</a><br>
+&nbsp; <a href="#f-compute-digest-authorization">compute-digest-authorization</a><br>
 &nbsp; <a href="#f-uriencode-string">uriencode-string</a></font><br>
 <a href="#proxy">Proxy</a><br>
 <a href="#cache">Cache</a><br>
@@ -96,8 +108,10 @@ Access Files</a><font face="Courier New"><br>
 <font face="Courier New">&nbsp; <a href="#f-wserver-io-timeout">wserver-io-timeout</a><br>
 &nbsp; <a href="#f-wserver-response-timeout">wserver-response-timeout</a></font><br>
 <a href="#miscellaneous">Miscellaneous</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-ensure-stream-lock">ensure-stream-lock</a></font><br>
-&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-map-entities"><font face="Courier New">map-entities</font></a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a
+ href="#f-ensure-stream-lock">ensure-stream-lock</a></font><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-map-entities"><font
+ face="Courier New">map-entities</font></a><br>
 <a href="#asaservice">Running AllegroServe as a Service on Windows NT</a><br>
 <a href="#international-chars-aserve">Using International Characters in
 AllegroServe</a><br>
@@ -108,7 +122,8 @@ AllegroServe</a><br>
 <br>
 </p>
 <h2 align="left">In<a name="introduction"></a>troduction</h2>
-<p><strong>AllegroServe </strong>is a webserver&nbsp; written at <a href="http://www.franz.com">Franz Inc</a>.&nbsp;&nbsp;AllegroServe is
+<p><strong>AllegroServe </strong>is a webserver&nbsp; written at <a
+ href="http://www.franz.com">Franz Inc</a>.&nbsp;&nbsp;AllegroServe is
 designed to work
 with the <a href="htmlgen.html">htmlgen</a> system for generating
 dynamic html, as one of
@@ -419,13 +434,13 @@ object and retrieved with<strong> wserver-response-timeout</strong>..</li>
   <li><strong>plist</strong> - initial property list for this entity</li>
   <li><strong>hook</strong> - a function of three arguments: req,ent
 and extra. &nbsp;&nbsp; See <a href="#entity-hook-function">entity
-hook function</a>.</li><li><span style="font-weight: bold;">headers</span>
+hook function</a>.</li>
+  <li><span style="font-weight: bold;">headers</span>
 - a list of cons's, with the car being a&nbsp; keyword symbol naming a
 header and the cdr being a string which is the header value.&nbsp;
 These headers are added to the response send back to the browser when
 this file is accessed.&nbsp; <br>
   </li>
-
 </ul>
 <p>The function that handles requests for files will respond correctly
 to <strong>If-Modified-Since</strong>
@@ -481,7 +496,8 @@ AllegroServe is returning a "304 - Not Modified" response.</td>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
 <p><a name="f-publish-directory"></a><strong><font face="Courier New">(publish-directory
-&amp;key prefix host port destination remove authorizer server <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+&amp;key prefix host port destination remove authorizer server <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 indexes filter timeout plist publisher access-file<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 hook headers)</font></strong></p>
@@ -581,7 +597,7 @@ function may
 wish to publish that entity but it need not do so.</p>
 <div align="center">
 <center>
-<table border="1" width="86%" cellpadding="5">
+<table border="1" cellpadding="5" width="86%">
   <tbody>
     <tr>
       <td width="100%">Note:&nbsp; <strong>publish-directory</strong>
@@ -826,7 +842,8 @@ to subdirectories<br>
 <p><a name="f-publish"></a><strong><font face="Courier New">(publish
 &amp;key path host
 port content-type function class format remove server <br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; authorizer
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+authorizer
 timeout plist hook headers)</font></strong></p>
 <p>This creates a mapping from a url to a <strong>computed-entity</strong>,
 that is an
@@ -834,7 +851,8 @@ entity that computes its response every time a request comes in.&nbsp;
 The <strong>path</strong>,
 <strong>host</strong>, <strong>port</strong>, <strong>remove, server</strong>
 , <strong>authorizer,
-hook, headers </strong>and <strong>class</strong> arguments are as in the
+hook, headers </strong>and <strong>class</strong> arguments are as in
+the
 other publish
 functions.&nbsp;&nbsp;The <strong>timeout</strong> argument defaults
 to <strong>nil </strong>always.&nbsp;&nbsp;
@@ -862,7 +880,8 @@ request.&nbsp;&nbsp; This function must generate a response to the http
 request, even if
 the response is only that the request wasn't found.</p>
 <p>&nbsp;</p>
-<p><a name="f-publish"></a><a name="f-publish-prefix"></a><strong><font face="Courier New">(publish-prefix
+<p><a name="f-publish"></a><a name="f-publish-prefix"></a><strong><font
+ face="Courier New">(publish-prefix
 &amp;key prefix host port content-type function class <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 format remove server authorizer timeout plist hook headers)</font></strong></p>
@@ -986,7 +1005,8 @@ World!&lt;/body&gt;&lt;/html&gt;.</font></p>
 <p align="left">The macros and functions used in computing responses
 are these:</p>
 <hr>
-<p align="left"><a name="f-with-http-response"></a><strong><font face="Courier New">(with-http-response
+<p align="left"><a name="f-with-http-response"></a><strong><font
+ face="Courier New">(with-http-response
 (req ent &amp;key timeout check-modified format response content-type) <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 &amp;rest body)</font></strong></p>
@@ -1068,7 +1088,8 @@ function.&nbsp; You must
 always call <strong>with-http-body </strong>inside the call to <strong>with-http-response</strong>.</p>
 <p align="left">&nbsp;</p>
 <hr>
-<p align="left"><a name="f-with-http-body"></a><strong><font face="Courier New">(with-http-body
+<p align="left"><a name="f-with-http-body"></a><strong><font
+ face="Courier New">(with-http-body
 (req ent &amp;key format headers external-format)&nbsp; &amp;rest body)</font></strong></p>
 <p align="left">This macro causes the whole http response to be sent
 out.&nbsp; The macro
@@ -1221,17 +1242,24 @@ have an associated
 value then the empty string is returned.</p>
 <hr>
 <h2><a name="request-variables"></a>Request Variables</h2>
-<p>Every request has zero or or more <span style="font-style: italic;">request variables</span>.&nbsp;&nbsp; A request variable is named by a lisp string.&nbsp; The value of a request variable can be any<br>
+<p>Every request has zero or or more <span style="font-style: italic;">request
+variables</span>.&nbsp;&nbsp; A request variable is named by a lisp
+string.&nbsp; The value of a request variable can be any<br>
 lisp object.&nbsp; <br>
 <br>
 &nbsp;Initially a request has zero request variables.<br>
 </p>
-<p style="font-family: courier new,courier,monospace; font-weight: bold;"><a name="f-request-variable-value"></a>(request-variable-value req "name")</p>
-<p>Return the value of the request variable named "name".&nbsp; Return nil if there is no such request variable.</p>
-<p>You&nbsp; can use&nbsp; <span style="font-family: courier new,courier,monospace;">(setf (request-variable req "name") value)</span> to set the value of a request variable.<br>
+<p
+ style="font-family: courier new,courier,monospace; font-weight: bold;"><a
+ name="f-request-variable-value"></a>(request-variable-value req "name")</p>
+<p>Return the value of the request variable named "name".&nbsp; Return
+nil if there is no such request variable.</p>
+<p>You&nbsp; can use&nbsp; <span
+ style="font-family: courier new,courier,monospace;">(setf
+(request-variable req "name") value)</span> to set the value of a
+request variable.<br>
 <br>
 &nbsp;</p>
-
 <h2><a name="request-object-readers"></a>Request Object Reader and
 Accessors</h2>
 <p>The request object contains information about the http request being
@@ -1296,7 +1324,8 @@ the response will
 be made (in Lisp's universal time format).&nbsp; This defaults to the
 time when the
 request arrived.</p>
-<p><a name="f-request-reply-headers"></a><strong><font face="Courier New">(request-reply-headers
+<p><a name="f-request-reply-headers"></a><strong><font
+ face="Courier New">(request-reply-headers
 request)</font></strong> - accessor - an alist of some of the headers
 to send out with the
 reply (other headers values are stored in specific slots of the request
@@ -1310,7 +1339,8 @@ isn't used, instead the headers to be sent are passed as the <strong>:header</st
 argument to <strong>with-http-body</strong>, or <strong>(setf
 reply-header-slot-value)</strong>
 is called.</p>
-<p><a name="f-request-reply-content-length"></a><strong><font face="Courier New">(request-reply-content-length
+<p><a name="f-request-reply-content-length"></a><strong><font
+ face="Courier New">(request-reply-content-length
 request) </font></strong>&nbsp;&nbsp;&nbsp; - accessor -&nbsp; the
 value to send as the
 Content-Length of this response.&nbsp;&nbsp; This is computed
@@ -1360,7 +1390,8 @@ CGI protocol with
 the <strong>run-cgi-program</strong> function.</p>
 <p><a name="f-run-cgi-program"></a><font face="Courier New"><strong>(run-cgi-program
 req
-ent program &amp;key path-info path-translated<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+ent program &amp;key path-info path-translated<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 script-name query-string <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 auth-type timeout error-output env)</strong></font></p>
@@ -1559,7 +1590,8 @@ totally different
 operating system.</p>
 <p>&nbsp;</p>
 <hr>
-<p><a name="f-parse-multipart-header"></a><strong><font face="Courier New">(parse-multipart-header
+<p><a name="f-parse-multipart-header"></a><strong><font
+ face="Courier New">(parse-multipart-header
 header)</font></strong></p>
 <p>This takes the value of get-multipart-header and returns values that
 describe the
@@ -1594,7 +1626,8 @@ or <span style="font-weight: bold;">get-multipart-data</span>.<br>
   </li>
   <li><strong>nil</strong> - This header has a form not recognized by <strong>parse-multipart-header</strong>.
 &nbsp;&nbsp;&nbsp; If you encounter this please let us know about it
-since we would like to enhance <strong>parse-multipart-header</strong> to
+since we would like to enhance <strong>parse-multipart-header</strong>
+to
 understand this type of header. &nbsp;&nbsp; If you encounter
 this&nbsp; type of header you still have to read the contents of the
 data item that follows the header in order to read the next header.
@@ -1603,7 +1636,8 @@ data item that follows the header in order to read the next header.
 then read the next header.</li>
 </ul>
 <hr>
-<p><a name="f-get-multipart-sequence"></a><strong><font face="Courier New">(get-multipart-sequence
+<p><a name="f-get-multipart-sequence"></a><strong><font
+ face="Courier New">(get-multipart-sequence
 request buffer &amp;key start end external-format)</font></strong></p>
 <p>This retrieves the next chunk of data for the current form field and
 stores it in <strong>buffer</strong>.
@@ -1648,7 +1682,8 @@ size of the internal buffers used by this function to retrieve the
 data.&nbsp;&nbsp; You
 usually won't need to specify a value for this but but if you know the
 values retrieved
-are either very small or very large it may make the operation run faster
+are either very small or very large it may make the operation run
+faster
 to specify an
 appropriate <strong>size</strong>.&nbsp;&nbsp;&nbsp; <strong>external-format</strong>
 is
@@ -1738,7 +1773,8 @@ in the entity.</p>
 Authorization Method
 &nbsp; defined by the http specification.&nbsp;&nbsp;&nbsp; The <strong>password-authorizer</strong>
 class described below make use of these functions.</p>
-<p><a name="f-get-basic-authorization"></a><strong><font face="Courier New">(get-basic-authorization
+<p><a name="f-get-basic-authorization"></a><strong><font
+ face="Courier New">(get-basic-authorization
 request)</font></strong></p>
 <p>This function retrieves the Basic authorization information
 associated with this
@@ -1748,7 +1784,8 @@ strings.&nbsp; If there is no Basic authorization information with this
 request, <strong>nil</strong>
 is returned.</p>
 <p>&nbsp;</p>
-<p><a name="f-set-basic-authorization"></a><strong><font face="Courier New">(set-basic-authorization
+<p><a name="f-set-basic-authorization"></a><strong><font
+ face="Courier New">(set-basic-authorization
 request realm)</font></strong></p>
 <p>This adds a header line that requests Basic authorization in the
 given realm (a
@@ -1902,7 +1939,8 @@ is assumed to match, and thus the request will be denied.&nbsp; </li>
 </ul>
 <p>The example of using a <strong>location-authorizer</strong> only
 permits connections
-coming in via the loopback network (which occurs if you specify <a href="http://localhost/whatever">http://localhost/whatever</a>) or if
+coming in via the loopback network (which occurs if you specify <a
+ href="http://localhost/whatever">http://localhost/whatever</a>) or if
 they come from one
 particular machine (tiger.franz.com).&nbsp; Note that we end the
 pattern list with <strong>:deny</strong>
@@ -2034,7 +2072,8 @@ AllegroServe:</p>
 - a list of three values: (major-version minor-version
 sub-minor-version) which is usually
 printed with periods separating the values (i.e. X.Y.Z).</p>
-<p><a name="v-default-aserve-external-format"></a><strong><font face="Courier New">*default-aserve-external-format*</font></strong>
+<p><a name="v-default-aserve-external-format"></a><strong><font
+ face="Courier New">*default-aserve-external-format*</font></strong>
 - a symbol or external format object which is the default value for
 those AllegroServe
 functions that take an external-format argument.&nbsp;&nbsp; http
@@ -2048,7 +2087,8 @@ affect its value in
 other threads.&nbsp;&nbsp; You should decide the default external
 format before you start
 AllegroServe running.</p>
-<p><a name="v-http-response-timeout"></a><strong><font face="Courier New">*http-response-timeout*</font></strong>
+<p><a name="v-http-response-timeout"></a><strong><font
+ face="Courier New">*http-response-timeout*</font></strong>
 - the default value for the timeout argument to
 with-http-response.&nbsp;&nbsp; [in future
 versions of AllegroServe we'll treat this value like
@@ -2238,8 +2278,9 @@ string is returned.</li>
 succeeded)</li>
   <li>an alist of headers where the <strong>car</strong> of each entry
 is a keyword symbol or a lowercase string with the header name and the <strong>cdr</strong>
-is a string with the value of that header item.&nbsp;&nbsp; A keyword symbol is returned for standard headers.<br>
-</li>
+is a string with the value of that header item.&nbsp;&nbsp; A keyword
+symbol is returned for standard headers.<br>
+  </li>
   <li>the uri object denoting the page accessed.&nbsp; This is normally
 computed from the <strong>uri</strong> value passed in but if
 redirection was done then this reflects the target of the
@@ -2358,6 +2399,20 @@ is the name and whose <strong>cdr </strong>is the password to be used
 to get authorization to access this page.</td>
     </tr>
     <tr>
+      <td style="vertical-align: top;">digest-authorization<br>
+      </td>
+      <td style="vertical-align: top;">nil<br>
+      </td>
+      <td style="vertical-align: top;">If given it is a <span
+ style="font-weight: bold;">digest-authorization</span> object with
+values in the <span style="font-weight: bold;">username</span> and <span
+ style="font-weight: bold;">password</span> slots.&nbsp; The
+digest-authorization object will be modified by do-http-request in
+order to store the information needed to send as authorization
+credentials.<br>
+      </td>
+    </tr>
+    <tr>
       <td width="22%">keep-alive</td>
       <td width="16%">nil</td>
       <td width="62%">If true then the web server will be told to keep
@@ -2371,15 +2426,18 @@ keep-alive request.</td>
       <td width="16%">nil</td>
       <td width="62%">an alist of conses <font face="Courier New">(header-name
 . "header-value")</font> for additional headers to send with the
-request.&nbsp;&nbsp; The header-name should be a keyword symbol naming the header, but it can be a string as well.<br>
-</td>
+request.&nbsp;&nbsp; The header-name should be a keyword symbol naming
+the header, but it can be a string as well.<br>
+      </td>
     </tr>
     <tr>
       <td width="22%">proxy</td>
       <td width="16%">nil</td>
       <td width="62%">the name and optionally the port number of a
 proxying web server through which this request should be
-made.&nbsp;&nbsp; The form is of the argument is <a href="http://www.machine.com">"www.machine.com"</a> or <a href="http://www.machine.com:8000">"www.machine.com:8000"</a> if the
+made.&nbsp;&nbsp; The form is of the argument is <a
+ href="http://www.machine.com">"www.machine.com"</a> or <a
+ href="http://www.machine.com:8000">"www.machine.com:8000"</a> if the
 web server is listening on port 8000 rather than 80.&nbsp;&nbsp;
 Proxying web servers are often used when clients are behind firewalls
 that prevent direct access to the internet. &nbsp; Another use is to
@@ -2438,14 +2496,22 @@ objects on a page.
 &nbsp; If the form has input elements named&nbsp; <strong>width</strong>
 and <strong>height</strong>
 then you can send a request that specifies that information in this way:</p>
-<pre><font face="Courier New">(do-http-request <a href="http://www.foo.com/myform.html">"http://www.foo.com/myform.html"</a> <br>                 :query '(("width" . 23) ("height" . 45)))</font></pre>
+<pre><font face="Courier New">(do-http-request <a
+ href="http://www.foo.com/myform.html">"http://www.foo.com/myform.html"</a> <br>                 :query '(("width" . 23) ("height" . 45)))</font></pre>
 <p>The above assumes that the method on the form is "GET".&nbsp;&nbsp;
 If the
 method is "POST" then a similar call will work:</p>
-<pre><font face="Courier New">(do-http-request <a href="http://www.foo.com/myform.html">"http://www.foo.com/myform.html"</a>  <strong>:method :post</strong>
+<pre><font face="Courier New">(do-http-request <a
+ href="http://www.foo.com/myform.html">"http://www.foo.com/myform.html"</a>  <strong>:method :post</strong>
                  :query '(("width" . 23) ("height" . 45)))</font></pre>
 <p><br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </p>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <br>
+If the page uses digest authorization then you would call with
+arguments like<br>
+</p>
+<pre>(do-http-request "http://www.secret.com/whatever.html"<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :digest-authorization (make-instance 'digest-authorization :username "joe" :password "secret"))<br></pre>
+<p><br>
+</p>
 <p>&nbsp;</p>
 <p>Before we describe the lower level client request functions we will
 describe two
@@ -2499,7 +2565,9 @@ Not Found.</td>
       <td width="39%">client-request-headers</td>
       <td width="61%">an alist of header values in the response.&nbsp;
 Each entry is a cons of the form <font face="Courier New">("header-name"
-. "header-value")</font>. &nbsp; The header names are all lower case.</td>
+. "header-value")</font> or (:header-name . "header-value") for well
+known slots. &nbsp; The header names, if strings,&nbsp; are in all
+lower case.</td>
     </tr>
     <tr>
       <td width="39%">client-request-protocol</td>
@@ -2519,7 +2587,8 @@ all web servers returning the same string for any given response code.</td>
 <h2><a name="c-cookie-jar"></a>cookie-jar</h2>
 <p>A <strong>cookie-jar</strong> is a respository for cookies.&nbsp;
 Cookies are stored in
-a jar when a response from a client request includes <font face="Courier New">Set-Cookie</font>
+a jar when a response from a client request includes <font
+ face="Courier New">Set-Cookie</font>
 headers.&nbsp;&nbsp; Cookies from a jar are sent along with a request
 when they are
 applicable to the given request.&nbsp;&nbsp; We won't describe the
@@ -2530,8 +2599,10 @@ access a site that uses cookies to implement persistence, then you
 should create a <strong>cookie-jar</strong>
 object and pass that same object in with each request.&nbsp;&nbsp; More
 information on
-cookies can be found <a href="http://developer.netscape.com:80/docs/manuals/js/client/jsref/cookies.htm">here</a>.</p>
-<p>A <strong>cookie-jar</strong> is created with <font face="Courier New">(make-instance
+cookies can be found <a
+ href="http://developer.netscape.com:80/docs/manuals/js/client/jsref/cookies.htm">here</a>.</p>
+<p>A <strong>cookie-jar</strong> is created with <font
+ face="Courier New">(make-instance
 'cookie-jar).</font></p>
 <p>&nbsp;</p>
 <p><strong><font face="Courier New">(cookie-jar-items&nbsp; cookie-jar)</font></strong></p>
@@ -2540,8 +2611,10 @@ form:</p>
 <p><strong>(hostname cookie-item ...)</strong></p>
 <p>The <strong>hostname</strong> is a string which is matched against
 the suffix of the
-name of the host in the request (that is, a hostname of&nbsp; <font face="Courier New">".foo.com"</font>
-matches <font face="Courier New">"a.foo.com"</font> and <font face="Courier New">"b.foo.com"</font>.
+name of the host in the request (that is, a hostname of&nbsp; <font
+ face="Courier New">".foo.com"</font>
+matches <font face="Courier New">"a.foo.com"</font> and <font
+ face="Courier New">"b.foo.com"</font>.
 ).&nbsp;&nbsp;&nbsp; The hostname should have at least two periods in
 it.
 &nbsp;&nbsp;&nbsp; The following <strong>cookie-item</strong> objects
@@ -2582,11 +2655,13 @@ secure connection.</td>
 </table>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
-<p><a name="f-make-http-client-request"></a><strong><font face="Courier New">(make-http-client-request
-uri &amp;key method protocol keep-alive<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<p><a name="f-make-http-client-request"></a><strong><font
+ face="Courier New">(make-http-client-request
+uri &amp;key method protocol keep-alive<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 accept cookies headers proxy<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-basic-authorization query<br>
+basic-authorization digest-authorization query<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 content content-type content-length<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -2637,7 +2712,8 @@ You should use <strong>client-request-read-sequence</strong>
 to read the body of the response</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
-<p><a name="f-client-request-read-sequence"></a><strong><font face="Courier New">(client-request-read-sequence
+<p><a name="f-client-request-read-sequence"></a><strong><font
+ face="Courier New">(client-request-read-sequence
 buffer client-request<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 &amp;key start end)</font></strong></p>
@@ -2664,7 +2740,33 @@ client-request)</strong></font></p>
 closed.&nbsp;&nbsp; This
 returns the resources used by this connection to the operating
 system.&nbsp; </p>
-<p>&nbsp;</p>
+<p><span
+ style="font-family: courier new,courier,monospace; font-weight: bold;"><br>
+</span></p>
+<p><span
+ style="font-family: courier new,courier,monospace; font-weight: bold;"><a
+ name="f-compute-digest-authorization"></a>(compute-digest-authorization
+client-request digest-authorization)<br>
+<br>
+</span>Given&nbsp; a client-request object after read-client-response
+headers has been called on it, determine if digest authorization is
+being requested and if so compute the authorization values based on the
+username and password in the digest-authorization object.&nbsp; Returns
+true if Digest Authorization was requested by the server and if the
+authorization values were successfully computed.<br>
+</p>
+<p><br>
+Digest authorization is more difficult since the authorization key
+passed by the client is based on values passed by the server when it
+rejected the request.&nbsp;&nbsp; Thus you need to make the same
+request twice.&nbsp; The do-http-request function handles this retry
+automatically.&nbsp;&nbsp; If you need to use
+client-request-read-sequence to read the data then you will have to do
+the retry as well.&nbsp;&nbsp; This function demonstrates how you use
+the above functions to do the retry and then to retrieve the data:<br>
+<br>
+</p>
+<pre>(defun getpage ()<br>  ;;<br>  ;; demonstrate how to add digest authorization to the<br>  ;; page retrieval loop that uses client-request-read-sequence<br>  ;;<br>  (let ((creq (make-http-client-request "http://www.secret.com/whatever.html")))<br>    (read-client-response-headers creq)<br>    (if* (eq 401 (client-request-response-code creq))<br>       then ; try digest authorization<br>	    (let ((da (make-instance 'digest-authorization<br>			:username "joe"<br>			:password "secret")))<br>	      (if* (compute-digest-authorization creq da)<br>		 then ; successfully computed digest authorization<br>		      ;; values<br>		      ;<br>		      ; end request<br>		      (client-request-close creq)<br>		      ; and create a new one<br>		      (setq creq (make-http-client-request <br>				  "http://www.secret.com/whatever.html"<br>				  :digest-authorization da))<br>		      (read-client-response-headers creq))))<br>    <br>    (if* (not (eql 200 (client-request-response-code creq)))<br>       then (error "get failed with code ~s"<br>		   (client-request-response-code creq)))<br>    <br>    (let ((buffer (make-array 2048 :element-type 'character)))<br>      (loop<br>	(let ((length (client-request-read-sequence buffer creq)))<br>	  (if* (zerop length)<br>	     then (return))<br>	  <br>	  (format t "got buffer of length ~s:~%~s~%" length<br>		  (subseq buffer 0 length))))<br>      <br>      (client-request-close creq))))<br><br></pre>
 <p><a name="f-uriencode-string"></a>(<strong><font face="Courier New">uriencode-string&nbsp;
 string &amp;key external-format)</font></strong></p>
 <p>Convert the string into a format that would be safe to use as a
@@ -2883,11 +2985,13 @@ more more IP addresses.&nbsp;&nbsp; When a request arrives there is
 usually a header line
 labelled <font face="Courier New">Host</font> whose value is the
 specific hostname typed
-into the browser by the user.&nbsp;&nbsp; Thus if hostnames <font face="Courier New">www.foo.com</font>
+into the browser by the user.&nbsp;&nbsp; Thus if hostnames <font
+ face="Courier New">www.foo.com</font>
 and <font face="Courier New">www.bar.com </font>both point to the
 same machine then it's
 possible for the webserver on that machine to distinguish a request for
-<font face="Courier New">http://www.foo.com</font> from a request for <font face="Courier New">http://www.bar.com</font>
+<font face="Courier New">http://www.foo.com</font> from a request for <font
+ face="Courier New">http://www.bar.com</font>
 by looking at the <font face="Courier New">Host</font> header.</p>
 <p>In order to make AllegroServe easy to use you can ignore the virtual
 hosting facility
@@ -3018,7 +3122,8 @@ search this time looking for a <strong>:wild</strong> handler.</p>
 <p>&nbsp;</p>
 <hr>
 <h2><a name="timeouts"></a>Timeouts</h2>
-<p>A web server is a program that provides resources to a client program
+<p>A web server is a program that provides resources to a client
+program
 connecting over the
 network.&nbsp; The resources a web server has to offer is limited and
 it's important that
@@ -3113,7 +3218,8 @@ the <strong>timeout</strong> argument defaults to a huge number.</p>
 <h2><a name="miscellaneous"></a>Miscellaneous</h2>
 <p><a name="f-ensure-stream-lock"></a><strong><font face="Courier New">(ensure-stream-lock
 stream)</font></strong></p>
-<p>The function adds a <a href="http://www.franz.com/support/documentation/6.1/doc/multiprocessing.htm#process-locks-1">process
+<p>The function adds a <a
+ href="http://www.franz.com/support/documentation/6.1/doc/multiprocessing.htm#process-locks-1">process
 lock</a> to <strong>stream</strong>'s property list (under the
 indicator<strong> :lock</strong>)
 if no such lock is present.&nbsp;&nbsp; Then it returns the object <strong>stream</strong>.</p>
@@ -3141,7 +3247,8 @@ the entities in the
 given<strong> locator</strong>.&nbsp;&nbsp; One common use of <strong>map-entities</strong>
 is to find entities that you no longer wish to be published.&nbsp; For
 that reason <strong>map-entities</strong>
-will remove the entity&nbsp; passed to the <strong>function</strong> if
+will remove the entity&nbsp; passed to the <strong>function</strong>
+if
 the <strong>function</strong>
 returns the keyword symbol <strong>:remove</strong> as its value.</p>
 <p>&nbsp;</p>
@@ -3155,8 +3262,10 @@ on your machine
 after you log out you have to start it as a <strong>Windows
 Service.&nbsp; </strong>This
 is easy to do thanks to code contributed by Ahmon Dancy.&nbsp;&nbsp; </p>
-<p>The first step is to download the <a href="http://opensource.franz.com/ntservice">ntservice
-code and documentation</a> from the Franz <a href="http://opensource.franz.com">opensource
+<p>The first step is to download the <a
+ href="http://opensource.franz.com/ntservice">ntservice
+code and documentation</a> from the Franz <a
+ href="http://opensource.franz.com">opensource
 site</a>.&nbsp; Read the documentation carefully especially as regards
 the different
 capabilities of the accounts under which you may choose to run
@@ -3184,7 +3293,8 @@ never returns.</p>
 system I call <strong>ntservice:create-service</strong>
 like this:</p>
 <pre>(ntservice:create-service "aservetest" "Aserve Test Service"<br>     "c:\\acl62\\testservice\\testapp\\testapp.exe -- /service")</pre>
-<p>Note that I use "<font face="Courier New">--</font>" before the "<font face="Courier New">/service</font>".&nbsp; This is <em>very </em>important.
+<p>Note that I use "<font face="Courier New">--</font>" before the "<font
+ face="Courier New">/service</font>".&nbsp; This is <em>very </em>important.
 &nbsp;&nbsp; The "<font face="Courier New">--</font>" separates the
 arguments
 used to start up the program from the arguments passed to the program
@@ -3214,7 +3324,8 @@ character and punctuation needed for western European languages (which
 includes English).
 &nbsp;&nbsp; </p>
 <p>If you want to work with characters outside the Latin1 set you'll
-want to use the <a href="http://www.franz.com/support/documentation/6.1/doc/iacl.htm">International
+want to use the <a
+ href="http://www.franz.com/support/documentation/6.1/doc/iacl.htm">International
 version
 of Allegro CL</a> which represents characters internally by their
 16-bit <a href="http://www.unicode.org">Unicode</a>
@@ -3281,7 +3392,8 @@ do this:</p>
 not identical.
 &nbsp; Check <a href="http://www.iana.org/assignments/character-sets">here</a>
 for the
-charset names and check <a href="http://www.franz.com/support/documentation/6.1/doc/iacl.htm#external-formats-1">here</a>
+charset names and check <a
+ href="http://www.franz.com/support/documentation/6.1/doc/iacl.htm#external-formats-1">here</a>
 for the Allegro CL external format names.</p>
 <p>In order to make it easier to specify external formats in
 AllegroServe you can specify
@@ -3308,7 +3420,8 @@ inside Lisp.
 &nbsp;&nbsp; The corresponding Allegro CL external format is the value
 of <font face="Courier New"><strong>(crlf-base-ef :utf-8)</strong></font>.&nbsp;&nbsp;
 Specifying
-this character set allows you to write web pages that can use characters
+this character set allows you to write web pages that can use
+characters
 from nearly every
 language in the world (whether the web browser can find the glyphs to
 display all those
@@ -3422,4 +3535,5 @@ Specifying <strong>:all </strong>to <strong>debug-on</strong> or <strong>debug-o
 Specifying <strong>:log</strong>
 is the same as specifying all features except <strong>:notrap.</strong></p>
 <p>&nbsp;</p>
-</body></html>
+</body>
+</html>
