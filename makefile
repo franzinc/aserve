@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.3.44.3 2001/09/20 14:31:59 layer Exp $
+# $Id: makefile,v 1.3.44.4 2001/09/20 15:29:29 layer Exp $
 #
 # On Windows, this makefile requires the use of GNU make from Redhat
 # (http://sources.redhat.com/cygwin/).
@@ -32,7 +32,10 @@ srcdist: FORCE
 # -batch must come before -L, since arguments are evaluated from left to right
 	$(mlisp) -batch -L build.tmp -kill
 
-clean:
-	rm -fr aserve-src *.fasl */*.fasl
+clean:	FORCE
+	rm -fr *.fasl */*.fasl
+
+cleanall: clean
+	rm -fr aserve-src
 
 FORCE:
