@@ -1,3 +1,13 @@
+2000-12-27  John Foderaro  <jkf@tiger.franz.com>
+1.1.36
+	* client.cl: handle illegal set-cookie headers sent by Netscape's
+	  v3 web server.  In a client request Split the single large 
+	  Cookie line into muliple Cookie lines so that Netscape's v3
+	  web server can understand them.
+	  Add a redirect-methods argument to do-http-request to support
+	  more user control of redirection.
+	* proxy.cl - many enhancements including connection caching
+
 2000-11-06  Kevin Layer  <layer@ultra>
 1.1.35
 	* log.cl: make logmess a method, so I can define an after method

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.30 2000/12/20 18:01:03 jkf Exp $
+;; $Id: proxy.cl,v 1.31 2000/12/27 19:47:08 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -39,6 +39,25 @@
 
 ; number of seconds to add to expiration time of any entry in cache
 (defparameter *extra-lifetime* 0) 
+	
+
+; true if we are to save cached connections
+(defparameter *connection-caching* t) 
+
+; statistics about connection caching
+
+(defparameter *connections-cached* 0) ; number of connections put in to cache
+(defparameter *connections-made*  0) ; number of make-socket calls made
+(defparameter *connections-used-cached* 0) ; number of cached connections used
+; the cache
+(defparameter *connection-cache-queue* (cons nil nil)) ; (first . last) queue of conn-cache objects
+(defparameter *connection-cache-expire* 10)  ; number of seconds to live
+
+
+; number of seconds we wait for a connect before we consider it timed
+; out.  Given the chance Linux seems to wait forever for a connection
+; so we need to shut it down ourselves.
+(defparameter *connection-timed-out-wait* 30)
 
 ; set to variable to be called when a new entry is cached
 ; (so that it can be scanned for links)
@@ -300,15 +319,26 @@
 	 (method (request-method req))
 	 (protocol :http/1.0)
 	 (state :pre-send)
+	 (keep-alive)
+	 (cached-connection)
 	 )
 
     (unwind-protect
-	(progn
+	(tagbody
 	  
+	  retry-proxy
 
 	  (handler-bind ((error #'(lambda (cond)
-				    (format *debug-stream*
-					    "error during proxy: ~a~%" cond)
+				    (logmess
+				     (format nil "error during proxy: ~a ~% with cached connection = ~s~%" cond cached-connection))
+				    (if* cached-connection
+				       then ; retry
+					    (logmess "retry proxy")
+					    (if* sock
+					       then (ignore-errors
+						     (close sock 
+							    :abort t)))
+					    (go retry-proxy))
 				    
 				    (if* pcache-ent
 				       then (kill-pcache-ent pcache-ent))
@@ -325,9 +355,9 @@
 					    (return-from proxy-request nil)))))
 	    
 
-	    ;(logmess "got proxy request")
-	    ;(dump-header-block (request-header-block req) *initial-terminal-io*)
 
+	    (setq keep-alive nil ; assume not keep alive
+		  cached-connection nil)
 	    
 	    ; create outgoing headers by copying
 	    (copy-headers (request-header-block req) outbuf
@@ -346,7 +376,11 @@
 	    ; connection  we'll set to 'close' for now but at some point
 	    ; we'll connection caching so we'll want to do some keep-alive'ing
 	    ;  
-	    (insert-header outbuf :connection "close")
+	    
+	    (insert-header outbuf :connection 
+			   (if* *connection-caching*
+			      then "Keep-Alive"
+			      else "close"))
     
 
 	    ;(logmess "outbuf now")
@@ -376,10 +410,13 @@
 		   
 	    ; time to make a call to the server
 	    (handler-case
-		(setq sock (socket:make-socket :remote-host host
+		(multiple-value-setq (sock cached-connection)
+		  #+ignore (socket:make-socket :remote-host host
 					       :remote-port (or port 80)
 					       :format :bivalent
-					       :type *socket-stream-type*))
+					       :type *socket-stream-type*)
+		      (get-possibly-cached-connection
+		       host (or port 80)))
 	      (error (cond)
 		(declare (ignore cond))
 		(if* respond
@@ -552,8 +589,7 @@
 
 		(if* (null outend)
 		   then ; response coming back was truncated
-			(return-from proxy-request
-			  (proxy-failure-response req ent)))
+			(error "truncated proxy response"))
 		      
   
 		(multiple-value-setq (protocol response comment header-start)
@@ -607,8 +643,18 @@
 	      
 	      (setf (request-reply-content-length req) 
 		(or body-length given-content-length 0))
-    
-	      (close sock)  (setq sock nil)
+
+	      (setq keep-alive
+		(equalp (header-buffer-header-value outbuf :connection)
+			"keep-alive"))
+	      
+	      (if* keep-alive
+		 then (add-to-connection-cache sock
+					       host
+					       (or port 80))
+		 else (close sock))
+	      
+	      (setq sock nil)
 
 	    
 	      ; convert the header we received from the server into one
@@ -833,6 +879,111 @@
 	     "The proxy could not find the requested uri")))))
 
   
+;;;--------------------- connection cache -------------
+(defstruct connection-cache-ent 
+  expire		; time when this entry expires
+  host
+  port
+  socket
+  )
+
+  
+(defun add-to-connection-cache (socket host port)
+  (let* ((now (get-universal-time))
+	 (ent (list (make-connection-cache-ent 
+		     :expire (+ now *connection-cache-expire*)
+		     :host host
+		     :port port
+		     :socket socket)))
+	 (queue *connection-cache-queue*))
+    
+    (incf *connections-cached*)
+    
+    (mp:without-scheduling
+      (let ((start (first-valid-entry now queue)))
+		
+	(if* (null start)
+	   then ; empty, this is the first entry
+		(setf (car queue) 
+		  (setf (cdr queue) ent))
+		; add at the end
+	   else (setf (cdr (cdr queue)) ent)
+		(setf (cdr queue) ent))))))
+
+(defun first-valid-entry (now queue)
+  ;; remove expired entries and return the list of entries
+  ;; beginning with the first non expired entry
+  (let ((start (car queue)))
+    ; scan down cache removing expired entries
+    (loop
+      (if* (null start) then (return))
+      (if* (< (connection-cache-ent-expire 
+	       (car start))
+	      now)
+	 then ; kill this one
+	      (ignore-errors 
+	       (close (connection-cache-ent-socket
+		       (car start))
+		      :abort t))
+	      (setf (car queue)
+		(setq start (cdr start)))
+	 else (return)))
+	
+    start))
+	
+  
+(defun get-possibly-cached-connection (host port)
+  ;; check the cache and then return a cached connection
+  ;; build a new one if there isn't  one cached
+  (let ((now (get-universal-time))
+	(queue *connection-cache-queue*))
+    (mp:without-scheduling
+      (let ((start (first-valid-entry now queue))
+	    (prev nil))
+	(loop
+	  (if* (null start) then (return))
+	  
+	  (if* (and (equalp host (connection-cache-ent-host (car start)))
+		    (eql port (connection-cache-ent-port (car start))))
+	     then ; a match
+		  (if* prev
+		     then ; slice it out
+			  (if* (null (setf (cdr prev) (cdr start)))
+			     then ; we removed last entry, fix last
+				  (setf (cdr queue) prev))
+		     else ; we're removing the first
+			  (setf (car queue) (cdr start)))
+		  (incf *connections-used-cached*)
+		  (return-from get-possibly-cached-connection 
+		    (values (connection-cache-ent-socket (car start)) t)))
+	  
+	  (setq prev start
+		start (cdr start)))))
+	
+    ; get here if there is no match
+
+    (incf *connections-made*)
+    (socket:with-pending-connect
+	(mp:with-timeout (*connection-timed-out-wait*
+			  (error "connection timed out"))
+	  (socket:make-socket :remote-host host
+			      :remote-port port
+			      :format :bivalent
+			      :type *socket-stream-type*)))))
+
+	
+	
+			  
+				  
+			  
+  
+	      
+		
+		
+		
+		
+		
+					 
 
 
 ;;;--------------------- proxy cache ------------------      
@@ -968,9 +1119,9 @@
 				     :if-exists :supersede
 				     :if-does-not-exist :create
 				     :direction :io
-				     #-(and allegro version>= 6)
+				     #-(and allegro (version>= 6))
 				     :element-type
-				     #-(and allegro version>= 6)
+				     #-(and allegro (version>= 6))
 				     '(unsigned-byte 8)))))
     (push pcache-disk (pcache-disk-caches 
 		       (wserver-pcache server)))
@@ -1036,8 +1187,26 @@
 	       (:tr 
 		(:td (:princ (car ent)))
 		(:td (:princ (funcall (cadr ent) pcache)))))))
-	  
-	  
+
+	   :br
+	   ;; info on connection caching
+	   "Connection caching is " 
+	   (:princ (if* *connection-caching* 
+		      then "enabled"
+		      else "diabled"))
+	   :br
+	   ((:table :border 2)
+	    (:tr
+	     (:td "make-socket calls") (:td (:princ *connections-made*)))
+	    (:tr
+	     (:td "connections cached") (:td (:princ *connections-cached*)))
+	    (:tr
+	     (:td "cached connections used")
+	     (:td (:princ *connections-used-cached*))))
+	   
+			 
+
+	   :br
 	   ((:table :border 2)
 	    (:tr
 	     (:th "Kind of Entry")
@@ -1054,58 +1223,58 @@
 		       (:princ (* (queueobj-blocks (pcache-queueobj pcache)) 
 				  *header-block-size*))
 		
-		       " bytes)"))
+		       " bytes)")))
 	    
-	     (:tr
-	      (:td "Dead entries in memory") 
-	      (:td (:princ (pcache-dead-items pcache)))
-	      (:td (:princ dead-bytes))
-	      (:td (:princ dead-blocks)
-		   " ("
-		   (:princ (* dead-blocks *header-block-size*)) " bytes)"
-		   ))
+	    (:tr
+	     (:td "Dead entries in memory") 
+	     (:td (:princ (pcache-dead-items pcache)))
+	     (:td (:princ dead-bytes))
+	     (:td (:princ dead-blocks)
+		  " ("
+		  (:princ (* dead-blocks *header-block-size*)) " bytes)"
+		  ))
+	    )
+	   :br
+	   "Memory Cache"
+	   ((:table :border 2)
+	    (:tr
+	     (:th "items")
+	     (:th "used-blocks/total-blocks")
+	     (:th "bytes")
 	     )
-	    :br
-	    "Memory Cache"
-	    ((:table :border 2)
-	     (:tr
-	      (:th "items")
-	      (:th "used-blocks/total-blocks")
-	      (:th "bytes")
-	      )
-	     (let ((queueobj (pcache-queueobj pcache)))
-	       (html (:tr 
-		      (:td (:princ-safe (queueobj-items queueobj)))
-		      (:td (:princ-safe (queueobj-blocks queueobj))
-			   "/"
-			   (:princ-safe (pcache-size pcache)))
-		      (:td (:princ-safe (queueobj-bytes queueobj)))))))
-	    :br
-	    :br
-	    "Disk Caches"
-	    :br
-	    ((:table :border 2)
-	     (:tr
-	      (:th "filename")
-	      (:th "items")
-	      (:th "blocks")
-	      (:th "bytes")
-	      (:th "free blocks")
-	      (:th "free list")
-	      )
-	     (dolist (pcache-disk (pcache-disk-caches pcache))
-	       (let ((queueobj (pcache-disk-queueobj pcache-disk)))
-		 (html (:tr 
-			(:td (:princ-safe (pcache-disk-filename pcache-disk)))
-			(:td (:princ-safe (queueobj-items queueobj)))
-			(:td (:princ-safe (queueobj-blocks queueobj)))
-			(:td (:princ-safe (queueobj-bytes queueobj)))
-			(:td (:princ-safe (pcache-disk-free-blocks
-					   pcache-disk)))
-			(:td (:princ-safe (pcache-disk-free-list
-					   pcache-disk))))))))
+	    (let ((queueobj (pcache-queueobj pcache)))
+	      (html (:tr 
+		     (:td (:princ-safe (queueobj-items queueobj)))
+		     (:td (:princ-safe (queueobj-blocks queueobj))
+			  "/"
+			  (:princ-safe (pcache-size pcache)))
+		     (:td (:princ-safe (queueobj-bytes queueobj)))))))
+	   :br
+	   :br
+	   "Disk Caches"
+	   :br
+	   ((:table :border 2)
+	    (:tr
+	     (:th "filename")
+	     (:th "items")
+	     (:th "blocks")
+	     (:th "bytes")
+	     (:th "free blocks")
+	     (:th "free list")
+	     )
+	    (dolist (pcache-disk (pcache-disk-caches pcache))
+	      (let ((queueobj (pcache-disk-queueobj pcache-disk)))
+		(html (:tr 
+		       (:td (:princ-safe (pcache-disk-filename pcache-disk)))
+		       (:td (:princ-safe (queueobj-items queueobj)))
+		       (:td (:princ-safe (queueobj-blocks queueobj)))
+		       (:td (:princ-safe (queueobj-bytes queueobj)))
+		       (:td (:princ-safe (pcache-disk-free-blocks
+					  pcache-disk)))
+		       (:td (:princ-safe (pcache-disk-free-list
+					  pcache-disk))))))))
 			  
-	    ))))))))
+	   )))))))
 				     
 				     
 (defun display-proxy-cache-entries (req ent pcache)
@@ -1781,7 +1950,15 @@
   (if* (> (queueobj-blocks (pcache-queueobj pcache))
 	  (pcache-high-water pcache))
      then (flush-memory-cache pcache
-			      (pcache-low-water pcache))))
+			      (pcache-low-water pcache)))
+  
+  ; now rotate caches so they are evenly used
+  (let ((caches (pcache-disk-caches pcache)))
+    (if* (cdr caches)
+       then (let ((new (cdr caches)))
+	      (setf (cdr caches) nil)
+	      (nconc new caches)
+	      (setf (pcache-disk-caches pcache) new)))))
 
 
 (defun flush-disk-cache (pcache pcache-disk goal)
@@ -1822,13 +1999,18 @@
 	 (queueobj (pcache-queueobj pcache))
 	 (mru-head (queueobj-mru queueobj))
 	 (lru-head (queueobj-lru queueobj))
-	 (disk-caches (pcache-disk-caches pcache)))
+	 (disk-caches (pcache-disk-caches pcache))
+	 (ent-todo)
+	 )
     
     (loop
       (if* (<= needed 0) then (return))
       
       (block main
+	(setq ent-todo nil)
+	
 	(mp:without-scheduling
+	  ;; find the next ent to process without other processes running
 	  (let ((lru lru-head))
 	    (loop
 	      (setq lru (pcache-ent-prev lru))
@@ -1836,19 +2018,22 @@
 		 then (setq needed 0) 
 		      (return-from main))
 	      (if* (lock-pcache-ent lru)
-		 then (dolist (dc disk-caches)
-			(if* (move-ent-to-disk lru dc)
-			   then ; successful move to disk
-				(decf needed (pcache-ent-blocks lru))
-				(unlock-pcache-ent lru)
-				(return-from main)))
-		      ; may or may not be on disk.  kill it in memory
-		      
-		      (decf needed (pcache-ent-blocks lru))
-		      (kill-pcache-ent lru pcache)
-		      (unlock-pcache-ent lru)
-		      (setq lru lru-head)
-		      ))))))))
+		 then (setq ent-todo lru)
+		      (return-from main))))))
+      
+      (if* ent-todo
+	 then ; move this one to disk or kill it off
+	      (if* (dolist (dc disk-caches t)
+		     (if* (move-ent-to-disk ent-todo dc)
+			then ; successful move to disk
+			     (decf needed (pcache-ent-blocks ent-todo))
+			     (unlock-pcache-ent ent-todo)
+			     (return nil)))
+		 then ; can't put on disk.  kill it in memory
+		      (decf needed (pcache-ent-blocks ent-todo))
+		      (kill-pcache-ent ent-todo pcache)
+		      (unlock-pcache-ent ent-todo))))))
+
 
 		  
 (defun flush-dead-entries (pcache)
@@ -2137,8 +2322,9 @@
       (dotimes (i (1+ (- (cdr ent) (car ent))))
 	(if* (null buffers)
 	   then (error "ran out of buffers before blocks"))
-	(write-sequence (car buffers) stream :end
-			(min *header-block-size* bytes))
+	(let ((length (min *header-block-size* bytes)))
+	  (if* (> length 0)
+	     then (write-sequence (car buffers) stream :end length)))
 	(pop buffers)
 	(decf bytes *header-block-size*)))))
     

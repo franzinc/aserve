@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.29 2000/10/31 19:00:55 jkf Exp $
+;; $Id: parse.cl,v 1.30 2000/12/27 19:47:08 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -563,7 +563,7 @@
     (if* (stringp val)
        then (if* (equalp key val)
 	       then (return val))
-     elseif (equal (car val) key)
+     elseif (equalp (car val) key)
        then (return val))))
 
   

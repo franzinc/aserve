@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.32 2000/10/19 21:37:39 jkf Exp $
+;; $Id: client.cl,v 1.33 2000/12/27 19:47:08 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -188,6 +188,7 @@
 			(format :text) ; or :binary
 			cookies ; nil or a cookie-jar
 			(redirect 5) ; auto redirect if needed
+			(redirect-methods '(:get :head))
 			basic-authorization  ; (name . password)
 			keep-alive   ; if true, set con to keep alive
 			headers	    ; extra header lines, alist
@@ -284,8 +285,8 @@
 				  #.(net.aserve::response-number 
 				     *response-see-other*))
 				:test #'eq)
-			(member method '(:get :head) :test #'eq)
 			redirect
+			(member method redirect-methods :test #'eq)
 			(if* (integerp redirect)
 			   then (> redirect 0))
 			(setq new-location
@@ -594,12 +595,24 @@
 	  (let ((jar (client-request-cookies creq)))
 	    (if* jar
 	       then ; do all set-cookie requests
-		    (dolist (headval headers)
-		      (if* (eq :set-cookie (car headval))
-			 then (save-cookie
-			       (client-request-uri creq)
-			       jar
-			       (cdr headval))))))
+		    (let (prev)
+		      ; Netscape v3 web server bogusly splits set-cookies
+		      ; over multiple set-cookie lines, so we look for
+		      ; incomplete lines (those ending in #\;) and combine
+		      ; them with the following set-cookie
+		      (dolist (headval headers)
+			(if* (eq :set-cookie (car headval))
+			   then (if* prev 
+				   then (setq prev (concatenate 'string
+						     prev (cdr headval)))
+				   else (setq prev (cdr headval)))
+				
+				(if* (not (eq #\; (last-character prev)))
+				   then (save-cookie (client-request-uri creq)
+						     jar
+						     prev)
+					
+					(setq prev nil)))))))
 	  
 	  
 	  (if* (eq :head (client-request-method creq))
@@ -916,11 +929,19 @@
 		  
       
 
-(defparameter semicrlf 
+(defparameter cookie-separator
     ;; useful for separating cookies, one per line
-    (make-array 4 :element-type 'character
-		:initial-contents '(#\; #\return
-				    #\linefeed #\space)))
+    (make-array 10 :element-type 'character
+		:initial-contents '(#\return
+				    #\linefeed 
+				    #\C
+				    #\o
+				    #\o
+				    #\k
+				    #\i
+				    #\e
+				    #\:
+				    #\space)))
 
 (defmethod compute-cookie-string (uri (jar cookie-jar))
   ;; compute a string of the applicable cookies.
@@ -942,16 +963,31 @@
     
     (if* res
        then ; have some cookies to return
+	    #+ignore (dolist (item res)
+		       (push (cookie-item-value item) rres)
+		       (push "=" rres)
+		       (push (cookie-item-name item) rres)
+		       (push semicrlf rres))
+	    
 	    (dolist (item res)
 	      (push (cookie-item-value item) rres)
 	      (push "=" rres)
 	      (push (cookie-item-name item) rres)
-	      (push semicrlf rres))
+	      (push cookie-separator rres))
 	    
-	    (pop rres) ; remove first semicrlf
+	    (pop rres) ; remove first seperator
 	    (apply #'concatenate 'string  rres))))
 
-			   
+(defun last-character (string)
+  ;; return the last non blank character, or nil
+  (do ((i (1- (length string)) (1- i))
+       (ch))
+      ((< i 0) nil)
+    (setq ch (schar string i))
+    (if* (eq #\space ch) 
+       thenret
+       else (return ch))))
+
 			   
    
     
