@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.34 2001/01/11 15:17:28 jkf Exp $
+;; $Id: proxy.cl,v 1.35 2001/01/12 16:27:54 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -64,9 +64,6 @@
 ; so we need to shut it down ourselves.
 (defparameter *connection-timed-out-wait* 30)
 
-; set to variable to be called when a new entry is cached
-; (so that it can be scanned for links)
-(defparameter *entry-cached-hook* nil)
 
 (defstruct pcache 
   ;; proxy cache
@@ -90,8 +87,13 @@
 
   ; hash table of handlers for uris, keyed by host
   uri-info-table
-  
 
+  ; pointer to linkscan object if we are doing automatic link scanning
+  ; in the proxy cache
+  linkscan
+
+  entry-cached-hook ; funcalled with pcache, pcache-ent and level
+  
   ; requests that completely bypass the cache
   (r-direct 0)
 
@@ -1515,7 +1517,7 @@ cached connection = ~s~%" cond cached-connection))
 			    ; (since this will allow us to flush the queue)
 			    ; of if this wasn't a fast hit and thus there
 			    ; is new data to cache
-			    (if* (and *entry-cached-hook* 
+			    (if* (and (pcache-entry-cached-hook pcache)
 				      (or (eql level *browser-level*)
 					  (not (member response '(:fh :fv :sh)
 						       :test #'eq))))
@@ -1526,7 +1528,8 @@ cached connection = ~s~%" cond cached-connection))
 				    
 				    (if* (lock-pcache-ent new-pcache-ent)
 				       then ; it will be unlocked by the hook fcn
-					    (funcall *entry-cached-hook* 
+					    (funcall (pcache-entry-cached-hook pcache)
+						     pcache
 						     new-pcache-ent level))))
 			  (return)
 		     else (dlogmess 
@@ -1948,7 +1951,8 @@ cached connection = ~s~%" cond cached-connection))
 		    body-length
 		    ))
   
-  (let (now uri-info) 
+  (let (now uri-info
+	(pcache (wserver-pcache *wserver*)))
     (if* (or (eql response-code 200)
 	     (eql response-code 302) ; redirect
 	     )
@@ -1976,7 +1980,7 @@ cached connection = ~s~%" cond cached-connection))
 	    
 	    (if* uri-info
 	       then (dlogmess (format nil "have uri info for ~a"
-				     (request-raw-uri req))))
+				      (request-raw-uri req))))
 	    
 	    (let* ((last-mod (header-buffer-header-value 
 			      client-response-header
@@ -2019,11 +2023,11 @@ cached connection = ~s~%" cond cached-connection))
 		       then (uri-info-extra-lifetime uri-info)
 		       else *extra-lifetime*))
 	      
-	      (if* *entry-cached-hook*
+	      (if* (pcache-entry-cached-hook pcache)
 		 then (if* (lock-pcache-ent pcache-ent)
 			 then ; it will be unlocked by the hook fcn
-			      (funcall *entry-cached-hook* 
-				       pcache-ent level))))
+			      (funcall (pcache-entry-cached-hook pcache)
+				       pcache pcache-ent level))))
 		       
      elseif (eql response-code 304)
        then ; just set that so the reader of the response will know
