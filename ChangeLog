@@ -1,3 +1,46 @@
+*******************************************************************************
+merge from trunk to acl62 branch on 9/24/03
+command:
+join.sh trunk trunk_to_acl62_merge_070703 trunk_to_acl62_merge_092403 aserve
+*******************************************************************************
+
+2003-09-22  John Foderaro  <jkf@tiger.franz.com>
+1.2.31
+	
+	* authorize.cl: send back some text with failed response
+	* publish.cl: fix html sent back to with failed responses
+	
+
+2003-09-22    <jkf@main.verada.com>
+
+	* decode.cl: fix multiline base64 decoding.
+
+2003-09-12    <layer@HOBART>
+1.2.30
+
+	* load.cl: fix problem building on acl 7.0 on windows
+
+2003-09-10  Kevin Layer  <layer@crikey>
+1.2.29
+
+	* load.cl,
+	* examples/examples.cl,
+	* examples/urian.cl: use *load-pathname* instead of
+	  *load-truename* since truename in ACL 7.0 goes through symbolic
+	  links and this doesn't work in the way aserve is built at franz
+	  (via symlinks to source code)
+
+2003-09-04  John Foderaro  <jkf@tiger.franz.com>
+1.2.28
+	* non-standard http headers are again supported in all
+	  functions, including proxying (where they are just passed on
+	  or passed back as the case may be).
+
+2003-08-12  John Foderaro  <jkf@tiger.franz.com>
+
+	* move the require of :uri to before the first
+	  reference to it in packages.cl
+
 2003-07-08  Kevin Layer  <layer@crikey>
 
 	* packages.cl: fmakunbound 'get-request-body so there are not

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.10.6.8.2.4 2003/07/07 21:20:03 layer Exp $
+;; $Id: examples.cl,v 1.10.6.8.2.5 2003/09/24 17:12:02 layer Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -43,7 +43,7 @@
 ;; example files this is bad news.
 ; (unpublish :all t)
 
-(defparameter *example-pathname* *load-truename*) ; where this file is
+(defparameter *example-pathname* *load-pathname*) ; where this file is
 (defmacro example-file (name)
     ;; create an absolute address for this file we'll load
     `(merge-pathnames ,name *example-pathname*))
@@ -466,7 +466,10 @@
 						*response-unauthorized*)
 			 (set-basic-authorization req
 						   "secretserver")
-			 (with-http-body (req ent)))))))
+			 (with-http-body (req ent)
+			   (html (:h1 "You Failed")
+				 "You failed to enter the correct name/password")
+			   ))))))
 
 
 (publish :path "/local-secret"

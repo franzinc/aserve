@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.5.4.6.14.3 2003/07/07 21:20:02 layer Exp $
+;; $Id: headers.cl,v 1.5.4.6.14.4 2003/09/24 17:12:02 layer Exp $
 
 ;; Description:
 ;;   header parsing
@@ -395,6 +395,8 @@
 	beginh
 	hnum
 	ch
+	otherheaders
+	otherheadername
 	)
     (macrolet ((tolower-set (loc)
 		 ;; return the value at loc, convert it to lower
@@ -434,9 +436,11 @@
 				 (locate-header buff beginh i))
 			       (incf i)
 			       (if* (null hnum)
-				  then (setq state 1) ; skip to eol
-				  else (setq state 2) ; skip to value
-				       )
+				  then ; unknown header, save specially
+				       (setq otherheadername
+					 (buffer-subseq-to-string
+					  buff beginh (1- i))))
+			       (setq state 2) ; skip to value
 			       (return)
 			  else (incf i)))))
 	
@@ -501,24 +505,33 @@
 		       
 		       ; must keep the header items in the same order 
 		       ; they were received (according to the http spec)
-		       (let ((cur (svref ans hnum))
-			     (new (list (cons beginhv  back))))
-			 (if* cur
-			    then (setq cur (append cur new))
-			    else (setq cur new))
+		       (if* hnum
+			  then ; known header
+			       (let ((cur (svref ans hnum))
+				     (new (list (cons beginhv  back))))
+				 (if* cur
+				    then (setq cur (append cur new))
+				    else (setq cur new))
 			 
-			 (setf (svref ans hnum) cur))
+				 (setf (svref ans hnum) cur))
+			  else ; unknown header
+			       (push (cons otherheadername
+					   (buffer-subseq-to-string
+					    buff beginhv back))
+				     otherheaders))
 			 
 				 
 		       (setq beginhv nil)
 		       (setq state 0))
 		else (setq state 2))))))
     
-      ans)))
+      otherheaders)))
 
 (defun parse-header-block (buff start end)
-  (let ((ans (get-sresource *header-index-sresource*)))
-    (parse-header-block-internal buff start end ans)
+  (let ((ans (get-sresource *header-index-sresource*))
+	(otherheaders))
+    
+    (setq otherheaders (parse-header-block-internal buff start end ans))
     
     ; store the info in ans into the buffer at the end
 
@@ -558,7 +571,7 @@
 	 then (error "header is too large")))
     
     (free-sresource *header-index-sresource* ans)
-    buff))
+    otherheaders))
 
 
 (defun free-req-header-block (req)
@@ -701,7 +714,9 @@
   ;; in assoc list form
   (let ((ans  (get-sresource *header-index-sresource*))
 	(headers))
-    (parse-header-block-internal buff 0 end ans)
+    
+    ; store the non-standard headers in the header array
+    (setq headers (parse-header-block-internal buff 0 end ans))
 		   
     ; now cons up the headers
     (dotimes (i *header-count*)
@@ -896,7 +911,43 @@
     ; new end of headers
     (setf (unsigned-16-value buff *header-block-used-size-index*) end)))
     
-	      
+
+
+(defun insert-non-standard-header (buff name value)
+  ;; insert a header that's not know by index into the buffer
+  ;;
+  (setq name (string name))
+  
+  (let ((end (unsigned-16-value buff *header-block-used-size-index*)))
+    (if* (> (+ end (length name) (length value) 4) 
+	    (header-block-data-start))
+       then ; no room
+	    (return-from insert-non-standard-header nil))
+    
+    (dotimes (i (length name))
+      (setf (aref buff end) (char-code (aref name i)))
+      (incf end))
+    
+    (setf (aref buff end) #.(char-code #\:))
+    (incf end)
+    
+    (setf (aref buff end) #.(char-code #\space))
+    (incf end)
+    
+    (dotimes (i (length value))
+      (setf (aref buff end) (char-code (aref value i)))
+      (incf end))
+    
+    (setf (aref buff end) #.(char-code #\return))
+    (incf end)
+    
+    (setf (aref buff end) #.(char-code #\linefeed))
+    (incf end)
+    
+    (setf (unsigned-16-value buff *header-block-used-size-index*) end)))
+		
+	       
+    
   
 			     
 #+ignore

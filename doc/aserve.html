@@ -383,8 +383,8 @@ given, the rest of the arguments are optional..&nbsp; The arguments have these m
     argument is <strong>nil</strong> meaning ignore this value and use the timeout value held
     in the server object and retrieved with<strong> wserver-response-timeout</strong>..</li>
   <li><strong>plist</strong> - initial property list for this entity</li>
-  <li><strong>hook</strong> - a function of three arguments: req,ent and extra.
-    &nbsp;&nbsp; See <a href="#entity-hook-function">entity hook function</a>.</li>
+  <li><strong>hook</strong> - a function of three arguments: req,ent and extra. &nbsp;&nbsp;
+    See <a href="#entity-hook-function">entity hook function</a>.</li>
 </ul>
 
 <p>The function that handles requests for files will respond correctly to <strong>If-Modified-Since</strong>
@@ -439,7 +439,8 @@ hook function if it's being called in a special context.</p>
 &amp;key prefix host port destination remove authorizer server <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 indexes filter timeout plist publisher access-file<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; hook)</font></strong></p>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+hook)</font></strong></p>
 
 <p><strong>publish-directory</strong> is used to publish a complete directory tree of
 files.&nbsp; This is similar to how web servers such as Apache publish files. &nbsp;
@@ -499,6 +500,25 @@ The filename is a string naming the file that's been matched with the request.&n
 for this file.&nbsp; The <strong>publisher</strong> function must return an entity to be
 processed to send back a response.&nbsp;&nbsp; The <strong>publisher</strong> function may
 wish to publish that entity but it need not do so.</p>
+<div align="center"><center>
+
+<table border="1" width="86%" cellpadding="5">
+  <tr>
+    <td width="100%">Note:&nbsp; <strong>publish-directory</strong> is a more general function
+    than its name implies.&nbsp;&nbsp;&nbsp; It looks at each url path for a match for <strong>prefix
+    </strong>and if such a match is found the <strong>prefix</strong> is removed and replaced
+    with <strong>destination</strong>.&nbsp;&nbsp; Thus is prefix is <strong>&quot;/foo&quot;</strong>
+    and destination is <strong>&quot;/bar&quot;</strong> then a url path of&nbsp; <strong>&quot;/foobaz/joe.html&quot;
+    </strong>would be converted to <strong>&quot;/barbaz/joe.html&quot;.</strong>
+    &nbsp;&nbsp;&nbsp; This is rarely useful but it does show that you have to be careful
+    about the prefix and destination strings.&nbsp; It's usually the case that if the prefix
+    string ends in <strong>&quot;/&quot;</strong> then the destination string should end in <strong>&quot;/&quot;</strong>
+    (and vice versa).&nbsp; Thus a prefix of <strong>&quot;/foo&quot;</strong> would have a
+    destination of <strong>&quot;/bar&quot; </strong>and a prefix of <strong>&quot;/foo/&quot;</strong>
+    would have a destination of <strong>&quot;/bar/&quot;</strong>.&nbsp; </td>
+  </tr>
+</table>
+</center></div>
 
 <p>&nbsp;</p>
 

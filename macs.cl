@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: macs.cl,v 1.10.8.4.14.2 2003/01/10 16:21:36 layer Exp $
+;; $Id: macs.cl,v 1.10.8.4.14.3 2003/09/24 17:12:02 layer Exp $
 
 ;; Description:
 ;;   useful internal macros
@@ -33,8 +33,7 @@
 ;;- http://www.franz.com/~jkf/coding_standards.html
 ;;-
 
-(eval-when (compile load eval)
- (require :uri))
+
 
 ;; macros used by iserve
 
