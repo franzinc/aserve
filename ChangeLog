@@ -1,5 +1,6 @@
 2003-09-22  John Foderaro  <jkf@tiger.franz.com>
-
+1.2.31
+	
 	* authorize.cl: send back some text with failed response
 	* publish.cl: fix html sent back to with failed responses
 	

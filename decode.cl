@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: decode.cl,v 1.17 2003/09/22 17:27:52 jkf Exp $
+;; $Id: decode.cl,v 1.18 2003/09/24 14:46:00 jkf Exp $
 
 ;; Description:
 ;;   decode/encode code
@@ -629,7 +629,7 @@
   ;; take the given string and encode as a base64 string
   ;; beware: the result will not be a simple string
   ;;
-  (let ((output (make-array (* 1.3 (length str)) 
+  (let ((output (make-array (ceiling (* 1.3 (length str)))
 			    :element-type 'character  
 			    :fill-pointer 0
 			    :adjustable t))
