@@ -4,10 +4,6 @@
 
 2000-04-16    <jkf@DEEDEE>
 
-	* htmlgen/htmlgen.cl - when printing option values inside
-	  a tag, a symbol is now printed as the string
-	  that is its symbol-name
-
 	* debug-on and debug-off are no longer exported symbols.
 	  They continue to exist but you have to use
           net.iserve::debug-on and net.iserve::debug-off to reach them.

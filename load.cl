@@ -1,6 +1,6 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.25 2000/04/17 15:58:07 jkf Exp $
+;; $Id: load.cl,v 1.26 2000/04/17 16:00:29 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -23,6 +23,7 @@
     '("readme.txt"
       "source-readme.txt"
       "ChangeLog"
+      "htmlgen/ChangeLog"
       "license-lgpl.txt"
       "examples/examples.cl"
       "examples/foo.txt"
