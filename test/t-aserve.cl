@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.34 2001/10/17 22:32:44 jkf Exp $
+;; $Id: t-aserve.cl,v 1.35 2001/10/19 21:25:42 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -78,6 +78,7 @@
 		   (test-publish-file port)
 		   (test-publish-directory port)
 		   (test-publish-computed port)
+		   (test-publish-multi port)
 		   (test-authorization port)
 		   (test-encoding)
 		   (test-forms port)
@@ -240,7 +241,7 @@
 				   :protocol protocol
 				   :keep-alive keep-alive)
 	      (test 200 code)
-	      (test (format nil "text/plain" port)
+	      (test (format nil "text/plain")
 		    (cdr (assoc :content-type headers :test #'eq))
 		    :test #'equal)
 	      #+ignore (if* (eq protocol :http/1.1)
@@ -280,7 +281,7 @@
 				 :protocol protocol
 				 :keep-alive keep-alive)
 	    (test 200 code)
-	    (test (format nil "text/plain" port)
+	    (test (format nil "text/plain")
 		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
 	    #+ignore (if* (eq protocol :http/1.1)
@@ -1193,7 +1194,37 @@
       
       )))
 
-			 
+
+;; publish-multi tests
+(defun test-publish-multi (port)
+  (let ((prefix-local (format nil "http://localhost:~a" port)))
+    (with-open-file (p "aservemulti.xx" 
+		     :direction :output
+		     :if-exists :supersede)
+      (write-sequence "bar" p))
+    (publish-multi :path "/multi-test"
+		   :items (list '(:string "foo")
+				"aservemulti.xx"  ; file
+				#'(lambda (req ent time value)
+				    (declare (ignore req ent time value))
+				    "baz")
+				#'(lambda (req ent time value)
+				    (declare (ignore req ent time value))
+				    (string-to-octets "bof" 
+						      :null-terminate nil))))
+    
+    
+    (test "foobarbazbof" 
+	  (values (x-do-http-request  (format nil "~a/multi-test" prefix-local)))
+	  :test #'equal)
+    
+    (ignore-errors (delete-file "aservemulti.xx"))
+    ))
+		   
+					     
+		   
+    
+
 		       
 (defun test-cgi (port)
   ;; currently we only have a test program on unix since

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.59 2001/10/18 21:46:37 jkf Exp $
+;; $Id: publish.cl,v 1.60 2001/10/19 21:25:42 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -155,6 +155,33 @@
 	    :reader special-entity-content)))
 
 (setq *not-modified-entity* (make-instance 'special-entity))
+
+
+
+;; the multi-entity contains  list of items.  the items can be
+;;
+;;  atom - assumed to be a namestring or pathname that can be opened
+;;  function - function to run to compute a result
+;;             function takes req ent last-modified-time
+
+(defclass multi-entity (entity)
+  ;; handle multiple files and compute entities
+  
+  ((items 
+    ;; list of multi-item structs
+    :initarg :items
+    :reader items)
+   (content-length :initform 0
+		   :accessor multi-entity-content-length))
+  )
+
+
+
+(defstruct multi-item
+  kind	; :file, :function
+  data  ; for :file, the filename  for :function the function
+  cache ; nil or unsigned-byte 8 array 
+  last-modified)
 
 
 
@@ -395,7 +422,9 @@
     (if* body 
        then (length body) 
        else 0)))
-  
+
+(defmethod content-length ((ent multi-entity))
+  (multi-entity-content-length ent))
 
 ;- transfer-mode - will the body be sent in :text or :binary mode.
 ;  use :binary if you're not sure
@@ -646,6 +675,71 @@
     ent
     ))
 		 
+
+(defun publish-multi (&key (server *wserver*)
+			   locator
+			   (host nil host-p)
+			   port
+			   path
+			   items
+			   class
+			   content-type
+			   remove
+			   authorizer
+			   timeout)
+  
+  (if* (null locator)
+     then (setq locator (find-locator :exact server)))
+  
+  (if* remove
+     then (unpublish-entity locator path host host-p)
+	  (return-from publish-multi nil))
+  
+  (let* ((hval)
+	 (ent (make-instance (or class 'multi-entity)
+		:host (setq hval 
+			(convert-to-vhosts
+			 (if* host 
+			    then (if* (and host (atom host))
+				    then (list host)
+				    else host))
+			 server))
+		:port port
+		:path path
+		:format :binary ; we send out octets
+		:items (mapcar #'(lambda (it)
+				   (if* (or (symbolp it)
+					    (functionp it))
+				      then (make-multi-item
+					    :kind :function
+					    :data  it)
+				    elseif (and (consp it)
+						(eq :string (car it))
+						(stringp (cadr it)))
+				      then (make-multi-item
+					    :kind :string
+					    :data (cadr it)
+					    :cache (string-to-octets
+						    (cadr it)
+						    :null-terminate nil))
+					    
+				    elseif (or (stringp it) (pathnamep it))
+				      then (make-multi-item
+					    :kind :file
+					    :data  it)
+				      else (error "Illegal item for publish-multi: ~s" it)
+					   ))
+			       items)
+		:content-type (or content-type "application/octet-stream")
+		:authorizer authorizer
+		:timeout timeout)))
+    (publish-entity ent locator path hval)))
+
+
+
+
+
+
 
 
 (defmethod publish-entity ((ent entity) 
@@ -1091,7 +1185,93 @@
 		      
 	      
 	      
-		    
+(defmethod process-entity ((req http-request) (ent multi-entity))
+  ;; send out the contents of the multi
+  ;;
+  
+  ; compute the contents of each item
+  (let ((fwd) (max-fwd 0) (total-size 0))
+    ;; we track max file write date (max-fwd) unless we can't compute
+    ;; it in which case max-fwd is nil.
+    (dolist (item (items ent))
+      (ecase (multi-item-kind item)
+	(:file 
+	 (setq fwd (file-write-date (multi-item-data item)))
+	 (if* (or (null (multi-item-last-modified item))
+		  (null fwd)
+		  (> fwd (multi-item-last-modified item)))
+	    then ; need to read new contents
+		 (if* (null (errorset
+			     (with-open-file (p (multi-item-data item)
+					      :direction :input)
+			       (let* ((size (excl::filesys-size 
+					     (stream-input-fn p)))
+				      (contents
+				       (make-array size 
+						   :element-type 
+						   '(unsigned-byte 8))))
+				 (read-sequence contents p)
+				 (incf total-size size)
+				 (setf (multi-item-cache item) contents)
+				 (setf (multi-item-last-modified item) fwd)
+				 (setq max-fwd (max max-fwd fwd))))
+			     t)
+			    )
+		    then ; failed to read, give up
+			 (return-from process-entity nil))
+	    else ; don't need to read, but keep running total
+		 (incf total-size (length
+				   (or (multi-item-cache item) "")))
+		 (if* max-fwd 
+		    then (setq max-fwd
+			   (max max-fwd
+				(or (multi-item-last-modified item) 0))))))
+	(:function
+	 (multiple-value-bind (new-value new-modified)
+	     (funcall (multi-item-data item)
+		      req
+		      ent
+		      (multi-item-last-modified item)
+		      (multi-item-cache item))
+	   (if* (stringp new-value)
+	      then  (setq new-value (string-to-octets new-value
+						      :null-terminate nil)))
+	   (setf (multi-item-cache item) new-value)
+	   (setf (multi-item-last-modified item) new-modified)
+	   (if* (null new-modified) then (setq max-fwd nil))
+	   (if* (and max-fwd (multi-item-last-modified item))
+	      then (setf max-fwd (max max-fwd (multi-item-last-modified item))))
+	   (incf total-size (length (or new-value "")))
+	   ))
+	(:string
+	 ; a constant thing
+	 (incf total-size (length (multi-item-cache item))))
+	))
+    
+    (if* (not (eql (last-modified ent) max-fwd))
+       then ; last modified has changed
+	    (setf (last-modified ent) max-fwd)
+	    (if* max-fwd
+	       then (setf (last-modified-string ent)
+		      (universal-time-to-date max-fwd))))
+    
+    (setf (multi-entity-content-length ent) total-size)
+    
+    ; now we have all the data
+    (with-http-response (req ent :format :binary)
+      (setf (request-reply-content-length req) total-size)
+      (if* max-fwd
+	 then (setf (reply-header-slot-value req :last-modified)
+		(last-modified-string ent)))
+      
+      (with-http-body (req ent)
+	(dolist (item (items ent))
+	  (let ((cache (multi-item-cache item)))
+	    (write-all-vector cache *html-stream*
+			      :end (length cache))))))
+    
+    t ; processed
+    ))		    
   
   
 
@@ -1375,7 +1555,10 @@
      then (setf (request-reply-stream req) (make-string-output-stream))
      else (setf (request-reply-stream req) (request-socket req))))
 
-
+(defmethod compute-response-stream ((req http-request) (ent multi-entity))
+    ;; send directly to the socket since we already know the length
+  ;;
+  (setf (request-reply-stream req) (request-socket req)))
 
 (defvar *far-in-the-future*
     (encode-universal-time 12 32 12 11 8 2020 0))

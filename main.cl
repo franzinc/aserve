@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.118 2001/10/18 21:46:37 jkf Exp $
+;; $Id: main.cl,v 1.119 2001/10/19 21:25:42 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -66,6 +66,7 @@
    #:publish
    #:publish-file
    #:publish-directory
+   #:publish-multi
    #:query-to-form-urlencoded
    #:reply-header-slot-value 
    #:run-cgi-program
@@ -146,7 +147,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 12))
+(defparameter *aserve-version* '(1 2 13))
 
 (eval-when (eval load)
     (require :sock)
@@ -289,6 +290,7 @@
 ;; more specials
 (defvar *max-socket-fd* 0) ; the maximum fd returned by accept-connection
 (defvar *aserve-debug-stream* nil) ; stream to which to seen debug messages
+(defvar *debug-connection-reset-by-peer* nil) ; true to signal these too
 (defvar *default-aserve-external-format* :latin1-base) 
 (defvar *worker-request*)  ; set to current request object
 
@@ -1253,7 +1255,22 @@ by keyword symbols and not by strings"
 				    else "")
 				 cond
 				 ))))
-	       else (process-connection sock))
+	       else ; in debugging mode where we don't ignore errors
+		    ; still, we want to ignore connection-reset-by-peer
+		    ; since they are often not errors
+		    (catch 'out-of-connection
+		      (handler-bind 
+			  ((socket-error 
+			    #'(lambda (c)
+				(if* (and 
+				      (not *debug-connection-reset-by-peer*)
+				      (eq (stream-error-identifier c)
+					  :connection-reset))
+				   then (throw 'out-of-connection nil)))))
+			(process-connection sock)))
+		    
+		      
+		    )
 	  (abandon ()
 	      :report "Abandon this request and wait for the next one"
 	    nil))

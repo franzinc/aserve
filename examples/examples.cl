@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.22 2001/10/16 16:58:20 jkf Exp $
+;; $Id: examples.cl,v 1.23 2001/10/19 21:25:42 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -77,6 +77,7 @@
 			 ((:a :href "pic") "Sample jpeg") :br
 			 ((:a :href "pic-redirect") "Redirect to previous picture") :br
 			 ((:a :href "pic-gen") "generated jpeg") "- hit reload to switch images" :br
+			 ((:a :href "pic-multi") "test of publish-multi") " - click more than once on this link" :br
 			 ((:a :href "cookietest") "test cookies") :br
 			 ((:a :href "secret") "Test manual authorization")
 			 " (name: " (:b "foo") ", password: " (:b "bar") ")"
@@ -274,7 +275,35 @@
 		    ((:a :href "pic") "This location"))))))))
 		    
 		    
-	 
+
+;; this publish-multi example is simple but really doesn't show
+;; the full power of publish-multi.
+;; It doesn't show that we can include the contents of files
+;; The :function case doesn't make use of the old cached value to
+;; decide if it wants to return the old value or create a new one.
+(publish-multi :path "/pic-multi"
+	       :content-type "text/html"
+	       :items  (list 
+			'(:string "<html><body>The first line is constant<br>")
+			(let (last-clicked)
+			  #'(lambda (req ent old-time cached-value)
+			      (declare (ignore req ent old-time cached-value))
+			      (if* (null last-clicked)
+				 then (setq last-clicked 
+					(get-universal-time))
+				      "this is your <b>first</b> click<br>"
+				 else (let* ((new (get-universal-time))
+					    (diff (- new last-clicked)))
+					(setq last-clicked new)
+					(format nil "~d seconds since the last click<br>" diff)))))
+			'(:string "The last line is constant</body></html>")))
+
+					       
+					 
+
+					 
+
+
 
 
 ;;

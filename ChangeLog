@@ -1,3 +1,12 @@
+2001-10-19  John Foderaro  <jkf@tiger.franz.com>
+1.2.13
+	* added publish-multi 
+	* while debugging (:notrap) we ignore connection reset by peer errors
+	  by default since they are frequent and not errors in most 
+	  cases. You can have them recognized by setting
+	  *debug-connection-reset-by-peer*  to t.
+	  
+
 2001-10-18  John Foderaro  <jkf@tiger.franz.com>
 
 	* The initial log stream (which is used then to initialize vhost
