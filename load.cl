@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.34 2000/08/10 15:48:50 jkf Exp $
+;; $Id: load.cl,v 1.35 2000/08/17 14:03:35 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -10,6 +10,7 @@
     '("htmlgen/htmlgen"
       "macs"
       "main"
+      "headers"
       "parse"
       "decode"
       "publish"

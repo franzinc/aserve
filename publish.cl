@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.36 2000/08/15 21:04:33 jkf Exp $
+;; $Id: publish.cl,v 1.37 2000/08/17 14:03:35 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -966,6 +966,8 @@
 	    ; ok, it could be valid, like foo../, but that's unlikely
 	    (return-from process-entity nil))
     
+    (if* sys:*tilde-expand-namestrings*
+       then (setq realname (excl::tilde-expand-unix-namestring realname)))
     
     (let ((type (excl::filesys-type realname)))
       (if* (null type)
@@ -1320,7 +1322,7 @@
 			res
 			"; secure")))
     
-    (push `("Set-Cookie" . ,res) (request-reply-headers req))
+    (push `(:set-cookie . ,res) (request-reply-headers req))
     res))
 
 
@@ -1329,7 +1331,7 @@
   ;; request as conses  (name . value) 
   ;;
   (let ((cookie-string (header-slot-value req :cookie)))
-    (if* cookie-string
+    (if* (and cookie-string (not (equal "" cookie-string)))
        then ; form is  cookie: name=val; name2=val2; name2=val3
 	    ; which is not exactly the format we want to see it in
 	    ; to parse it.  we want   

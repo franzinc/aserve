@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.55 2000/08/15 21:04:33 jkf Exp $
+;; $Id: main.cl,v 1.56 2000/08/17 14:03:35 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -467,9 +467,25 @@
        then (header-name-error name))
     (if* (setq ent (assoc name *fast-headers* :test #'eq))
        then ; has a fast accesor
-	    `(,(third ent) ,obj)
+	    `(or (,(third ent) ,obj)
+		 (setf (,(third ent) ,obj)
+		   (or (header-buffer-header-value ,obj ,name)
+		       "" ; to speed up the next search
+		       )))
        else ; must get it from the alist
-	    `(cdr (assoc ,name (request-headers ,obj) :test #'eq)))))
+	    `(header-slot-value-other ,obj ,name))))
+
+(defun header-slot-value-other (req name)
+  ;; handle out of the the 'extra' headers
+  (let ((ent (assoc name (request-headers req) :test #'eq)))
+    (if* ent
+       then (cdr ent)
+       else (let ((ans (or (header-buffer-header-value req name) "")))
+	      (push (cons name ans) (request-headers req))
+	      ans))))
+      
+
+
 
 (defsetf header-slot-value (obj name) (newval)
   ;; set the header value regardless of where it is stored
@@ -619,7 +635,11 @@ by keyword symbols and not by strings"
     ;  here
     :initform nil
     :accessor request-headers)
-   
+
+   (header-block  ;; *header-block-sresource* object
+    :initform nil
+    :accessor request-header-block)
+    
    (request-body 
     ;; if we've read the request body then this 
     ;; is the string holding it.
@@ -996,6 +1016,9 @@ by keyword symbols and not by strings"
 	     else ;; got a request
 		  (handle-request req)
 		  (log-request req)
+		  
+		  (free-req-header-block req)
+		  
 		  (let ((sock (request-socket req)))
 		    (if* (member :keep-alive
 				 (request-reply-strategy req)
@@ -1070,7 +1093,9 @@ by keyword symbols and not by strings"
 	    
 	    
 	    (if* (and (not (eq protocol :http/0.9))
-		      (null (read-request-headers req sock buffer)))
+		      #+ignore (null (read-request-headers req sock buffer))
+		      (null (new-read-request-headers req sock))
+		      )
 	       then (debug-format :info "no headers, ignore~%")
 		    (return-from read-http-request nil))
 	    
@@ -1836,41 +1861,78 @@ by keyword symbols and not by strings"
 	      min
 	      sec))))
 
+
+
+;; ----- simple resource
+
+(defstruct sresource
+  data	 ; list of buffers
+  create ; create new object for the buffer
+  init	 ; optional - used to init buffers taken off the free list
+  )
+
+(defun create-sresource (&key create init)
+  (make-sresource :create create :init init))
+
+(defun get-sresource (sresource &optional size)
+  ;; get a new resource. If size is given then ask for at least that
+  ;; size
+  (let (to-return)
+    (mp:without-scheduling 
+      (let ((buffers (sresource-data sresource)))
+	(if* size
+	   then ; must get one of at least a certain size
+		(dolist (buf buffers)
+		  (if* (>= (length buf) size)
+		     then (setf (sresource-data sresource)
+			    (delete buf buffers :test #'eq))
+			  (setq to-return buf)
+			  (return)))
 	    
+		; none big enough
+	      
+	   else ; just get any buffer
+		(if* buffers
+		   then (setf (sresource-data sresource) (cdr buffers))
+			(setq to-return (car buffers))))))
+  
+    (if* to-return
+       then ; found one to return, must init
+		      
+	    (let ((init (sresource-init sresource)))
+	      (if* init
+		 then (funcall init sresource to-return)))
+	    to-return
+       else ; none big enough, so get a new buffer.
+	    (funcall (sresource-create sresource)
+		     sresource
+		     size))))
+  
+(defun free-sresource (sresource buffer)
+  ;; return a resource to the pool
+  ;; we silently ignore nil being passed in as a buffer
+  (if* buffer 
+     then (mp:without-scheduling
+	    (push buffer (sresource-data sresource)))))
+
+
 
 
 ;; ----- scratch buffer resource:
- 
-(defvar *rq-buffers* nil)
-(defparameter *max-buffer-size* #.(* 5 1024)) ; no line should be this long
-    
-(defun get-request-buffer (&optional size)
-  ;; get a string buffer.
-  ;; if size is important, it is specified.
-  ;; if the size is too great, then refuse to create one and return
-  ;; nil
-  (mp:without-scheduling 
-    (if* size
-       then ; must get one of at least a certain size
-	    (if* (> size *max-buffer-size*)
-	       then (return-from get-request-buffer nil))
-	    
-	    (dolist (buf *rq-buffers*)
-	      (if* (>= (length buf) size)
-		 then (setq *rq-buffers* (delete buf *rq-buffers* :test #'eq))
-		      (return-from get-request-buffer  buf)))
-	    
-	    ; none big enough
-	    (make-array size :element-type 'character)
-       else ; just get any buffer
-	    (if* (pop *rq-buffers*)
-	       thenret
-	       else (make-array 2048 :element-type 'character)))))
 
+(defparameter *request-buffer-sresource* 
+    (create-sresource 
+     :create #'(lambda (sresource &optional size)
+			  (declare (ignore sresource))
+			  (make-array (or size 2048)
+				      :element-type 'character))))
+
+(defun get-request-buffer (&optional size)
+  (get-sresource *request-buffer-sresource* size))
 
 (defun free-request-buffer (buffer)
-  ;; return buffer to the free pool
-  (mp:without-scheduling (push buffer *rq-buffers*)))
+  (free-sresource *request-buffer-sresource* buffer))
+
 
 
 	    

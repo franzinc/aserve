@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.22 2000/08/01 01:19:01 jkf Exp $
+;; $Id: client.cl,v 1.23 2000/08/17 14:03:34 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -285,8 +285,8 @@
 			(if* (integerp redirect)
 			   then (> redirect 0))
 			(setq new-location
-			  (cdr (assoc "location" (client-request-headers creq)
-				      :test #'equal))))
+			  (cdr (assoc :location (client-request-headers creq)
+				      :test #'eq))))
 		 then ; must do a redirect to get to the real site
 		    
 		      (apply #'do-http-request
@@ -507,13 +507,11 @@
 	(buff2 (get-header-line-buffer))
 	(pos 0)
 	len
-	len2
 	(sock (client-request-socket creq))
 	(headers)
 	protocol
 	response
 	comment
-	saveheader
 	val
 	)
     (unwind-protect
@@ -545,65 +543,10 @@
       
 	  (setf (client-request-response-comment creq) comment)
       
-     
+
 	  ; now read the header lines
-	  (loop
-	    (if* saveheader
-	       then ; buff2 has the saved header we should work on next
-		    (psetf buff buff2  
-			   buff2 buff)
-		    (setq len len2
-			  saveheader nil)
-	     elseif (null (setq len (read-socket-line sock buff (length buff))))
-	       then ; eof before header lines
-		    (error "premature eof in headers"))
-	    
-	    
-	    (if* (eql len 0)
-	       then ; last header line
-		    (return))
+	  (setq headers (net.aserve::compute-client-request-headers sock))
 	  
-	    ; got header line. Must get next one to see if it's a continuation
-	    (if* (null (setq len2 (read-socket-line sock buff2 (length buff2))))
-	       then ; eof before crlf ending the headers
-		    (error "premature eof in headers")
-	     elseif (and (> len2 0)
-			 (eq #\space (schar buff2 0)))
-	       then ; a continuation line
-		    (if* (< (length buff) (+ len len2))
-		       then (let ((buff3 (make-array (+ len len2 50)
-						     :element-type 'character)))
-			      (dotimes (i len)
-				(setf (schar buff3 i) (schar buff i)))
-			      (put-header-line-buffer buff)
-			      (setq buff buff3)))
-		    ; can all fit in buff
-		    (do ((to len (1+ to))
-			 (from 0 (1+ from)))
-			((>= from len2))
-		      (setf (schar buff to) (schar buff2 from))
-		      )
-	       else ; must be a new header line
-		    (setq saveheader t))
-	  
-	    ; parse header
-	    (let ((pos 0)
-		  (headername)
-		  (headervalue))
-	      (macrolet ((fail ()
-			   `(let ((i 0))
-			      (error "header line missing a colon:  ~s" 
-				     (collect-to-eol buff i len)))))
-		(setq headername (collect-to #\: buff pos len :downcase)))
-	  
-	      (incf pos) ; past colon
-	      (macrolet ((fail ()
-			   `(progn (setq headervalue "")
-				   (return))))
-		(skip-to-not #\space buff pos len)
-		(setq headervalue (collect-to-eol buff pos len)))
-	  
-	      (push (cons headername headervalue) headers)))
       
 	  (setf (client-request-headers creq) headers)
 	  
@@ -612,7 +555,7 @@
 	    (if* jar
 	       then ; do all set-cookie requests
 		    (dolist (headval headers)
-		      (if* (equal "set-cookie" (car headval))
+		      (if* (eq :set-cookie (car headval))
 			 then (save-cookie
 			       (client-request-uri creq)
 			       jar
@@ -623,19 +566,19 @@
 	     then  ; no data is returned for a head request
 		  (setf (client-request-bytes-left creq) 0)
 	   elseif (equalp "chunked" (client-response-header-value 
-				  creq "transfer-encoding"))
+				     creq :transfer-encoding))
 	     then ; data will come back in chunked style
 		  (setf (client-request-bytes-left creq) :chunked)
 		  (socket:socket-control (client-request-socket creq)
-				  :input-chunking t)
+					 :input-chunking t)
 	   elseif (setq val (client-response-header-value
-			     creq "content-length"))
+			     creq :content-length))
 	     then ; we know how many bytes are left
 		  (setf (client-request-bytes-left creq) 
 		    (quick-convert-to-integer val))
 	   elseif (not (equalp "keep-alive"
 			       (client-response-header-value
-				creq "connection")))
+				creq :connection)))
 	     then ; connection will close, let it indicate eof
 		  (setf (client-request-bytes-left creq) :unknown)
 	     else ; no data in the response
@@ -739,7 +682,10 @@
 					 name &key parse)
   ;; return the value associated with the given name
   ;; parse it too if requested
-  (let ((val (cdr (assoc name (client-request-headers creq) :test #'equal))))
+  (if* (stringp name)
+     then (error "client-response headers are now named by symbols, not strings"))
+  
+  (let ((val (cdr (assoc name (client-request-headers creq) :test #'eq))))
     (if* (and parse val)
        then (net.aserve::parse-header-value val)
        else val)))

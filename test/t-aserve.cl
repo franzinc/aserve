@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.7 2000/08/12 17:40:19 jkf Exp $
+;; $Id: t-aserve.cl,v 1.8 2000/08/17 14:03:35 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -155,12 +155,12 @@
 		:keep-alive keep-alive)
 	    (test 200 code)
 	    (test (format nil "text/plain" port)
-		  (cdr (assoc "content-type" headers :test #'equal))
+		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
 	    #+ignore (if* (eq protocol :http/1.1)
 			then (test "chunked"
-				   (cdr (assoc "transfer-encoding" headers 
-					       :test #'equal))
+				   (cdr (assoc :transfer-encoding headers 
+					       :test #'eq))
 				   :test #'equalp))
 	    (test dummy-1-contents body :test #'equal)))))
 
@@ -191,12 +191,12 @@
 		:keep-alive keep-alive)
 	    (test 200 code)
 	    (test (format nil "text/plain" port)
-		  (cdr (assoc "content-type" headers :test #'equal))
+		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
 	    #+ignore (if* (eq protocol :http/1.1)
 			then (test "chunked"
-				   (cdr (assoc "transfer-encoding" headers 
-					       :test #'equal))
+				   (cdr (assoc :transfer-encoding headers 
+					       :test #'eq))
 				   :test #'equalp))
 	    (test dummy-2-contents body :test #'equal)))))
 
@@ -328,12 +328,12 @@
 		:keep-alive keep-alive)
 	    (test 200 code)
 	    (test (format nil "text/plain" port)
-		  (cdr (assoc "content-type" headers :test #'equal))
+		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
 	    (if* (eq protocol :http/1.1)
 	       then (test "chunked"
-			  (cdr (assoc "transfer-encoding" headers 
-				      :test #'equal))
+			  (cdr (assoc :transfer-encoding headers 
+				      :test #'eq))
 			  :test #'equalp))
 	    (test (cadr pair) body :test #'equal)))))))
 
@@ -370,7 +370,7 @@
       (test 401 code)
       ; verify that we are asking for the right realm
       (test "Basic realm=\"secretserver\""
-	    (cdr (assoc "www-authenticate" headers :test #'equal))
+	    (cdr (assoc :www-authenticate headers :test #'eq))
 	    :test #'equal))
   
     
@@ -436,7 +436,7 @@
       (declare (ignore body))
       (test 401 ccode)
       (test "Basic realm=\"SecretAuth\""
-	    (cdr (assoc "www-authenticate" headers :test #'equal))
+	    (cdr (assoc :www-authenticate headers :test #'eq))
 	    :test #'equal))
     
     (test 200

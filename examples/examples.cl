@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.11 2000/08/12 17:40:19 jkf Exp $
+;; $Id: examples.cl,v 1.12 2000/08/17 14:03:35 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -542,6 +542,16 @@
 	       (set-cookie-header req 
 				  :name "froba" 
 				  :value "vala"
+				  :path "/"
+				  :expires :never)
+	       (set-cookie-header req 
+				  :name "frob2" 
+				  :value "val2"
+				  :path "/"
+				  :expires :never)
+	       (set-cookie-header req 
+				  :name "frob3-loooooooooooooong" 
+				  :value "val3-loooooooooooooong"
 				  :path "/"
 				  :expires :never)
 	       (set-cookie-header req

@@ -1,3 +1,12 @@
+2000-08-17  jkf  <jkf@main.verada.com>
+
+	*  implement generalized cons-free header parsing and use it
+	   in both the client and server.
+
+	* change the header info returned by do-http-request to
+	  also use keywords to describe headers
+	  !! non upward compatiable change !!
+
 2000-08-15  John Foderaro  <jkf@tiger.franz.com>
 
 	*  fix bug where certain headers were sent twice
