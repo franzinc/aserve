@@ -1,5 +1,6 @@
 ;; neo 
-;; 
+;;
+;; main program 
 ;;
 
 
@@ -7,6 +8,7 @@
   (:use :common-lisp :excl :htmlgen)
   (:export
    #:base64-decode
+   #:base64-encode
    #:decode-form-urlencoded
    #:get-multipart-header
    #:get-multipart-sequence

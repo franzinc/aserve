@@ -8,6 +8,7 @@
       "macs"
       "main"
       "parse"
+      "decode"
       "publish"
       "log" ))
 

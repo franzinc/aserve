@@ -275,15 +275,20 @@
 ;       uris use only the printing characters.
 ;	a url can be broken down into a set of a components using
 ;	a regular expression matcher.
-;	There are a set of characters that are reserved:
-;		; / ? : @ & = + $ ,
-;	Certain reserved characters have special meanings within
-;	certain components of the uri.
-;	When a reserved character must be used for its normal character
-;	meaning within a component, it is expressed in the form %xy 
-;	where xy are hex digits representing the characters ascii value.
+;	Each component consists of a string of characters.  Certain
+;	characters must be escaped with %xy in order to put them 
+;	in the uri, and others need only be escaped in certain components
+;	where not escaping them would change the meaning.  It's legal
+;	to over-escape though.
+;	Here are the characters that need never be escaped:
+;		lower case a-z
+;		upper case A-Z
+;		numbers    0-9
+;	        mark chars: - _ . ! ~ * ' ( )
+;       
+;	anything else should be escaped.
 ;
-;       The encoding (converting characters to their $xy form) must be
+;       The encoding (converting characters to their %xy form) must be
 ;	done on a component by component basis for a uri.
 ;	You can't just give a function a complete uri and say "encode this"
 ;	because if it's a uri then it's already encoded.   You can
@@ -321,7 +326,8 @@
   ;; of conses, the car being the name and the cdr the value, for
   ;; each form element
   ;;
-  (let (res (max (length str)))
+  (let ((res nil)
+	(max (length str)))
     
     (do ((i 0)
 	 (start 0)
@@ -700,71 +706,12 @@
   
 					 
 			     
-;------- base64
-
-; encoding algorithm:
-  ;; each character is an 8 bit value.
-  ;; three 8 bit values (24 bits) are turned into four 6-bit values (0-63)
-  ;; which are then encoded as characters using the following mapping.
-  ;; Zero values are added to the end of the string in order to get
-  ;; a size divisible by 3.
-  ;; 
-  ;; encoding
-  ;; 0-25   A-Z
-  ;; 26-51  a-z
-  ;; 52-61  0-9
-  ;; 62     +
-  ;; 63     /
-  ;;
 
     
 
-(defvar *base64-decode* 
-    (let ((arr (make-array 128 :element-type '(unsigned-byte 8))))
-      (do ((i 0 (1+ i))
-	   (ch (char-code #\A) (1+ ch)))
-	  ((> ch #.(char-code #\Z)))
-	(setf (aref arr ch) i))
-      (do ((i 26 (1+ i))
-	   (ch (char-code #\a) (1+ ch)))
-	  ((> ch #.(char-code #\z)))
-	(setf (aref arr ch) i))
-      (do ((i 52 (1+ i))
-	   (ch (char-code #\0) (1+ ch)))
-	  ((> ch #.(char-code #\9)))
-	(setf (aref arr ch) i))
-      (setf (aref arr (char-code #\+)) 62)
-      (setf (aref arr (char-code #\/)) 62)
-      
-      arr))
 
-(defun base64-decode (string)
-  ;; given a base64 string, return it decoded.
-  ;; the result will not be a simple string
-  (let ((res (make-array 20 :element-type 'character
-			 :fill-pointer 0
-			 :adjustable t))
-	(arr *base64-decode*))
-    (declare (type (simple-array (unsigned-byte 8) 128) arr))
-    (do ((i 0 (+ i 4))
-	 (cha)
-	 (chb))
-	((>= i (length string)))
-      (let ((val (+ (ash (aref arr (char-code (char string i))) 18)
-		    (ash (aref arr (char-code (char string (+ i 1)))) 12)
-		    (ash (aref arr (char-code 
-				    (setq cha (char string (+ i 2)))))
-			 6)
-		    (aref arr (char-code 
-			       (setq chb (char string (+ i 3))))))))
-	(vector-push-extend (code-char (ash val -16)) res)
-	;; when the original size wasn't a mult of 3 there may be
-	;; non-characters left over
-	(if* (not (eq cha #\=))
-	   then (vector-push-extend (code-char (logand #xff (ash val -8))) res))
-	(if* (not (eq chb #\=))
-	   then (vector-push-extend (code-char (logand #xff val)) res))))
-    res))
+
+
 
 	
 

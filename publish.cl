@@ -1,7 +1,7 @@
 ;; neo
 ;; url publishing
 ;;
-;; $Id: publish.cl,v 1.15 1999/12/12 03:15:41 jkf Exp $
+;; $Id: publish.cl,v 1.16 1999/12/14 19:39:26 jkf Exp $
 ;;
 
 
@@ -839,7 +839,7 @@
   ;; put a set cookie header in the list of header to be sent as
   ;; a response to this request.
   ;; name and value are required, they should be strings
-  ;; value will be urlencoded.
+  ;; name and value will be urlencoded.
   ;; If expires is nil (the default) then this cookie will expire
   ;;	when the browser exits.
   ;; If expires is :never then we'll sent a date so far into the future
@@ -849,6 +849,8 @@
   ;; than "franz.com".... as netscape why this is important
   ;; secure is either true or false
   ;;
+  
+  
   
 
 )
