@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.31.10.4.4.1 2001/09/10 17:55:42 layer Exp $
+;; $Id: load.cl,v 1.31.10.4.4.2 2001/09/18 21:23:30 layer Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -195,7 +195,7 @@
 
 
 
-(defun make-src-distribution ()
+(defun make-src-distribution (&optional (dist-name aserve-version-name))
   ;; make a source distribution of aserve
   ;;
     
@@ -207,22 +207,22 @@
 	   *aserve-root*
 	   
 	   *aserve-root*
-	   aserve-version-name
+	   dist-name
 	   
 	   *aserve-root*
-	   aserve-version-name
+	   dist-name
 	   ))
   
   (run-shell-command 
    (format nil "mkdir ~aaserve-src/~a/doc ~aaserve-src/~a/examples ~aaserve-src/~a/test"
 	   *aserve-root*
-	   aserve-version-name
+	   dist-name
 	   
 	   *aserve-root*
-	   aserve-version-name
+	   dist-name
 	   
 	   *aserve-root*
-	   aserve-version-name
+	   dist-name
 	   
 	   ))
 	   
@@ -231,7 +231,7 @@
 			*aserve-other-files*))
     (copy-files-to
      (list file)
-     (format nil "aserve-src/~a/~a" aserve-version-name file)
+     (format nil "aserve-src/~a/~a" dist-name file)
      :root *aserve-root*)))
 
 
