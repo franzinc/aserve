@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.24 2001/07/18 19:05:13 jkf Exp $
+;; $Id: t-aserve.cl,v 1.25 2001/07/19 18:55:06 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -356,6 +356,42 @@
 
     
     
+
+    (setq dummy-1-contents (build-dummy-file 432 23 dummy-1-name))
+    
+    ; test caching and auto uncaching and recaching
+    (let ((ent (publish-file :path "/check-uncache"
+			     :file dummy-1-name
+			     :cache-p t)))
+
+      ; verify nothing cached right now
+      (test nil (and :second (net.aserve::contents ent)))
+      
+      (let ((body2 (x-do-http-request (format nil "~a/check-uncache" 
+					      prefix-local))))
+	
+	; verify result was correct
+	(test dummy-1-contents body2 :test #'equal)
+
+	; verify that something's cached.
+	(test t (not (null (and :second (net.aserve::contents ent)))))
+
+	; overwrite dummy file with new contents
+	(sleep 2) ; pause to get file write date to noticably advance
+	(setq dummy-1-contents (build-dummy-file 555 44 dummy-1-name))
+	
+	; verify that the contents are in fact different
+	(test nil (equal dummy-1-contents body2))
+
+	; now do the same request.. but we should get new things back
+	; since the last modified time of the file
+	(setq body2
+	  (x-do-http-request (format nil "~a/check-uncache" prefix-local)))
+	; verify that we did get the new stuff back.
+	
+	(test t (equal dummy-1-contents body2))))
+    
+    ; rewrite file with different contents
     
     
     

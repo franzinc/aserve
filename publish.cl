@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.46 2001/07/18 19:05:12 jkf Exp $
+;; $Id: publish.cl,v 1.47 2001/07/19 18:55:06 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -93,21 +93,7 @@
     :initform nil
     :accessor cache-p)
      
-   (ssi
-    ;; true if we should look for server side includes when
-    ;; accessing this file
-    :initarg :ssi
-    :initform nil
-    :accessor ssi)
-     
-   (dependencies 
-    ;; list of (filename . lastmodifiedtime) 
-    ;; for each of the files that this file includes
-    :initarg :dependencies
-    :initform nil
-    :accessor dependencies)
-     
-   )) 
+   ))
 
 
 (defclass computed-entity (entity)
@@ -134,13 +120,7 @@
     :initform nil
     :accessor cache-p)   
     
-   (ssi
-    ;; settting for file entities created:
-    ;; true if we should look for server side includes when
-    ;; accessing this file
-    :initarg :ssi
-    :initform nil
-    :accessor ssi)
+   
    )
   )
 
@@ -445,7 +425,7 @@
 			  (host nil host-p) 
 			  port path
 			  file content-type class preload
-			  cache-p ssi 
+			  cache-p
 			  remove
 			  authorizer)
   ;; return the given file as the value of the url
@@ -495,7 +475,6 @@
 			    :last-modified-string (universal-time-to-date lastmod)
 			    
 			    :cache-p cache-p
-			    :ssi     ssi
 			    :authorizer authorizer
 			    ))))
        else (setq ent (make-instance (or class 'file-entity)
@@ -508,7 +487,6 @@
 			:file file
 			:content-type c-type
 			:cache-p cache-p
-			:ssi ssi
 			:authorizer authorizer
 			)))
 
@@ -887,6 +865,15 @@
     (let ((contents (contents ent)))
       (if* contents
 	 then ;(preloaded)
+	      ; ensure that the cached file matches the 
+	      ; actual file
+	      (if* (not (eql (last-modified ent)
+			     (file-write-date (file ent))))
+		 then ; uncache it
+		      (setf (contents ent) nil
+			    (last-modified ent) nil)
+		      (go retry))
+	      
 	      ; set the response code and 
 	      ; and header fields then dump the value
 	      

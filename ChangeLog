@@ -1,3 +1,13 @@
+2001-07-19  John Foderaro  <jkf@tiger.franz.com>
+1.2.3
+	* publish.cl 
+	  - If publish-file file is changed then invalidate
+	    the cached information on it.
+	  - remove extraneous slots in classes.
+	    
+         * test/t-aserve.cl
+	    test cache invaldation in publish-file
+
 2001-07-18    <jkf@CROW>
 
 	* doc/publish.html - update publish-file doc for preload and
@@ -12,6 +22,11 @@
 	* chat.cl - add support for removing selective private messages
 	    after a certain amount of time.
 	* test/t-aserve.cl - test cache-p argument to publish-file
+
+2001-07-09  John Foderaro  <jkf@tiger.franz.com>
+
+	* example/chat.cl - add chat transcript feature
+
 
 2001-06-27  jkf  <jkf@main.verada.com>
 1.2.2
