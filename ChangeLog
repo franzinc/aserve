@@ -1,3 +1,8 @@
+2000-03-17  John Foderaro  <jkf@tiger.franz.com>
+1.1.4
+	* change source-readme.txt and load.cl so that
+	  it will build on Windows without the unix tools
+
 *******************************************************************************
 join from acl50 branch
 - cvs command: cvs update -d -j acl50

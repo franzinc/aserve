@@ -1,10 +1,10 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.13 2000/03/16 17:53:28 layer Exp $
+;; $Id: load.cl,v 1.14 2000/03/17 22:53:14 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
-;(require :defftype)
+(defparameter *iserve-root* (directory-namestring *load-truename*))
 
 (defparameter *iserve-files* 
     '("htmlgen/htmlgen"
@@ -83,49 +83,93 @@
 
 (defun make-distribution ()
   ;; make a distributable version of iserve
-  (run-shell-command "rm -fr iserve-dist")
-  (run-shell-command "mkdir iserve-dist iserve-dist/doc iserve-dist/examples")
-  (copy-files-to *iserve-files* "iserve.fasl")
+  (run-shell-command 
+   (format nil "rm -fr ~aiserve-dist" *iserve-root*))
+   
+  (run-shell-command 
+   (format nil "mkdir ~aiserve-dist ~aiserve-dist/doc ~aiserve-dist/examples"
+	   *iserve-root*
+	   *iserve-root*
+	   *iserve-root*))
+   
+  (copy-files-to *iserve-files* "iserve.fasl" :root *iserve-root*)
   (copy-files-to '("htmlgen/htmlgen.html")
-		 "iserve-dist/htmlgen.html")
+		 "iserve-dist/doc/htmlgen.html"
+		 :root *iserve-root*
+		 )
   (dolist (file '("iserve.fasl"
 		  "doc/iserve.html"
 		  "doc/tutorial.html"
 		  "readme.txt"
-		   "examples/examples.cl"
-		   "examples/examples.fasl"
-		   "examples/foo.txt"
-		   "examples/fresh.jpg"
-		   "examples/prfile9.jpg"))
+		  "examples/examples.cl"
+		  "examples/examples.fasl"
+		  "examples/foo.txt"
+		  "examples/fresh.jpg"
+		  "examples/prfile9.jpg"))
     (copy-files-to (list file)
-		   (format nil "iserve-dist/~a" file))))
+		   (format nil "iserve-dist/~a" file)
+		   :root *iserve-root*)))
 		
+
+(defparameter iserve-version-name 
+    (apply #'format nil "iserve-~d.~d.~d" net.iserve::*iserve-version*))
+
+
+(defun make-iserve.fasl ()
+  (copy-files-to *iserve-files* "iserve.fasl" :root *iserve-root*))
+
+
 
 (defun make-src-distribution ()
   ;; make a source distribution of iserve
   ;;
+    
   (run-shell-command "rm -fr iserve-src")
-  (run-shell-command "mkdir iserve-src iserve-src/iserve iserve-src/iserve/htmlgen")
-  (run-shell-command "mkdir iserve-src/iserve/doc iserve-src/iserve/examples")
+    
+  (run-shell-command 
+   (format nil "mkdir iserve-src iserve-src/~a iserve-src/~a/htmlgen"
+	   iserve-version-name
+	   iserve-version-name
+	   ))
+  
+  (run-shell-command 
+   (format nil "mkdir iserve-src/~a/doc iserve-src/~a/examples"
+	   iserve-version-name
+	   iserve-version-name))
+	   
   (dolist (file (append (mapcar #'(lambda (file) (format nil "~a.cl" file))
 				*iserve-files*)
 			*iserve-other-files*))
     (copy-files-to
      (list file)
-     (format nil "iserve-src/iserve/~a" file))))
+     (format nil "iserve-src/~a/~a" iserve-version-name file))))
+
+
+(defun ftp-publish-src ()
+  ;; assuming tha we've made the source distribution, tar it
+  ;; and copy it to the ftp directory
+  (run-shell-command
+   (format nil "(cd iserve-src ; tar cfz ~a.tgz ~a)"
+	   iserve-version-name
+	   iserve-version-name))
+  (run-shell-command 
+   (format nil "cp iserve-src/~a.tgz /net/candyman/home/ftp/pub/iserve"
+	   iserve-version-name)))
 
   
   
 
-(defun copy-files-to (files dest)
+(defun copy-files-to (files dest &key (root ""))
   ;; copy the contents of all files to the file named dest.
   ;; append .fasl to the filenames (if no type is present)
   
   (let ((buffer (make-array 4096 :element-type '(unsigned-byte 8))))
-    (with-open-file (p dest :direction :output
+    (with-open-file (p (concatenate 'string root dest)
+		     :direction :output
 		     :if-exists :supersede
 		     :element-type '(unsigned-byte 8))
       (dolist (file files)
+	(setq file (concatenate 'string root file))
 	(if* (and (null (pathname-type file))
 		  (not (probe-file file)))
 	   then (setq file (concatenate 'string file  ".fasl")))

@@ -1,4 +1,4 @@
-				-[Wed Mar 15 12:32:14 2000 by jkf]-
+				-[Fri Mar 17 14:51:35 2000 by jkf]-
 
 Allegro iServe Source Distribution ReadMe file
 
@@ -54,10 +54,12 @@ an iserve.fasl that you can load into your application.
     
 6.  make a distribution
 
-    user(4): (make-distribution)
+    user(4): (make-iserve.fasl)
 
 
-7.  now you'll find iserve.fasl in iserve-dist/
+7.  now you'll find iserve.fasl in the iserve source directory.
+
+
 
 
 
