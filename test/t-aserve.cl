@@ -1,6 +1,6 @@
 ;; -*- mode: common-lisp; package: net.aserve.test -*-
 ;;
-;; t-iserve.cl
+;; t-aserve.cl
 ;;
 ;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA 
 ;;
@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.16 2000/09/29 19:03:48 jkf Exp $
+;; $Id: t-aserve.cl,v 1.17 2000/10/06 15:16:16 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -43,7 +43,7 @@
 (in-package :net.aserve.test)
 
 ; set to nil before loading the test to prevent the test from auto-running
-(defvar user::*do-aserve-test* nil)
+(defvar user::*do-aserve-test* t)
 (defvar *x-proxy* nil) ; when true x-do-http-request will go through a proxy
 (defvar *proxy-wserver* nil)
 

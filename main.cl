@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.73 2000/09/28 16:11:12 jkf Exp $
+;; $Id: main.cl,v 1.74 2000/10/06 15:16:15 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -256,6 +256,13 @@
 (defvar *max-socket-fd* 0) ; the maximum fd returned by accept-connection
 (defvar *aserve-debug-stream* nil) ; stream to which to seen debug messages
 
+; type of socket stream built.
+; :hiper is possible in acl6
+(defvar *socket-stream-type* 
+    #+(and allegro (version>= 6)) :hiper
+    #-(and allegro (version>= 6)) :stream
+)
+
 ;; specials from other files
 (defvar *header-block-sresource*)
 (defvar *header-index-sresource*)
@@ -310,6 +317,14 @@
     :initarg :log-stream
     :initform  t 	; initially to *standard-output*
     :accessor wserver-log-stream)
+
+   (accept-hook
+    ;; if non-nil the function to call passing the socket about to be
+    ;; processed by aserve, and charged with returning the socket to
+    ;; process
+    :initarg :accept-hook
+    :initform nil
+    :accessor wserver-accept-hook)
    
    ;;
    ;; -- internal slots --
@@ -808,6 +823,7 @@ by keyword symbols and not by strings"
 		   proxy
 		   cache       ; enable proxy cache
 		   debug-stream  ; stream to which to send debug messages
+		   (accept-hook nil ah-p) ; fcn of one arg, socket
 		   )
   ;; -exported-
   ;;
@@ -827,6 +843,9 @@ by keyword symbols and not by strings"
   (if* (eq server :new)
      then (setq server (make-instance 'wserver)))
   
+  (if* ah-p
+     then (setf (wserver-accept-hook server) accept-hook))
+  
   
   ; shut down existing server
   (shutdown server) 
@@ -845,8 +864,7 @@ by keyword symbols and not by strings"
 					  :format :bivalent
 					  
 					  :type 
-					  #+hiper-socket :hiper
-					  #-hiper-socket :stream
+					  *socket-stream-type*
 					  )))
 
     #+unix
@@ -1087,6 +1105,12 @@ by keyword symbols and not by strings"
   ;; another request.
   ;; When this function returns the given socket has been closed.
   ;;
+  
+  ; run the accept hook on the socket if there is one
+  (let ((ahook (wserver-accept-hook *wserver*)))
+    (if* ahook then (setq sock (funcall ahook sock))))
+  
+	
   (unwind-protect
       (let ((req))
 	;; get first command
@@ -2052,28 +2076,38 @@ in get-multipart-sequence"))
      then ut-or-string
      else (universal-time-to-date ut-or-string)))
 
+(defvar *saved-ut-to-date* nil)
+    
 (defun universal-time-to-date (ut)
   ;; convert a lisp universal time to rfc 1123 date
   ;;
-  (let ((*print-pretty* nil))
-    (multiple-value-bind
-	(sec min hour date month year day-of-week dsp time-zone)
-	(decode-universal-time ut 0)
-      (declare (ignore time-zone dsp))
-      (format nil "~a, ~2,'0d ~a ~d ~2,'0d:~2,'0d:~2,'0d GMT"
-	      (svref
-	       '#("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun")
-	       day-of-week)
-	      date
-	      (svref
-	       '#(nil "Jan" "Feb" "Mar" "Apr" "May" "Jun"
-		  "Jul" "Aug" "Sep" "Oct" "Nov" "Dec")
-	       month
-	       )
-	      year
-	      hour
-	      min
-	      sec))))
+  (let ((cval *saved-ut-to-date*))
+    (if* (eql ut (car cval))
+       then ; turns out we often repeatedly ask for the same conversion
+	    (cdr cval)
+       else
+	    (let ((*print-pretty* nil))
+	      (multiple-value-bind
+		  (sec min hour date month year day-of-week dsp time-zone)
+		  (decode-universal-time ut 0)
+		(declare (ignore time-zone dsp))
+		(let ((ans (format nil "~a, ~2,'0d ~a ~d ~2,'0d:~2,'0d:~2,'0d GMT"
+				   (svref
+				    '#("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun")
+				    day-of-week)
+				   date
+				   (svref
+				    '#(nil "Jan" "Feb" "Mar" "Apr" "May" "Jun"
+				       "Jul" "Aug" "Sep" "Oct" "Nov" "Dec")
+				    month
+				    )
+				   year
+				   hour
+				   min
+				   sec)))
+		  (setf *saved-ut-to-date* (cons ut ans))
+		  ans
+		  ))))))
 
 
 

@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.40 2000/09/15 15:20:51 jkf Exp $
+;; $Id: load.cl,v 1.41 2000/10/06 15:16:15 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -52,6 +52,7 @@
 ;; end experimental
 
 (require :sock)  ; so we can tell if we have hiper sockets
+;(setq *features* (delete :hiper-socket *features*))
 
 (with-compilation-unit  nil
   (dolist (file (append *aserve-files* *aserve-examples*))

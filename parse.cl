@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.26 2000/09/13 23:58:43 jkf Exp $
+;; $Id: parse.cl,v 1.27 2000/10/06 15:16:15 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -314,7 +314,6 @@
 	(end))
 	       
     (setf (request-header-block req) buff)
-    
     ;; read in all the headers, stop at the last crlf
     (if* (setq end (read-headers-into-buffer sock buff))
        then (parse-header-block buff 0 end)
@@ -329,7 +328,7 @@
   ;;
   (let ((len (- (length buff) 500)) ; leave space for index at end
 	(i 0)
-	(state 0)
+	(state 2)
 	(echo (member :xmit *debug-current*)))
 	
     (loop

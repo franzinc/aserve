@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.40 2000/09/28 16:11:12 jkf Exp $
+;; $Id: publish.cl,v 1.41 2000/10/06 15:16:16 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -58,6 +58,12 @@
 		  :accessor last-modified
 		  :initform nil ; means always considered new
 		  )
+   
+   ; ut string format for last-modified cached here.
+   (last-modified-string :initarg :last-modified-string
+			 :accessor last-modified-string
+			 :initform nil)
+   
    (format :initarg :format  ;; :text or :binary
 	   :initform :text
 	   :reader  entity-format)
@@ -481,6 +487,8 @@
 			    
 			    :contents  guts
 			    :last-modified lastmod
+			    :last-modified-string (universal-time-to-date lastmod)
+			    
 			    :cache-p cache-p
 			    :ssi     ssi
 			    :authorizer authorizer
@@ -874,10 +882,7 @@
 	    (with-http-response (req ent
 				     :content-type (content-type ent))
 	      (setf (request-reply-content-length req) (length contents))
-	      (push (cons "Last-Modified"
-			  (universal-time-to-date 
-			   (min (request-reply-date req) 
-				(last-modified ent))))
+	      (push (cons "Last-Modified" (last-modified-string ent))
 		    (request-reply-headers req))
 	      
 	      (with-http-body (req ent :format :binary)
@@ -907,7 +912,10 @@
 					      :element-type '(unsigned-byte 8))))
 		      (declare (dynamic-extent buffer))
 		      
-		      (setf (last-modified ent) lastmod)
+		      (setf (last-modified ent) lastmod
+			    (last-modified-string ent)
+			    (universal-time-to-date lastmod))
+		      
 		      
 		      (with-http-response (req ent)
 
@@ -919,8 +927,7 @@
 			
 			(setf (request-reply-content-length req) size)
 			(push (cons "Last-Modified"
-				    (universal-time-to-date 
-				     (min (request-reply-date req) lastmod)))
+				    (last-modified-string ent))
 			      (request-reply-headers req))
 			
 			
@@ -1243,8 +1250,8 @@
 	      (force-output sock)
 	      ; clear bytes written count so we can count data bytes
 	      ; transferred
-	      #+hiper-socket
-	      (setf (excl::hiper-bytes-written sock) 0) 
+	      #+(and allegro (version>= 6))
+	      (excl::socket-bytes-written sock 0) 
 	      )
       
       (if* (and send-headers chunked-p (eq time :pre))
@@ -1262,7 +1269,7 @@
 	 then (socket:socket-control sock :output-chunking-eof t)
 	      ; in acl5.0.1 the output chunking eof didn't send 
 	      ; the final crlf, so we do it here
-	      #+(and allegro (not hiper-socket))
+	      #+(and allegro (not (version>= 6)))
 	      (write-sequence *crlf* sock)
 	      )
       )))

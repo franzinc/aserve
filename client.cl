@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.28 2000/09/26 15:56:30 jkf Exp $
+;; $Id: client.cl,v 1.29 2000/10/06 15:16:15 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -378,22 +378,18 @@
 	      (setq sock (socket:make-socket :remote-host phost
 					     :remote-port pport
 					     :format :bivalent
-					     :type 
-					     #+hiper-socket :hiper
-					     #-hiper-socket :stream
+					     :type net.aserve::*socket-stream-type*
 					     )))
        else (setq sock 
 	      (socket:make-socket :remote-host host
 				  :remote-port port
 				  :format :bivalent
 				  :type 
-				  #+hiper-socket :hiper
-				  #-hiper-socket :stream
+				  net.aserve::*socket-stream-type*
 					     
 				  )))
 
     #+(and allegro (version>= 6 0))
-    ;; cac 28aug00
     (let ((ef (find-external-format external-format)))
       #+(version>= 6 0 pre-final 1) (net.aserve::warn-if-crlf ef)
       (setf (stream-external-format sock) ef))
