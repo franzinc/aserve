@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: decode.cl,v 1.10 2000/09/07 19:48:04 jkf Exp $
+;; $Id: decode.cl,v 1.11 2000/09/28 16:11:12 jkf Exp $
 
 ;; Description:
 ;;   decode/encode code
@@ -111,52 +111,61 @@
       
       res))
 
-(defun uri-encode-p (ch)
+(defun uri-encode-p (code)
   ;; return t iff the character must be encoded as %xy in a uri
-  (let ((code (char-code ch)))
-    (if* (>= code 128)
-       then t
-       else (svref *uri-encode* code))))
+  (if* (>= code 128)
+     then t
+     else (svref *uri-encode* code)))
 
-(defun uriencode-string (str)
+(defun uriencode-string (str &key (external-format :latin1-base))
   ;; encode the given string using uri encoding.
   ;; It may return the same string if no encoding need be done
   ;;
-  (let ((len (length str))
+  (let ((len (native-string-sizeof str :external-format external-format))
 	(count 0))
-    ; count the number of encodings that must be done
-    (dotimes (i len)
-      (if* (uri-encode-p (char str i)) then (incf count)))
-    
-    (if* (zerop count)
-       then str ; just return the string, no encoding done
-       else (let ((newstr (make-array (+ len (* 2 count))
-				      :element-type 'character)))
-	      (let ((j 0))
-		(dotimes (i len)
-		  (let ((ch (char str i)))
-		    (if* (uri-encode-p ch)
-		       then (setf (schar newstr j) #\%)
-			    (macrolet ((hexdig (code)
-					 ;; return char code of hex digit
-					 `(if* (< ,code 10)
-					     then (+ ,code
-						     #.(char-code #\0))
-					     else (+ (- ,code 10)
-						     #.(char-code #\a)))))
-			      (let* ((code (char-code ch))
-				     (upcode (logand #xf (ash code -4)))
-				     (downcode (logand #xf code)))
-				(setf (schar newstr (+ j 1))
-				  (code-char 
-				   (hexdig upcode)))
-				(setf (schar newstr (+ j 2))
-				  (code-char 
-				   (hexdig downcode)))))
-			    (incf j 3)
-		       else (setf (schar newstr j) ch)
-			    (incf j)))))
-	      newstr))))
+    (excl::with-dynamic-extent-usb8-array (mbvec len)
+      ;; We use string-to-mb for 5.0.1 compatibility.  string-to-octets is
+      ;; generally prefered after 6.0.
+      (string-to-mb str :external-format external-format
+		    :null-terminate nil
+		    :mb-vector mbvec)
+      ;; count the number of encodings that must be done
+      (dotimes (i len)
+	(if* (uri-encode-p (aref mbvec i)) then (incf count)))
+
+      (if* (zerop count)
+	 then str ;; just return the string, no encoding done
+	 else (excl::with-dynamic-extent-usb8-array (newmbvec
+						     (+ len (* 2 count)))
+		(let ((j 0))
+		  (dotimes (i len)
+		    (let ((code (aref mbvec i)))
+		      (if* (uri-encode-p code)
+			 then (setf (aref newmbvec j) #.(char-code #\%))
+			      (macrolet ((hexdig (code)
+					   ;; return char code of hex digit
+					   `(if* (< ,code 10)
+					       then (+ ,code
+						       #.(char-code #\0))
+					       else (+ (- ,code 10)
+						       #.(char-code #\a)))))
+				(let* ((upcode (logand #xf (ash code -4)))
+				       (downcode (logand #xf code)))
+				  (setf (aref newmbvec (+ j 1))
+				    (hexdig upcode))
+				  (setf (aref newmbvec (+ j 2))
+				    (hexdig downcode))))
+			      (incf j 3)
+			 else (setf (aref newmbvec j) code)
+			      (incf j)))))
+		(values
+		 ;; use values to suppress multiple values returned by
+		 ;; octets-to-string.
+		 ;; We use mb-to-string for 5.0.1 compatibility.
+		 ;; octets-to-string is generally prefered after 6.0.
+		 (mb-to-string newmbvec
+			       :external-format :latin1-base
+			       :end (+ len (* 2 count)))))))))
 
 
 (defun uridecode-string (str &key (external-format :latin1-base))
@@ -386,8 +395,9 @@
   ;; Buffer is a static octet array, which gets converted to a string.
   `(excl::with-dynamic-extent-usb8-array (,buffer-var ,size)
      (macrolet ((cvt-buf-to-string (x &key external-format end)
-		  `(octets-to-string ,x :end ,end
-				     :external-format ,external-format))
+		  `(values
+		    (octets-to-string ,x :end ,end
+				      :external-format ,external-format)))
 		(set-buf-elt (buf i char)
 		  `(setf (aref ,buf ,i) (char-code ,char)))
 		(buf-elt (buf i)

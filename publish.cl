@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.39 2000/09/13 23:58:43 jkf Exp $
+;; $Id: publish.cl,v 1.40 2000/09/28 16:11:12 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -1288,7 +1288,8 @@
 (defmethod set-cookie-header ((req http-request)
 			      &key name value expires domain 
 				   (path "/")
-				   secure)
+				   secure
+				   (external-format :latin1-base))
   ;; put a set cookie header in the list of header to be sent as
   ;; a response to this request.
   ;; name and value are required, they should be strings
@@ -1303,9 +1304,11 @@
   ;; secure is either true or false
   ;;
   (let ((res (concatenate 'string 
-	       (uriencode-string (string name))
+	       (uriencode-string (string name)
+				 :external-format external-format)
 	       "="
-	       (uriencode-string (string value)))))
+	       (uriencode-string (string value)
+				 :external-format external-format))))
     (if* expires
        then (if* (eq expires :never)
 	       then (setq expires *far-in-the-future*))

@@ -1,3 +1,10 @@
+2000-09-22  Charles A. Cox  <cox@pie>
+
+	* decode.cl: Add :external-format to to uriencode-string.
+	* publish.cl: Add :external-format to set-cookie-header.
+	* test/t-aserve.cl: Add :external-format tests for
+	uri{en,de}code-string.
+
 2000-09-07  Charles A. Cox  <cox@delta>
 1.1.29
 	

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.72 2000/09/26 15:56:30 jkf Exp $
+;; $Id: main.cl,v 1.73 2000/09/28 16:11:12 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -522,9 +522,8 @@ Problems with protocol may occur." (ef-name ef)))))
        then ; has a fast accesor
 	    `(or (,(third ent) ,req)
 		 (setf (,(third ent) ,req)
-		   (or (header-buffer-req-header-value ,req ,name)
-		       "" ; to speed up the next search
-		       )))
+		    (header-buffer-req-header-value ,req ,name)
+		       ))
        else ; must get it from the alist
 	    `(header-slot-value-other ,req ,name))))
 
@@ -533,7 +532,7 @@ Problems with protocol may occur." (ef-name ef)))))
   (let ((ent (assoc name (request-headers req) :test #'eq)))
     (if* ent
        then (cdr ent)
-       else (let ((ans (or (header-buffer-req-header-value req name) "")))
+       else (let ((ans (header-buffer-req-header-value req name)))
 	      (push (cons name ans) (request-headers req))
 	      ans))))
       
@@ -1289,11 +1288,7 @@ by keyword symbols and not by strings"
 				      
 				      
 		     else ; no content length given
-			  (format *initial-terminal-io*
-				  "grb: connection is ~s~%"
-				  (header-slot-value req :connection))
-			  (dump-header-block (request-header-block req)
-					     *initial-terminal-io*)
+			  
 			  (if* (equalp "keep-alive" 
 				       (header-slot-value req :connection))
 			     then ; must be no body
@@ -1913,7 +1908,7 @@ in get-multipart-sequence"))
   ;; else nil
   (if* val 
      then (let (ans)
-	    (ignore-errors (setq ans (read-from-string val)))
+	    (setq ans (string-to-number val 0 (length val)))
 	    (if* (integerp ans)
 	       then (values ans t)))))
 

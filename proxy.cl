@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.15 2000/09/26 15:56:31 jkf Exp $
+;; $Id: proxy.cl,v 1.16 2000/09/28 16:11:12 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -35,6 +35,8 @@
 (in-package :net.aserve)
 
 
+(defparameter *extra-lifetime-factor* 1.1)
+
 (defstruct pcache 
   ;; proxy cache
   table		; hash table mapping to pcache-ent objects
@@ -45,6 +47,10 @@
   (bytes  0)	; total number of bytes cached
   (memory 0)	; total number of bytes in memory
   (disk	  0)	; bytes written to disk
+
+  ; requests thet completely bypass the cache
+  (r-direct 0)
+  
   
   ; types of responses to cache requests
   ; item not in cache, did proxy to get value
@@ -88,8 +94,11 @@
 
 
 (defstruct pcache-ent
-  max-valid-time ; most recent time at which this is known to be a valid
-  		; response
+  last-modified-string  ; last modified time from the header
+  last-modified  ; universal time entry was last modified
+  expires	; universal time when this entry expires
+  
+  
   request	; request header block 
   data		; data blocks (first is the response header block)
   data-length	; number of octets of data
@@ -99,7 +108,7 @@
   ; count of the internal use of this
   use		; nil - dead entry. >= 0 - current users of this entry
 
-  state		; nil - normal , 
+  (state :new)	; nil - normal , 
                 ; :dead - trying to kill off, 
   		; :new - filling the entry
   
@@ -600,6 +609,22 @@
 (defparameter *min-freshness* 10) ; assume values valid this long
 (defparameter *likely-fresh*  60) ; values probably valid this long but check
 
+; cache items are in one of these states
+;  fresh - item in case is considered to be valid
+;  stale - item in cache may be valid but it will requires validate to verify
+;
+
+
+
+
+
+; proxy cache actions
+;  direct - go to the proxy without considering the cache
+;  hit - found item in the cache and it is fresh
+; 
+
+
+
 
 
   
@@ -711,76 +736,30 @@
   ;; if we've got a proxy cache then retrieve it from there
   ;; else just proxy the request
   
-  (let ((pcache (wserver-pcache *wserver*)))
+  
+  (let ((pcache (wserver-pcache *wserver*))
+	(rendered-uri (net.uri:render-uri (request-raw-uri req) nil)))
     
     (if* (or (null pcache)
-	     (not (eq (request-method req) :get)))
-       then (return-from proxy-cache-request
+	     ; should handle :head requests too
+	     (not (eq (request-method req) :get))
+	     ; don't look in cache if request has cookies
+	     (header-slot-value req :authorization)
+	     )
+       then (if* pcache then (incf (pcache-r-direct pcache)))
+	    (return-from proxy-cache-request
 	      (proxy-request req ent)))
 
-    (logmess (format nil "cache: look for ~a~%" (net.uri:render-uri (request-raw-uri req) nil)))
-    
-    (mp:without-scheduling (incf (pcache-probes pcache)))
+    (logmess (format nil "cache: look in cache for ~a~%" rendered-uri))
 
-    (tagbody top
-      (dolist (pcache-ent
-		  (gethash (net.uri:render-uri (request-raw-uri req) nil) 
-			   (pcache-table pcache))
-		; here is failed to match in the cache
-		(let ((pcache-ent (make-pcache-ent
-				   :request (request-header-block req)
-				   :use 0
-				   :state :new)))
-		  (push pcache-ent
-			(gethash (net.uri:render-uri (request-raw-uri req) nil) 
-				 (pcache-table pcache)))
+    (dolist (pcache-ent (gethash rendered-uri (pcache-table pcache)))
+      (if* (lock-pcache-ent pcache-ent)
+	 then (unwind-protect
+		  (progn (use-value-from-cache req ent pcache-ent)
+			 (return))
+		(unlock-pcache-ent pcache-ent))))))
 
-		  (incf (pcache-r-miss pcache))
-		  (logmess (format nil "cache miss for ~s"
-				   (net.uri:render-uri (request-raw-uri req) nil)))
-				 
-		  (proxy-request req ent :pcache-ent pcache-ent)))
 
-      
-	; see if this request matches our request
-      
-	(if* (lock-pcache-ent pcache-ent)
-	   then (unwind-protect
-		    (if* (match-request-blocks 
-			  (request-header-block req)
-			  (pcache-ent-request pcache-ent))
-		       then (mp:without-scheduling
-			      (incf (pcache-hits pcache)))
-			  
-			    (if* (eq (pcache-ent-state pcache-ent) :new)
-			       then ; still reading this one in
-				    (mp:process-wait "wait for cache to fill"
-						     #'(lambda (ent)
-							 (not (eq (pcache-ent-state ent) :new)))
-						     pcache-ent))
-			  
-			    (if* (not (null (pcache-ent-state pcache-ent)))
-			       then ; the cache didn't fill this correctly
-				    ; try again
-				    (go top))
-				  
-			    (use-value-from-cache req ent pcache-ent)
-			    (return)
-		       else ; uri's match but headers don't.
-			    ; print some debugging to figure out why
-			    (logmess "uri match but header mismatch.. request header:")
-			    (logmess "-------------")
-			    (dump-header-block (request-header-block req)
-					       *initial-terminal-io*)
-			    (logmess "-------------")
-			    (logmess " ... and cached header")
-			    (logmess "-------------")
-			    (dump-header-block (pcache-ent-request pcache-ent)
-					       *initial-terminal-io*)
-			    (logmess "-------------")
-			    )
-		  ; cleanup
-		  (unlock-pcache-ent pcache-ent)))))))
 
 
 (defun use-value-from-cache (req ent pcache-ent)
@@ -788,106 +767,89 @@
   ;; now deal with the issue of it possibily being out of date
   (let* ((ims (header-slot-value req :if-modified-since))
 	 (now (get-universal-time))
-	 (time (- now (pcache-ent-max-valid-time pcache-ent)))
 	 (pcache (wserver-pcache *wserver*))
-	 (rendered-uri (net.uri:render-uri (request-raw-uri req) nil)))
+	 (rendered-uri (net.uri:render-uri (request-raw-uri req) nil))
+	 (fresh))
     (logmess (format nil "ims is ~s" ims))
-    (if* (and ims (not (equal "" ims)))
-       then (setq ims (date-to-universal-time ims))
-	    
-	    (if* (<= time 0)
-	       then ; we are within the max valid time for
-		    ; this entry
-		    (logmess 
-		     (format nil 
-			     "ims with max-valid-time, so not modified for ~a"
-			     rendered-uri))
-		    (incf (pcache-r-ims-valid pcache))
-		    (send-not-modified-response req ent)
-	     elseif (<= time *min-freshness*)
-	       then (logmess 
-		     (format nil
-			     "ims within min freshness, so not modified for ~a"
-			     rendered-uri))
-		    (incf (pcache-r-ims-assumed-valid pcache))
-		    (send-not-modified-response req ent)
-	     elseif (<= time *likely-fresh*)
-	       then (logmess 
-		     (format nil "ims within likely freshness, so not modified and retry for ~a"
-			     rendered-uri))
-		    (incf (pcache-r-ims-maybe-valid pcache))
-		    (send-not-modified-response req ent)
-		    (let ((new-ent (make-pcache-ent)))
-		      (proxy-request req ent :pcache-ent new-ent
-				     :respond nil)
-		      (if* (eq (pcache-ent-code new-ent) 304)
-			 then ; still not modified
-			      (setf (pcache-ent-max-valid-time pcache-ent) now)
-		       elseif (eq (pcache-ent-code new-ent) 200)
-			 then ; got a good response this time
-			      (logmess "freshness test showed that it is newer")
-			      (setf (pcache-ent-state pcache-ent) :dead)
-			      (push new-ent
-				    (gethash rendered-uri 
-					     (pcache-table pcache)))))
-	       else ; our cached entry has no value, just proxy it
-		    
-		    (incf (pcache-r-ims-invalid pcache))
-		    
-		    (let ((new-ent (make-pcache-ent)))
-		      (logmess "ims request, cache out of date, get new contents")
-		      (proxy-request req ent :pcache-ent new-ent)
-		      (push new-ent (gethash rendered-uri 
-					     (pcache-table pcache)))
-		      (setf (pcache-ent-state pcache-ent) :dead)))
-       else ; no ims
-	    (if* (<= time *min-freshness*)
-	       then (logmess 
-		     (format nil "return cached response to ~s"
-			     rendered-uri))
-		    (incf (pcache-r-assumed-valid pcache))
-		    
-		    (send-cached-response req pcache-ent)
-	       else (let ((do-respond t))
-		      (if* (<= time *likely-fresh*)
-			 then (logmess 
-			       (format nil "return cached response to ~s and check"
-				       rendered-uri))
-			      
-			      (incf (pcache-r-maybe-valid pcache))
-			      (send-cached-response req pcache-ent)
-			      (setq do-respond nil)
-			 else (incf (pcache-r-invalid pcache)))
-		    
-		      (insert-header (request-header-block req)
-				     :if-modified-since
-				     (universal-time-to-date now))
-		      (let ((new-ent (make-pcache-ent)))
-			(proxy-request req ent :pcache-ent new-ent
-				       :respond do-respond)
-			(if* (eq (pcache-ent-code new-ent) 200)
-			   then ; newly modified
-				(let (olddata)
-				  (mp:without-scheduling
-				    (setf olddata (pcache-ent-data pcache-ent)
-					  (pcache-ent-data pcache-ent)
-					  (pcache-ent-data new-ent)
-					
-					  (pcache-ent-data-length
-					   pcache-ent)
-					  (pcache-ent-data-length
-					   new-ent)
-					
-					  (pcache-ent-max-valid-time pcache-ent)
-					  now))
-				  (free-header-blocks olddata))
-			 elseif (eq (pcache-ent-code new-ent) 304)
-			   then ; still not modified
-				(setf (pcache-ent-max-valid-time pcache-ent)
-				  now)
-			   else ; some mysterious return
-				(setf (pcache-ent-state pcache-ent) :dead))))))))
 
+    (flet ((process-proxy-response (pcache-ent)
+	     (let ((new-ent (make-pcache-ent)))
+	       (proxy-request req ent :pcache-ent pcache-ent)
+	       (if* (eq (pcache-ent-code new-ent) 200)
+		  then ; turns out it was modified, must
+		       ; make this the new entry
+
+		       (logmess (format nil "replace cache entry for ~a"
+					rendered-uri))
+		       (push new-ent
+			     (gethash rendered-uri
+				      (pcache-table pcache)))
+			      
+		       ; and disable the old entry
+		       (setf (pcache-ent-state pcache-ent) :dead)
+		elseif (eq (pcache-ent-code new-ent) 304)
+			      
+		  then ; still not modified, recompute the 
+		       ; expiration time since we now know
+		       ; that the item is older
+		       ;* this may end up violation the expiration
+		       ; time in a header from a previous call
+		       (logmess (format nil "change expiration date for ~a"
+					rendered-uri))      
+		       (setf (pcache-ent-expires pcache-ent)
+			 (max (pcache-ent-expires pcache-ent)
+			      (compute-approx-expiration
+			       (pcache-ent-last-modified pcache-ent)
+			       now)))))))
+      ; compute if the entry is fresh or stale
+      (setq fresh (<= now (pcache-ent-expires pcache-ent)))
+    
+    
+      (if* (and ims (not (equal "" ims)))
+	 then ; we're in a conditional get situation, where the
+	      ; condition is If-Modified-Since
+	      (setq ims (date-to-universal-time ims))
+	    
+	      (if* (< ims (pcache-ent-last-modified pcache-ent))
+		 then ; it has been modified since the ims time
+		      ; must return the whole thing
+		      (if* fresh
+			 then (send-cached-response req pcache-ent)
+			 else (process-proxy-response pcache-ent))
+		    
+	       elseif fresh
+		 then ; (>= ims last-modified-time) and the entry
+		      ; is fresh, we we believe the last-modified-time
+		      ; thus we respond that entry is correct
+		      (send-not-modified-response req ent)
+		 else ; (>= ims last-modified-time) butthe entry
+		      ;  stale, so we can't trust the last modified time
+		      ;
+		      (process-proxy-response pcache-ent))
+	 else ; unconditional get
+	      (if* fresh
+		 then (send-cached-response req pcache-ent)
+		 else ; issue a validating send
+		    
+		      (insert-header 
+		       (request-header-block req)
+		       :if-modified-since
+		       (or (pcache-ent-last-modified-string pcache-ent) 
+			   (setf (pcache-ent-last-modified-string pcache-ent)
+			     (universal-time-to-date
+			      (pcache-ent-last-modified pcache-ent)))))
+
+		      (process-proxy-response pcache-ent))))))
+		      
+		    
+(defun compute-approx-expiration (changed  now)
+  ;; compute the expires time based on the last time the file was
+  ;; change and current time.
+  (let ((delta (max 1 (ceiling 
+		       (* (- now changed) *extra-lifetime-factor*)))))
+    (+ changed delta)))
+
+  
 
 
 (defun send-not-modified-response (req ent)
@@ -897,16 +859,6 @@
 
 	    
 	    
-			      
-			      
-			
-    
-    
-    
-    
-    
-  
-
 
 
 
@@ -961,7 +913,7 @@
 		 else (setf (pcache-ent-use pcache-ent) val))))))
 
 
-
+#+ignore
 (defun match-request-blocks (request-block cache-block)
   ;; compare the header entries that have to match for this
   ;; cached request to be used.
@@ -980,7 +932,7 @@
 		   then ; give up
 			(return nil)))))))
 
-
+#+ignore
 (defun response-is-young-enough (last-modified-ut request-block)
   ;; return true if the last-modified date satisified
   ;; the contraints of the request
@@ -998,35 +950,79 @@
 		       body-buffers body-length)
   
   ;; we are caching, save the information about this response 
-  ;; in the pcache-ent we are passed.
+  ;; in the pcache-ent we are passed, which should be blank
   
 	    
   (logmess (format nil "cache: caching response to ~a, length ~d~%" 
 		   (net.uri:render-uri (request-raw-uri req) nil)
 		   body-length
 		   ))
-  (setf (pcache-ent-max-valid-time pcache-ent) (get-universal-time))
-
-  ; usually this is nil but just in case..
-  (if* (pcache-ent-data pcache-ent)
-     then (logmess "Freeing existing data in cache entry"))
   
-  (free-header-blocks  (pcache-ent-data pcache-ent))
-  (setf (pcache-ent-data pcache-ent) 
-    (cons client-response-header body-buffers))
-
-  (setf (pcache-ent-data-length pcache-ent) body-length)
-  (setf (pcache-ent-code pcache-ent) response-code)
-  (setf (pcache-ent-comment pcache-ent) comment)
-  
-  (setf (pcache-ent-state pcache-ent) nil) ; valid stuff in here now
-  )
-
-
-
-  
-
+  (let (now)
+    (if* (eql response-code 200)
+       then ; full response
+	    (setf (pcache-ent-code pcache-ent) response-code)
+	    (setf (pcache-ent-comment pcache-ent) comment)
+	  
+	    (setf (pcache-ent-data pcache-ent) 
+	      (cons client-response-header body-buffers))
+	    (setf (pcache-ent-data-length pcache-ent) body-length)
+	  
+	    (setq client-response-header nil
+		  body-buffers nil)
+	  
+	    (setf (pcache-ent-state pcache-ent) nil) ; means valid data
+	  
+	    (let* ((last-mod (header-buffer-header-value 
+			      client-response-header
+			      :last-modified))
+		   (last-mod-val (and last-mod
+				      (date-to-universal-time last-mod)))
+		   (expires (header-buffer-header-value 
+			     client-response-header
+			     :expires))
+		   (expires-val (and expires
+				     (date-to-universal-time expires))))
 	    
+	      (if* last-mod-val
+		 then (setf (pcache-ent-last-modified-string pcache-ent) last-mod
+			    (pcache-ent-last-modified pcache-ent) last-mod-val)
+		 else ; no value given, store current time minus a 
+		      ; second to account for the transit time
+		    
+		      (setf (pcache-ent-last-modified pcache-ent)  
+			(- (setq now (get-universal-time)) 2))
+	    
+		      (if* expires-val
+			 then ; given expiration date, use it
+			      ;* it may be bogus since people doing ads use this
+			      ;  to force cache reloads
+			      (setf (pcache-ent-expires pcache-ent) expires-val)
+			 else ; must compute expiration
+			      (setf (pcache-ent-expires pcache-ent)
+				(compute-approx-expiration
+				 (pcache-ent-last-modified pcache-ent)
+				 (or now (get-universal-time)))))))
+		       
+     elseif (eql response-code 304)
+       then ; just set that so the reader of the response will know
+	    ; the result
+	    (setf (pcache-ent-code pcache-ent) response-code))
+  
+    (if* client-response-header 
+       then (free-header-block client-response-header))
+  
+    (if* body-buffers
+       then (free-header-blocks body-buffers))))
+
+	  
+  
+
+
+
+  
+
+#+ignore	    
 (defun dump-cache ()
   ;; dump the proxy cache
   (let ((pcache (wserver-pcache *wserver*)))

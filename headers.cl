@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.11 2000/09/26 15:56:30 jkf Exp $
+;; $Id: headers.cl,v 1.12 2000/09/28 16:11:12 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -96,7 +96,7 @@
 ;; its size will effectively be hardwired into cache entries and
 ;; thus a change in this value should be accompanied by a 
 ;; clearing of the cache.
-(defconstant *headers-count* 49)
+(defconstant *headers-count* 50)
 
 (defmacro header-block-data-start ()
   ;; return index right above the first data index object stored
@@ -159,6 +159,7 @@
 	("Referer" :p :nf nil)  ; should we match? who cares..
 	("Retry-After" :nf :p nil )
 	("Server" :nf :p nil)
+	("Set-Cookie" :nf :p nil)
 	("TE" :p :nf   :mx)
 	("Trailer" :np :np nil)
 	("Transfer-Encoding" :np :np nil)
@@ -282,6 +283,13 @@
   ;; free a list of blocks
   (dolist (block blocks)
     (free-sresource *header-block-sresource* block)))
+
+(defun free-header-block (block)
+  (if* (and block (atom block))
+     then (free-sresource *header-block-sresource* block)
+   elseif block
+     then (error "bad value passed to free-header-block ~s" block)))
+
 
 	      
 ;; parsed header array

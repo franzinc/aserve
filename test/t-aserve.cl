@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.14 2000/09/26 15:56:31 jkf Exp $
+;; $Id: t-aserve.cl,v 1.15 2000/09/28 16:11:13 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -627,9 +627,11 @@
 	     (query-to-form-urlencoded query :external-format ef)
 	     :external-format ef)
 	    query
-	    :test #'equal))))
-		       
-
+	    :test #'equal)
+      (test str1
+	    (uridecode-string (uriencode-string str1 :external-format ef)
+			      :external-format ef)
+	    :test #'string=))))
     
     
 (defun test-forms (port)
@@ -991,7 +993,12 @@
 
 
     
-(if* user::*do-aserve-test* then (test-aserve))
+(if* user::*do-aserve-test* 
+   then (test-aserve)
+   else (format t 
+		" (net.aserve.test::test-aserve) will run the aserve test~%"))
+
+
 
 	
     
