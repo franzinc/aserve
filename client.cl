@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.13 2000/04/17 21:34:24 jkf Exp $
+;; $Id: client.cl,v 1.14 2000/04/23 23:52:11 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -188,6 +188,7 @@
 			basic-authorization  ; (name . password)
 			keep-alive   ; if true, set con to keep alive
 			headers	    ; extra header lines, alist
+			proxy	    ; naming proxy server to access through
 			user-agent
 			      )
   
@@ -203,6 +204,7 @@
 	       :basic-authorization basic-authorization
 	       :keep-alive keep-alive
 	       :headers headers
+	       :proxy proxy
 	       :user-agent user-agent
 	       )))
 
@@ -299,6 +301,7 @@
 				     content-length 
 				     content
 				     headers
+				     proxy
 				     user-agent
 				     )
   
@@ -319,18 +322,41 @@
 	(port))
     (if* (null host)
        then (error "need a host in the client request: ~s" uri))
+
+    ; default the port to 80
+    (setq port (or (net.uri:uri-port uri) 80))
     
-    (setq sock 
-      (socket:make-socket :remote-host host
-			  :remote-port (setq port
-					 (or (net.uri:uri-port uri) 80))
-			  :format :bivalent))
+    (if* proxy
+       then ; sent request through a proxy server
+	    (assert (stringp proxy) (proxy) 
+	      "proxy value ~s should be a string" proxy)
+	    (let ((parts (net.aserve::split-on-character proxy #\:))
+		  (pport 80)
+		  phost)
+	      (if* (cdr parts)
+		 then ; port given
+		      (setq pport (read-from-string (cadr parts)))
+		      (assert (integerp pport)
+			  (pport)
+			"proxy port ~s should be an integer"
+			pport))
+	      (setq phost (car parts))
+	      
+	      (setq sock (socket:make-socket :remote-host phost
+					     :remote-port pport
+					     :format :bivalent)))
+       else (setq sock 
+	      (socket:make-socket :remote-host host
+				  :remote-port port
+				  :format :bivalent)))
     
     (net.aserve::format-dif :xmit sock "~a ~a ~a~a"
-	    (string-upcase (string method))
-	    (uri-path-etc uri)
-	    (string-upcase (string protocol))
-	    crlf)
+			    (string-upcase (string method))
+			    (if* proxy
+			       then (net.uri:render-uri uri nil)
+			       else (uri-path-etc uri))
+			    (string-upcase (string protocol))
+			    crlf)
 
     ; always send a Host header, required for http/1.1 and a good idea
     ; for http/1.0
@@ -369,11 +395,11 @@
 
     (if* basic-authorization
        then (net.aserve::format-dif :xmit sock "Authorization: Basic ~a~a"
-		    (base64-encode
-		     (format nil "~a:~a" 
-			     (car basic-authorization)
-			     (cdr basic-authorization)))
-		    crlf))
+				    (base64-encode
+				     (format nil "~a:~a" 
+					     (car basic-authorization)
+					     (cdr basic-authorization)))
+				    crlf))
     
     (if* user-agent
        then (if* (stringp user-agent)

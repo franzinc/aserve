@@ -1,4 +1,4 @@
-The Allegro iServe Webserver
+The AllegroServe Webserver
 copyright (c) 1999,2000 Franz Inc.
 
 
@@ -18,17 +18,17 @@ copyright (c) 1999,2000 Franz Inc.
 
 
 
-This is a distribution of the current state of the iServe web server.
+This is a distribution of the current state of the AllegroServe web server.
 This is not a finished product.   We are distributing this so that
 people can see what directions we are taking in our design.
 
 
 == The files in this distribution:
 
-iserve.fasl -- This includes the iserve web server and htmlgen html generation
+aserve.fasl -- This includes the iserve web server and htmlgen html generation
     code.
 
-doc/iserve.html -- documentation on the web server
+doc/aserve.html -- documentation on the web server
 htmlgen.html -- documentation on the html generation system
 
 examples.cl -- load this into lisp to publish sample urls.  Read  this file
@@ -47,9 +47,9 @@ other files are present to support the examples in examples/examples.cl.
    (or start Allegro cl 5.0.1 and use the toplevel ":cd" command to cd 
    to the directory containing the iserve distribution).
 
-2. load iserve.fasl
+2. load aserve.fasl
     
-        user(1): :ld iserve.fasl
+        user(1): :ld aserve.fasl
 
 3. load the examples (either the compiled or source version)
 
@@ -57,7 +57,7 @@ other files are present to support the examples in examples/examples.cl.
 
 4. start the webserver
 
-        user(3):  (net.iserve:start :port 8010)
+        user(3):  (net.aserve:start :port 8010)
 
 
 5. go to a web browser and select this machine and the port you chose:

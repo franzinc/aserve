@@ -1,3 +1,9 @@
+2000-04-23  jkf  <jkf@main.verada.com>
+
+	* client.cl - added proxy argument so that client requests
+	    can go through a proxy
+	* various doc fixes
+
 2000-04-17  John Foderaro  <jkf@tiger.franz.com>
 1.1.13
 	* rename Allegro iServe to AllegroServe.
