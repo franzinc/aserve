@@ -1,4 +1,10 @@
 *******************************************************************************
+merge from trunk to acl62 branch on 12/23/03
+command:
+join.sh trunk trunk_to_acl62_merge_122203 trunk_to_acl62_merge_122303 aserve
+*******************************************************************************
+
+*******************************************************************************
 merge from trunk to acl62 branch on 12/22/03
 command:
 join.sh trunk trunk_to_acl62_merge_102203_2 trunk_to_acl62_merge_122203 aserve
@@ -25,6 +31,10 @@ merge from trunk to acl62 branch on 9/24/03
 command:
 join.sh trunk trunk_to_acl62_merge_070703 trunk_to_acl62_merge_092403 aserve
 *******************************************************************************
+
+2003-12-23  John Foderaro  <jkf@tiger.franz.com>
+1.2.34
+	*  fix typo in exports wserver-io-timeout
 
 2003-12-12  Kevin Layer  <layer@relay.known.net>
 
