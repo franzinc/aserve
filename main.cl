@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.45 2000/06/12 21:53:03 jkf Exp $
+;; $Id: main.cl,v 1.46 2000/06/26 04:51:34 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -76,6 +76,7 @@
    #:request-query
    #:request-query-value
    #:request-raw-request
+   #:request-raw-uri
    #:request-socket
    #:request-uri
    #:request-wserver
@@ -314,7 +315,12 @@
     ;; entity to invoke given a request that was denied
     :initform nil  ; will build on demand if not present
     :accessor wserver-denied-request)
-   ))
+   
+   (ipaddrs
+    ;; list of the ip addresses by which this wserver has been contacted
+    :initform nil
+    :accessor wserver-ipaddrs
+   )))
 
 
      
@@ -437,7 +443,11 @@
 			"content-type"
 			"content-length"))
 	  (push (list name   ;; string name
-		      (read-from-string name) ;; symbol name
+		      
+		      ;; symbol naming slot
+		      (read-from-string 
+		       (concatenate 'string (symbol-name :reply-) name))
+		      
 		      ;; accessor name
 		      (read-from-string 
 			    (format nil "request-reply-~a" name))) res))
@@ -548,10 +558,15 @@
     :initarg :method
     :reader request-method)
    
-   (uri  ;; uri object holding the current request
+   (uri  ;; uri object holding the current request with the scheme, host
+         ;; and port filled in.
     :initarg :uri
-    :reader request-uri)
+    :accessor request-uri)
 
+   (raw-uri  ;; uri object holding the actual uri from the command
+    :initarg :raw-uri
+    :accessor request-raw-uri)
+   
    (protocol ;; symbol naming the http protocol  (e.g. :http/1.0)
     :initarg :protocol
     :reader request-protocol)
@@ -668,6 +683,19 @@
     (make-resp 500 "Internal Server Error"))
 (defparameter *response-not-implemented* (make-resp 501 "Not Implemented"))
 
+(defparameter *responses*
+    (list *response-ok*
+	  *response-created*
+	  *response-accepted*
+	  *response-moved-permanently*
+	  *response-found*
+	  *response-see-other*
+	  *response-not-modified*
+	  *response-temporary-redirect*
+	  *response-bad-request*
+	  *response-unauthorized*
+	  *response-not-found*))
+
 (defvar *crlf* (make-array 2 :element-type 'character :initial-contents
 			   '(#\return #\linefeed)))
 
@@ -759,11 +787,21 @@
 (defun start-simple-server ()
   ;; do all the serving on the main thread so it's easier to
   ;; debug problems
-  (let ((main-socket (wserver-socket *wserver*)))
+  (let ((main-socket (wserver-socket *wserver*))
+	(ipaddrs (wserver-ipaddrs *wserver*)))
     (unwind-protect
 	(loop
 	  (restart-case
-	      (process-connection (socket:accept-connection main-socket))
+	      (let ((sock (socket:accept-connection main-socket))
+		    (localhost))
+		(if* (not (member (setq localhost (socket:local-host sock))
+				  ipaddrs))
+		   then ; new ip address by which this machine is known
+			(push localhost ipaddrs)
+			(setf (wserver-ipaddrs *wserver*) ipaddrs))
+		
+		(process-connection sock))
+	    
 	    (:loop ()  ; abort out of error without closing socket
 	      nil)))
       (close main-socket))))
@@ -832,12 +870,23 @@
   (let* ((error-count 0)
 	 (workers nil)
 	 (server *wserver*)
-	 (main-socket (wserver-socket server)))
+	 (main-socket (wserver-socket server))
+	 (ipaddrs (wserver-ipaddrs server)))
     (unwind-protect
 
 	(loop
 	  (handler-case
-	      (let ((sock (socket:accept-connection main-socket)))
+	      (let ((sock (socket:accept-connection main-socket))
+		    (localhost))
+		
+		; track all the ipaddrs by which we're reachable
+		(if* (not (member (setq localhost (socket:local-host sock))
+				  ipaddrs))
+		   then ; new ip address by which this machine is known
+			(push localhost ipaddrs)
+			(setf (wserver-ipaddrs *wserver*) ipaddrs))
+		
+		
 		(setq error-count 0) ; reset count
 	
 		; find a worker thread
@@ -985,10 +1034,14 @@
 	    (if* (or (null cmd) (null protocol))
 	       then ; no valid command found
 		    (return-from read-http-request nil))
-	      
+
+	    (if* (null (net.uri:uri-path uri))
+	       then (setf (net.uri:uri-path uri) "/"))
+	    
 	    (setq req (make-instance 'http-request
 			:method cmd
-			:uri uri
+			:uri (net.uri:copy-uri uri)
+			:raw-uri uri
 			:protocol protocol
 			:protocol-string (case protocol
 					   (:http/1.0 "HTTP/1.0")
@@ -1735,7 +1788,13 @@
     ))
     
      
-     
+
+(defun maybe-universal-time-to-date (ut-or-string)
+  ;; given a ut or a string, only do the conversion on the string
+  (if* (stringp ut-or-string) 
+     then ut-or-string
+     else (universal-time-to-date ut-or-string)))
+
 (defun universal-time-to-date (ut)
   ;; convert a lisp universal time to rfc 1123 date
   ;;
@@ -1871,3 +1930,11 @@
 		(setf (cdr ent) (cdr header)))))
     (setf (request-reply-headers req) current-headers)))
 	
+
+(defun code-to-response (code)
+  ;; return response object for the given code
+  (let ((obj (find code *responses* :key #'response-number)))
+    (if* (null obj)
+       then (push (setq obj (make-resp code "unknown code")) *responses*))
+    obj))
+  

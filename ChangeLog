@@ -1,3 +1,15 @@
+2000-06-25  jkf  <jkf@main.verada.com>
+
+	* keep track all of all ip addresses by which the server
+	  is contacted (this is simpler than trying to figure them
+	  out in advance).
+	* add function to find a response object given the code.
+	* keep track of the raw uri by which a request was made
+	  (as distinguished from the uri in which we've added the
+	  host and port values).  This is necessary to distriguish
+	  when we must proxy.
+	* in html-print assume that attribute values are already html escaped
+
 2000-06-12  John Foderaro  <jkf@tiger.franz.com>
 
 	* main.cl: add utility function request-query-value to

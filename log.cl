@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: log.cl,v 1.10 2000/06/10 19:06:41 jkf Exp $
+;; $Id: log.cl,v 1.11 2000/06/26 04:51:34 jkf Exp $
 
 ;; Description:
 ;;   iserve's logging
@@ -74,7 +74,7 @@
 	    (format stream
 		    "~a - - [~a] ~s ~s ~s~%"
 		    (socket:ipaddr-to-dotted ipaddr)
-		    (universal-time-to-date time)
+		    (maybe-universal-time-to-date time)
 		    (request-raw-request req)
 		    code
 		    (or length -1)))))

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.32 2000/06/10 19:06:41 jkf Exp $
+;; $Id: publish.cl,v 1.33 2000/06/26 04:51:34 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -355,7 +355,7 @@
 ;-- content-length -- how long is the body of the response, if we know
 
 (defmethod content-length ((ent entity))
-  ;; by default we don't know, and that's what nil mean
+  ;; by default we don't know, and that's what nil means
   nil)
 
 (defmethod content-length ((ent file-entity))
@@ -1181,7 +1181,7 @@
 		(not (eq (request-protocol req) :http/0.9)))
 	 then ; can put out headers
 	      (format-dif :xmit sock "Date: ~a~a" 
-			  (universal-time-to-date (request-reply-date req))
+			  (maybe-universal-time-to-date (request-reply-date req))
 			  *crlf*)
 
 	      (if* (member :keep-alive strategy :test #'eq)

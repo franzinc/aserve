@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.7 2000/05/16 14:01:26 jkf Exp $
+;; $Id: htmlgen.cl,v 1.8 2000/06/26 04:51:34 jkf Exp $
 
 ;; Description:
 ;;   html generator
@@ -348,9 +348,9 @@
 	then (format stream "<~a" (html-process-key ent))
 	     (do ((xx args (cddr xx)))
 		 ((null xx))
-	       (format stream " ~a=\"" (car xx))
-	       (emit-safe stream (format nil "~a" (cadr xx)))
-	       (format stream "\""))
+	       ; assume that the arg is already escaped since we read it
+	       ; from the parser
+	       (format stream " ~a=\"~a\"" (car xx) (cadr xx)))
 	     (format stream ">")
 	else (format stream "<~a>" (html-process-key ent)))
      (dolist (ff (cdr form))
