@@ -1,3 +1,8 @@
+2000-07-17  John Foderaro  <jkf@tiger.franz.com>
+1.1.22
+	
+	*  main.cl: incf version 
+
 2000-07-15  John Foderaro  <jkf@tiger.franz.com>
 
 	*  examples/chat.cl - sample program that does web based chat

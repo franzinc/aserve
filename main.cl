@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.47 2000/07/01 17:07:44 jkf Exp $
+;; $Id: main.cl,v 1.48 2000/07/17 16:03:52 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -130,7 +130,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 1 21))
+(defparameter *aserve-version* '(1 1 22))
 
 
 (provide :aserve)
@@ -1639,7 +1639,7 @@
       (setf (request-query-alist req) res))))
 			
 
-(defun request-query-value (key req &key (post t) (uri t) (test #'equalp))
+(defun request-query-value (key req &key (post t) (uri t) (test #'equal))
   ;; access the value of the given key in the request's 
   ;; request query.  We do this so often that it's useful
   ;; to make this a function
