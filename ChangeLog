@@ -1,3 +1,8 @@
+2001-11-28  John Foderaro  <jkf@tiger.franz.com>
+
+	* log.cl - use locking around writes to the log if the
+	 stream has a lock on it's property list.
+
 2001-11-28    <jkf@main.verada.com>
 
 	* add :binary type to publish-multi

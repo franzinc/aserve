@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.14 2001/11/28 17:52:03 jkf Exp $
+;; $Id: chat.cl,v 1.15 2001/11/29 03:57:36 jkf Exp $
 
 ;; Description:
 ;;   aserve chat program
@@ -1760,7 +1760,8 @@
 	     :real (if* user then t else nil)
 	     :time (let ((time (compute-chat-date ut)))
 		     (if* *message-id-hook*
-			then (funcall *message-id-hook* time)))
+			then (funcall *message-id-hook* time)
+			else time))
 	     :ut   ut
 	     :body (if* link
 		      then (cons link cvted-body)

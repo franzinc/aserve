@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.54 2001/11/15 19:45:08 jkf Exp $
+;; $Id: load.cl,v 1.55 2001/11/29 03:57:36 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -189,7 +189,7 @@
 
 
 ;; checklist for publishing aserve source for source-master:
-;; 1. incf version number in main.cl, edit ChangeLog and commit
+;; 1. incf version number in main.cl,doc/aserve.html, edit ChangeLog and commit
 ;; 2. make clean
 ;; 3. start lisp and load aserve/load to compile all files, there should
 ;;    be no warnings.
@@ -198,7 +198,8 @@
 ;; 5. :cl test/t-aserve
 ;; 6. (make-src-distribution)
 ;; 7. (ftp-publish-src)
-;; 8. (publish-docs)   ;  to put latest docs on aserve web page
+;; 8. on cobweb in /fi/opensource/src/aserve 
+;;    do cvs update to put code on opensource site
 ;; 9. on spot run /fi/sa/bin/aserve-sync
 ;; 10. ftp upload.sourceforge.net and put the tar file in the
 ;;     incoming directory, then go to the aserve sourceforge web page and 

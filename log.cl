@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: log.cl,v 1.22 2001/11/05 22:01:25 jkf Exp $
+;; $Id: log.cl,v 1.23 2001/11/29 03:57:36 jkf Exp $
 
 ;; Description:
 ;;   iserve's logging
@@ -37,30 +37,58 @@
 (defvar *enable-logging* t) ; to turn on/off the standard logging method
 
 (defmethod logmess (message)
+  ;; send log message to the default vhost's error stream 
+  (logmess-stream message (vhost-error-stream
+			   (wserver-default-vhost
+			    *wserver*))))
+
+
+
+(defmethod logmess-stream (message stream)
+  ;; send the log message to the given stream which should be a
+  ;; stream object and not a stream indicator (like t)
+  ;; If the stream has a lock use that.
   (multiple-value-bind (csec cmin chour cday cmonth cyear)
       (decode-universal-time (get-universal-time))
-    (let ((str (format nil
-		       "~a: ~2,'0d/~2,'0d/~2,'0d - ~2,'0d:~2,'0d:~2,'0d - ~a~%"
-		       (mp:process-name sys:*current-process*)
-		       cmonth cday (mod cyear 100)
-		       chour cmin csec
-		       message)))
-      (write-sequence str 
-		      (vhost-error-stream
-		       (wserver-default-vhost
-			 *wserver*))))))
+    (let* ((*print-pretty* nil)
+	   (str (format
+		 nil
+		 "~a: ~2,'0d/~2,'0d/~2,'0d - ~2,'0d:~2,'0d:~2,'0d - ~a~%"
+		 (mp:process-name sys:*current-process*)
+		 cmonth cday (mod cyear 100)
+		 chour cmin csec
+		 message))
+	   (lock (getf (excl::stream-property-list stream) :lock)))
+      (if* lock
+	 then (mp:with-process-lock (lock)
+		(if* (open-stream-p stream)
+		   then (write-sequence str stream)
+			(finish-output stream)))
+	 else (write-sequence str stream)
+	      (finish-output stream)))))
 
 (defmethod brief-logmess (message)
   ;; omit process name and month, day, year
   (multiple-value-bind (csec cmin chour)
       (decode-universal-time (get-universal-time))
-    (let ((str (format nil
-		       "~2,'0d:~2,'0d:~2,'0d - ~a~%"
-		       chour cmin csec
-		       message)))
-      (write-sequence str (vhost-error-stream
-			   (wserver-default-vhost
-			    *wserver*))))))
+    (let* ((*print-pretty* nil)
+	   (stream (vhost-error-stream
+		    (wserver-default-vhost
+		     *wserver*)))
+	   (str (format nil
+			"~2,'0d:~2,'0d:~2,'0d - ~a~%"
+			chour cmin csec
+			message))
+	   (lock (getf (excl::stream-property-list stream) :lock)))
+      (if* lock
+	 then (mp:with-process-lock (lock)
+		(setq stream (vhost-error-stream
+			      (wserver-default-vhost
+			       *wserver*)))
+		(write-sequence str stream)
+		(finish-output stream))
+	 else (write-sequence str stream)
+	      (finish-output stream)))))
 
 
 
@@ -75,20 +103,22 @@
 (defmethod log-request ((req http-request))
   ;; after the request has been processed, write out log line
   (if* *enable-logging*
-     then (let ((ipaddr (socket:remote-host (request-socket req)))
-		(time   (request-reply-date req))
-		(code   (let ((obj (request-reply-code req)))
-			  (if* obj
-			     then (response-number obj)
-			     else 999)))
-		(length  (or (request-reply-content-length req)
-			     #+(and allegro (version>= 6))
-			     (excl::socket-bytes-written 
-			      (request-socket req))))
+     then (let* ((ipaddr (socket:remote-host (request-socket req)))
+		 (time   (request-reply-date req))
+		 (code   (let ((obj (request-reply-code req)))
+			   (if* obj
+			      then (response-number obj)
+			      else 999)))
+		 (length  (or (request-reply-content-length req)
+			      #+(and allegro (version>= 6))
+			      (excl::socket-bytes-written 
+			       (request-socket req))))
 	
-		(stream (vhost-log-stream
-			 (request-vhost req)))
-		(lock))
+		 (stream (vhost-log-stream (request-vhost req)))
+		
+		 (lock (and (streamp stream)
+			    (getf (excl::stream-property-list stream) 
+				  :lock))))
 
 	    (macrolet ((do-log ()
 			 '(progn (format stream
@@ -100,12 +130,11 @@
 				  (or length -1))
 			   (force-output stream))))
 			 
-	      (if* (streamp stream)
-		 then (setq lock (getf (excl::stream-property-list stream) 
-				       :lock)))
-	    
 	      (if* lock
 		 then (mp:with-process-lock (lock)
+			; in case stream switched out while we weren't busy
+			; get the stream again
+			(setq stream (vhost-log-stream (request-vhost req)))
 			(do-log))
 		 else (do-log))))))
 
