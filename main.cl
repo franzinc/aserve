@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.86 2000/12/13 15:24:25 jkf Exp $
+;; $Id: main.cl,v 1.87 2000/12/20 18:01:03 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -347,9 +347,9 @@
     :initform nil
     :accessor wserver-accept-thread)
 
-   (link-scan-thread  ;; thread scanning cached entries for links
+   (link-scan-threads  ;; threads scanning cached entries for links
     :initform nil
-    :accessor wserver-link-scan-thread)
+    :accessor wserver-link-scan-threads)
    
    (uri-scan-threads  ;; list of uri scanning processes
     :initform nil
@@ -1023,6 +1023,8 @@ by keyword symbols and not by strings"
     (mp:process-preset proc #'http-worker-thread)
     (push proc (wserver-worker-threads *wserver*))
     (atomic-incf (wserver-free-workers *wserver*))
+    (setf (getf (mp:process-property-list proc) 'short-name) 
+      (format nil "w~d" *thread-index*))
     ))
 
 

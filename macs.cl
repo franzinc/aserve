@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: macs.cl,v 1.12 2000/10/25 01:31:29 jkf Exp $
+;; $Id: macs.cl,v 1.13 2000/12/20 18:01:03 jkf Exp $
 
 ;; Description:
 ;;   useful internal macros
@@ -181,6 +181,13 @@
 
 
 
+
+(defmacro dlogmess (&rest args)
+  ;; for now we just disable completely the log messages.
+  ;; in the future we'll turn on and off the log messages 
+  ;; at runtime with a switch.
+  (declare (ignore args))
+  nil)
 
 
 

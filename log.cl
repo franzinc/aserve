@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: log.cl,v 1.17 2000/11/06 21:24:38 layer Exp $
+;; $Id: log.cl,v 1.18 2000/12/20 18:01:03 jkf Exp $
 
 ;; Description:
 ;;   iserve's logging
@@ -47,7 +47,15 @@
 		       message)))
       (write-sequence str (or *aserve-debug-stream* *initial-terminal-io*)))))
 
-
+(defmethod brief-logmess (message)
+  ;; omit process name and month, day, year
+  (multiple-value-bind (csec cmin chour)
+      (decode-universal-time (get-universal-time))
+    (let ((str (format nil
+		       "~2,'0d:~2,'0d:~2,'0d - ~a~%"
+		       chour cmin csec
+		       message)))
+      (write-sequence str (or *aserve-debug-stream* *initial-terminal-io*)))))
 
 
 
@@ -87,6 +95,22 @@
 	    	
     
     
-    
+(defun log-proxy (uri level action extra)
+  ;; log information from the proxy module
+  ;;
+  (brief-logmess 
+   (format nil "~a ~d ~a ~a ~s"
+	   (or (getf (mp:process-property-list mp:*current-process*)
+		     'short-name)
+	       (mp:process-name mp:*current-process*))
+	   level
+	   action
+	   (if* (stringp uri) 
+	      then uri 
+	      else (net.uri:render-uri uri nil))
+	   extra))
+  (force-output (or *aserve-debug-stream* *initial-terminal-io*)))
+
     
   
+

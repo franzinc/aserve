@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.29 2000/11/22 16:04:58 jkf Exp $
+;; $Id: proxy.cl,v 1.30 2000/12/20 18:01:03 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -58,6 +58,8 @@
   
   (dead-items 0) ; total number of objects on the dead-ent list
 
+  (level0-time 0) ; last time level0 access was done
+  
   queueobj	; queue object holding in-memory cache objects
   
   dead-ent	; linked list of dead pcache-ents, linked by next field only
@@ -69,6 +71,10 @@
   ; and the request headers
   (r-miss 0)
 
+  ; like r-miss except the level is greater than 0 thus this is a
+  ; cache fill rather than a direct user request
+  (r-cache-fill 0)
+  
   ; non-ims request.  value within the min-freshness contstraints
   ; ims request where we know that the value in the cache is fresh
   ;  and has been modified since the ims time
@@ -149,7 +155,7 @@
                 ; :dead - trying to kill off, 
   		; :new - filling the entry
 
-  scanned	; true when link scanning has been done
+  ;; scanned	; true when link scanning has been done
   
   ; number of times this entry was returned due to a request
   (returned 0)
@@ -165,7 +171,16 @@
   next
 
   ; scanning for links
-  links	    ; list of uris
+  ; notes:
+  ;  links is initially nil and once the page has been scanned for links
+  ;      it is t or a list of uri objects 
+  ;      or it is :scanning when then pcache-ent is in the to be link scanned
+  ;  level is non-zero when this entry is on the link-scan queue or
+  ;	uri-scan queue.
+  ;  scan-next is valid (nil or non-nil) when this entry is on the 
+  ;    link-scan queue or uri-scan queue.
+  ;  
+  links	    ; nil or list of uris to img's then  list of uris from a links
   links-left ; list of uris still to scan
   level	    ; level at which to scan these links
   scan-next ; next pcache-ent to scan
@@ -290,8 +305,6 @@
     (unwind-protect
 	(progn
 	  
-	  (format *debug-stream* "do proxy to ~s~%" uri)
-	  (force-output *debug-stream*)
 
 	  (handler-bind ((error #'(lambda (cond)
 				    (format *debug-stream*
@@ -871,7 +884,11 @@
 			   (return))
 		   (ignore-errors (cache-housekeeping)))
 		 (sleep 30))))
-	 server)))
+	 server))
+      (setf (getf (mp:process-property-list (pcache-cleaner pcache))
+		  'short-name)
+	(format nil "c~d" *thread-index*))
+      )
   
     (publish :path "/cache-stats"
 	     :function
@@ -1009,7 +1026,8 @@
 		       
 	    (dolist (ent
 			'(("direct"   pcache-r-direct)
-			  ("miss"     pcache-r-miss)
+			  ("miss (user request)"     pcache-r-miss)
+			  ("miss (anticipated request)"  pcache-r-cache-fill)
 			  ("consistency miss" pcache-r-consistency-miss)
 			  ("fast hit" pcache-r-fast-hit)
 			  ("fast validation" pcache-r-fast-validation)
@@ -1207,8 +1225,7 @@
   ;;
   
   (let ((pcache (wserver-pcache *wserver*))
-	(rendered-uri 
-	 (transform-uri (net.uri:render-uri (request-raw-uri req) nil))))
+	(rendered-uri))
     
     (if* (or (null pcache)
 	     ; should handle :head requests too
@@ -1220,12 +1237,19 @@
 		    t))
 	     )
        then (if* pcache then (incf (pcache-r-direct pcache)))
-	    (logmess (format nil "direct for ~a~%" rendered-uri))
 	    (return-from proxy-cache-request
 	      (proxy-request req ent :respond respond)))
 
-    (logmess (format nil "cache: look in cache for ~a, number of ents ~d~%" 
+    ; clear out the fragment part (after the #) so that we don't match
+    ; on that.
+    (setf (net.uri:uri-fragment (request-raw-uri req)) nil)
+    (setq rendered-uri
+      (transform-uri (net.uri:render-uri (request-raw-uri req) nil)))
+      
+    
+    (dlogmess (format nil "cache: look in cache for ~a, level ~d, ents ~d~%" 
 		     rendered-uri
+		     level
 		     (length (gethash rendered-uri (pcache-table pcache)))
 		     ))
 
@@ -1233,8 +1257,14 @@
 	      ; not found, must proxy and then cache if the
 	      ; result looks good
 	      (progn
-		(logmess "not in cache, proxy it")
-		(incf (pcache-r-miss pcache))
+		(dlogmess (format nil "not in cache, proxy it level ~d" level))
+		(if* (zerop level)
+		   then (incf (pcache-r-miss pcache))
+			(log-proxy rendered-uri level :mi nil)
+		   else (incf (pcache-r-cache-fill pcache))
+			(log-proxy rendered-uri level :pf nil))
+		
+			
 		(proxy-and-cache-request req ent (get-universal-time) 
 					 nil respond level)))
       (if* (lock-pcache-ent pcache-ent)
@@ -1251,10 +1281,10 @@
 					  (funcall *entry-cached-hook* 
 						   pcache-ent level)))
 			  (return)
-		     else (logmess 
+		     else (dlogmess 
 			   (format nil "can't use cached ~s due to cookie difference~%"
 				   rendered-uri))
-			  (logmess (format nil
+			  (dlogmess (format nil
 					   "cached cookie ~s~%, current cookie: ~s~%" 
 					   (pcache-ent-cookie pcache-ent)
 					   (header-slot-value req :cookie))))
@@ -1286,7 +1316,7 @@
 	    ; make this the new entry
 
 	    (if* pcache-ent
-	       then (logmess (format nil "replace cache entry for ~a"
+	       then (dlogmess (format nil "replace cache entry for ~a"
 				     rendered-uri)))
 	    
 	    
@@ -1298,7 +1328,9 @@
 	    ; could already be dead from some other threads o
 	    ; be careful
 	    (if* (lock-pcache-ent new-ent)
-	       then (move-pcache-ent new-ent nil (pcache-queueobj pcache))
+	       then (if* (not (eq (pcache-ent-state new-ent) :dead))
+		       then (move-pcache-ent new-ent nil 
+					     (pcache-queueobj pcache)))
 		    (unlock-pcache-ent new-ent))
 			      
 	    ; and disable the old entry
@@ -1313,7 +1345,7 @@
 	    ; that the item is older
 	    ;* this may end up violation the expiration
 	    ; time in a header from a previous call
-	    (logmess (format nil "change expiration date for ~a"
+	    (dlogmess (format nil "change expiration date for ~a"
 			     rendered-uri))      
 	    (setf (pcache-ent-expires pcache-ent)
 	      (max (pcache-ent-expires pcache-ent)
@@ -1335,13 +1367,13 @@
     
     (most-recently-used-ent pcache-ent)
     
-    (logmess (format nil "ims is ~s" ims))
+    (dlogmess (format nil "ims is ~s" ims))
 
     ; compute if the entry is fresh or stale
     (setq fresh (<= now (pcache-ent-expires pcache-ent)))
     
     
-    (logmess (format nil "ims is ~s, fresh by ~s seconds" ims 
+    (dlogmess (format nil "ims is ~s, fresh by ~s seconds" ims 
 		     (-  (pcache-ent-expires pcache-ent) now)))
     
     
@@ -1355,30 +1387,58 @@
 	       then (if* (< ims (pcache-ent-last-modified pcache-ent))
 		       then ; it has been modified since the ims time
 			    ; must return the whole thing
-			    (logmess "validation->fast hit")
+			    (dlogmess "validation->fast hit")
 			    (incf (pcache-r-fast-hit pcache))
 			    (send-cached-response req pcache-ent)
+			    (log-proxy (pcache-ent-key pcache-ent)
+				       level
+				       :fh
+				       (- (pcache-ent-last-modified pcache-ent)
+					  ims))
+			    
 		       else ; it hasn't been modified since the ims time
-			    (logmess "fast validation")
+			    (dlogmess "fast validation")
 			    (incf (pcache-r-fast-validation pcache))
-			    (send-not-modified-response req ent))
+			    (send-not-modified-response req ent)
+			    (log-proxy (pcache-ent-key pcache-ent)
+				       level
+				       :fv
+				       (- (pcache-ent-last-modified pcache-ent)
+					  ims))
+			    )
 	       else ; stale, must revalidate
 		    (let ((code
 			   (proxy-and-cache-request req ent 
 						    now pcache-ent t
 						    level)))
 		      (if* (eql code 304)
-			 then (logmess "slow validation")
+			 then (dlogmess "slow validation")
 			      (incf (pcache-r-slow-validation pcache))
-			 else (logmess "consistency miss")
+			      (log-proxy (pcache-ent-key pcache-ent)
+				       level
+				       :sv
+				       (- (pcache-ent-last-modified pcache-ent)
+					  ims))
+			      
+			 else (dlogmess "consistency miss")
 			      (incf (pcache-r-consistency-miss
-				     pcache)))))
+				     pcache))
+			      (log-proxy (pcache-ent-key pcache-ent)
+				       level
+				       :cm
+				       (- (pcache-ent-last-modified pcache-ent)
+					  ims)))))
 			    
        else ; unconditional get
 	    (if* fresh
-	       then (logmess "fast hit")
+	       then (dlogmess "fast hit")
 		    (incf (pcache-r-fast-hit pcache))
 		    (send-cached-response req pcache-ent)
+		    (log-proxy (pcache-ent-key pcache-ent)
+				       level
+				       :fh
+				       nil)
+		    
 	       else ; issue a validating send
 		    
 		    (insert-header 
@@ -1396,11 +1456,21 @@
 		      (if* (eql code 304)
 			 then ; hasn't been modified since our 
 			      ; cached entry
-			      (logmess "slow hit")
+			      (dlogmess "slow hit")
 			      (incf (pcache-r-slow-hit pcache))
+			      (log-proxy (pcache-ent-key pcache-ent)
+				       level
+				       :sh
+				       nil)
+			      
 			 else ; was modified, so new item is cached
-			      (logmess "consistency miss")
-			      (incf (pcache-r-consistency-miss pcache)))
+			      (dlogmess "consistency miss")
+			      (incf (pcache-r-consistency-miss pcache))
+			      (log-proxy (pcache-ent-key pcache-ent)
+				       level
+				       :cm
+				       nil)
+			      )
 		      (send-cached-response req pcache-ent))))))
 		      
 		    
@@ -1426,7 +1496,7 @@
 
 (defun send-cached-response (req pcache-ent)
   ;; send back this response
-  (logmess (format nil "cache: sending back cached response: ~a, length ~d~%" 
+  (dlogmess (format nil "cache: sending back cached response: ~a, length ~d~%" 
 		   (net.uri:render-uri (request-raw-uri req) nil)
 		   (pcache-ent-data-length pcache-ent)))
   (incf (pcache-ent-returned pcache-ent))
@@ -1601,7 +1671,7 @@
   ;; in the pcache-ent we are passed, which should be blank
   
 	    
-  (logmess (format nil "cache: caching response to ~a, code ~d, length ~d~%" 
+  (dlogmess (format nil "cache: caching response to ~a, code ~d, length ~d~%" 
 		   (net.uri:render-uri (request-raw-uri req) nil)
 		   response-code
 		   body-length
@@ -1732,10 +1802,11 @@
 	(let ((lru (pcache-ent-prev lru-head)))
 	  (if* (not (eq lru mru-head))
 	     then ; a legit block
-		  (logmess (format nil "kill ~s from disk queue"
+		  (dlogmess (format nil "kill ~s from disk queue"
 				   (pcache-ent-key lru)))
 		  (decf needed (pcache-ent-blocks lru))
 		  (kill-pcache-ent lru pcache)
+		  (log-proxy (pcache-ent-key lru) 0 :kd nil)
 	     else (return) ; no more left ? shouldn't happen
 		  ))))))
 
@@ -1771,7 +1842,8 @@
 				(decf needed (pcache-ent-blocks lru))
 				(unlock-pcache-ent lru)
 				(return-from main)))
-		      ; couldn't get it into a disk cache.. just kill it
+		      ; may or may not be on disk.  kill it in memory
+		      
 		      (decf needed (pcache-ent-blocks lru))
 		      (kill-pcache-ent lru pcache)
 		      (unlock-pcache-ent lru)
@@ -1834,7 +1906,7 @@
   ;; return t if we suceede and nil if we didn't
   ;;
   (if* (pcache-ent-disk-location pcache-ent)
-     then (logmess (format nil "cached ~s is already on the disk"
+     then (dlogmess (format nil "cached ~s is already on the disk"
 			   (pcache-ent-key pcache-ent)))
 	  (return-from move-ent-to-disk t))
   
@@ -1843,11 +1915,11 @@
 	(buffs))
     
     (if* to-store-list
-       then (logmess (format nil "store ~s on disk at ~s~%"
+       then (dlogmess (format nil "store ~s on disk at ~s~%"
 			     (pcache-ent-key pcache-ent)
 			     to-store-list))
 	    (store-data-on-disk pcache-ent pcache-disk to-store-list)
-	    
+	    (log-proxy (pcache-ent-key pcache-ent) 0 :wd nil)
 	    (let ((ans
 		   (mp:without-scheduling
 		     (if* (and (null (pcache-ent-state pcache-ent))
@@ -1917,9 +1989,11 @@
 	   (bytes (+ (pcache-ent-data-length pcache-ent)
 		     *header-block-size*))
 	   (res))
-      (logmess (format nil "retrieve ~s in blocks ~s~%"
+      (dlogmess (format nil "retrieve ~s in blocks ~s~%"
 		       (pcache-ent-key pcache-ent)
 		       block-list))
+      (log-proxy (pcache-ent-key pcache-ent) 0 :rd nil)
+      
       (mp:with-process-lock ((pcache-disk-lock pcache-disk))
 	; get a lock so we're the only thread doing operations
 	; on the stream to the cache
@@ -2053,7 +2127,7 @@
 	(stream (pcache-disk-stream pcache-disk))
 	(bytes (+  *header-block-size*  ; for header block
 		   (pcache-ent-data-length pcache-ent))))
-    (logmess (format nil "writing ~d buffers to list ~d~%" 
+    (dlogmess (format nil "writing ~d buffers to list ~d~%" 
 		     (length buffers)
 		     list-of-blocks))
     (dolist (ent list-of-blocks)
