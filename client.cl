@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.27 2000/09/15 01:04:15 jkf Exp $
+;; $Id: client.cl,v 1.28 2000/09/26 15:56:30 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -387,8 +387,8 @@
 				  :remote-port port
 				  :format :bivalent
 				  :type 
-					     #+hiper-socket :hiper
-					     #-hiper-socket :stream
+				  #+hiper-socket :hiper
+				  #-hiper-socket :stream
 					     
 				  )))
 

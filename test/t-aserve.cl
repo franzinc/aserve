@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.13 2000/09/24 22:54:50 jkf Exp $
+;; $Id: t-aserve.cl,v 1.14 2000/09/26 15:56:31 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -43,7 +43,7 @@
 (in-package :net.aserve.test)
 
 ; set to nil before loading the test to prevent the test from auto-running
-(defvar user::*do-aserve-test* t)
+(defvar user::*do-aserve-test* nil)
 (defvar *x-proxy* nil) ; when true x-do-http-request will go through a proxy
 (defvar *proxy-wserver* nil)
 
@@ -914,85 +914,76 @@
 	(proxy-host)
 	(origin-server))
     
-    (setq proxy-host (format nil "localhost:~d"
-			     (socket:local-port
-			      (net.aserve::wserver-socket proxy-wserver))))
+    (macrolet ((test-2 (res1 res2 form &key (test #'eql))
+		 `(multiple-value-bind (v1 v2) ,form
+		    (test ,res1 (and `(:first ,',form) v1) :test ,test)
+		    (test ,res2 (and `(:second ,',form) v2) :test ,test))))
+		 
+		      
+		 
     
-    (setq origin-server
-      (format nil "http://localhost:~d" (socket:local-port
-					 (net.aserve::wserver-socket *wserver*))))
+      (setq proxy-host (format nil "localhost:~d"
+			       (socket:local-port
+				(net.aserve::wserver-socket proxy-wserver))))
+    
+      (setq origin-server
+	(format nil "http://localhost:~d" (socket:local-port
+					   (net.aserve::wserver-socket *wserver*))))
 
-    (format t "server on port ~d, proxy server on port ~d~%"
-	    (socket:local-port
-	     (net.aserve::wserver-socket *wserver*))
-	    (socket:local-port
-	     (net.aserve::wserver-socket proxy-wserver)))
+      (format t "server on port ~d, proxy server on port ~d~%"
+	      (socket:local-port
+	       (net.aserve::wserver-socket *wserver*))
+	      (socket:local-port
+	       (net.aserve::wserver-socket proxy-wserver)))
 
-    (with-tests (:name "aserve-proxy-cache")
-      (unwind-protect
-	  (progn
-	    (publish :path "/foo"
-		     :function #'(lambda (req ent)
-				   (with-http-response (req ent)
-				     (with-http-body (req ent)
-				       (html "foo")))))
+      (with-tests (:name "aserve-proxy-cache")
+	(unwind-protect
+	    (progn
+	      (publish :path "/foo"
+		       :function #'(lambda (req ent)
+				     (with-http-response (req ent)
+				       (with-http-body (req ent)
+					 (html "foo")))))
 	  
-	    (test "foo" 
-		  (values (do-http-request 
-			      (format nil "~a/foo" origin-server)
-			    :proxy proxy-host))
-		  :test #'equal)
-	    (test "foo" 
-		  (values (do-http-request 
-			      (format nil "~a/foo" origin-server)
-			    :proxy proxy-host))
-		  :test #'equal)
-	    (test "foo" 
-		  (values (do-http-request 
-			      (format nil "~a/foo" origin-server)
-			    :proxy proxy-host))
-		  :test #'equal)
+	      (test-2 "foo" 200
+		    (do-http-request 
+				(format nil "~a/foo" origin-server)
+			      :proxy proxy-host)
+		    :test #'equal)
+	      (test-2 "foo" 200
+		    (do-http-request 
+				(format nil "~a/foo" origin-server)
+			      :proxy proxy-host)
+		    :test #'equal)
+	      (test-2 "foo" 200
+		     (do-http-request 
+				(format nil "~a/foo" origin-server)
+			      :proxy proxy-host)
+		    :test #'equal)
 	  
 	  
-	    (sleep 15)
-	    (test "foo" 
-		  (values (do-http-request 
-			      (format nil "~a/foo" origin-server)
-			    :proxy proxy-host))
-		  :test #'equal)
+	      (sleep 15)
+	      (test-2 "foo" 200
+		    (do-http-request 
+				(format nil "~a/foo" origin-server)
+			      :proxy proxy-host)
+		    :test #'equal)
 	  
-	    (test "foo" 
-		  (values (do-http-request 
-			      (format nil "~a/foo" origin-server)
-			    :proxy proxy-host))
-		  :test #'equal)
+	      (test-2 "foo"  200
+		     (do-http-request 
+				(format nil "~a/foo" origin-server)
+			      :proxy proxy-host)
+		    :test #'equal)
 	  
 		
-	    )
+	      )
 	    
 	  
       
       
-	(shutdown  proxy-wserver)
-	(shutdown  *wserver*)))))
+	  (shutdown  proxy-wserver)
+	  (shutdown  *wserver*))))))
 
-
-    
-    
-    
-    
-
-
-
-
-
-      
-    
-    
-    
-    
-			  
-		   
     
     
     

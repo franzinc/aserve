@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.14 2000/09/24 22:54:50 jkf Exp $
+;; $Id: proxy.cl,v 1.15 2000/09/26 15:56:31 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -34,6 +34,78 @@
 
 (in-package :net.aserve)
 
+
+(defstruct pcache 
+  ;; proxy cache
+  table		; hash table mapping to pcache-ent objects
+  file		; file in which to store the cache info
+  (probes 0)	; cache problems
+  (hits	  0)	; number of times we could send something from the cache
+  (items  0)	; total number of objects cached
+  (bytes  0)	; total number of bytes cached
+  (memory 0)	; total number of bytes in memory
+  (disk	  0)	; bytes written to disk
+  
+  ; types of responses to cache requests
+  ; item not in cache, did proxy to get value
+  (r-notpresent  0) 
+  
+  ; ims request made and cached value within constraints, just send 
+  ; not modified response back
+  (r-ims-valid   0) 
+  
+  ; ims request made, while cached value isn't within the ims constraints
+  ; it's within min-freshness contraints. thus we send back a
+  ; not modified response
+  (r-ims-assumed-valid 0)
+  
+  ; ims request made, while cached value isn't within the ims constraints
+  ; it's likely to be valid, we send back a not-modifed response and
+  ; then do a proxy request to update our cache
+  (r-ims-maybe-valid 0)
+  
+  ; ims request made, cached value is way out of date, kill off cached value
+  ; and do a proxy to get the value
+  (r-ims-invalid 0)
+  
+
+  ; non-ims request.  value within the min-freshness contstraints
+  (r-assumed-valid 0)
+  
+  ; non-ims request mde, out of date between min-freshness and likely-fresh
+  ; send back the cached value and also proxy the request to refresh the cache
+  (r-maybe-valid 0)
+  
+  ; non-ims request made, cached value is assumed out of date. proxy
+  ; to get a new value
+  (r-invalid 0)
+  
+  ; ims or non-ims where there is no entry that mathes this url
+  ; and the request headers
+  (r-miss 0)
+  )
+
+
+
+(defstruct pcache-ent
+  max-valid-time ; most recent time at which this is known to be a valid
+  		; response
+  request	; request header block 
+  data		; data blocks (first is the response header block)
+  data-length	; number of octets of data
+  code		; response code
+  comment	; response comment 
+
+  ; count of the internal use of this
+  use		; nil - dead entry. >= 0 - current users of this entry
+
+  state		; nil - normal , 
+                ; :dead - trying to kill off, 
+  		; :new - filling the entry
+  
+  ; number of times this entry was returned due to a request
+  (returned 0)
+  )
 
 
 
@@ -136,6 +208,12 @@
 	  (handler-bind ((error #'(lambda (cond)
 				    (format *debug-stream*
 					    "error during proxy: ~a~%" cond)
+				    
+				    (if* pcache-ent
+				       then (setf (pcache-ent-state 
+						   pcache-ent)
+					      :dead))
+						   
 				    (if* (not (member :notrap *debug-current* 
 						      :test #'eq))
 				       then ; we want to auto-handle the error
@@ -181,7 +259,7 @@
 				      then (format nil "~a:~d"
 						   host port)
 				      else host)))
-	    (setq outend (add-trailing-crlf outbuf))
+	    (setq outend (add-trailing-crlf outbuf 1))
 
 	    (if-debug-action :xmit
 			     (format *debug-stream* "proxy covnerted headers toward server~%")
@@ -272,7 +350,7 @@
 			 given-content-length)))
 
 
-	      (setf (request-reply-content-length req) (or given-content-length 0))
+	      
 	    
 	      (if* (not (or (eq (request-method req) :head)
 			    (<= 100 response 199) 
@@ -288,6 +366,10 @@
 			 then (warn "content-length ~s but body length ~d"
 				    given-content-length body-length)
 			      (setq given-content-length body-length)))
+	      
+	      
+	      (setf (request-reply-content-length req) 
+		(or body-length given-content-length 0))
     
 	      (close sock)  (setq sock nil)
 
@@ -309,7 +391,7 @@
 	      ; transfer-encoding - 
 	      ; we won't chunk back since we know the content length
 
-	      (setq cliend (add-trailing-crlf clibuf))
+	      (setq cliend (add-trailing-crlf clibuf 2))
 
 	  
 	      (if-debug-action 
@@ -519,45 +601,110 @@
 (defparameter *likely-fresh*  60) ; values probably valid this long but check
 
 
-(defstruct pcache 
-  ;; proxy cache
-  table		; hash table mapping to pcache-ent objects
-  file		; file in which to store the cache info
-  (probes 0)	; cache problems
-  (hits	  0)	; number of times we could send something from the cache
-  (items  0)	; total number of objects cached
-  (bytes  0)	; total number of bytes cached
-  (memory 0)	; total number of bytes in memory
-  (disk	  0)	; bytes written to disk
-  )
-
-(defstruct pcache-ent
-  max-valid-time ; most recent time at which this is known to be a valid
-  		; response
-  request	; request header block 
-  data		; data blocks (first is the response header block)
-  data-length	; number of octets of data
-  code		; response code
-  comment	; response comment 
-
-  ; count of the internal use of this
-  use		; nil - dead entry. >= 0 - current users of this entry
-
-  state		; nil - normal , 
-                ; :dead - trying to kill off, 
-  		; :new - filling the entry
-  
-  ; number of times this entry was returned due to a request
-  (returned 0)
-  )
-
 
   
 (defun create-proxy-cache (&key (server *wserver*))
   ;; create a cache for the proxy
-  (setf (wserver-pcache server)
-    (make-pcache 
-     :table (make-hash-table :test #'equal))))
+  (let (pcache)
+    (setf (wserver-pcache server)
+      (setq pcache (make-pcache 
+		    :table (make-hash-table :test #'equal))))
+  
+    (publish :path "/cache-stats"
+	     :function
+	     #'(lambda (req ent)
+		 (display-proxy-cache-statistics req ent pcache)))))
+				
+
+
+(defun display-proxy-cache-statistics (req ent pcache)
+  (let ((dead-count 0)
+	(dead-bytes 0)
+	(new-count 0)
+	(per-age-count (make-array 10 :initial-element 0))
+	(per-age-bytes (make-array 10 :initial-element 0))
+	(other-age-count 0)
+	)
+    (maphash #'(lambda (key vals)
+		 (declare (ignore key))
+		 (dolist (val vals)
+		   (let ((state (pcache-ent-state val))
+			 (use (pcache-ent-use val))
+			 (size (pcache-ent-data-length val)))
+		     (if* (eq state :dead)
+			then (incf dead-count)
+			     (incf dead-bytes
+				   (if* (numberp size) then size else 0))
+		      elseif (eq state :new)
+			then (incf new-count)
+		      elseif (and (null state)
+				  (numberp use)
+				  (<= 0 use 9))
+			then (incf (aref per-age-count use))
+			     (incf (aref per-age-bytes use)
+				   (if* (numberp size) then size else 0))
+			else (incf other-age-count)))))
+					   
+	     (pcache-table pcache))
+    
+    (with-http-response (req ent)
+      (with-http-body (req ent)
+	(html
+	 (:html
+	  (:head (:title "AllegroServe Proxy Cache Statistics"))
+	  (:body 
+	   (:h1 "AllegroServe Proxy Cache Statistics")
+	   ((:table :border 2)
+	    (:tr
+	     (:th "Cache Action")
+	     (:th "Count"))
+		       
+	    (dolist (ent
+			'(("miss" pcache-r-miss)
+			  ("assumed valid" pcache-r-assumed-valid)
+			  ("maybe valid"   pcache-r-maybe-valid)
+			  ("invalid"       pcache-r-invalid)
+				     
+			  ("assumed valid - ims"
+			   pcache-r-ims-assumed-valid)
+			  ("maybe valid - ims"
+			   pcache-r-ims-maybe-valid)
+			  ("invalid - ims" 
+			   pcache-r-ims-invalid)))
+	      (html
+	       (:tr 
+		(:td (:princ (car ent)))
+		(:td (:princ (funcall (cadr ent) pcache)))))))
+	  
+	  
+	   ((:table :border 2)
+	    (:tr
+	     (:th "Kind of Entry")
+	     (:th "Count")
+	     (:th "Bytes"))
+	   
+	    (:tr
+	     (:td "Dead Entries") 
+	     (:td (:princ dead-count))
+	     (:td (:princ dead-bytes)))
+	   
+	   
+	    (:tr
+	     (:td "New Entries") (:td (:princ new-count)) (:td))
+	   
+	    (:tr
+	     (:td "Other Entries") (:td (:princ other-age-count)) (:td))
+	   
+	    (dotimes (i 10)
+	      (html
+	       (:tr
+		(:td (:princ i))
+		(:td (:princ (aref per-age-count i)))
+		(:td (:princ (aref per-age-bytes i))))))))))))))
+				     
+				     
+				   
+  
 
 
 (defun proxy-cache-request (req ent)
@@ -574,43 +721,66 @@
     (logmess (format nil "cache: look for ~a~%" (net.uri:render-uri (request-raw-uri req) nil)))
     
     (mp:without-scheduling (incf (pcache-probes pcache)))
-    
-    (dolist (pcache-ent
-		(gethash (net.uri:render-uri (request-raw-uri req) nil) 
-			 (pcache-table pcache))
-	      ; here is failed to match in the cache
-	      (let ((pcache-ent (make-pcache-ent
-				 :request (request-header-block req)
-				 :use 0
-				 :state :new)))
-		(push pcache-ent
-		      (gethash (net.uri:render-uri (request-raw-uri req) nil) 
-			       (pcache-table pcache)))
-		      
-		(proxy-request req ent :pcache-ent pcache-ent)))
+
+    (tagbody top
+      (dolist (pcache-ent
+		  (gethash (net.uri:render-uri (request-raw-uri req) nil) 
+			   (pcache-table pcache))
+		; here is failed to match in the cache
+		(let ((pcache-ent (make-pcache-ent
+				   :request (request-header-block req)
+				   :use 0
+				   :state :new)))
+		  (push pcache-ent
+			(gethash (net.uri:render-uri (request-raw-uri req) nil) 
+				 (pcache-table pcache)))
+
+		  (incf (pcache-r-miss pcache))
+		  (logmess (format nil "cache miss for ~s"
+				   (net.uri:render-uri (request-raw-uri req) nil)))
+				 
+		  (proxy-request req ent :pcache-ent pcache-ent)))
 
       
-      ; see if this request matches our request
+	; see if this request matches our request
       
-      (if* (lock-pcache-ent pcache-ent)
-	 then (unwind-protect
-		  (if* (match-request-blocks 
-			     (request-header-block req)
-			     (pcache-ent-request pcache-ent))
-		     then (mp:without-scheduling
-			    (incf (pcache-hits pcache)))
+	(if* (lock-pcache-ent pcache-ent)
+	   then (unwind-protect
+		    (if* (match-request-blocks 
+			  (request-header-block req)
+			  (pcache-ent-request pcache-ent))
+		       then (mp:without-scheduling
+			      (incf (pcache-hits pcache)))
 			  
-			  (if* (eq (pcache-ent-state pcache-ent) :new)
-			     then ; still reading this one in
-				  (mp:process-wait "wait for cache to fill"
-						   #'(lambda (ent)
-						       (null (pcache-ent-state ent)))
-						   pcache-ent))
+			    (if* (eq (pcache-ent-state pcache-ent) :new)
+			       then ; still reading this one in
+				    (mp:process-wait "wait for cache to fill"
+						     #'(lambda (ent)
+							 (not (eq (pcache-ent-state ent) :new)))
+						     pcache-ent))
 			  
-			  (use-value-from-cache req ent pcache-ent)
-			  (return))
-		; cleanup
-		(unlock-pcache-ent pcache-ent))))))
+			    (if* (not (null (pcache-ent-state pcache-ent)))
+			       then ; the cache didn't fill this correctly
+				    ; try again
+				    (go top))
+				  
+			    (use-value-from-cache req ent pcache-ent)
+			    (return)
+		       else ; uri's match but headers don't.
+			    ; print some debugging to figure out why
+			    (logmess "uri match but header mismatch.. request header:")
+			    (logmess "-------------")
+			    (dump-header-block (request-header-block req)
+					       *initial-terminal-io*)
+			    (logmess "-------------")
+			    (logmess " ... and cached header")
+			    (logmess "-------------")
+			    (dump-header-block (pcache-ent-request pcache-ent)
+					       *initial-terminal-io*)
+			    (logmess "-------------")
+			    )
+		  ; cleanup
+		  (unlock-pcache-ent pcache-ent)))))))
 
 
 (defun use-value-from-cache (req ent pcache-ent)
@@ -619,7 +789,8 @@
   (let* ((ims (header-slot-value req :if-modified-since))
 	 (now (get-universal-time))
 	 (time (- now (pcache-ent-max-valid-time pcache-ent)))
-	 (pcache (wserver-pcache *wserver*)))
+	 (pcache (wserver-pcache *wserver*))
+	 (rendered-uri (net.uri:render-uri (request-raw-uri req) nil)))
     (logmess (format nil "ims is ~s" ims))
     (if* (and ims (not (equal "" ims)))
        then (setq ims (date-to-universal-time ims))
@@ -630,18 +801,21 @@
 		    (logmess 
 		     (format nil 
 			     "ims with max-valid-time, so not modified for ~a"
-			     (net.uri:render-uri (request-raw-uri req) nil)))
+			     rendered-uri))
+		    (incf (pcache-r-ims-valid pcache))
 		    (send-not-modified-response req ent)
 	     elseif (<= time *min-freshness*)
 	       then (logmess 
 		     (format nil
 			     "ims within min freshness, so not modified for ~a"
-			     (net.uri:render-uri (request-raw-uri req) nil)))
+			     rendered-uri))
+		    (incf (pcache-r-ims-assumed-valid pcache))
 		    (send-not-modified-response req ent)
 	     elseif (<= time *likely-fresh*)
 	       then (logmess 
 		     (format nil "ims within likely freshness, so not modified and retry for ~a"
-			     (net.uri:render-uri (request-raw-uri req) nil)))
+			     rendered-uri))
+		    (incf (pcache-r-ims-maybe-valid pcache))
 		    (send-not-modified-response req ent)
 		    (let ((new-ent (make-pcache-ent)))
 		      (proxy-request req ent :pcache-ent new-ent
@@ -654,21 +828,36 @@
 			      (logmess "freshness test showed that it is newer")
 			      (setf (pcache-ent-state pcache-ent) :dead)
 			      (push new-ent
-				    (gethash (net.uri:render-uri (request-raw-uri req) nil) 
-					     (pcache-table pcache))))))
+				    (gethash rendered-uri 
+					     (pcache-table pcache)))))
+	       else ; our cached entry has no value, just proxy it
+		    
+		    (incf (pcache-r-ims-invalid pcache))
+		    
+		    (let ((new-ent (make-pcache-ent)))
+		      (logmess "ims request, cache out of date, get new contents")
+		      (proxy-request req ent :pcache-ent new-ent)
+		      (push new-ent (gethash rendered-uri 
+					     (pcache-table pcache)))
+		      (setf (pcache-ent-state pcache-ent) :dead)))
        else ; no ims
 	    (if* (<= time *min-freshness*)
 	       then (logmess 
 		     (format nil "return cached response to ~s"
-			     (net.uri:render-uri (request-raw-uri req) nil)))
+			     rendered-uri))
+		    (incf (pcache-r-assumed-valid pcache))
+		    
 		    (send-cached-response req pcache-ent)
 	       else (let ((do-respond t))
 		      (if* (<= time *likely-fresh*)
 			 then (logmess 
 			       (format nil "return cached response to ~s and check"
-				       (net.uri:render-uri (request-raw-uri req) nil)))
+				       rendered-uri))
+			      
+			      (incf (pcache-r-maybe-valid pcache))
 			      (send-cached-response req pcache-ent)
-			      (setq do-respond nil))
+			      (setq do-respond nil)
+			 else (incf (pcache-r-invalid pcache)))
 		    
 		      (insert-header (request-header-block req)
 				     :if-modified-since
@@ -733,10 +922,17 @@
 	    (pcache-ent-code pcache-ent)
 	    (pcache-ent-comment pcache-ent) *crlf*)
 
+    (setf (request-reply-code req) (code-to-response
+				    (pcache-ent-code pcache-ent)))
+    
     (let ((data (pcache-ent-data pcache-ent))
 	  (data-length (pcache-ent-data-length pcache-ent)))
+      
+      
+      (setf (request-reply-content-length req) data-length)
+      
       (write-sequence (car data) rsock 
-		      :end (add-trailing-crlf (car data)))
+		      :end (add-trailing-crlf (car data) 3))
       (if* data-length 
 	 then (write-body-buffers rsock (cdr data) data-length))
 		
@@ -812,6 +1008,9 @@
   (setf (pcache-ent-max-valid-time pcache-ent) (get-universal-time))
 
   ; usually this is nil but just in case..
+  (if* (pcache-ent-data pcache-ent)
+     then (logmess "Freeing existing data in cache entry"))
+  
   (free-header-blocks  (pcache-ent-data pcache-ent))
   (setf (pcache-ent-data pcache-ent) 
     (cons client-response-header body-buffers))

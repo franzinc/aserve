@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.10 2000/09/24 22:54:50 jkf Exp $
+;; $Id: headers.cl,v 1.11 2000/09/26 15:56:30 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -152,7 +152,7 @@
 	("Last-Modified"       :nf   :p  nil)
 	("Location" 	       :nf   :p  nil)
 	("Max-Forwards"        :np   :nf nil)  
-	("Pragma"              :p    :p  :mx)
+	("Pragma"              :p    :p  nil) ; on reloads browsers add pragms
 	("Proxy-Authenticate"  :nf   :p   nil)
 	("Proxy-Authorization" :p    :nf :mx)
 	("Range" :p :nf :mx)
@@ -865,12 +865,13 @@
 	       
 			 
 	       
-(defun add-trailing-crlf (buff)
+(defun add-trailing-crlf (buff xx)
   ;; buff is a parsed header block.
   ;; find the end of the data and add a crlf and then return the
   ;; index right after the linefeed
+  (declare (ignore xx))
   (let ((size (unsigned-16-value buff *header-block-used-size-index*)))
-    (if* (not (< 0 size (header-block-data-start)))
+    (if* (not (<= 0 size (header-block-data-start)))
        then (error "buffer likely isn't a parsed header block"))
     
     (setf (aref buff size) #.(char-code #\return))

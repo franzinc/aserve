@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.71 2000/09/24 22:54:50 jkf Exp $
+;; $Id: main.cl,v 1.72 2000/09/26 15:56:30 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -2097,6 +2097,7 @@ in get-multipart-sequence"))
   ;; get a new resource. If size is given then ask for at least that
   ;; size
   (let (to-return)
+    ;; force new ones to be allocated
     (mp:without-scheduling 
       (let ((buffers (sresource-data sresource)))
 	(if* size
@@ -2132,6 +2133,12 @@ in get-multipart-sequence"))
   ;; we silently ignore nil being passed in as a buffer
   (if* buffer 
      then (mp:without-scheduling
+	    ;; if debugging
+	    (if* (member buffer (sresource-data sresource)
+			 :test #'eq)
+	       then (error "freeing freed buffer"))
+	    ;;
+	    
 	    (push buffer (sresource-data sresource)))))
 
 
