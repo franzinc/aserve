@@ -1,8 +1,8 @@
 2004-10-19  John Foderaro  <jkf@tiger.franz.com>
 1.2.38
 
-	* cgi.cl (parse-cgi-script-data): fix bug where find
-	  was used instead of position.
+	* cgi.cl (parse-cgi-script-data): bug14892: fix bug where find was
+	  used instead of position.
 
 2004-08-31  Kevin Layer  <layer@gemini>
 
