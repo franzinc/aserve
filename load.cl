@@ -1,6 +1,6 @@
 ;; load in neo
 ;;
-;; $Id: load.cl,v 1.10 2000/01/07 22:40:35 jkf Exp $
+;; $Id: load.cl,v 1.11 2000/01/11 18:38:55 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -21,6 +21,7 @@
       "examples.cl"
       "foo.txt"
       "fresh.jpg"
+      "load.cl"
       "neo.html"
       "prfile9.jpg"))
 
@@ -88,11 +89,12 @@
   ;;
   (run-shell-command "rm -fr neo-src")
   (run-shell-command "mkdir neo-src neo-src/neo neo-src/htmlgen")
-  (dolist (file (append *neo-files*
+  (dolist (file (append (mapcar #'(lambda (file) (format nil "~a.cl" file))
+				*neo-files*)
 			*neo-other-files*))
     (copy-files-to
-     (list (format nil "~a.cl" file))
-     (format nil "neo-src/neo/~a.cl" file))))
+     (list file)
+     (format nil "neo-src/neo/~a" file))))
 
   
   

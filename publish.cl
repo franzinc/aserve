@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: publish.cl,v 1.18 2000/01/07 22:40:35 jkf Exp $
+;; $Id: publish.cl,v 1.19 2000/01/11 18:38:55 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -938,7 +938,16 @@
 			      (cddr (car res))))))))
 			
 
+;-----------
 
+(defmethod timedout-response ((req http-request) (ent entity))
+  ;; return a response to a web server indicating that it is taking
+  ;; too long for us to respond
+  ;;
+  (setf (resp-code req) *response-internal-server-error*)
+  (with-http-body (req ent)
+    (html (:title "Internal Server Error")
+	  (:body "500 - The server has taken too long to respond to the request"))))
 
   
   

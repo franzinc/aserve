@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: main.cl,v 1.12 2000/01/07 22:40:35 jkf Exp $
+;; $Id: main.cl,v 1.13 2000/01/11 18:38:55 jkf Exp $
 
 ;; Description:
 ;;   neo's main loop
@@ -43,6 +43,15 @@
    #:publish
    #:publish-file
    #:publish-directory
+   
+   #:resp-code
+   #:resp-date
+   #:resp-content-length
+   #:resp-content-type
+   #:resp-plist
+   #:resp-strategy
+   #:resp-stream
+   
    #:set-cookie-header
    #:shutdown
    #:split-into-words
@@ -362,13 +371,6 @@
    (resp-stream   ;; stream to which to send response
     :initform nil
     :accessor resp-stream)
-   #+ignore (resp-keep-alive   ;; true if we are not shutting down the connection
-    :initform nil
-    :accessor resp-keep-alive)
-   #+ignore
-   (resp-transfer-encoding ;; encoding for sending the body
-    :initform :identity
-    :accessor resp-transfer-encoding)
    (resp-content-length
     :initform nil  ;; nil means "i don't know"
     :accessor resp-content-length)
@@ -1133,6 +1135,10 @@
 
 
 ;; end multipart code
+
+
+
+
 
 
 

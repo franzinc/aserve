@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: examples.cl,v 1.18 2000/01/07 22:40:35 jkf Exp $
+;; $Id: examples.cl,v 1.19 2000/01/11 18:38:55 jkf Exp $
 
 ;; Description:
 ;;   neo examples
@@ -57,7 +57,9 @@
 			 ((:a :href "/pic") "Sample jpeg") :br
 			 ((:a :href "/cookietest") "test cookies") :br
 			 ((:a :href "/secret") "Test authorization")
- 			 " (name: " (:b "foo") ", password: " (:b "bar") ")")
+ 			 " (name: " (:b "foo") ", password: " (:b "bar") ")"
+			 :br
+			 ((:a :href "/timeout") "Test timeout"))
 			 )))))
 			     
 
@@ -411,6 +413,14 @@
 	 
 
 
+(publish :url "/timeout"
+	 :content-type "text/html"
+	 :function
+	 #'(lambda (req ent)
+	     ;; do nothing interesting so that the timeout will
+	     ;; occur
+	     (with-http-response (req ent :timeout 15)
+	       (loop (sleep 5)))))
 
 
 ;;;;;;  directory publishing.  These will only work on a particular

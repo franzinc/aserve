@@ -402,6 +402,53 @@ the cdr is a string giving the value of the argument.</p>
 
 <p>&nbsp;</p>
 
+<h2>request object reader and accessors</h2>
+
+<p>The request object contains information about the http request being processed and it
+contains information about the response that is being computed and returned to the
+requestor.&nbsp;&nbsp; The following functions access slots of the request object.
+&nbsp; Those with names beginning with <strong>resp-</strong> are accessing the slots
+which hold information about the response the to request.&nbsp;&nbsp; When a function is
+listed as an<em> accessor<strong> </strong></em>that means that it can be <strong>setf</strong>'ed
+as well as used to read the slot value.</p>
+
+<p><strong><font face="Courier New">(resp-code request)</font></strong>
+&nbsp;&nbsp;&nbsp;&nbsp; - accessor - the value is describes the response code and string
+we will return for this request.&nbsp;&nbsp; See the value of the argument <strong>response</strong>
+in <strong>with-http-response</strong> for more information.</p>
+
+<p><strong><font face="Courier New">(resp-date request)</font></strong>
+&nbsp;&nbsp;&nbsp;&nbsp; - accessor - the date the response will be made (in Lisp's
+universal time format)</p>
+
+<p><strong><font face="Courier New">(resp-content-length request) </font></strong>
+&nbsp;&nbsp;&nbsp; - accessor -&nbsp; the value to send as the Content-Length of this
+response.&nbsp;&nbsp; This is computed automatically by neo and thus a user program
+shouldn't have to set this slot under normal circumstances.</p>
+
+<p><strong><font face="Courier New">(resp-plist request)</font></strong>
+&nbsp;&nbsp;&nbsp;&nbsp; - accessor -&nbsp; this slot holds a property list on which neo
+uses to stores some lesser used information.&nbsp; The user program can use it as well.</p>
+
+<p><font face="Courier New"><strong>(resp-strategy request)</strong></font>&nbsp;&nbsp; -
+accessor - the strategy is a list of symbols which describe how neo will build a response
+stream and will send back a response.&nbsp; More details will be given about the possible
+strategies at a future time.</p>
+
+<p><strong><font face="Courier New">(resp-stream request)</font></strong>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; - accessor -&nbsp; This is the stream to be used in user
+code to send back the body of the response. </p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr>
+
 <h2>Form Processing</h2>
 
 <p>Forms are used on web pages in order to allow the user to send information to the web

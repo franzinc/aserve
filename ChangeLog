@@ -1,3 +1,8 @@
+2000-01-11  John Foderaro  <jkf@tiger.franz.com>
+
+	* document accessors.
+	  get timedout-response working
+
 1999-12-15  John Foderaro  <jkf@tiger.franz.com>
 1.0.6
 	* cookie support added and documented
