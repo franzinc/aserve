@@ -1,8 +1,14 @@
+2001-10-19  Jon Howard  <jhoward@cobweb>
+
+	* log.cl: non-access messages logged to error log stream.
+	* publish.cl: changed standard-locator (locator-exact) to assoc on
+	uri-host rather than request-vhost of req's.
+
 2001-10-18  Jon Howard  <jhoward@cobweb>
 
-	* log.cl: added facility for dynamically binding vhost log stream;
+	* log.cl: added dynamic binding of vhost log and error streams;
 	changed logging to emulate apache logging.
-	* main.cl: ignoring socket reset by peer errorno 104; more apache
+	* main.cl: ignoring socket reset by peer errno 104; more apache
 	log emulation.
 
 2001-10-16  Kevin Layer  <layer@crikey>

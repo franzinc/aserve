@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: log.cl,v 1.20.4.1 2001/10/18 17:51:10 jhoward Exp $
+;; $Id: log.cl,v 1.20.4.2 2001/10/19 16:40:27 jhoward Exp $
 
 ;; Description:
 ;;   iserve's logging
@@ -45,8 +45,8 @@
 		       cmonth cday (mod cyear 100)
 		       chour cmin csec
 		       message))
-	  (stream (vhost-log-stream
-		   (wserver-default-vhost user::*server*))))
+	  (stream (vhost-error-stream
+		   (wserver-default-vhost *wserver*))))
       (write-sequence str stream)
       (finish-output stream))))
 
@@ -59,8 +59,8 @@
 		       chour cmin csec
 		       message))
 	  (stream (or *aserve-debug-stream*
-		      (vhost-log-stream
-		       (wserver-default-vhost user::*server*)))))
+		      (vhost-error-stream
+		       (wserver-default-vhost *wserver*)))))
       (write-sequence str stream)
       (finish-output stream))))
 

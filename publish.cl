@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.58 2001/10/18 17:17:14 jkf Exp $
+;; $Id: publish.cl,v 1.58.2.1 2001/10/19 16:40:27 jhoward Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -814,14 +814,16 @@
     (process-entity req entity)))
 
 
+;;; Wasn't matching for /support/customer-survey.lhtml
 (defmethod standard-locator ((req http-request)
 			     (locator locator-exact))
   ;; standard function for finding an entity in an exact locator
   ;; return the entity if one is found, else return nil
   (let ((ents (gethash (uri-path (request-uri req))
 		       (locator-info locator))))
+   #+ignore(format t "~S ; Ents: ~S~%" (uri-host (request-uri req)) ents)
     (cdr 
-     (or (assoc (request-vhost req) ents :test #'eq)
+     (or (assoc (uri-host (request-uri req)) ents :test #'equal)
 	 (assoc :wild ents :test #'eq)))))
 
 (defmethod standard-locator ((req http-request)
