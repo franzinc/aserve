@@ -547,7 +547,7 @@ argument, AllegroServe will create the correct kind of response stream.&nbsp;&nb
 </strong>is not specified here it will default to the value specified when <strong>publish</strong>
 was called to create the entity.&nbsp; If not <strong>:format </strong>argument was passed
 to <strong>publish</strong> then <strong>:binary</strong> format is assumed.
-&nbsp;&nbsp;&nbsp; If <strong> :binary</strong> is specified then you can write both text
+&nbsp;&nbsp;&nbsp; If <strong>:binary</strong> is specified then you can write both text
 and binary to the stream&nbsp; since Allegro's binary streams also support text calls as
 well.&nbsp; If you specify <strong>:text</strong> then you may end up with a stream that
 supports only text operations.</p>
@@ -590,9 +590,9 @@ easy&nbsp; to use the <strong>html</strong> macro to generate html as part of th
 response. </p>
 
 <p align="left"><em>Note: there used to be a <strong>:format</strong> argument to <strong>with-http-body.
-</strong> That argument was never used by <strong>with-http-body</strong>.&nbsp; The <strong>:format
-</strong> argument has been moved to <strong>with-http-response </strong>so that it can
-now have an effect on the stream created.</em></p>
+</strong>That argument was never used by <strong>with-http-body</strong>.&nbsp; The <strong>:format
+</strong>argument has been moved to <strong>with-http-response </strong>so that it can now
+have an effect on the stream created.</em></p>
 
 <hr>
 
@@ -791,28 +791,99 @@ the <strong>run-cgi-program</strong> function.</p>
 <p><a name="f-run-cgi-program"></a><font face="Courier New"><strong>(run-cgi-program req
 ent program &amp;key path-info path-translated<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-script-name query-string auth-type timeout)</strong></font></p>
+script-name query-string <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; auth-type
+timeout error-output)</strong></font></p>
 
 <p>In response to an http request, this runs <strong>program</strong> which must be a
 string naming an exectuable program or script followed optionally by command line
 arguments to pass to that program.&nbsp; Before the <strong>program </strong>is run the
 environment variables are set according the the CGI protocol.&nbsp; The <strong>timeout</strong>
 argument is how long AllegroServe should wait for a response from the <strong>program </strong>before
-giving up.&nbsp;&nbsp; The default is 200 seconds.&nbsp;&nbsp; The other keyword arguments
-allow the caller to specify values for the CGI environment variables that can't be
-computed automatically.&nbsp; <strong>path-info</strong> specifies the PATH_INFO
-environment variable, and similarly for<strong> path-translated, script-name, query-string</strong>
+giving up.&nbsp;&nbsp; The default is 200 seconds.&nbsp;&nbsp; The <strong>error-output </strong>argument
+specifies what should be done with data the cgi program sends to its standard error.
+&nbsp; This is described in detail below.&nbsp; The other keyword arguments allow the
+caller to specify values for the CGI environment variables that can't be computed
+automatically.&nbsp; <strong>path-info</strong> specifies the PATH_INFO environment
+variable, and similarly for<strong> path-translated, script-name, query-string</strong>
 and <strong>auth-type.</strong>&nbsp;&nbsp; If <strong>query-string</strong> is <em>not</em>
 given and the <strong>uri</strong> that invoked this request contains a query part then
 that query part is passed in the QUERY_STRING environment variable.</p>
 
-<p>&nbsp;</p>
+<p>cgi programs send their result to standard output (file descriptor 1 on Unix).&nbsp; If
+they encounter problems they often send informative messages to standard error (file
+descriptor 2 on Unix).&nbsp;&nbsp;&nbsp; The <strong>error-output</strong> argument to
+run-cgi-program allows the caller to specify what happens to data sent to standard error.
+&nbsp; The possibile values for <strong>error-output</strong> are:</p>
+
+<table border="1" width="100%">
+  <tr>
+    <td width="32%"><strong>nil</strong></td>
+    <td width="68%">The cgi program's standard error is made the same as the Lisp process'
+    standard error.&nbsp;&nbsp; This standard error may not be the same as the current binding
+    of *standard-error*.</td>
+  </tr>
+  <tr>
+    <td width="32%"><strong></strong>pathname or string<strong></strong></td>
+    <td width="68%">A file with the given name is opened and standard error is directed to
+    that file.</td>
+  </tr>
+  <tr>
+    <td width="32%"><strong>:output</strong></td>
+    <td width="68%">Standard error is directed to the same place as standard output thus the
+    error messages will be mixed into the result of running the cgi program.</td>
+  </tr>
+  <tr>
+    <td width="32%"><strong></strong>symbol or function<strong></strong></td>
+    <td width="68%">The function is run whenever there is data available to be read from
+    standard error.&nbsp; It must read that data.&nbsp; It must return a true value if it
+    detected an end of file during the read and <strong>nil</strong> otherwise.
+    &nbsp;&nbsp; The function takes arguments: req ent stream</td>
+  </tr>
+</table>
 
 <p>A typical way of publishing a CGI page is this:</p>
 
 <pre>(publish :path &quot;/cgi/myprog&quot;
          :function #'(lambda (req ent) 
                         (run-cgi-program req ent &quot;/server/cgi-bin/myprog&quot;)))</pre>
+
+<p>If you're concerned about capturing the error output then here's an example where we
+supply&nbsp; a function to collect all the error output into a string. Once collected we
+simply print it out here but in a real web server you would want to store it in a log
+file.</p>
+
+<pre>(defun cgierr (req ent)
+  (let ((error-buffer (make-array 10
+                                  :element-type 'character
+                                  :adjustable t
+                                  :fill-pointer 0)))
+    (net.aserve:run-cgi-program
+     req ent
+     &quot;aserve/examples/cgitest.sh 4&quot;
+     :error-output
+     #'(lambda (req ent stream)
+         (declare (ignore req ent))
+         (let (eof)
+           (loop
+             (let ((ch (read-char-no-hang stream nil :eof)))
+
+               (if* (null ch) then (return))
+
+               (if* (eq :eof ch)
+                  then (setq eof t)
+                       (return))
+
+               (vector-push-extend ch error-buffer)))
+           eof
+           )))
+
+    (format t &quot;error buffer is ~s~%&quot; error-buffer)
+    ))</pre>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
 
 <p><strong>Note: </strong>The ability to run CGI programs from AllegroServe was due to
 features added in Allegro Common Lisp version 6.1.&nbsp;&nbsp; This will not work in
