@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: publish.cl,v 1.23.2.3 2000/03/03 03:07:07 jkf Exp $
+;; $Id: publish.cl,v 1.23.2.4 2000/03/03 15:50:44 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -538,7 +538,7 @@
 	    (setf (locator-info locator)
 	      `((,prefix (,host ,ent)) ,@list))
        else ; must fit somewhere in the list
-	    (do* ((back info (cdr back))
+	    (do* ((back list (cdr back))
 		  (cur  (cdr back) (cdr cur)))
 		((null cur)
 		 ; put at end
