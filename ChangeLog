@@ -1,3 +1,8 @@
+2001-08-24  John Foderaro  <jkf@tiger.franz.com>
+
+	*  when an error occurs in the worker thread  print the command line
+	   for the request that got the error.
+
 2001-08-16  John Foderaro  <jkf@tiger.franz.com>
 1.2.6
 	* main.cl - try harder to prevent debug output from multiple

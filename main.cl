@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.107 2001/08/16 17:38:54 jkf Exp $
+;; $Id: main.cl,v 1.108 2001/08/24 22:31:17 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -276,6 +276,8 @@
 ;; more specials
 (defvar *max-socket-fd* 0) ; the maximum fd returned by accept-connection
 (defvar *aserve-debug-stream* nil) ; stream to which to seen debug messages
+
+(defvar *worker-request*)  ; set to current request object
 
 ; type of socket stream built.
 ; :hiper is possible in acl6
@@ -1133,7 +1135,8 @@ by keyword symbols and not by strings"
 
 (defun http-worker-thread ()
   ;; made runnable when there is an socket on which work is to be done
-  (let ((*print-level* 5))
+  (let ((*print-level* 5)
+	(*worker-request* nil))
     ;; lots of circular data structures in the caching code.. we 
     ;; need to restrict the print level
     (loop
@@ -1143,9 +1146,17 @@ by keyword symbols and not by strings"
 	    (if* (not (member :notrap *debug-current* :test #'eq))
 	       then (handler-case (process-connection sock)
 		      (error (cond)
-			(logmess (format nil "~s: got error ~a~%" 
-					 (mp:process-name sys:*current-process*)
-					 cond))))
+			(logmess 
+			 (format nil "~agot error ~a~%" 
+				 (if* *worker-request*
+				    then (format 
+					  nil 
+					  "while processing command ~s~%"
+					  (request-raw-request 
+					   *worker-request*))
+				    else "")
+				 cond
+				 ))))
 	       else (process-connection sock))
 	  (abandon ()
 	      :report "Abandon this request and wait for the next one"
@@ -1155,6 +1166,9 @@ by keyword symbols and not by strings"
     
       )))
 
+
+
+  
 (defun http-accept-thread ()
   ;; loop doing accepts and processing them
   ;; ignore sporatic errors but stop if we get a few consecutive ones
@@ -1298,11 +1312,14 @@ by keyword symbols and not by strings"
 		  ; end this connection by closing socket
 		  (return-from process-connection nil)
 	     else ;; got a request
+		  (setq *worker-request* req) 
+		  
 		  (handle-request req)
 		  (force-output-noblock (request-socket req))
 		  
 		  (log-request req)
 		  
+		  (setq *worker-request* nil)
 		  (free-req-header-block req)
 		  
 		  (let ((sock (request-socket req)))
