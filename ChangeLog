@@ -1,5 +1,7 @@
 2001-09-20  Kevin Layer  <layer@crikey>
 
+	* makefile: split `clean' into `clean' and `cleanall', the latter
+	which removes aserve-src.
 	* makefile (clean): add `r' to `rm'
 
 2001-09-18  Kevin Layer  <layer@crikey>
