@@ -1,5 +1,7 @@
-2000-03-21  John Foderaro  <jkf@tiger.franz.com>
-
+2000-03-22  John Foderaro  <jkf@tiger.franz.com>
+1.1.7
+	* make initial lisp listerner of standalone version sleep
+	  so that the process can be put in the background.
 	* add t-iserve.cl and begin to add automated tests
 	* add cookies and authorization to client module
 	* load client module into iserve

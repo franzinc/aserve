@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-iserve.cl,v 1.5 2000/03/22 03:16:20 jkf Exp $
+;; $Id: t-iserve.cl,v 1.6 2000/03/22 11:46:55 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -42,23 +42,19 @@
 
 (in-package :net.iserve.test)
 
+; set to nil before loading the test to prevent the test from auto-running
+(defvar user::*do-iserve-test* t)
 
 (defun test-iserve ()
-  (let ((*test-errors* 0)
-	(*test-successes* 0)
-	(*test-unexpected-failures* 0))
+  (with-tests (:name "iserve")
     (let ((port (start-iserve-running)))
       (format t "server started on port ~d~%" port)
       (unwind-protect 
 	  (progn
 	    (test-publish-file port)
 	    (test-publish-computed port)
-	    )
-	(stop-iserve-running)))
-    (format t "~%succeses: ~d~%errors ~d~%unexpected errors: ~d~%"
-	    *test-successes*
-	    *test-errors*
-	    *test-unexpected-failures*)))
+	(stop-iserve-running))))))
+    
 
 
 (defun start-iserve-running ()
@@ -317,7 +313,8 @@
 
 
     
-    
+(if* user::*do-iserve-test* then (test-iserve))
+
 	
     
    

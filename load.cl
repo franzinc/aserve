@@ -1,6 +1,6 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.20 2000/03/22 04:07:30 jkf Exp $
+;; $Id: load.cl,v 1.21 2000/03/22 11:46:55 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -57,6 +57,13 @@
 
 
 
+;; after running this function you'll have a lisp binary
+;; with the webserver loaded.
+;; you can cd to iserveserver and start with
+;;   nohup ./iserverserver -f ../examples/examples.fasl >& errs &
+;; and it will run the server in the background, serving the iserve
+;; examples.
+;;
 (defun makeapp ()
   (run-shell-command "rm -fr iserveserver")
   (make-iserve.fasl)
@@ -85,7 +92,7 @@
    :discard-xref-info t
  
    :ignore-command-line-arguments t
-   :suppress-allegro-cl-banner t))
+   :suppress-allegro-cl-banner nil))
 
 
 (defun make-distribution ()
@@ -122,10 +129,11 @@
 ;; 1. incf version number, edit ChangeLog and commit
 ;; 2. start lisp and load iserve/load to compile all files
 ;; 3. start the server and run through the samples
-;; 4. (make-src-distribution)
-;; 5. (ftp-publish-src)
-;; 6. (publish-docs)   ;  to put latest docs on iserve web page
-;; 7. on beast run /fi/sa/bin/iserve-sync
+;; 4. :cl test/t-iserve to run the automated tests 
+;; 5. (make-src-distribution)
+;; 6. (ftp-publish-src)
+;; 7. (publish-docs)   ;  to put latest docs on iserve web page
+;; 8. on beast run /fi/sa/bin/iserve-sync
 ;; 
 
 
