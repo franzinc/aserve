@@ -448,24 +448,27 @@ wish to publish that entity but it need not do so.</p>
 <h3><a name="directory-access-files"></a>Directory Access Files</h3>
 
 <p>When files are accessed and automatically published you may wish to set some of the
-parameters of the entity that is published. As mentioned above you can defined a <strong>publisher</strong>
+parameters of the entity that is published. As mentioned above you can define a <strong>publisher</strong>
 function that has complete control in publishing the entity.&nbsp; A less powerful but
 easier to use alternative is to place <em>access files </em>in the directory tree being
 published.&nbsp;&nbsp; An access file specifies information that you want passed to the
 publisher function.&nbsp; You can modify these access files while the directory tree is
-published and their latest values will be used for publishing subsequent files.
+published and their latest values will be used for publishing <em>subsequent</em> files.
 &nbsp;&nbsp; This is similar to they way Apache controls its publishing with <strong>.htaccess</strong>
-files.&nbsp; </p>
+files (except that in AllegroServe once a file is published the access files have no
+effect on it).</p>
 
 <p>The name of an access file in AllegroServe is controlled by the <strong>:access-file</strong>
 argument to <strong>publish-directory.</strong>&nbsp;&nbsp; We'll assume the name chosen
-is <strong>access.cl</strong> in this document.&nbsp;&nbsp;&nbsp;When a file is about to
-be published all access files from the <strong>destination</strong> directory all the way
-down to the directory containing the file to be published are read and used.&nbsp; For
-example if the <strong>destination</strong> in a <strong>publish-directory </strong>was
-given as &quot;/home/joe/html/&quot; and an http request comes in which references the
-file &quot;/home/joe/html/pics/archive/foo.jpg&quot;&nbsp; then AllegroServe will check
-for access files at all of these locations and in this order 
+is <strong>access.cl</strong> in this document.&nbsp;&nbsp; If no <strong>:access-file</strong>
+argument is given to <strong>publish-directory</strong> then no access file checking is
+done. &nbsp;When a file is about to be published all access files from the <strong>destination</strong>
+directory all the way down to the directory containing the file to be published are read
+and used.&nbsp; For example if the <strong>destination</strong> in a <strong>publish-directory
+</strong>was given as &quot;/home/joe/html/&quot; and an http request comes in which
+references the file &quot;/home/joe/html/pics/archive/foo.jpg&quot;&nbsp; then
+AllegroServe will check for access files at <em>all</em> of these locations and in this
+order 
 
 <ul>
   <li>/home/joe/html/access.cl</li>
@@ -494,16 +497,24 @@ followed by a property-list-like sequence of &nbsp; keywords and values.&nbsp;&n
 Nothing in the form is evaluated. &nbsp;&nbsp;&nbsp; The form cannot contain #. or #,.
 macros.</p>
 
-<p>One&nbsp; information form is used by AllegroServe itself:</p>
+<p>One&nbsp; information form is used by AllegroServe's directory publisher code to decide
+if it's permitted to descend another directory level:</p>
 
-<p><strong>(:subdirectories :block t)</strong></p>
+<p><strong>(:subdirectories&nbsp; :allow </strong><em>allow-list</em><strong> :deny </strong><em>deny-list</em><strong>
+:inherit </strong><em>inherit-value</em><strong>)</strong></p>
 
-<p>If this appears in an access file then no subdirectories of this directory will be
-searched for files.&nbsp; This prunes the directory tree at this directory.</p>
+<p>As AllegroServe descends from the <strong>destination</strong> directory toward the
+directory containing the file to be accessed it stops at each directory level accumlates
+the access information and then tests to see if it can descend further based on the <strong>:subdirectories
+</strong>information.&nbsp;&nbsp; If it cannot descend into the next subdirectory it gives
+up immediately and a <strong>404 - Not Found</strong> response is returned.
+&nbsp;&nbsp; See the section Allow Deny processing below for a description of how it uses
+the <strong>:allow</strong> and <strong>:deny</strong> values.</p>
 
 <p>These other information forms are used by the standard publisher function. &nbsp;&nbsp;
-Each takes an <strong>:inherit</strong> argument which defaults to true. &nbsp; If set to <strong>nil</strong>
-then this means that this information will not apply to files found in subdirectories.</p>
+Each takes an <strong>:inherit</strong> argument which defaults to false. &nbsp;
+Information not given with :<strong>:inherit t</strong> will be eliminated as AllegroServe
+descends directory levels.</p>
 
 <table border="1" width="100%">
   <tr>
@@ -532,13 +543,12 @@ then this means that this information will not apply to files found in subdirect
   <tr>
     <td width="15%"><strong>:files</strong></td>
     <td width="17%"><strong>:allow<br>
-    :ignore<br>
+    :deny<br>
     :inherit</strong></td>
     <td width="68%">specifies which files are visible to be published.&nbsp; To be visible a
-    file must be allowed and not ignored.&nbsp; Allowed and ignored are lists of regular
-    expressions.&nbsp;&nbsp; The default value of <strong>:allow</strong> is (&quot;.*&quot;)
-    which matches everything.&nbsp;&nbsp; The default value of<strong> :ignore</strong> is nil
-    which matches nothing.</td>
+    file must be allowed and not denied.&nbsp; What is tested is the filename only (that is
+    the part after the last directory separator in the files's complete name).&nbsp; See below
+    for the rules on how allow and denied is used.</td>
   </tr>
   <tr>
     <td width="15%"><strong>:mime</strong></td>
@@ -551,20 +561,57 @@ then this means that this information will not apply to files found in subdirect
   </tr>
 </table>
 
+<h3>Allow and Deny Processing</h3>
+
+<p>The <strong>:files </strong>and <strong>:subdirectories</strong> information are used
+to determine if a file or subdirectory of a given name is accessible.&nbsp; AllegroServe
+will collect all the access file information for the directory containing the file or
+subdirectory and for all directories above it up to the directory given as the <strong>destination</strong>
+argument to <strong>publish-directory.&nbsp; </strong>Information from superdirectories
+will only be used <strong>:inherit t</strong> is given for that information.&nbsp; </p>
+
+<p>The rules is it that a given name is accessible if it is allowed and not denied.
+&nbsp; That is the filename or directory name must match one of the allow clauses and none
+of the deny clauses.&nbsp; There may be multiple allow and deny clauses since there may be
+multiple information forms of the type <strong>:files </strong>or <strong>:subdirectories</strong>.
+&nbsp;&nbsp; Each allow or deny argument can be a string or a list of strings or nil
+(which is the same as that argument not being given).<strong> </strong>&nbsp; The strings
+are regular expressions (which are not exactly like unix shell wildcard filename
+expressions).&nbsp;&nbsp; In particular <font face="Courier New">&quot;.*&quot;</font> is
+the regular expression that matches anything.</p>
+
+<p>The special cases are the following
+
+<ul>
+  <li>if <strong>:allow</strong> is given as nil or is not given at all then that is the same
+    as specifying <font face="Courier New">&quot;.*&quot;</font> the regular expression that
+    matches everything.</li>
+  <li>if <strong>:deny</strong> is given as nil or is not given then that is the same as
+    specifying a regular expression that matches nothing.</li>
+  <li>if AllegroServe is looking for <strong>:files </strong>information and there is none to
+    be found in the accumulated information, then access is allowed.&nbsp;&nbsp; A similar
+    thing is true if AllegroServe is searching for <strong>:subdirectories</strong>
+    information and none is found.</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<p>.</p>
+
 <p>Here is a sample access file:</p>
 
 <p><font face="Courier New">; only connections to localhost will be able to access the
 files<br>
-(:ip :patterns ((:accept &quot;127.1&quot;) :deny))&nbsp;&nbsp;&nbsp; <br>
+(:ip :patterns ((:accept &quot;127.1&quot;) :deny) :inherit t)&nbsp;&nbsp;&nbsp; <br>
 (:password :realm &quot;mysite&quot; <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :allowed ((&quot;joe&quot; .
 &quot;mypassword&quot;)<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 (&quot;sam&quot; . &quot;secret&quot;)) <br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :inherit nil) ; doesn't apply
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :inherit t) ;&nbsp; applies
 to subdirectories<br>
 ; publish html and cgi files, but not those beginning with a period<br>
-(:files :allow (&quot;\\.html$&quot; &quot;\\.cgi$&quot;) :ignore (&quot;^\\.&quot;)) <br>
+(:files :allow (&quot;\\.html$&quot; &quot;\\.cgi$&quot;) :deny (&quot;^\\.&quot;)) <br>
 (:mime :types ((&quot;text/jil&quot; &quot;jil&quot; &quot;jlc&quot;) (&quot;text/c&quot;
 &quot;c&quot; &quot;cc&quot;)))</font></p>
 
@@ -597,10 +644,10 @@ the response is only that the request wasn't found.</p>
 
 <p><a name="f-publish"></a><a name="f-publish-prefix"></a><strong><font face="Courier New">(publish-prefix
 &amp;key prefix host port content-type function class <br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; format
-remove server authorizer timeout plist)</font></strong></p>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+format remove server authorizer timeout plist)</font></strong></p>
 
-<p>This is like <strong>publish </strong> except that it declares <strong>function</strong>
+<p>This is like <strong>publish </strong>except that it declares <strong>function</strong>
 to be the handler for all urls that begin with the string <strong>prefix</strong>.
 &nbsp;&nbsp; Note however that prefix handlers have lower priority than exact handlers.
 &nbsp; Thus if you declare a prefix handler for &quot;/foo&quot; and also a specific
