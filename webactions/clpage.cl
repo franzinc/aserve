@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: clpage.cl,v 1.7 2004/06/09 21:50:58 jkf Exp $
+;; $Id: clpage.cl,v 1.8 2004/11/18 19:28:43 jkf Exp $
 
 
 (eval-when (compile load eval) (require :aserve))
@@ -645,23 +645,22 @@
 		   else (init-search-obj ,obj))))
 	     
     (let ((end-tag   (create-search-obj (format nil "</~a_~a>" module fcn)))
-	  (start-tag (create-search-obj (format nil "<~a_~a>" module fcn)))
+	  (start-tag (create-search-obj (format nil "<~a_~a" module fcn)))
 	  (nest-level 0)
 	  (ch)
 	  (chcount 0))
 
     
       (loop
-	
+
+	(format t "nest: ~s  start ~s . end ~s~%" nest-level start-tag end-tag)
 	(if* (end-of-search-p end-tag)
 	   then (if* (> nest-level 0)
 		   then (decf nest-level)
 			(init-search-obj end-tag)
 		   else (return (- chcount (length (search-string end-tag))))))
 	
-	(if* (end-of-search-p start-tag)
-	   then (incf nest-level)
-		(init-search-obj start-tag))
+	
 	    
 
     
@@ -669,6 +668,13 @@
 	(if* (null (setq ch (read-char p nil nil)))
 	   then ; no end tag found
 		(return nil))
+	
+	; start tag can end with > or a space character preceeding
+	; attributes
+	(if* (and (end-of-search-p start-tag)
+		  (member ch '(#\> #\space #\tab #\newline)))
+	   then (incf nest-level)
+		(init-search-obj start-tag))
 	
 	(incf chcount)
 

@@ -1,3 +1,8 @@
+2004-11-18  John Foderaro  <jkf@tiger.franz.com>
+
+	* clpage.cl (scan-for-end-tag): fix search for a nested
+	  start tag that is followed by attributes
+
 2004-06-09    <jkf@main.verada.com>
 1.10
 	* clpage.cl - do uri-rewriting to add session is for the src
