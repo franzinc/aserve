@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: decode.cl,v 1.11 2000/09/28 16:11:12 jkf Exp $
+;; $Id: decode.cl,v 1.12 2000/10/31 19:00:55 jkf Exp $
 
 ;; Description:
 ;;   decode/encode code
@@ -83,12 +83,13 @@
 ;	    alphanumerics are unchanged
 ;	    space turns into "+"
 ;	    newline turns into "%0d%0a"
-;	    these characters are encoded as %xy:
-;		+ # ; / ? : @ = & < > %
-;	    all non-printing ascii characters are encoded as %xy
-;	    printing characters not mentioned are passed through
-;	
-;
+;           The following characters don't have to be encoded:
+;		- _ . ! ~ * ' (  )
+;           Everything else must be escaped.  While the escaping
+;	    isn't necessary to be stored as the body of a post form
+;           we want to use the same function to encode queries
+;	    to be placed in uris, and there escaping is more necessary.
+
 
 ;--- uriencoding
 
@@ -193,15 +194,21 @@
     ;;  N (integer) - how many extra characters are needed to encode this
     ;;               (i.e. one less than the total size encoded)
     
-    (let ((res (make-array 128 :initial-element nil)))
+    (let ((res (make-array 128 :initial-element 2) ; assume all escaped
+	       ))
       
-      ; must escape the non printing characters
-      (dotimes (i 32) (setf (svref res i) 2))
-      (setf (svref res 127) 2)	; delete
+      ; don't escape the alphanumerics
+      (dolist (range '((#\a #\z)
+		       (#\A #\Z)
+		       (#\0 #\9)))
+	(do ((i (char-code (car range)) (1+ i)))
+	    ((> i (char-code (cadr range))))
+	  (setf (svref res i) nil)))
       
-      ; the printing characters needing escaping
-      (dolist (ch '(#\+ #\# #\; #\/ #\? #\: #\@ #\= #\& #\< #\> #\%))
-	(setf (svref res (char-code ch)) 2))
+      
+      ; these 'mark' characters don't need escaping either
+      (dolist (ch '(#\- #\_ #\. #\! #\~ #\* #\' #\(  #\)))
+	(setf (svref res (char-code ch)) nil))
       
       ; note: character needing special handling are space and newline
       (setf (svref res #.(char-code #\space)) 0)

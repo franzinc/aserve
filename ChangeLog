@@ -1,3 +1,12 @@
+2000-10-31  John Foderaro  <jkf@tiger.franz.com>
+1.1.34
+	* add to the list of characters to escape in form-urlencoding
+	  those that must be escaped so that the result can be put
+	  in the query string of a uri
+
+	* in proxy code write request and headers in one big block
+	  to get around bug in IP redirectors (such as found in www.cbs.com)
+
 2000-10-25  jkf  <jkf@main.verada.com>
 1.1.33
 	* hooks for link checking and experimenting with caching

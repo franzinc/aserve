@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.27 2000/10/27 15:40:29 jkf Exp $
+;; $Id: proxy.cl,v 1.28 2000/10/31 19:00:56 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -134,7 +134,6 @@
   expires	; universal time when this entry expires
   
   
-  ;; request	; request header block 
   data		; data blocks (first is the response header block)
   data-length	; number of octets of data
   blocks	; number of cache blocks (length of the value in data slot)
@@ -149,6 +148,8 @@
   (state :new)	; nil - normal , 
                 ; :dead - trying to kill off, 
   		; :new - filling the entry
+
+  scanned	; true when link scanning has been done
   
   ; number of times this entry was returned due to a request
   (returned 0)
@@ -382,15 +383,135 @@
 		     sock 
 		     #'check-for-open-socket-before-gc))
 	    
-	    (net.aserve::format-dif :xmit sock "~a ~a ~a~a"
-				    (string-upcase (string method))
-				    (net.aserve.client::uri-path-etc uri)
-				    (string-upcase (string protocol))
-				    *crlf*)
-	  
-	    ; now the headers
-	    (write-sequence outbuf sock :end outend)
 
+	    ;; there are bogus ip redirectors out there that want to
+	    ;; see the whole request in the packet. (e.g www.cbs.com)
+	    ;; so we build as much as we can and then blast that out
+	    
+	    ; this is written in this non-pretty way for speed
+	    
+	    
+	    (let ((firstbuf (get-header-block))
+		  (ind 0)
+		  (cmdstrings
+		   '((:get . #.(make-array 3
+					   :element-type '(unsigned-byte 8)
+					   :initial-contents
+					   (list
+					    (char-int #\G)
+					    (char-int #\E)
+					    (char-int #\T))))
+		     (:post . #.(make-array 4
+				 :element-type '(unsigned-byte 8)
+				 :initial-contents
+				 (list
+				  (char-int #\P)
+				  (char-int #\O)
+				  (char-int #\S)
+				  (char-int #\T))))
+				       
+		     ))
+		  (prot-strings
+		   '((:http/1.0 . #.(make-array 8
+						:element-type '(unsigned-byte 8)
+						:initial-contents
+						(list
+						 (char-int #\H)
+						 (char-int #\T)
+						 (char-int #\T)
+						 (char-int #\P)
+						 (char-int #\/)
+						 (char-int #\1)
+						 (char-int #\.)
+						 (char-int #\0)
+						 )))
+		     (:http/1.1 . #.(make-array 8
+				     :element-type '(unsigned-byte 8)
+				     :initial-contents
+				     (list
+				      (char-int #\H)
+				      (char-int #\T)
+				      (char-int #\T)
+				      (char-int #\P)
+				      (char-int #\/)
+				      (char-int #\1)
+				      (char-int #\.)
+				      (char-int #\1)
+				      )))))
+		     
+		  )
+	      (let ((cmd (cdr (assoc method cmdstrings :test #'eq))))
+		
+		; write method
+		(if* cmd
+		   then (dotimes (i (length cmd))
+			  (setf (ausb8 firstbuf i)  (ausb8 cmd i)))
+			(incf ind (length cmd))
+		   else ; unusual method, turn method into a string
+			(let ((str (string-upcase (string method))))
+			  (dotimes (i (length str))
+			    (setf (ausb8 firstbuf i) 
+			      (char-int (schar str i))))
+			  (incf ind (length str))))
+		
+		(setf (ausb8 firstbuf ind) #.(char-int #\space))
+		(incf ind)
+		
+		
+		; now the uri
+		(let ((str (net.aserve.client::uri-path-etc uri)))
+		  (dotimes (i (length str))
+		    ; should do string-to-octets...
+		    (setf (ausb8 firstbuf ind) 
+		      (char-int (schar str i)))
+		    (incf ind)))
+		
+		(setf (ausb8 firstbuf ind) #.(char-int #\space))
+		(incf ind)
+		
+		; now the protocol
+		    
+		(let ((cmd (cdr (assoc protocol prot-strings :test #'eq))))
+		  (if* (null cmd)
+		     then (error "can't proxy protocol ~s" protocol))
+		  (dotimes (i (length cmd))
+		    (setf (ausb8 firstbuf ind)  (ausb8 cmd i))
+		    (incf ind)))
+		    
+		(setf (ausb8 firstbuf ind) #.(char-int #\return))
+		(incf ind)
+		(setf (ausb8 firstbuf ind) #.(char-int #\newline))
+		(incf ind)
+		    
+		    
+		; now add as much of the headers as we can 
+		(do ((i 0 (1+ i))
+		     (tocopy (min (- (length firstbuf) ind) outend)))
+		    ((>= i tocopy)
+		     
+		     ; 
+		     (if-debug-action 
+		      :xmit
+		      (format *debug-stream* "about to send~%")
+		      (dotimes (i ind)
+			(write-char (code-char (ausb8 firstbuf i))
+				    *debug-stream*))
+		      (format *debug-stream* "<endof xmission>~%"))
+		     (write-sequence firstbuf sock :end ind)
+		     (if* (< i outend)
+			then ; still more from original buffer left
+			     (write-sequence outbuf sock
+					     :start i
+					     :end outend))
+		     )
+		      
+		  (setf (ausb8 firstbuf ind) (ausb8 outbuf i))
+		  (incf ind))
+		    
+		(free-header-block firstbuf)))
+
+	    
+	    
 	    
 	    ; now the body if any
 	    (if* request-body
@@ -400,7 +521,7 @@
 	  
 	    ; a shutdown would make sense here but it seems to confuse
 	    ; the aol servers
-	    ; (socket:shutdown sock :direction :output)
+	    ;(socket:shutdown sock :direction :output)
 
 	    (let (protocol response comment header-start given-content-length
 		  body-buffers body-length)
@@ -564,8 +685,8 @@
 			 #.(char-int #\1)
 			 #.(char-int #\.)))
 	 then (case (aref buff 7)
-		(#.(char-code #\0) (setq protocol :http/1.0))
-		(#.(char-code #\1) (setq protocol :http/1.1)))
+		(#.(char-int #\0) (setq protocol :http/1.0))
+		(#.(char-int #\1) (setq protocol :http/1.1)))
 	      (if* (null protocol)
 		 then (return-from parse-response-buffer nil)))
     
@@ -1118,6 +1239,11 @@
 			  (if* respond 
 			     then (use-value-from-cache req ent pcache-ent
 							level))
+			  (if* *entry-cached-hook*
+			     then (if* (lock-pcache-ent pcache-ent)
+				     then ; it will be unlocked by the hook fcn
+					  (funcall *entry-cached-hook* 
+						   pcache-ent level)))
 			  (return)
 		     else (logmess 
 			   (format nil "can't use cached ~s due to cookie difference~%"
@@ -1640,6 +1766,7 @@
 				(unlock-pcache-ent lru)
 				(return-from main)))
 		      ; couldn't get it into a disk cache.. just kill it
+		      (decf needed (pcache-ent-blocks lru))
 		      (kill-pcache-ent lru pcache)
 		      (unlock-pcache-ent lru)
 		      (setq lru lru-head)

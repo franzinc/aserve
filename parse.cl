@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.28 2000/10/20 16:41:12 jkf Exp $
+;; $Id: parse.cl,v 1.29 2000/10/31 19:00:55 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -337,7 +337,7 @@
       
       (let ((ch (read-byte sock nil nil)))
 	(if* (null ch) 
-	   then (format *debug-stream* "early eof reading response~%")
+	   then (format *debug-stream* "early eof reading response after ~d bytes~%" i)
 		(return nil) ; eof - failure
 		)
 	(if* echo then (write-char (code-char ch) *debug-stream*))
