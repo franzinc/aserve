@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.19 2000/07/01 17:07:44 jkf Exp $
+;; $Id: client.cl,v 1.20 2000/07/14 21:48:53 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -215,7 +215,13 @@
 
     (unwind-protect
 	(loop 
-	  (read-client-response-headers creq)
+	  
+	  (loop
+	    (read-client-response-headers creq)
+	    ; if it's a continue, then start the read again
+	    (if* (not (eql 100 (client-request-response-code creq)))
+	       then (return)))
+	  
 	  (let* ((atype (if* (eq format :text) 
 			   then 'character
 			   else '(unsigned-byte 8)))
@@ -672,13 +678,23 @@
 							   bytes-left)))))
 		      (if* (eq ans start)
 			 then 0  ; eof
-			 else (setf (client-request-bytes-left creq)
+			 else (net.aserve::if-debug-action :xmit
+					       (write-sequence 
+						buffer 
+						net.aserve::*debug-stream*
+						:start start
+						:end
+						(+ start ans)))
+			      (setf (client-request-bytes-left creq)
 				(- bytes-left (- ans start)))
 			      ans)))
      elseif (or (eq bytes-left :chunked)
 		(eq bytes-left :unknown))
        then (handler-case (do ((i start (1+ i))
-			       (stringp (stringp buffer)))
+			       (stringp (stringp buffer))
+			       (debug-on (member :xmit 
+						 net.aserve::*debug-current*
+						 :test #'eq)))
 			      ((>= i end) (setq last end))
 			    (setq last i)
 			    (let ((ch (if* stringp
@@ -686,7 +702,13 @@
 					 else (read-byte socket nil nil))))
 			      (if* (null ch)
 				 then (return)
-				 else (setf (aref buffer i) ch))))
+				 else (if* debug-on
+					 then (write-char
+					       (if* (characterp ch) 
+						  then ch
+						  else (code-char ch))
+					       net.aserve::*debug-stream*))
+				      (setf (aref buffer i) ch))))
 	      (excl::socket-chunking-end-of-file
 		  (cond)
 		(declare (ignore cond))
