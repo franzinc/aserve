@@ -1,3 +1,8 @@
+2001-10-17  John Foderaro  <jkf@tiger.franz.com>
+
+	* cgi.cl: redo cgi so that it doesn't buffer data... also  
+	  can now process standard error from scripts
+
 2001-10-16  John Foderaro  <jkf@tiger.franz.com>
 1.2.12
 	

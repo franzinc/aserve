@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.33 2001/10/16 17:55:41 jkf Exp $
+;; $Id: t-aserve.cl,v 1.34 2001/10/17 22:32:44 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -1200,23 +1200,24 @@
   ;; that where our shell script works
   ;;
   #+(and unix (version>= 6 1))
-  (let ((prefix-local (format nil "http://localhost:~a" port)))
+  (let ((prefix-local (format nil "http://localhost:~a" port))
+	(error-buffer))
     (publish :path "/cgi-0"
-	    :function #'(lambda (req ent)
-			  (net.aserve:run-cgi-program 
-			   req ent "aserve/examples/cgitest.sh")))
+	     :function #'(lambda (req ent)
+			   (net.aserve:run-cgi-program 
+			    req ent "aserve/examples/cgitest.sh")))
     (publish :path "/cgi-1"
-	    :function #'(lambda (req ent)
-			  (net.aserve:run-cgi-program 
-			   req ent "aserve/examples/cgitest.sh 1")))
+	     :function #'(lambda (req ent)
+			   (net.aserve:run-cgi-program 
+			    req ent "aserve/examples/cgitest.sh 1")))
     (publish :path "/cgi-2"
-	    :function #'(lambda (req ent)
-			  (net.aserve:run-cgi-program 
-			   req ent "aserve/examples/cgitest.sh 2")))
+	     :function #'(lambda (req ent)
+			   (net.aserve:run-cgi-program 
+			    req ent "aserve/examples/cgitest.sh 2")))
     (publish :path "/cgi-3"
-	    :function #'(lambda (req ent)
-			  (net.aserve:run-cgi-program 
-			   req ent "aserve/examples/cgitest.sh 3")))
+	     :function #'(lambda (req ent)
+			   (net.aserve:run-cgi-program 
+			    req ent "aserve/examples/cgitest.sh 3")))
     
     ;; verify that the various headers work
     (test 200 (values2 
@@ -1229,9 +1230,9 @@
     
     ; verify that a redirect is requested
     (multiple-value-bind (body code headers)
-	       (x-do-http-request (format nil "~a/cgi-2"
-					  prefix-local)
-				  :redirect nil)
+	(x-do-http-request (format nil "~a/cgi-2"
+				   prefix-local)
+			   :redirect nil)
       (test "go to franz" body :test #'equal)
       (test 301 code)
       (test "http://www.franz.com" (cdr (assoc :location headers))
@@ -1243,7 +1244,43 @@
     ; verify that the unauthorized response is made
     (test 401 (values2 
 	       (x-do-http-request (format nil "~a/cgi-3"
-					  prefix-local))))))
+					  prefix-local))))
+
+    ; test error output processing
+    (publish :path "/cgi-4"
+	     :function #'(lambda (req ent)
+			   (net.aserve:run-cgi-program 
+			    req ent "aserve/examples/cgitest.sh 4"
+			    :error-output
+			    #'(lambda (req ent stream)
+				(declare (ignore req ent))
+				(let (eof)
+				  (loop
+				    (let ((ch (read-char-no-hang stream 
+								 nil :eof)))
+	     
+				      (if* (null ch) then (return))
+	     
+				      (if* (eq :eof ch) 
+					 then (setq eof t)
+					      (return))
+	     
+				      (vector-push-extend ch error-buffer)))
+				  eof
+				  )))))
+    (setq error-buffer (make-array 10 
+				  :element-type 'character
+				  :adjustable t
+				  :fill-pointer 0))
+    
+    (multiple-value-bind (body rescode)
+	(x-do-http-request (format nil "~a/cgi-4" prefix-local))
+      (test "okay
+" body :test #'equal)
+      (test 200 rescode)
+      (test "stuff-on-error-stream
+" error-buffer :test #'equal))
+    ))
    
 	    
 	
