@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: urian.cl,v 1.4 2003/02/26 01:16:47 jkf Exp $
+;; $Id: urian.cl,v 1.5 2003/09/10 16:54:14 layer Exp $
 
 ;; Description:
 ;;   urian example
@@ -59,15 +59,15 @@
       (declare (ignore c))
       (let (name)
 	(if* (or (probe-file (setq name (concatenate 'string
-					  (directory-namestring *load-truename*)
+					  (directory-namestring *load-pathname*)
 					  "../xmlutils/phtml.fasl")))
 		 (probe-file (setq name (concatenate 'string
-					  (directory-namestring *load-truename*)
+					  (directory-namestring *load-pathname*)
 					  "../../xmlutils/phtml.fasl"))))
 		 
 	   then (load name)
 	   else (format t " not at ~s~%, tn is ~s~%" name
-			*load-truename*)
+			*load-pathname*)
 		(error "can't locate phtml module"))))))
 
 (defpackage :urian

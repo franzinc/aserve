@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.35 2003/05/09 17:34:01 jkf Exp $
+;; $Id: examples.cl,v 1.36 2003/09/10 16:54:14 layer Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -43,7 +43,7 @@
 ;; example files this is bad news.
 ; (unpublish :all t)
 
-(defparameter *example-pathname* *load-truename*) ; where this file is
+(defparameter *example-pathname* *load-pathname*) ; where this file is
 (defmacro example-file (name)
     ;; create an absolute address for this file we'll load
     `(merge-pathnames ,name *example-pathname*))

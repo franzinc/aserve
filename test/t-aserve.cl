@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.48 2003/09/04 21:36:33 jkf Exp $
+;; $Id: t-aserve.cl,v 1.49 2003/09/10 16:54:14 layer Exp $
 
 ;; Description:
 ;;   test iserve
@@ -56,7 +56,7 @@
 (defvar *save-proxy-wserver* nil)
 
 ; remember where we were loaded from so we can run manually
-(defparameter *aserve-load-truename* *load-truename*)
+(defparameter *aserve-load-truename* *load-pathname*)
 
 (defun test-aserve (test-timeouts)
   ;; run the allegroserve tests three ways:

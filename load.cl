@@ -1,10 +1,10 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.60 2003/07/07 21:10:13 jkf Exp $
+;; $Id: load.cl,v 1.61 2003/09/10 16:54:14 layer Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
-(defparameter *aserve-root* (directory-namestring *load-truename*))
+(defparameter *aserve-root* (directory-namestring *load-pathname*))
 
 (defparameter *aserve-files* 
     ;; this list is in cl/src/sys/make.cl as well... keep in sync
@@ -95,9 +95,9 @@
       ;; not the lite version
       (if* (equal file "examples/examples")
 	 then (load (merge-pathnames (format nil "~a.cl" file)
-				     *load-truename*))
+				     *load-pathname*))
 	 else (excl:load-compiled (merge-pathnames (format nil "~a.cl" file)
-						   *load-truename*)))
+						   *load-pathname*)))
       (gc t) ; must compact to keep under the heap limit
       )
     #-allegro-cl-lite
@@ -106,14 +106,14 @@
        then (progn (case *loadswitch*
 		     (:compile-if-needed (compile-file-if-needed 
 					  (merge-pathnames (format nil "~a.cl" file)
-							   *load-truename*)))
+							   *load-pathname*)))
 		     (:compile (compile-file 
 				(merge-pathnames (format nil "~a.cl" file)
-						 *load-truename*)))
+						 *load-pathname*)))
 		     (:load nil))
 		   (load (merge-pathnames 
 			  (format nil "~a.fasl" file)
-			  *load-truename*))))))
+			  *load-pathname*))))))
 
 
 

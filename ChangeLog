@@ -1,3 +1,13 @@
+2003-09-10  Kevin Layer  <layer@crikey>
+1.2.29
+
+	* load.cl,
+	* examples/examples.cl,
+	* examples/urian.cl: use *load-pathname* instead of
+	  *load-truename* since truename in ACL 7.0 goes through symbolic
+	  links and this doesn't work in the way aserve is built at franz
+	  (via symlinks to source code)
+
 2003-09-04  John Foderaro  <jkf@tiger.franz.com>
 1.2.28
 	* non-standard http headers are again supported in all
