@@ -441,7 +441,7 @@ it isn't enough, even if there no body to send, to just call <strong>with-http-r
 <hr>
 
 <p align="left"><a name="f-with-http-body"></a><strong><font face="Courier New">(with-http-body
-(req ent &amp;key format headers)&nbsp; &amp;rest body)</font></strong></p>
+(req ent &amp;key format headers external-format)&nbsp; &amp;rest body)</font></strong></p>
 
 <p align="left">This macro causes the whole http response to be sent out.&nbsp; The macro
 itself will send out everything except the body of the response.&nbsp; That is the
@@ -464,7 +464,12 @@ is the header name (a keyword symbol) and the cdr is the header value.&nbsp; The
 are added to the headers sent as part of this response.</p>
 
 <p align="left">Within the <strong>body </strong>forms the code calls <strong>(request-reply-stream
-req)</strong> to obtain a stream to which it can write to supply the body of the response.</p>
+req)</strong> to obtain a stream to which it can write to supply the body of the response.
+&nbsp; The external-format of this stream is set to the value of the <strong>external-format</strong>
+argument (which defaults to <strong>:latin1-base</strong>).&nbsp;&nbsp; The variable <strong>*html-stream*</strong>
+is bound to the value of <strong>(request-reply-stream req)</strong> before the <strong>body</strong>
+is evaluated.&nbsp;&nbsp; This is done to for the convenience of users of the <strong>html</strong>
+macro.</p>
 
 <hr>
 
@@ -504,7 +509,7 @@ specify headers and values to be sent with a reply.</p>
 <hr>
 
 <p><a name="f-request-query"></a><strong><font face="Courier New">(request-query request
-&amp;key uri post)</font></strong></p>
+&amp;key uri post external-format)</font></strong></p>
 
 <p>Decode and return an alist of the query values in the request.&nbsp;&nbsp; Each item in
 the alist is a cons where the car is a string giving the name of the argument and the cdr
@@ -525,6 +530,9 @@ keyword arguments.&nbsp;&nbsp; If <strong>uri</strong> is true (and true is the 
 value) then the query string in the uri is checked.&nbsp; If <strong>post</strong> is true
 (and true is the default value) and if the request is a POST then the body of the post
 form will be decoded for query values.</p>
+
+<p>The <strong>external-format</strong> is used in the conversion of bytes in the form to
+characters.</p>
 
 <p>A query is normally a set of names and values.&nbsp; <br>
 <strong>http://foo.com/bar?a=3&amp;b=4 </strong>yields a query alist <strong>((&quot;a&quot;
@@ -743,7 +751,7 @@ operating system.</p>
 <hr>
 
 <p><a name="f-get-multipart-sequence"></a><strong><font face="Courier New">(get-multipart-sequence
-request buffer &amp;key start end)</font></strong></p>
+request buffer &amp;key start end external-format)</font></strong></p>
 
 <p>This retrieves the next chunk of data for the current form field and stores it in <strong>buffer</strong>.
 &nbsp;&nbsp; If <strong>start</strong> is given then it specifies the index in the buffer
@@ -758,7 +766,8 @@ it is the index one after the last last index filled with data in <strong>buffer
 AllegroServe, the program should use a 4096 byte (unsigned-byte 8) array.</p>
 
 <p>If the buffer is&nbsp; a character array then the data is converted from
-get-multipart-sequence's (unsigned-byte 8) array to characters using <strong>code-char. </strong></p>
+get-multipart-sequence's (unsigned-byte 8) array to characters using the given<strong>
+external-format </strong>(which defaults to<strong> :latin1-base</strong>)<strong>.</strong></p>
 
 <p><strong>get-multipart-sequence</strong> may return before filling up the whole buffer,
 so program should be sure to make use of the index returned by <strong>get-multipart-sequence</strong>.</p>
@@ -780,16 +789,18 @@ following functions to convert between the encoding and the query list:</p>
 <p>&nbsp;</p>
 
 <p><a name="f-form-urlencoded-"></a><font face="Courier New"><strong>(form-urlencoded-to-query
-string)</strong></font></p>
+string &amp;key external-format)</strong></font></p>
 
-<p>Decodes the string and returns the query list.</p>
+<p>Decodes the string and returns the query list.&nbsp;&nbsp; The default value for <strong>external-format</strong>
+is <strong>:latin1-base</strong>.</p>
 
 <p>&nbsp;</p>
 
 <p><a name="f-query-to"></a><font face="Courier New"><strong>(query-to-form-urlencoded
-query)</strong></font></p>
+query &amp;key external-format)</strong></font></p>
 
-<p>Encodes the query and returns a string.</p>
+<p>Encodes the query and returns a string.&nbsp;&nbsp; The default value for <strong>external-format</strong>
+is <strong>:latin1-base</strong></p>
 
 <p>&nbsp;</p>
 
@@ -803,7 +814,31 @@ user(5): <strong>(form-urlencoded-to-query &quot;first+name=joe&amp;last+name=sm
 ((&quot;first name&quot; . &quot;joe&quot;) (&quot;last name&quot; . &quot;smith&quot;))
  </pre>
 
-<p>&nbsp;</p>
+<pre>user(6): <strong>(query-to-form-urlencoded
+            `((&quot;last name&quot; . ,(coerce '(#\hiragana_letter_ta
+                                        #\hiragana_letter_na
+                                        #\hiragana_letter_ka)
+                                      'string)))
+              :external-format :euc)</strong>
+ &quot;last+name=%a4%bf%a4%ca%a4%ab&quot;</pre>
+
+<pre>user(7): <strong>(query-to-form-urlencoded
+            `((&quot;last name&quot; . ,(coerce '(#\hiragana_letter_ta
+                                        #\hiragana_letter_na
+                                        #\hiragana_letter_ka)
+                                      'string)))
+             :external-format :shiftjis)</strong>
+ &quot;last+name=%82%bd%82%c8%82%a9&quot;
+
+user(8): <strong>(coerce
+           (cdr
+              (assoc &quot;last name&quot;
+                (form-urlencoded-to-query &quot;last+name=%82%bd%82%c8%82%a9&quot;
+                                      :external-format :shiftjis)
+                :test #'equalp))
+           'list)</strong>
+ (#\hiragana_letter_ta #\hiragana_letter_na #\hiragana_letter_ka)
+</pre>
 
 <hr>
 
@@ -1069,13 +1104,15 @@ true. The default value is false.</p>
 <p>&nbsp;</p>
 
 <p><a name="f-get-cookie-values"></a><strong><font face="Courier New">(get-cookie-values
-request)</font></strong></p>
+request &amp;key external-format)</font></strong></p>
 
 <p>Return the cookie <strong>name</strong> and <strong>value</strong> pairs from the
 header of the request.&nbsp;&nbsp; Each <strong>name</strong> <strong>value</strong> pair
 will be in a cons whose <strong>car</strong> is the <strong>name</strong> and whose <strong>cdr</strong>
 is the <strong>value</strong>.&nbsp;&nbsp; The names and values will be decoded (in other
-words the decoding done by <strong>set-cookie-header</strong> will be undone).</p>
+words the decoding done by <strong>set-cookie-header</strong> will be undone).
+&nbsp;&nbsp; The <strong>external-format</strong> is used to convert bytes to characters.
+&nbsp; It defaults to <strong>:latin1-base</strong>. </p>
 
 <p>&nbsp;</p>
 
@@ -1224,11 +1261,11 @@ page.</p>
 <p><a name="f-do-http-request"></a><strong><font face="Courier New">(do-http-request uri
 &amp;key method protocol accept <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-content format cookies <br>
+content content-type query format cookies <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 redirect basic-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-keep-alive headers proxy)</font></strong></p>
+keep-alive headers proxy user-agent external-format)</font></strong></p>
 
 <p>Sends a request to <strong>uri</strong> and returns four values: 
 
@@ -1307,7 +1344,8 @@ keep-alive headers proxy)</font></strong></p>
     <td width="22%">format</td>
     <td width="16%">:text</td>
     <td width="62%">The body of the response is returned as a string if the value is<strong>
-    :text </strong>or as an array of type (unsigned-byte 8) if the value is <strong>:binary</strong>.</td>
+    :text </strong>or as an array of type (unsigned-byte 8) if the value is <strong>:binary</strong>.
+    &nbsp;&nbsp; When the body is a string the external-format argument is important.</td>
   </tr>
   <tr>
     <td width="22%">cookies</td>
@@ -1366,6 +1404,11 @@ keep-alive headers proxy)</font></strong></p>
     request since it believes that it is being probed by a robot.&nbsp; The value of
     user-agent can be a string or one of the keywords <strong>:aserve</strong>, <strong>:netscape</strong>
     or <strong>:ie</strong> in which case an appropriate user agent string is sent.</td>
+  </tr>
+  <tr>
+    <td width="22%">external-format</td>
+    <td width="16%">:latin1-base</td>
+    <td width="62%">This determines the socket stream's external format.</td>
   </tr>
 </table>
 
@@ -1547,7 +1590,8 @@ accept cookies headers proxy<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 basic-authorization query<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-content content-type content-length)</font></strong></p>
+content content-type content-length<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; external-format)</font></strong></p>
 
 <p>This function connects to the web server indicated by the <strong>uri</strong> and
 sends the request.&nbsp;&nbsp; The arguments are the same as those for <strong>do-http-request</strong>
