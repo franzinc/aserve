@@ -8,7 +8,7 @@
 <body>
 
 <h1 align="center">AllegroServe - A Web Application Server<br>
-<small><small><small>version <font face="Courier New">1.2.20</font></small></small></small></h1>
+<small><small><small>version <font face="Courier New">1.2.21</font></small></small></small></h1>
 
 <p align="left"><strong><small>copyright(c) 2000-2001. Franz Inc</small></strong></p>
 
@@ -562,7 +562,9 @@ descends directory levels.</p>
     <td width="68%">specifies which mime types are to be associated with which file types.
     &nbsp; This list takes precedence over the built-in list inside AllegroServe.&nbsp; :types
     is a list of mime specifiers.&nbsp;&nbsp; A mime specifier is a list beginning with a
-    string giving the mime type followed by the files types that should map to that mime type</td>
+    string giving the mime type followed by the files types that should map to that mime type.
+    &nbsp; A file type in a list (e.g. (&quot;ReadMe&quot;)) refers to the whole file name
+    rather than the type component.</td>
   </tr>
 </table>
 
@@ -1274,6 +1276,10 @@ important information in the header.</p>
     browser is guessing applies to this contents of the file.&nbsp;&nbsp; The contents of the
     file can be retrieved using repeated calls to <strong>get-multipart-sequence</strong> or
     one call to <strong>get-all-multipart-data</strong>. </li>
+  <li><strong>:nofile</strong> - If a form contains a place for a filename but no filename was
+    entered before the form was submitted then this type of header is sent.&nbsp; The values
+    returned are the same as those for <strong>:file. </strong>The third value (the filename)
+    will always be the empty string. </li>
   <li><strong>nil</strong> - This header has a form not recognized by <strong>parse-multipart-header</strong>.
     &nbsp;&nbsp;&nbsp; If you encounter this please let us know about it since we would like
     enhance <strong>parse-multipart-header</strong> to understand this type of header.
@@ -1638,7 +1644,7 @@ site that depends on cookies to work.</p>
 <p>&nbsp;</p>
 
 <p><a name="f-set-cookie-header"></a><strong><font face="Courier New">(set-cookie-header
-request &amp;key name value expires domain path secure external-format)</font></strong></p>
+request &amp;key name value expires domain path secure encode-value external-format)</font></strong></p>
 
 <p>This function should be called between the calls to <strong>with-http-response </strong>and
 <strong>with-http-body</strong>.&nbsp;&nbsp; It can be called more than once.&nbsp; Each
@@ -1651,7 +1657,12 @@ printable string.&nbsp;&nbsp;&nbsp; The web browser doesn't care about the <stro
 and <strong>value</strong>, it just stores them and sends them back to the web server.
 &nbsp;&nbsp;&nbsp; If you use the <strong>get-cookie-values </strong>function to retrieve
 the cookie <strong>name</strong> and <strong>value</strong> pairs, then it will
-automatically decode the uriencoding.<br>
+automatically decode the uriencoding.</p>
+
+<p>You can disable the encoding of the value by specifying a <strong>nil</strong> value to
+<strong>encode-value</strong>.&nbsp;&nbsp;&nbsp; This should only be necessary if you are
+working with buggy http client applications.<br>
+<br>
 If the <strong>path </strong>argument isn't given, it will default to &quot;/&quot; which
 will allow this cookie to match all requests.<br>
 If the <strong>domain</strong> argument isn't given then it will default to the host to
