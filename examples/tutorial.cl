@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: tutorial.cl,v 1.3 2000/04/26 18:11:48 jkf Exp $
+;; $Id: tutorial.cl,v 1.4 2000/06/12 21:53:03 jkf Exp $
 
 ;; Description:
 ;;   iserver tutorial examples
@@ -32,7 +32,7 @@
 ;;-
 
 (defpackage :tutorial 
-  (:use :common-lisp :excl :net.iserve :net.html.generator))
+  (:use :common-lisp :excl :net.aserve :net.html.generator))
 
 (in-package :tutorial)
 

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.44 2000/06/10 19:06:41 jkf Exp $
+;; $Id: main.cl,v 1.45 2000/06/12 21:53:03 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -74,6 +74,7 @@
    #:request-protocol
    #:request-protocol-string
    #:request-query
+   #:request-query-value
    #:request-raw-request
    #:request-socket
    #:request-uri
@@ -1582,6 +1583,11 @@
       (setf (request-query-alist req) res))))
 			
 
+(defun request-query-value (key req &key (post t) (uri t) (test #'equalp))
+  ;; access the value of the given key in the request's 
+  ;; request query.  We do this so often that it's useful
+  ;; to make this a function
+  (cdr (assoc key (request-query req :post post :uri uri) :test test)))
 
 
 	
