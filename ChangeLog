@@ -1,3 +1,9 @@
+2001-07-30    <jkf@DEEDEE>
+1.2.4
+	* main.cl: fix get-multipart-* to correspond to rfc2046
+		and thus it will work with the Opera browser which 
+		generates legal (but unusual) kinds of boundary markers
+
 2001-07-19  John Foderaro  <jkf@tiger.franz.com>
 1.2.3
 	* publish.cl 

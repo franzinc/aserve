@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.104 2001/07/19 18:55:06 jkf Exp $
+;; $Id: main.cl,v 1.105 2001/07/31 02:52:56 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -133,7 +133,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 3))
+(defparameter *aserve-version* '(1 2 4))
 
 (eval-when (eval load)
     (require :sock)
@@ -1515,6 +1515,7 @@ by keyword symbols and not by strings"
   left		; bytes of content-length left to read
   state		; state where the buffer pointer is pointed
   cur		; current buffer pointer
+  after		; after the boundary value
   end		; index after last byte in the buffer
   boundary	; boundary vector
   socket	; socket we're reading from
@@ -1596,7 +1597,7 @@ by keyword symbols and not by strings"
 	(:header (return)) ; ok
 	((:body :start) 
 	 (loop
-	   (multiple-value-bind (pos state)
+	   (multiple-value-bind (pos state after)
 	       (scan-forward mp-info)
 	     (if* (eq state :partial)
 		then (if* (not (shift-buffer-up-and-read mp-info))
@@ -1604,7 +1605,8 @@ by keyword symbols and not by strings"
 			     (setf (mp-info-state mp-info) :last-boundary)
 			     (return))
 		else (setf (mp-info-cur mp-info) pos
-			   (mp-info-state mp-info) state)
+			   (mp-info-state mp-info) state
+			   (mp-info-after mp-info) after)
 		     (return)))))
 	(:boundary  (scan-forward mp-info))
 	(:last-boundary ; no more space
@@ -1722,14 +1724,35 @@ by keyword symbols and not by strings"
 			      t ; read something in
 			      ))))))
 
-	    
+
+
+;; for debugging
+#+ignore
+(defun dump-mp-info (mp-info)
+  (let ((buff (mp-info-buffer mp-info)))
+    (format t "dump, state is ~s, cur = ~s, after is ~s, end is ~s~%"
+	    (mp-info-state mp-info) (mp-info-cur mp-info) 
+	    (mp-info-after mp-info)
+	    (mp-info-end mp-info)
+	    )
+    (format t "buf:~%")
+    
+    (do ((v (mp-info-cur mp-info) (1+ v)))
+	((>= v (mp-info-end mp-info)))
+      (write-char (code-char (aref buff v))))
+    (format t "<<end>>~%")
+    ))
+	 
+
 (defun scan-forward (mp-info)
   ;; scan forward to the next interesting thing
+  ;;
+  ;; rfc2046 describes the multipart syntax
   ;;
   ;; If the current state is :boundary then we are being called 
   ;;   to locate the next header.  If we find it we set cur to point
   ;;   to it and set the state to :header.  If no more data is available
-  ;;   (and this will never happen if the client works correctly) twe
+  ;;   (and this will never happen if the client works correctly) we
   ;;   set the state to :last-boundary
   ;;   nil is returned
   ;;
@@ -1747,23 +1770,27 @@ by keyword symbols and not by strings"
   ;;	    :partial - we've identified something that could be
   ;;		a boundary or last-boundary but don't have enough
   ;;		data to tell.
+  ;(dump-mp-info mp-info)
   (case (mp-info-state mp-info)
     (:boundary
      ;; skip past boundary if it's in the buffer
      ;; this is called only in get-multipart-header
      (loop
-       (let ((past (+ (mp-info-cur mp-info)
-		      (length (mp-info-boundary mp-info))
-		      2 ; for the crlf
-		      )))
+       (let ((past (mp-info-after mp-info)))
 	 (if* (< past (mp-info-end mp-info))
 	    then ; inside the buffer
 		 (setf (mp-info-cur mp-info) past)
 		 (setf (mp-info-state mp-info) :header)
 		 (return)
-	    else (if* (not (shift-buffer-up-and-read mp-info))
+	    else (if* past
+		    then ; adjust 'past' location to account for shifting
+			 ; buffer contents up
+			 (decf (mp-info-after mp-info)
+			       (mp-info-cur mp-info)))
+		 (if* (not (shift-buffer-up-and-read mp-info))
 		    then ; no more data
 			 (setf (mp-info-state mp-info) :last-boundary)
+			 (setf (mp-info-after mp-info) (mp-info-cur mp-info))
 			 (return))))))
     (:last-boundary nil)
     
@@ -1778,7 +1805,7 @@ by keyword symbols and not by strings"
 	  then (if* (not (shift-buffer-up-and-read mp-info))
 		  then ; no more data available
 		       (setf (mp-info-state mp-info) :last-boundary)
-		       (return-from scan-forward (values 0 :last-boundary))))
+		       (return-from scan-forward (values 0 :last-boundary 0))))
        (setq cur (mp-info-cur mp-info)
 	     end (mp-info-end mp-info))
        
@@ -1796,37 +1823,42 @@ by keyword symbols and not by strings"
 		       (nil)
 		     (if* (>= ind len-boundary)
 			then ; matched the whole boundary
-			     ; minus the tail... a tail of crlf 
-			     ; is a boundary and a --crlf is a last
-			     ; boundary
-				
-			     (if* (< (- end j) 2)
-				then ; can't tell yet
-				     (return-from scan-forward
-				       (values i :partial))
-			      elseif (and (eql (aref mpbuffer j) 
-					       #.(char-code #\return))
-					  (eql (aref mpbuffer (1+ j))
-					       #.(char-code #\linefeed)))
-				then ; it's a boundary match
-				     (return-from scan-forward
-				       (values i :boundary))
-			      elseif (and (eql (aref mpbuffer j) 
-					       #.(char-code #\-))
-					  (eql (aref mpbuffer (1+ j))
-					       #.(char-code #\-)))
-				then ; could be last-boundary
-				     (if* (< (- end j) 4)
-					then ; not enough to tell
-					     (return-from scan-forward
-					       (values i :partial))
-				      elseif (and (eql (aref mpbuffer (+ 2 j))
-						       #.(char-code #\return))
-						  (eql (aref mpbuffer (+ 3 j))
-						       #.(char-code #\linefeed)))
-					then ; hit the end
-					     (return-from scan-forward
-					       (values i :last-boundary))))
+			     ; may be followed by white space 
+			     ; then crlf (for boundary)
+			     ; or -- (for closing boundary)
+			     
+			     (do ((jj j (1+ jj)))
+				 ((>= jj end)
+				  ; can't tell yet
+				  (return-from scan-forward
+				    (values i :partial)))
+			       
+			       (if* (member (aref mpbuffer jj)
+					    '(#.(char-code #\space)
+					      #.(char-code #\tab)))
+				  thenret ; pass over
+				  else ; we need at least 2 chars in the buff
+				       ; to see crlf or --
+				       (if* (>= (1+ jj) end)
+					  then ; only one char
+					       (return-from scan-forward
+						 (values i :partial)))
+					       
+				       (if* (and (eql (aref mpbuffer jj)
+						      #.(char-code #\return))
+						 (eql (aref mpbuffer (1+ jj))
+						      #.(char-code #\newline)))
+					  then (return-from scan-forward
+						 (values i :boundary (+ jj 2)))
+					elseif (and (eq (aref mpbuffer jj)
+							#.(char-code #\-))
+						    (eq (aref mpbuffer (1+ jj))
+							#.(char-code #\-)))
+					  then (return-from scan-forward
+						 (values i :last-boundary (+ jj 2)))
+					  else ; nothing we recognize
+					       (return))))
+				       
 			     ; if here then doesn't match boundary
 			     (return)
 		      elseif (>= j end)
@@ -1834,24 +1866,18 @@ by keyword symbols and not by strings"
 			     (return-from scan-forward
 			       (values i :partial)))
 		     
-		     (if* (not (eq (aref mpbuffer j)
-				   (aref boundary ind)))
-			then (return))))))))))
+		     ; boundary value is downcased so we must downcase 
+		     ; value in buffer.  we had to do the downcasing since
+		     ; I found cases where a case insensitive match had
+		     ; to be done
+		     (let ((bufch (aref mpbuffer j)))
+		       (if* (<= #.(char-code #\A) bufch #.(char-code #\Z))
+			  then (incf bufch #.(- (char-code #\a)
+						(char-code #\A))))
+		       (if* (not (eq bufch (aref boundary ind)))
+			  then (return))))))))))) 
        
 		     
-		     
-						
-						
-					 
-					 
-	   
-	   
-	       
-		       
-	       
-  
-  
-    
 
 
 
@@ -1879,7 +1905,8 @@ in get-multipart-sequence"))
 	 cur
 	 pos
 	 kind
-	 text-mode)
+	 text-mode
+	 after)
 
     (typecase buffer
       ((array (unsigned-byte 8) (*))
@@ -1890,7 +1917,7 @@ in get-multipart-sequence"))
        (error 
 	"This function only accepts (array (unsigned-byte 8)) or character arrays")))
     (if* (null mp-info)
-       then (error "get-multipart-sequence called before get-mulipart-header"))
+       then (error "get-multipart-sequence called before get-multipart-header"))
     
     (setq mpbuffer (mp-info-buffer mp-info)
 	  cur      (mp-info-cur mp-info))
@@ -1901,14 +1928,15 @@ in get-multipart-sequence"))
 	 ; no data left
 	 (return-from get-multipart-sequence nil))
 	(:start
-	 (error "get-multipart-sequence called before get-mulipart-header"))
+	 (error "get-multipart-sequence called before get-multipart-header"))
 	((:body :partial)
 	 (if* (eq (mp-info-state mp-info) :partial)
 	    then ; this was set below. we will return the partial
 		 ; at then end of the buffer
 		 (setf (mp-info-state mp-info) :body)
 		 (setq pos (mp-info-end mp-info))
-	    else (multiple-value-setq (pos kind) (scan-forward mp-info))
+	    else (multiple-value-setq (pos kind after) (scan-forward mp-info))
+		 (setf (mp-info-after mp-info) after)
 		 (setq cur (mp-info-cur mp-info)) ; scan-forward can change
 		 )
 	 (if* (> pos cur)
