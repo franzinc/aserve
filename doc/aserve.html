@@ -136,7 +136,7 @@ server running.</p>
 <p><strong><font face="Courier New"><a name="f-start"></a>(start &amp;key port listeners
 chunking keep-alive<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; server setuid setgid
-debug proxy cache restore-cache accept-hook ssl)</font></strong></p>
+debug proxy proxy-proxy cache restore-cache accept-hook ssl)</font></strong></p>
 
 <p>If no arguments are given then <strong>start</strong>&nbsp; starts a multi-threaded web
 server on port 80, which is the standard web server port.&nbsp;&nbsp;&nbsp; If you are
@@ -184,6 +184,13 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
     removed in future versions.</li>
   <li>proxy -- if true then this server will also act as a proxy server and will forward http
     requests to other servers.</li>
+  <li>proxy-proxy -- if <strong>proxy</strong> is also given a true value, then this argument
+    determines where the proxy will forward&nbsp; requests.&nbsp; If proxy-proxy is nil then
+    the requests go directly to the server sgiven in the request.&nbsp; If proxy-proxy is
+    given&nbsp; a value of a host and an optional port then the request is forwarded to the
+    proxy server at that address.&nbsp;&nbsp; Valid values for proxy-proxy look like
+    &quot;proxy.myfirm.com&quot; and &quot;localhost:8000&quot;.&nbsp;&nbsp; If no port is not
+    specified, 80 is assumed.</li>
   <li>cache -- if true (and if proxy is true as well) cache locally the work done by the proxy
     server.&nbsp; The value of this variable specifies the size of the caches, both memory and
     disk.&nbsp; See the section on caches for more details on the format of the argument.</li>
@@ -193,7 +200,7 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
     &nbsp;&nbsp; This will only succeed if the external cache files that were in use when the <strong>shutdown</strong>
     was done are in exactly the same state they were when the <strong>shutdown </strong>was
     done.&nbsp;&nbsp; When the <strong>restore-cache</strong> argument is given, the value of
-    the <strong>cache </strong> argument is ignored.</li>
+    the <strong>cache </strong>argument is ignored.</li>
   <li>accept-hook -- this should be a function of one argument, the socket which was created
     when a http request was accepted by AllegroServe.&nbsp; The function should return a
     socket for AllegroServe to use.&nbsp; This hook is normally used to turn a regular socket
