@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: cgi.cl,v 1.2.2.1 2001/09/21 21:49:14 layer Exp $
+;; $Id: cgi.cl,v 1.2.2.2 2001/09/29 19:23:09 layer Exp $
 
 ;; Description:
 ;;   common gateway interface (running external programs)
@@ -116,7 +116,8 @@
 				  content-type)
 			    envs))
 	      (push (cons "CONTENT_LENGTH"
-			  (if* body then (length body) else 0))
+			  (princ-to-string
+			   (if* body then (length body) else 0)))
 		    envs)))
     
     ; now do the rest of the headers.

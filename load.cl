@@ -1,12 +1,13 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.31.10.4.4.4 2001/09/24 03:01:43 layer Exp $
+;; $Id: load.cl,v 1.31.10.4.4.5 2001/09/29 19:23:09 layer Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
 (defparameter *aserve-root* (directory-namestring *load-truename*))
 
 (defparameter *aserve-files* 
+    ;; this list is in cl/src/sys/make.cl as well... keep in sync
     '("htmlgen/htmlgen"
       "macs"
       "main"
