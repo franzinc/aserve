@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.36 2000/08/20 19:13:23 jkf Exp $
+;; $Id: load.cl,v 1.37 2000/08/29 01:51:09 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -233,7 +233,7 @@
 (defun publish-docs ()
   ;; copy documentation to the external web site
   (run-shell-command
-   (format nil "cp ~adoc/htmlgen.html ~adoc/aserve.html ~adoc/tutorial.html /net/cobweb/www/opensource/htdocs/aserve"
+   (format nil "cp ~adoc/htmlgen.html ~adoc/aserve.html ~adoc/tutorial.html /net/cobweb/www/opensource/devel/www/aserve"
 	   *aserve-root*
 	   *aserve-root*
 	   *aserve-root*)))

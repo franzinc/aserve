@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.24 2000/08/24 23:26:52 jkf Exp $
+;; $Id: client.cl,v 1.25 2000/08/29 01:51:09 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -288,7 +288,7 @@
 			  (cdr (assoc :location (client-request-headers creq)
 				      :test #'eq))))
 		 then ; must do a redirect to get to the real site
-		    
+		      (client-request-close creq)
 		      (apply #'do-http-request
 			     (net.uri:merge-uris new-location uri)
 			     :redirect
@@ -668,7 +668,11 @@
   
 
 (defmethod client-request-close ((creq client-request))
-  (close (client-request-socket creq)))
+  (let ((sock (client-request-socket creq)))
+    (if* sock
+       then (setf (client-request-socket creq) nil)
+	    (ignore-errors (force-output sock))
+	    (ignore-errors (close sock)))))
 
 
 (defun quick-convert-to-integer (str)
