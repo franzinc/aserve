@@ -136,11 +136,11 @@
   (setq outend (insert-end-of-headers outbuf outend))
 
   (if-debug-action :xmit
-   (format *debug-stream* "proxy covnerted headers toward server~%")
-   (dotimes (i outend)
-     (write-char (code-char (aref outbuf i)) *debug-stream*))
-   (format *debug-stream* "---- end---~%")
-   (force-output *debug-stream*))
+		   (format *debug-stream* "proxy covnerted headers toward server~%")
+		   (dotimes (i outend)
+		     (write-char (code-char (aref outbuf i)) *debug-stream*))
+		   (format *debug-stream* "---- end---~%")
+		   (force-output *debug-stream*))
   
   
   
@@ -166,13 +166,23 @@
     
   (force-output sock)
 
-  ; now read the response and the following headers
-  (setq outend (read-headers-into-buffer sock outbuf))
+  (let (protocol response commment header-start)
+    (loop
+      ; loop until we don't get a 100 continue
+      ;
+      ; now read the response and the following headers
+      (setq outend (read-headers-into-buffer sock outbuf))
   
   
+      (multiple-value-setq (protocol response comment headerstart)
+	(parse-response-buffer outbuf outend))
+    
+      (if* (not (eql response 100)) then (return)))
+  
+
   
   
-  )
+    ))
 
 
     
