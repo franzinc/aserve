@@ -1,4 +1,5 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"><html><head><title>AllegroServe</title>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head><title>AllegroServe</title>
   
   <meta name="GENERATOR" content="Microsoft FrontPage 3.0"></head><body>
 <h1 align="center">AllegroServe - A Web Application Server<br>
@@ -178,7 +179,7 @@ default.</li>
   <li>host -- the host on which to run the server.&nbsp; If you don't
 specify this then the server will listen on all TCP/IP network
 interfaces on the machine.&nbsp;&nbsp; If you specify "localhost" then
-the server willl only accept connections from the same
+the server will only accept connections from the same
 machine.&nbsp;&nbsp; Other values for host can be used to run
 AllegroServe only a particular network interface.&nbsp; Host can be a
 name (like "foo.franz.com"), a dotted ip address "192.168.0.1" or an
@@ -193,7 +194,7 @@ If a positive number is given as the value of <strong>:listeners</strong>
 then the server runs in <em>threaded server mode<strong>.</strong></em><strong>
     </strong>&nbsp; In this mode separate lisp lightweight processes
 are started to handle requests from clients, the number of request
-handing threads is equal to the value of the <strong>:listeners</strong>
+handling threads is equal to the value of the <strong>:listeners</strong>
 keyword argument.&nbsp; In this mode the <strong>start </strong>function
 returns after starting the other threads.</li>
   <li>chunking -- if true then the server will use the chunked transfer
@@ -204,7 +205,7 @@ sort of error.&nbsp;&nbsp; The default is true.</li>
 if requested by the web client, and if there are sufficient free
 threads to handle new requests coming in. &nbsp;&nbsp; This is an
 optimization and should be left on.&nbsp;&nbsp; The default is true.</li>
-  <li>server -- if this is a passed a value it must be a <strong>wserver</strong>
+  <li>server -- if this is passed a value it must be a <strong>wserver</strong>
 object, which denotes&nbsp; a particular instance of a web
 server.&nbsp;&nbsp; This is for support of running multiple independent
 web servers in the same lisp image.&nbsp; This will be described in a
@@ -232,7 +233,7 @@ the server given in the request.&nbsp; If proxy-proxy is given&nbsp; a
 value of a host and an optional port then the request is forwarded to
 the proxy server at that address.&nbsp;&nbsp; Valid values for
 proxy-proxy look like "proxy.myfirm.com" and
-"localhost:8000".&nbsp;&nbsp; If no port is not specified, port 80 is
+"localhost:8000".&nbsp;&nbsp; If no port is&nbsp; specified, port 80 is
 assumed.</li>
   <li>cache -- if true (and if proxy is true as well) cache locally the
 work done by the proxy server.&nbsp; The value of this variable
@@ -364,7 +365,7 @@ have these meanings: </p>
 of the url as described above in <strong>Components of a Request</strong></li>
   <li><strong>host -- </strong>normally <strong>nil</strong>.&nbsp;
 If you wish to do virtual hosting read <a href="#virtual_hosts">this
-section</a> describing how it's done.a</li>
+section</a> describing how it's done.</li>
   <li><strong>port</strong> -- this argument is currently unused and
 will likely be removed in future versions.</li>
   <li><strong>file </strong>-- the name of the file to return when a
@@ -393,7 +394,7 @@ true as well.</li>
 will cache the last value read for this file.&nbsp; When asked for this
 file <strong>AllegroServe</strong> will check to see if the file has
 changed on disk (using the last modified time as a measure).&nbsp; If
-the file hasn't changed AllegroServe will returned the cached value,
+the file hasn't changed AllegroServe will return the cached value,
 otherwise <strong>AllegroServe</strong> will read in and cache the new
 contents of the file and will return that as a response.</li>
   <li><strong>remove </strong>-- instead of adding an entity, remove
@@ -528,7 +529,7 @@ argument
 specifies a list of index files to search for.&nbsp; By default the
 list consists of two
 filenames "index.html" and "index.htm".</p>
-<p>The valueof the <strong>filter </strong>argument is a function of
+<p>The value of the <strong>filter </strong>argument is a function of
 four values: <strong>req</strong>
 <strong>ent</strong>&nbsp; <strong>filename</strong> and <strong>info</strong>.&nbsp;
 <strong>req</strong>
@@ -699,7 +700,7 @@ and <strong>:deny</strong> values.</p>
 function. &nbsp;&nbsp;
 Each takes an <strong>:inherit</strong> argument which defaults to
 false. &nbsp;
-Information not given with :<strong>:inherit t</strong> will be
+Information not given with&nbsp; <strong>:inherit t</strong> will be
 eliminated as AllegroServe
 descends directory levels.</p>
 <table border="1" width="100%">
@@ -765,9 +766,9 @@ subdirectory and for all directories above it up to the directory given
 as the <strong>destination</strong>
 argument to <strong>publish-directory.&nbsp; </strong>Information
 from superdirectories
-will only be used <strong>:inherit t</strong> is given for that
+will only be used if <strong>:inherit t</strong> is given for that
 information.&nbsp; </p>
-<p>The rules is it that a given name is accessible if it is allowed and
+<p>The rule is it that a given name is accessible if it is allowed and
 not denied. &nbsp;
 That is the filename or directory name must match one of the allow
 clauses and none of the
@@ -876,7 +877,7 @@ handler for "/foo/bar.html" then the specific handler will be chosen if
 prefix
 handler is used to make available a whole directory of files since
 their complete names
-being with a common prefix (namely the directory in which the files are
+begin with a common prefix (namely the directory in which the files are
 located).
 &nbsp;&nbsp; If you want to publish a whole directory then you probably
 want to use <strong>publish-directory</strong>
@@ -961,7 +962,7 @@ the browser window:</p>
 comes in from an old
 HTTP/0.9 browser or a modern HTTP/1.1 browser.&nbsp; It may or may not
 send the response
-back with Chunked transfer encoding and it may or may not keep the
+back with chunked transfer encoding and it may or may not keep the
 connection alive after
 sending back the response.&nbsp;&nbsp; The user code doesn't have to
 deal with those
@@ -1003,7 +1004,7 @@ response.&nbsp;&nbsp; If <strong>timeout</strong> is nil then the
 entity <strong>ent</strong>
 is checked for a timeout value.&nbsp; If that value is also nil then
 the timeout value is
-retreived from the current <strong>wserver</strong> object using <strong>wserver-response-timeout</strong>.
+retrieved from the current <strong>wserver</strong> object using <strong>wserver-response-timeout</strong>.
 &nbsp; If <strong>check-modified </strong>is true (the default) then
 the <strong>last-modified
 </strong>time stored in the entity object will be compared against the <strong>if-modified-since
@@ -1350,7 +1351,7 @@ its environment
 variables and, in the case of a <strong>put</strong> or <strong>post</strong>
 request, the
 body of the request is sent to standard input of the program.</p>
-<p>CGI is a clumsy and slow protocol for extending the behavior or a
+<p>CGI is a clumsy and slow protocol for extending the behavior of a
 web server and is
 falling out of favor.&nbsp; However there are legacy CGI applications
 you may need to call
@@ -1369,7 +1370,7 @@ string naming an exectuable program or script followed optionally by
 command line
 arguments to pass to that program.&nbsp; Before the <strong>program </strong>is
 run the
-environment variables are set according the the CGI protocol.&nbsp; The
+environment variables are set according to the CGI protocol.&nbsp; The
 <strong>timeout</strong>
 argument is how long AllegroServe should wait for a response from the <strong>program
 </strong>before
@@ -1515,7 +1516,7 @@ following to retrieve the value of each field in the form: </p>
 MIME headers of the next field.&nbsp; If this returns nil then there
 are no more fields to retrieve.&nbsp; You'll likely want to call <strong>parse-multipart-header</strong>
 on the result of <strong>get-multipart-header</strong> in order to
-extract the imporant information from the header.</li>
+extract the important information from the header.</li>
   <li>Create a buffer and call <strong>(get-multipart-sequence req
 buffer)</strong> repeatedly to return the next chunk of data.&nbsp;
 When there is no more data to read for this field, <strong>get-multipart-sequence</strong>
@@ -1540,7 +1541,7 @@ request)</font></strong></p>
 in alist form.
 &nbsp;&nbsp;&nbsp; If nil is returned then there is no more form
 data.&nbsp;&nbsp; See <strong>parse-multipart-header</strong>
-for a simple way to extratacting information from the header.</p>
+for a simple way to extract information from the header.</p>
 <p>For an input field such as <strong>&lt;input type="text"
 name="textthing"&gt; </strong>the value returned by <strong>get-multipart-header</strong>
 would be</p>
@@ -1560,7 +1561,7 @@ operating system.</p>
 <hr>
 <p><a name="f-parse-multipart-header"></a><strong><font face="Courier New">(parse-multipart-header
 header)</font></strong></p>
-<p>This take the value of get-multipart-header and returns values that
+<p>This takes the value of get-multipart-header and returns values that
 describe the
 important information in the header.</p>
 <p>The first value returned is </p>
@@ -1593,7 +1594,7 @@ or <span style="font-weight: bold;">get-multipart-data</span>.<br>
   </li>
   <li><strong>nil</strong> - This header has a form not recognized by <strong>parse-multipart-header</strong>.
 &nbsp;&nbsp;&nbsp; If you encounter this please let us know about it
-since we would like enhance <strong>parse-multipart-header</strong> to
+since we would like to enhance <strong>parse-multipart-header</strong> to
 understand this type of header. &nbsp;&nbsp; If you encounter
 this&nbsp; type of header you still have to read the contents of the
 data item that follows the header in order to read the next header.
@@ -1647,7 +1648,7 @@ size of the internal buffers used by this function to retrieve the
 data.&nbsp;&nbsp; You
 usually won't need to specify a value for this but but if you know the
 values retrieved
-are either very small or very large it may may the operation run faster
+are either very small or very large it may make the operation run faster
 to specify an
 appropriate <strong>size</strong>.&nbsp;&nbsp;&nbsp; <strong>external-format</strong>
 is
@@ -1668,7 +1669,7 @@ read the data from the client until it reaches the end of the data,
 however it will <em>not</em>
 save it and will return the symbol <strong>:limit</strong> to indicate
 that the data being
-send to the sever exceeded the limit.&nbsp; It will return a second
+sent to the sever exceeded the limit.&nbsp; It will return a second
 value which is the
 size of the data the client tried to upload to the
 server.&nbsp;&nbsp;&nbsp; If your
@@ -1836,7 +1837,7 @@ the browser displays when asking for a name and password. </td>
     </tr>
   </tbody>
 </table>
-<p>An example of it's use is the following where we allow access only
+<p>An example of its use is the following where we allow access only
 if the user enters a
 name of <strong>joe</strong> and a password of <strong>eoj</strong>
 or a name of <strong>fred</strong>
@@ -1915,7 +1916,7 @@ request is authorized.&nbsp;&nbsp; The function take three arguments,
 the http-request
 object, the entity and the authorizer object.&nbsp;&nbsp; It must
 return one of the four
-value that the <strong>authorize</strong> function returns, namely <strong>t,
+values that the <strong>authorize</strong> function returns, namely <strong>t,
 nil :deny</strong>
 or <strong>:done.</strong></p>
 <p>A function-authorizer is created as follows</p>
@@ -2419,7 +2420,7 @@ as an argument. &nbsp; At this point the client-request object contains
 the information on the headers of the response.&nbsp;&nbsp; The
 function should return true if the body of the response should be
 skipped and <strong>nil</strong> returned as the first value from
-do-http-request.&nbsp; If skip-body is not a function then if its value
+do-http-request.&nbsp; If skip-body is not a function and if its value
 is true then reading the body is skipped and <strong>nil</strong>
 returned in its place.</td>
     </tr>
@@ -2815,7 +2816,7 @@ are <strong>setf</strong>'able to change the set of filters.</p>
 should be run after
 this one. If the filter returns anything else then subsequent filters
 in the list are run
-as well.&nbsp;&nbsp; If a filters in the <strong>vhost</strong> list
+as well.&nbsp;&nbsp; If a filter in the <strong>vhost</strong> list
 returns <strong>:done</strong>
 then the server global filters are not even checked.</p>
 <p>When a filter function runs it's most likely going to be looking at
@@ -2863,7 +2864,7 @@ raw uri: </p>
 ensure that the three
 values mentioned above are set appropriately for the destination. If
 the new destination
-is not served by the current allegroserve wserver, then the filter will
+is not served by the current Allegroserve wserver, then the filter will
 have to make sure
 to turn it into a proxy request (and this will only work if this
 AllegroServe was started
@@ -2871,7 +2872,7 @@ with proxying enabled).</p>
 <p>&nbsp;</p>
 <hr>
 <h2><a name="virtual_hosts"></a>Virtual Hosts</h2>
-<p>It is possible for a single web sever to act like two or more
+<p>It is possible for a single web server to act like two or more
 indepenent web servers.
 &nbsp; This is known as <em>virtual hosting</em>.&nbsp; AllegroServe
 supports the ability
@@ -2899,7 +2900,7 @@ to access your site.&nbsp; If you decide you want to make use of
 virtual hosting, then
 read on.</p>
 <h3>vhost class</h3>
-<p>In AllegroServe a virtual host is denoted by a instance of class <strong>vhost</strong>.
+<p>In AllegroServe a virtual host is denoted by an instance of class <strong>vhost</strong>.
 &nbsp;&nbsp; The contents of a vhost object are:</p>
 <table border="1" width="83%">
   <tbody>
@@ -2999,12 +3000,12 @@ of a vhost is clear: it means that this entity will be visible on this
 virtual host.
 &nbsp; The meaning of <strong>:wild </strong>is that this entity will
 be visible on <em>all</em>
-virtual hosts, except it can be shadowed by a entity specified for a
+virtual hosts, except it can be shadowed by an entity specified for a
 particular virtual
 host.&nbsp; Thus you could publish an entity for<strong> :path "/" </strong>and
 <strong>:host
 :wild</strong> and it will be used for all virtual hosts that don't
-specify a entity for <strong>:path
+specify an entity for <strong>:path
 "/"</strong>.&nbsp; Note that when a request comes in and the search is
 done for
 an entity to match the request every step of the way we look first for
@@ -3017,7 +3018,7 @@ search this time looking for a <strong>:wild</strong> handler.</p>
 <p>&nbsp;</p>
 <hr>
 <h2><a name="timeouts"></a>Timeouts</h2>
-<p>A web server is a program that provides resources to client program
+<p>A web server is a program that provides resources to a client program
 connecting over the
 network.&nbsp; The resources a web server has to offer is limited and
 it's important that
@@ -3130,7 +3131,7 @@ from multiple threads will become intermixed. </p>
 function
 locator)</strong></font></p>
 <p>When<strong> </strong>one of the<strong> </strong>publish
-functions is called enties
+functions is called entities
 are placed in <em>locator<strong> </strong></em>objects.&nbsp;&nbsp;
 The locator objects
 are then checked when http requests come in to find the appropriate
@@ -3140,7 +3141,7 @@ the entities in the
 given<strong> locator</strong>.&nbsp;&nbsp; One common use of <strong>map-entities</strong>
 is to find entities that you no longer wish to be published.&nbsp; For
 that reason <strong>map-entities</strong>
-will remove the entity the passed to the <strong>function</strong> if
+will remove the entity&nbsp; passed to the <strong>function</strong> if
 the <strong>function</strong>
 returns the keyword symbol <strong>:remove</strong> as its value.</p>
 <p>&nbsp;</p>
@@ -3164,7 +3165,7 @@ AllegroServe.&nbsp;&nbsp; </p>
 run either normally
 or as a service,.&nbsp; You can run it normally to debug it and then
 start it as a service
-when you're satisifed that it works.</p>
+when you're satisfied that it works.</p>
 <p>Following is an example of how this can be done.&nbsp;&nbsp; I've
 decided that if the <font face="Courier New">/service</font> argument
 is given on the command line when I start my
@@ -3182,7 +3183,7 @@ never returns.</p>
 <p>In order to register my application as a service to the operating
 system I call <strong>ntservice:create-service</strong>
 like this:</p>
-<pre>(ntservice:create-service "aservetest" "Aserve Test Service"<br>     "c:\\acl61\\testservice\\testapp\\testapp.exe -- /service")</pre>
+<pre>(ntservice:create-service "aservetest" "Aserve Test Service"<br>     "c:\\acl62\\testservice\\testapp\\testapp.exe -- /service")</pre>
 <p>Note that I use "<font face="Courier New">--</font>" before the "<font face="Courier New">/service</font>".&nbsp; This is <em>very </em>important.
 &nbsp;&nbsp; The "<font face="Courier New">--</font>" separates the
 arguments
@@ -3197,7 +3198,7 @@ Panel, selecting Administrative Tools and then Services.&nbsp;&nbsp;
 Locate the service
 you just added, right click on it and select <strong>start</strong>.&nbsp;&nbsp;
 You can
-stop the service with a a right click as well. </p>
+stop the service with&nbsp; a right click as well. </p>
 <p>&nbsp;</p>
 <hr>
 <h2><a name="international-chars-aserve"></a>Using International
@@ -3245,7 +3246,7 @@ convert the lisp end of line (a single #\newline character) to the
 character that is standard on Windows.&nbsp;&nbsp; Thus an external
 format such as <strong>:utf-8</strong>
 &nbsp; has a different effect on Windows than on Unix, and this is not
-desireable for web
+desirable for web
 applications.&nbsp;&nbsp; The function call <font face="Courier New">(crlf-base-ef&nbsp;:utf-8)</font>
 returns an external format on Windows and on Unix that simply does the
 character encoding
@@ -3258,7 +3259,7 @@ response line, a
 header and optionally a body.&nbsp;&nbsp; The response line and header
 are always sent
 using a subset of the Latin1 character set (the subset corresponding
-the the US ASCII
+the&nbsp; US ASCII
 character set).&nbsp;&nbsp; The body is sent using the full Latin1
 character set, unless
 otherwise specified.&nbsp; To specify the character set of the body you
@@ -3298,7 +3299,7 @@ function, and thus the default value of *<strong>default-aserve-external-format*
 is <strong>(crlf-base-ef :latin1-base</strong>).&nbsp;&nbsp; This
 means that regardless of
 the locale in which you run AllegroServe, AllegroServe will by default
-using the Latin1
+use the Latin1
 character set, which is what is expected by web clients..</p>
 <p>A very useful character set is <strong>utf-8</strong> which is the
 whole Unicode
@@ -3307,7 +3308,7 @@ inside Lisp.
 &nbsp;&nbsp; The corresponding Allegro CL external format is the value
 of <font face="Courier New"><strong>(crlf-base-ef :utf-8)</strong></font>.&nbsp;&nbsp;
 Specifying
-this character set allows you to write web pages that can characters
+this character set allows you to write web pages that can use characters
 from nearly every
 language in the world (whether the web browser can find the glyphs to
 display all those
@@ -3346,13 +3347,13 @@ to retrieve the form data and decode the data.</p>
 <h3>examples</h3>
 <p>The AllegroServe test page has links to a few pages that show how
 international
-characters work with AllegroServe.&nbsp; One of these is the the
+characters work with AllegroServe.&nbsp; One of these is&nbsp; the
 International Character
 Display page.&nbsp; This page&nbsp; shows what happens when the <strong>charset</strong>
 and <strong>external-format</strong> are set to different values and a
 page containing
 international characters is displayed.&nbsp; It demonstrates how it
-important is is that
+important it is that
 those two character set specifications be kept in sync, and it shows
 that <strong>utf-8</strong>
 is most likely the best choice for a character set for your web pages.</p>
