@@ -1,3 +1,7 @@
+2004-12-15  John Foderaro  <jkf@tiger.franz.com>
+1.11
+	* remove debugging format statement
+
 2004-11-18  John Foderaro  <jkf@tiger.franz.com>
 
 	* webact.cl (redirect-to): do redirections with a 307 response

@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: webact.cl,v 1.11 2004/11/18 22:44:51 jkf Exp $
+;; $Id: webact.cl,v 1.12 2004/12/15 20:53:43 jkf Exp $
 
 
 
@@ -99,7 +99,7 @@
    
    ))
 
-(defparameter *webactions-version* "1.10")
+(defparameter *webactions-version* "1.11")
 	      
 (defvar *name-to-webaction* (make-hash-table :test #'equal))
 

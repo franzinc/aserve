@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: clpage.cl,v 1.8 2004/11/18 19:28:43 jkf Exp $
+;; $Id: clpage.cl,v 1.9 2004/12/15 20:53:43 jkf Exp $
 
 
 (eval-when (compile load eval) (require :aserve))
@@ -653,7 +653,7 @@
     
       (loop
 
-	(format t "nest: ~s  start ~s . end ~s~%" nest-level start-tag end-tag)
+	;(format t "nest: ~s  start ~s . end ~s~%" nest-level start-tag end-tag)
 	(if* (end-of-search-p end-tag)
 	   then (if* (> nest-level 0)
 		   then (decf nest-level)
