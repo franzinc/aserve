@@ -23,7 +23,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.3 2000/03/21 05:55:55 jkf Exp $
+;; $Id: htmlgen.cl,v 1.4 2000/04/09 04:34:27 jkf Exp $
 
 ;; Description:
 ;;   html generator
@@ -63,15 +63,18 @@
   ;; just emit html to the curfent stream
   (process-html-forms forms))
 
-(defmacro html-out-stream-cvt (stream)
-  ;; converts pseudo streams symbols to real streams
-  `(cond ((eq ,stream t) *terminal-io*)
-	 (,stream)
- 	 (t *standard-output*)))
+(defmacro html-out-stream-check (stream)
+  ;; ensure that a real stream is passed to this function
+  `(let ((.str. ,stream))
+     (if* (not (streamp .str.))
+	then (error "html-stream must be passed a stream object, not ~s"
+		    .str.))
+     .str.))
+
 
 (defmacro html-stream (stream &rest forms)
   ;; set output stream and emit html
-  `(let ((*html-stream* (html-out-stream-cvt ,stream))) (html ,@forms)))
+  `(let ((*html-stream* (html-out-stream-check ,stream))) (html ,@forms)))
 
 
 

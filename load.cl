@@ -1,6 +1,6 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.23 2000/03/27 20:47:48 jkf Exp $
+;; $Id: load.cl,v 1.24 2000/04/09 04:34:27 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -33,7 +33,7 @@
       "load.cl"
       "doc/iserve.html"
       "doc/tutorial.html"
-      "htmlgen/htmlgen.html"
+      "doc/htmlgen.html"
       ))
 
 (defparameter *iserve-examples*
@@ -107,13 +107,11 @@
 	   *iserve-root*))
    
   (copy-files-to *iserve-files* "iserve.fasl" :root *iserve-root*)
-  (copy-files-to '("htmlgen/htmlgen.html")
-		 "iserve-dist/doc/htmlgen.html"
-		 :root *iserve-root*
-		 )
+  
   (dolist (file '("iserve.fasl"
 		  "doc/iserve.html"
 		  "doc/tutorial.html"
+		  "doc/htmlgen.html"
 		  "readme.txt"
 		  "examples/examples.cl"
 		  "examples/examples.fasl"
@@ -204,7 +202,7 @@
 (defun publish-docs ()
   ;; copy documentation to the external web site
   (run-shell-command
-   (format nil "cp ~ahtmlgen/htmlgen.html ~adoc/iserve.html ~adoc/tutorial.html /net/cobweb/www/people/jkf/iserve"
+   (format nil "cp ~adoc/htmlgen.html ~adoc/iserve.html ~adoc/tutorial.html /net/cobweb/www/people/jkf/iserve"
 	   *iserve-root*
 	   *iserve-root*
 	   *iserve-root*)))

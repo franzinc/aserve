@@ -1,3 +1,8 @@
+2000-03-28  John Foderaro  <jkf@tiger.franz.com>
+
+	* move htmlgen.html from htmlgen/ to doc/ so that it's in
+	  a consistent place regardless of distribution type.
+
 2000-04-08    <jkf@DEEDEE>
 1.1.11
 	* make the debugging output feature based rather than

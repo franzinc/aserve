@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.11 2000/04/09 04:09:43 jkf Exp $
+;; $Id: client.cl,v 1.12 2000/04/09 04:34:27 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -148,10 +148,13 @@
 		     (incf ,i)
 		     )))
 	      
-	      (skip-to-not (ch buffer i max)
+	      (skip-to-not (ch buffer i max &optional (errorp t))
 		;; skip to first char not ch
 		`(loop
-		   (if* (>= ,i ,max) then (fail))
+		   (if* (>= ,i ,max) 
+		      then ,(if* errorp 
+			      then `(fail)
+			      else `(return)))
 		   (if* (not (eq ,ch (schar ,buffer ,i)))
 		      then (return))
 		   (incf ,i)))
@@ -450,7 +453,8 @@
 	    (setq protocol (collect-to #\space buff pos len))
 	    (skip-to-not #\space buff pos len)
 	    (setq response (collect-to #\space buff pos len))
-	    (skip-to-not #\space buff pos len)
+	    ; some servers don't return a comment, so handle that
+	    (skip-to-not #\space buff pos len nil)
 	    (setq comment (collect-to-eol buff pos len)))
 
 	  (if* (equalp protocol "HTTP/1.0")
