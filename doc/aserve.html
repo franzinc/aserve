@@ -300,7 +300,9 @@ an entity assigned, the old entity is replaced by the new entity.</p>
 <p>&nbsp;</p>
 
 <p><a name="f-publish-file"></a><strong><font face="Courier New">(publish-file &amp;key
-path host port&nbsp; file content-type class preload cache-p remove server timeout)</font></strong></p>
+path host port&nbsp; file content-type class preload cache-p remove <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; authorizer
+server timeout)</font></strong></p>
 
 <p>This creates an entity that will return the contents of a file on the disk in response
 to a request.&nbsp;&nbsp; The <strong>url</strong> and <strong>file</strong>&nbsp; must be
@@ -367,21 +369,21 @@ header lines and thus minimizes network traffic. </p>
 <p>&nbsp;</p>
 
 <p><a name="f-publish-directory"></a><strong><font face="Courier New">(publish-directory
-&amp;key prefix host port destination remove server <br>
+&amp;key prefix host port destination remove authorizer server <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 indexes filter timeout publisher)</font></strong></p>
 
 <p>This creates a mapping from all urls whose name begins with<strong> prefix</strong> to
 files stored in the directory specified by the destination.&nbsp;&nbsp; The <strong>host</strong>,
-<strong>port, remove </strong>and <strong>server</strong> arguments are as described above
-for <strong>publish.</strong> &nbsp;&nbsp;&nbsp;&nbsp; The <strong>timeout</strong>
+<strong>port, remove, authorizer </strong>and <strong>server</strong> arguments are as
+described above for <strong>publish.</strong> &nbsp;&nbsp;&nbsp;&nbsp; The <strong>timeout</strong>
 argument defaults as described in <strong>publish-file</strong>. When a request comes in
 for which there isn't an entity that matches it exactly,&nbsp; AllegroServe checks to see
 if a prefix of the request matches the request.&nbsp; If so, and if the resulting entity
 is a <strong>directory-entity</strong> as created by this function, then it strips the
 prefix off the given request and appends the remaining part of the request to the
-destination string.&nbsp; It then publishes that (using <strong>publish-file</strong> and
-computing the content-type from the file type). &nbsp;&nbsp; Next that <strong>file-entity
+destination string.&nbsp; It then publishes that (normally using <strong>publish-file</strong>
+and computing the content-type from the file type). &nbsp;&nbsp; Next that <strong>file-entity
 </strong>is made to handle the request in the normal manner.</p>
 
 <p>If a request comes that maps to a directory rather than a file then AllegroServe tries
@@ -434,18 +436,19 @@ function is:</p>
 <p>&nbsp;</p>
 
 <p><a name="f-publish"></a><strong><font face="Courier New">(publish &amp;key path host
-port content-type function class format remove server timeout)</font></strong></p>
+port content-type function class format remove server authorizer timeout)</font></strong></p>
 
 <p>This creates a mapping from a url to a <strong>computed-entity</strong>, that is an
 entity that computes its response every time a request comes in.&nbsp; The <strong>path</strong>,
-<strong>host</strong>, <strong>port</strong>, <strong>remove, server</strong> and <strong>class</strong>
-arguments are as in the other publish functions.&nbsp;&nbsp;The <strong>timeout</strong>
-argument defaults to <strong>nil </strong>always.&nbsp;&nbsp; The <strong>content-type</strong>
-sets a default value for the response to the request but this can be overridden.&nbsp; The
-<strong>format</strong> argument is either <strong>:text </strong>(the default) or <strong>:binary</strong>
-and it specifies the kind of value that will be sent back (after the response headers,
-which are always in text).&nbsp;&nbsp; This value is only important if the response is
-generated in a particular way (described below).</p>
+<strong>host</strong>, <strong>port</strong>, <strong>remove, server</strong> , <strong>authorizer
+</strong>and <strong>class</strong> arguments are as in the other publish
+functions.&nbsp;&nbsp;The <strong>timeout</strong> argument defaults to <strong>nil </strong>always.&nbsp;&nbsp;
+The <strong>content-type</strong> sets a default value for the response to the request but
+this can be overridden.&nbsp; The <strong>format</strong> argument is either <strong>:text
+</strong>(the default) or <strong>:binary</strong> and it specifies the kind of value that
+will be sent back (after the response headers, which are always in text).&nbsp;&nbsp; This
+value is only important if the response is generated in a particular way (described
+below).</p>
 
 <p>The <strong>function </strong>argument is&nbsp; a function of two arguments: an object
 of class <strong>http-request</strong> that holds a description of the request, and an
@@ -454,6 +457,60 @@ request.&nbsp;&nbsp; This function must generate a response to the http request,
 the response is only that the request wasn't found.</p>
 
 <p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong><font face="Courier New">(publish-multi &amp;key path host port content-type
+items class remove server authorizer timeout)</font></strong></p>
+
+<p>Some web pages are created from information from various sources.&nbsp;&nbsp; <strong>publish-multi</strong>
+allows you to specify a sequence of places that supply data for the combined web page.
+&nbsp; The data for each page is cached by <strong>publish-multi</strong> so that minimal
+conputation is required each time the page is requested.&nbsp;&nbsp;&nbsp; </p>
+
+<p>The <strong>host, port, content-type, class, remove, server authorizer </strong>and<strong>
+timeout</strong> arguments are the same as those of the other publish functions.
+&nbsp;&nbsp; The <strong>items </strong>argument is unique to <strong>publish-multi</strong>
+and is a list of zero or more of the following objects
+
+<ul>
+  <li>string or pathname - this is a reference to a file on the server.&nbsp; This item
+    contributes the contents of the file to the final web page.</li>
+  <li>symbol or function - this is a function of four arguments: <strong>req ent cached-time
+    cached-value</strong>.&nbsp;&nbsp; It returns two values:&nbsp; the new value and the last
+    modified time of the value.&nbsp;&nbsp; The function may look at the cached-value or
+    cached-time and realize that nothing has changed since that time that would cause this
+    function to return a new value.&nbsp; In that case it should return the cached-value and
+    cached-time that it received as arguments.&nbsp;&nbsp; If a value must always be computed
+    each time the function is called it may return <strong>nil</strong> for the last modified
+    time.&nbsp; This will result in no LastModified header being sent in the response.
+    &nbsp;&nbsp; The value the function returns can either be a string or an array of
+    unsigned-byte 8 values.&nbsp;&nbsp; It's preferred to return an array of unsigned-byte 8
+    values.&nbsp; If a string is returned then<strong> </strong>it will be converted to an
+    array of unsigned-byte 8 by using <strong>(string-to-octets string :null-terminate nil).
+    &nbsp;&nbsp; </strong>The cached-value argument to the function will be <strong>nil</strong>
+    or an unsigned-byte 8 array.</li>
+  <li><strong>(:string</strong> string<strong>) - </strong> this item supplies the given
+    string to the web page.</li>
+</ul>
+
+<p>Here's an example where we create a page from a fixed header and trailer page with a
+bit of dynamic content in the middle.</p>
+
+<pre>(publish-multi :path &quot;/thetime&quot;
+	       :items (list &quot;header.html&quot;
+			    #'(lambda (req ent old-time old-val)
+				(declare (ignore req ent old-time old-val))
+				(with-output-to-string (p)
+				  (html-stream p
+					       :br
+					       &quot;The time is &quot;
+					       (:princ (get-universal-time))
+					       (:b
+						&quot;Lisp Universal Time&quot;)
+					       :br)))
+			    &quot;footer.html&quot;))
+				   </pre>
 
 <h2><a name="generating-a-computed-response"></a>Generating a computed response </h2>
 
