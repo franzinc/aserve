@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: clpage.cl,v 1.5 2004/03/04 21:52:38 jkf Exp $
+;; $Id: clpage.cl,v 1.6 2004/03/04 22:02:45 jkf Exp $
 
 
 (eval-when (compile load eval) (require :aserve))
@@ -600,29 +600,6 @@
 	
 	
     
-#+ignore(defun old-scan-for-end-tag (p module fcn)
-  ;; look for </module_fcn>
-  ;; leave the file position after the tag
-  ;;
-  ;; return the number of characters read not including
-  ;; the end tag
-  ;; 
-  ;; return  nil if the end tag wasn't found
-  ;;
-  (let ((searchfor (format nil "</~a_~a>" module fcn))
-	(chcount 0))
-
-    (loop
-      (dotimes (i (length searchfor)
-		 ; matched
-		 (return-from scan-for-end-tag
-		   (- chcount (length searchfor))))
-	(let ((ch (read-char p nil nil)))
-	  (incf chcount)
-	  (if* (null ch) then (return-from scan-for-end-tag nil))  ; eof
-	  (if* (not (eq ch (aref searchfor i)))
-	     then ;(format t "ch: ~s~%" ch)
-		  (return)))))))
 
 
 
