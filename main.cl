@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.54 2000/08/12 17:40:18 jkf Exp $
+;; $Id: main.cl,v 1.55 2000/08/15 21:04:33 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -385,9 +385,7 @@
        ,(if* body 
 	   then `(compute-response-stream ,g-req ,g-ent))
        (if* ,g-headers
-	  then (bulk-set-reply-headers ,g-req ,g-headers)
-	       (setf (request-reply-headers ,g-req)
-		 (append ,g-headers (request-reply-headers ,g-req))))
+	  then (bulk-set-reply-headers ,g-req ,g-headers))
        (send-response-headers ,g-req ,g-ent :pre)
        (if* (not (member :omit-body (request-reply-strategy ,g-req)))
 	  then (let ((*html-stream* (request-reply-stream ,g-req)))
@@ -1939,12 +1937,12 @@ by keyword symbols and not by strings"
     (dolist (header headers)
       (let ((this (car header))
 	    (ent))
-	(if* (setq ent (assoc this fast-headers :test #'equal))
+	(if* (setq ent (assoc this fast-headers :test #'eq))
 	   then ; a fast one
 		(setf (slot-value req (second ent)) (cdr header))
 	   else ; a slow one
 		(if* (null (setq ent (assoc this 
-					    current-headers :test #'equal)))
+					    current-headers :test #'eq)))
 		   then ; not present yet
 			(push (setq ent (cons this nil)) current-headers))
 		(setf (cdr ent) (cdr header)))))

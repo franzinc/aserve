@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.35 2000/08/12 17:40:19 jkf Exp $
+;; $Id: publish.cl,v 1.36 2000/08/15 21:04:33 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -1149,6 +1149,7 @@
 		       (throw 'with-http-response nil))
     (let* ((sock (request-socket req))
 	   (strategy (request-reply-strategy req))
+	   (extra-headers (request-reply-headers req))
 	   (post-headers (member :post-headers strategy :test #'eq))
 	   (content)
 	   (chunked-p (member :chunked strategy :test #'eq))
@@ -1191,10 +1192,12 @@
 				  *read-request-timeout*
 				  *crlf*)
 		 else (format-dif :xmit sock "Connection: Close~a" *crlf*))
-      
-	      (format-dif :xmit sock "Server: AllegroServe/~a~a" 
-			  *aserve-version-string*
-			  *crlf*)
+
+	      (if* (not (assoc :server extra-headers :test #'eq))
+		 then ; put out default server info
+		      (format-dif :xmit sock "Server: AllegroServe/~a~a" 
+				  *aserve-version-string*
+				  *crlf*))
       
 	      (if* (request-reply-content-type req)
 		 then (format-dif :xmit
