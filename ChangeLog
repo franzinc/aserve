@@ -1,3 +1,9 @@
+2004-04-29  John Foderaro  <jkf@tiger.franz.com>
+
+	* main.cl - http-worker-thread don't expect the stream
+	    to process to be the first and only thing on the
+	    run-reasons list.  Acl7.0 will add things as well.
+
 2004-03-04  John Foderaro  <jkf@tiger.franz.com>
 
 	* main.cl - ensure that get-request-body always reads from

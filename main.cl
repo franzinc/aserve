@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.159 2004/03/04 21:52:38 jkf Exp $
+;; $Id: main.cl,v 1.160 2004/04/29 22:33:42 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1171,7 +1171,13 @@ by keyword symbols and not by strings"
     ;; need to restrict the print level
     (loop
 
-      (let ((sock (car (mp:process-run-reasons sys:*current-process*))))
+      (let ((sock (dolist (rr (mp:process-run-reasons sys:*current-process*))
+		    (if* (streamp rr) then (return rr)))))
+	(if* (null sock)
+	   then ; started without a stream to process, must be because
+		;; we're being told to die, so abandon thread
+		(return-from http-worker-thread nil))
+	
 	(restart-case
 	    (if* (not (member :notrap *debug-current* :test #'eq))
 	       then (handler-case (process-connection sock)
