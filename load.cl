@@ -1,6 +1,6 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.15 2000/03/20 15:52:27 jkf Exp $
+;; $Id: load.cl,v 1.16 2000/03/20 15:56:36 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -27,6 +27,7 @@
       "examples/fresh.jpg"
       "examples/prfile9.jpg"
       "examples/tutorial.cl"
+      "examples/iservelogo.gif"
       "load.cl"
       "doc/iserve.html"
       "doc/tutorial.html"

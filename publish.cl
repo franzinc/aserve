@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.24 2000/03/16 17:53:28 layer Exp $
+;; $Id: publish.cl,v 1.25 2000/03/20 15:56:36 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -892,9 +892,8 @@
 					:direction :input
 					:element-type '(unsigned-byte 8)))))
 		 then ; file not readable
-		      (with-http-response (req ent)
-			(setf (request-reply-code req) *response-not-found*)
-			(with-http-body (req ent)))
+		      (failed-request req)
+		      
 		      (return-from process-entity nil))
 	      
 	      (unwind-protect 
@@ -1192,17 +1191,17 @@
 			       (request-reply-content-length req)      
 			       *crlf*)
 		      (debug-format 10 
-				       "~d ~s - ~d bytes" 
+				       "~d ~s - ~d bytes~%" 
 				       (response-number code)
 				       (response-desc   code)
 				       (request-reply-content-length req))
 	       elseif chunked-p
-		 then (debug-format 10 "~d ~s - chunked" 
+		 then (debug-format 10 "~d ~s - chunked~%" 
 				       (response-number code)
 				       (response-desc   code)
 				       )
 		 else (debug-format 10 
-				       "~d ~s - unknown length" 
+				       "~d ~s - unknown length~%" 
 				       (response-number code)
 				       (response-desc   code)
 				       ))

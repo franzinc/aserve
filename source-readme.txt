@@ -1,4 +1,4 @@
-				-[Fri Mar 17 14:51:35 2000 by jkf]-
+				-[Fri Mar 17 15:54:15 2000 by jkf]-
 
 Allegro iServe Source Distribution ReadMe file
 
@@ -19,6 +19,7 @@ How to build and test iServe:
    This should work in a lisp running in a :case-insensitive-upper
    or :case-sensitive-lower mode, although we do most of our running
    and testing in a :case-sensitive-lower lisp.
+   The current case mode is the value of excl:*current-case-mode*
 
 2. load in the file load.cl 
 

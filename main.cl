@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.21 2000/03/17 22:53:14 jkf Exp $
+;; $Id: main.cl,v 1.22 2000/03/20 15:56:36 jkf Exp $
 
 ;; Description:
 ;;   iserve's main loop
@@ -115,7 +115,7 @@
 (in-package :net.iserve)
 
 
-(defparameter *iserve-version* '(1 1 4))
+(defparameter *iserve-version* '(1 1 5))
 
 ;;;;;;;  debug support 
 
