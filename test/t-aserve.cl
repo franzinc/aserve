@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.6 2000/06/08 16:43:58 jkf Exp $
+;; $Id: t-aserve.cl,v 1.7 2000/08/12 17:40:19 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -597,7 +597,7 @@
 		 ;; get both uri and post
 		 (if* (eql (request-method req) :post)
 		    then (test "application/x-www-form-urlencoded"
-			       (header-slot-value req "content-type")
+			       (header-slot-value req :content-type)
 			       :test #'equal))
 		 (setq req-query-res (request-query req))
 		 (with-http-response (req ent)
@@ -797,7 +797,7 @@
 	     :function #'(lambda (req ent)
 			   (with-http-response (req ent
 						    :response *response-found*)
-			     (setf (reply-header-slot-value req "location") 
+			     (setf (reply-header-slot-value req :location) 
 			       "redir-target")
 			     (with-http-body (req ent)))))
     
@@ -806,7 +806,7 @@
 	     :function #'(lambda (req ent)
 			   (with-http-response (req ent
 						    :response *response-found*)
-			     (setf (reply-header-slot-value req "location") 
+			     (setf (reply-header-slot-value req :location) 
 			       "redir-inf")
 			     (with-http-body (req ent)))))
     

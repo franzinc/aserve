@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.22 2000/05/16 14:01:25 jkf Exp $
+;; $Id: parse.cl,v 1.23 2000/08/12 17:40:19 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -164,7 +164,7 @@
     ;; but with upper case following the lower case
     (let ((newstr (make-string (* 2 (length str)))))
       (dotimes (i (length str))
-	(setf (schar newstr (* 2 i)) (schar str i))
+	(setf (schar newstr (* 2 i)) (char-downcase (schar str i)))
 	(setf (schar newstr (1+ (* 2 i))) (char-upcase (schar str i))))
       newstr)))
 
@@ -175,11 +175,28 @@
     '#.(let (res)
 	(dolist (head *fast-headers*)
 	  (push (cons
-		 (dual-caseify (concatenate 'string (car head) ":"))
+		 (dual-caseify (concatenate 'string (string (car head)) ":"))
 		 (third head))
 		res))
 	res))
-      
+
+(defparameter *header-to-keyword*
+    ;; headers that we've seen so far that are stored on the alist
+    ;; we use this to avoid interning.
+    ;; we should order this for fast searching
+    '(
+      ("content-type" . :content-type)
+      ("accept-encoding" . :accept-encoding) 
+      ("accept-charset" . :accept-charset) 
+      ("accept-language" . :accept-language)
+      ("pragma" . :pragma) 
+      ("referer" . :referer)
+      ("if-modified-since" . :if-modified-since) 
+      ("cookie" . :cookie)
+      ("authorization" . :authorization)
+      ))
+
+
 (defun read-request-headers (req sock buffer)
   ;; read in the headers following the command and put the
   ;; info in the req object
@@ -250,6 +267,7 @@
 				       buffer
 				       (+ 2 colonpos)
 				       end)))
+			
 			; downcase the key
 			(dotimes (i (length key))
 			  (let ((ch (schar key i)))
@@ -257,10 +275,25 @@
 			       then (setf (schar key i) 
 				      (char-downcase ch)))))
 			
+			(let ((ent (assoc key *header-to-keyword*
+					  :test #'equal)))
+			  (if* (null ent)
+			     then (push (setq ent
+					  (cons key
+						(intern
+						 (if* (eq *current-case-mode*
+							  :case-sensitive-lower)
+						    then key
+						    else (string-upcase key))
+						 :keyword)))
+					*header-to-keyword*))
+			  (setq key (cdr ent)))
+					
+							  
 			; now add or append
 			
 			(let* ((alist (request-headers req))
-			       (ent (assoc key alist :test #'equal)))
+			       (ent (assoc key alist :test #'eq)))
 			  (if* (null ent)
 			     then (push (setq ent (cons key "")) alist)
 				  (setf (request-headers req) alist))

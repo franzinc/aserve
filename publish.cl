@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.34 2000/08/10 00:57:32 jkf Exp $
+;; $Id: publish.cl,v 1.35 2000/08/12 17:40:19 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -777,7 +777,7 @@
       (let ((entity-host (host entity)))
 	(if* entity-host
 	   then ; must do a host match
-		(let ((req-host (header-slot-value req "host")))
+		(let ((req-host (header-slot-value req :host)))
 		  (if* req-host 
 		     then ; name may be foo.com:8000
 			  ; need to just use the foo.com part:
@@ -799,7 +799,7 @@
   ;; return the entity if one is found, else return nil
   (let* ((url (uri-path (request-uri req)))
 	 (len-url (length url))
-	 (req-host (header-slot-value req "host")))
+	 (req-host (header-slot-value req :host)))
     
     (setq req-host (car (split-on-character req-host #\:)))
 	     
@@ -1026,7 +1026,7 @@
      then ; we dont' even care
 	  (return-from up-to-date-check nil))
   
-  (let ((if-modified-since (header-slot-value req "if-modified-since")))
+  (let ((if-modified-since (header-slot-value req :if-modified-since)))
     (if* if-modified-since
        then (setq if-modified-since
 	      (date-to-universal-time if-modified-since)))
@@ -1056,7 +1056,7 @@
 	 (and (wserver-enable-keep-alive *wserver*)
 		      (>= (wserver-free-workers *wserver*) 2)
 		      (header-value-member "keep-alive" 
-			      (header-slot-value req "connection" )))))
+			      (header-slot-value req :connection )))))
     (if* (eq (request-method req) :head)
        then ; head commands are particularly easy to reply to
 	    (setq strategy '(:use-socket-stream
@@ -1111,7 +1111,7 @@
   (let ((keep-alive (and (wserver-enable-keep-alive *wserver*)
 			 (>= (wserver-free-workers *wserver*) 2)
 			 (equalp "keep-alive" 
-				 (header-slot-value req "connection"))))
+				 (header-slot-value req :connection))))
 	(strategy))
     
     (if*  (eq (request-method req) :get)
@@ -1325,7 +1325,7 @@
   ;; return the set of cookie name value pairs from the current
   ;; request as conses  (name . value) 
   ;;
-  (let ((cookie-string (header-slot-value req "cookie")))
+  (let ((cookie-string (header-slot-value req :cookie)))
     (if* cookie-string
        then ; form is  cookie: name=val; name2=val2; name2=val3
 	    ; which is not exactly the format we want to see it in

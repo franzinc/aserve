@@ -1,3 +1,9 @@
+2000-08-12  John Foderaro  <jkf@tiger.franz.com>
+
+	*  name headers by keyword symbols rather than strings
+	  !! this change is not upward compatible !!
+	
+    
 2000-08-10  John Foderaro  <jkf@tiger.franz.com>
 1.1.25
 	*  decode.cl: request-query will now convert items in query

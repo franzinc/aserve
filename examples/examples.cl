@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.10 2000/06/11 15:24:19 jkf Exp $
+;; $Id: examples.cl,v 1.11 2000/08/12 17:40:19 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -61,7 +61,7 @@
 			 (:h1 "Welcome to AllegroServe") 
 			 (:p "These links show off some of AllegroServe's capabilities. ")
 			 (:i "This server's host name is "
-			     (:princ-safe (header-slot-value req "host")))
+			     (:princ-safe (header-slot-value req :host)))
 			 :p
 			 (:b "Sample pages") :br
 			 ((:a :href "gc") "Garbage Collector Stats") :br
@@ -206,7 +206,7 @@
 	 #'(lambda (req ent)
 	     (with-http-response (req ent
 				      :response *response-moved-permanently*)
-	       (setf (reply-header-slot-value req "location") "pic")
+	       (setf (reply-header-slot-value req :location) "pic")
 	       (with-http-body (req ent)
 		 ;; this is optional and most likely unnecessary since most 
 		 ;; browsers understand the redirect response

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.53 2000/08/10 15:48:50 jkf Exp $
+;; $Id: main.cl,v 1.54 2000/08/12 17:40:18 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -422,14 +422,14 @@
   ;; where name is symbol naming the accessor function
   (defparameter *fast-headers*
       (let (res)
-	(dolist (name '("connection" 
-			"date" 
-			"transfer-encoding"
-			"accept"
-			"host"
-			"user-agent"
-			"content-length"))
-	  (push (list name   ;; string name
+	(dolist (name '(:connection
+			:date
+			:transfer-encoding
+			:accept
+			:host
+			:user-agent
+			:content-length))
+	  (push (list name   ;; keyword symbol name
 		      (read-from-string (format nil "reply-~a" name)) ;; symbol name
 		      ;; accessor name
 		      (read-from-string 
@@ -440,14 +440,15 @@
       ;; list of headers for the reply that at stored in slots of
       ;; the http request object
       (let (res)
-	(dolist (name '("date" 
-			"content-type"
-			"content-length"))
+	(dolist (name '(:date
+			:content-type
+			:content-length))
 	  (push (list name   ;; string name
 		      
 		      ;; symbol naming slot
 		      (read-from-string 
-		       (concatenate 'string (symbol-name :reply-) name))
+		       (concatenate 'string (symbol-name :reply-) 
+				    (string name)))
 		      
 		      ;; accessor name
 		      (read-from-string 
@@ -461,25 +462,29 @@
 
 
 (defmacro header-slot-value (obj name)
-  ;; name is a string naming the header value (all lower case)
+  ;; name is a keyword symbol naming the header value.
   ;; retrive the slot's value from the http-request obj obj.
   (let (ent)
-    (if* (setq ent (assoc name *fast-headers* :test #'equal))
+    (if* (stringp name)
+       then (header-name-error name))
+    (if* (setq ent (assoc name *fast-headers* :test #'eq))
        then ; has a fast accesor
 	    `(,(third ent) ,obj)
        else ; must get it from the alist
-	    `(cdr (assoc ,name (request-headers ,obj) :test #'equal)))))
+	    `(cdr (assoc ,name (request-headers ,obj) :test #'eq)))))
 
 (defsetf header-slot-value (obj name) (newval)
   ;; set the header value regardless of where it is stored
   (let (ent)
-    (if* (setq ent (assoc name *fast-headers* :test #'equal))
+    (if* (stringp name)
+       then (header-name-error name))
+    (if* (setq ent (assoc name *fast-headers* :test #'eq))
        then `(setf (,(third ent) ,obj) ,newval)
        else (let ((genvar (gensym))
 		  (nobj (gensym)))
 	      `(let* ((,nobj ,obj)
 		      (,genvar (assoc ,name (request-headers ,nobj) 
-				      :test #'equal)))
+				      :test #'eq)))
 		 (if* (null ,genvar)
 		    then (push (setq ,genvar (cons ,name nil))
 			       (request-headers ,nobj)))
@@ -489,26 +494,36 @@
   ;; name is a string naming the header value (all lower case)
   ;; retrive the slot's value from the http-request obj obj.
   (let (ent)
-    (if* (setq ent (assoc name *fast-reply-headers* :test #'equal))
+    (if* (stringp name)
+       then (header-name-error name))
+    (if* (setq ent (assoc name *fast-reply-headers* :test #'eq))
        then ; has a fast accesor
 	    `(,(third ent) ,obj)
        else ; must get it from the alist
-	    `(cdr (assoc ,name (request-reply-headers ,obj) :test #'equal)))))
+	    `(cdr (assoc ,name (request-reply-headers ,obj) :test #'eq)))))
 
 (defsetf reply-header-slot-value (obj name) (newval)
   ;; set the header value regardless of where it is stored
   (let (ent)
-    (if* (setq ent (assoc name *fast-reply-headers* :test #'equal))
+    (if* (stringp name)
+       then (header-name-error name))
+    (if* (setq ent (assoc name *fast-reply-headers* :test #'eq))
        then `(setf (,(third ent) ,obj) ,newval)
        else (let ((genvar (gensym))
 		  (nobj (gensym)))
 	      `(let* ((,nobj ,obj)
 		      (,genvar (assoc ,name (request-reply-headers ,nobj) 
-				      :test #'equal)))
+				      :test #'eq)))
 		 (if* (null ,genvar)
 		    then (push (setq ,genvar (cons ,name nil))
 			       (request-reply-headers ,nobj)))
 		 (setf (cdr ,genvar) ,newval))))))
+
+
+(defun header-name-error (name)
+  (error "You attempted to reference header ~s.  Headers are now named
+by keyword symbols and not by strings"
+	 name))
 
 (defmacro header-slot-value-integer (obj name)
   ;; if the header value exists and has an integer value
@@ -1187,7 +1202,7 @@
       (setf (request-request-body req)
 	(if* (member (request-method req) '(:put :post))
 	   then (multiple-value-bind (length believe-it)
-		    (header-slot-value-integer req "content-length")
+		    (header-slot-value-integer req :content-length)
 		  (if* believe-it
 		     then ; we know the length
 			  (prog1 (let ((ret (make-string length)))
@@ -1219,7 +1234,7 @@
 				      
 		     else ; no content length given
 			  (if* (equalp "keep-alive" 
-				       (header-slot-value req "connection"))
+				       (header-slot-value req :connection))
 			     then ; must be no body
 				  ""
 			     else ; read until the end of file
@@ -1263,11 +1278,11 @@
 (defmethod start-multipart-capture ((req http-request))
   ;; begin the grab of the body.
   ;; user doesn't have to call this, it's called automatically
-  (let* ((ctype (header-slot-value req "content-type"))
+  (let* ((ctype (header-slot-value req :content-type))
 	 (parsed (and ctype (parse-header-value ctype)))
 	 (boundary (and (equalp "multipart/form-data" (cadar parsed))
 			(cdr (assoc "boundary" (cddar parsed) :test #'equal))))
-	 (len (header-slot-value-integer req "content-length")))
+	 (len (header-slot-value-integer req :content-length)))
     
     (if* (null boundary)
        then ; not in the right form, give up
@@ -1894,7 +1909,7 @@
   ;;  name
   ;;  password
   ;;
-  (let ((auth-value (header-slot-value req "authorization")))
+  (let ((auth-value (header-slot-value req :authorization)))
     (if* auth-value
        then (let ((words (split-into-words auth-value)))
 	      (if* (equalp (car words) "basic")
@@ -1909,7 +1924,7 @@
   ;; This must be called after with-http-response and before
   ;; with-http-body
   (setq realm (string realm))
-  (setf (reply-header-slot-value req "www-authenticate")
+  (setf (reply-header-slot-value req :www-authenticate)
     (format nil "Basic realm=~s" realm)))
     
 
