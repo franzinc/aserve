@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.59 2000/08/21 23:32:41 jkf Exp $
+;; $Id: main.cl,v 1.60 2000/08/22 05:32:26 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -131,7 +131,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 1 26))
+(defparameter *aserve-version* '(1 1 27))
 
 
 (provide :aserve)
@@ -773,7 +773,7 @@ by keyword symbols and not by strings"
   (shutdown server) 
 
   (if* proxy 
-     then (enable-proxy server))
+     then (enable-proxy :server server))
   
   (let* ((main-socket (socket:make-socket :connect :passive
 					  :local-port port

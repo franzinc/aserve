@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.10 2000/08/21 23:32:41 jkf Exp $
+;; $Id: t-aserve.cl,v 1.11 2000/08/22 05:32:27 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -103,8 +103,7 @@
 
 (defun start-proxy-running ()
   ;; start another web server to be the proxy
-  (setq *proxy-wserver* (start :server :new :port nil))
-  (enable-proxy :server *proxy-wserver*)
+  (setq *proxy-wserver* (start :server :new :port nil :proxy t))
   (setq *x-proxy* (format nil "localhost:~d" 
 			  (socket:local-port
 			   (wserver-socket *proxy-wserver*))))
