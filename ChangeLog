@@ -1,3 +1,8 @@
+2001-09-20  John Foderaro  <jkf@tiger.franz.com>
+
+	* examples/examples.cl - add commentary to some of the links
+	to make them clearer
+
 2001-09-20  Kevin Layer  <layer@crikey>
 
 	* makefile: split `clean' into `clean' and `cleanall', the latter
