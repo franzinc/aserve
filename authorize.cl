@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: authorize.cl,v 1.4 2000/05/16 14:01:25 jkf Exp $
+;; $Id: authorize.cl,v 1.4.10.1 2002/01/21 21:58:52 layer Exp $
 
 ;; Description:
 ;;   classes and functions for authorizing access to entities
@@ -73,6 +73,7 @@
     ;; valid name/password not given, ask for it 
     (with-http-response (req ent :response 
 			     *response-unauthorized*)
+      (setf (request-reply-content-length req) 0)
       (set-basic-authorization req
 			       (password-authorizer-realm auth))
       (with-http-body (req ent)))

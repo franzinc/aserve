@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: puzzle.cl,v 1.1.2.3 2001/10/22 16:12:57 layer Exp $
+;; $Id: puzzle.cl,v 1.1.2.4 2002/01/21 21:58:52 layer Exp $
 
 ;; Description:
 ;;   Allegro Serve puzzle example
@@ -489,43 +489,43 @@
 (defun extend-puzzle (puzzle extend-limit erow ecol
 		      &aux (prows (puzzle-rows puzzle))
 			   (pcols (puzzle-cols puzzle)))
-  (let* ((shift-rows (when (minusp erow)
-		       (- erow)))
-	 (shift-cols (when (minusp ecol)
-		       (- ecol)))
+  (let* ((shift-rows (if* (minusp erow)
+			then (- erow)))
+	 (shift-cols (if* (minusp ecol)
+			then (- ecol)))
 	 (new-rows (+ prows (or shift-rows (max 0 (- (1+ erow) prows)))))
 	 (new-cols (+ pcols (or shift-cols (max 0 (- (1+ ecol) pcols))))))
-    (when (or (> new-rows extend-limit)
-	      (> new-cols extend-limit))
-      ;; reject
-      (return-from extend-puzzle nil))
+    (if* (or (> new-rows extend-limit)
+	     (> new-cols extend-limit))
+       then ;; reject
+	    (return-from extend-puzzle nil))
     (setq shift-rows (or shift-rows 0))
     (setq shift-cols (or shift-cols 0))
     (setq puzzle (adjust-array puzzle (list new-rows new-cols)
 			       :initial-element nil))
-    (when (or (minusp erow) (minusp ecol))
-      (do ((r (- new-rows shift-rows 1) (1- r)))
-	  ((< r 0))
-	(do ((c (- new-cols shift-cols 1) (1- c)))
-	    ((< c 0))
-	  (setf (aref puzzle (+ r shift-rows) (+ c shift-cols))
-	    (aref puzzle r c)))
-	(do ((c 0 (1+ c)))
-	    ((>= c shift-cols))
-	  (setf (aref puzzle (+ r shift-rows) c) nil)))
-      (do ((r 0 (1+ r)))
-	  ((>= r shift-rows))
-	(do ((c 0 (1+ c)))
-	    ((>= c new-cols))
-	  (setf (aref puzzle r c) nil))))
+    (if* (or (minusp erow) (minusp ecol))
+       then (do ((r (- new-rows shift-rows 1) (1- r)))
+		((< r 0))
+	      (do ((c (- new-cols shift-cols 1) (1- c)))
+		  ((< c 0))
+		(setf (aref puzzle (+ r shift-rows) (+ c shift-cols))
+		  (aref puzzle r c)))
+	      (do ((c 0 (1+ c)))
+		  ((>= c shift-cols))
+		(setf (aref puzzle (+ r shift-rows) c) nil)))
+	    (do ((r 0 (1+ r)))
+		((>= r shift-rows))
+	      (do ((c 0 (1+ c)))
+		  ((>= c new-cols))
+		(setf (aref puzzle r c) nil))))
     (values puzzle shift-rows shift-cols)))
 
 (defun make-puzzle (word-list fill)
   ;; We actually make the puzzle twice, throwing away the first one after
   ;; getting its size.  The idea is that words are likely to be more evenly
   ;; distributed in the second puzzle.
-  (unless word-list
-    (return-from make-puzzle nil))
+  (if* (not word-list)
+     then (return-from make-puzzle nil))
   (let ((puzzle (make-puzzle-1 word-list
 			       (make-array '(1 1)
 					   :initial-element nil
@@ -548,20 +548,20 @@
 	(incf (cdr (second a)) coff))
       (push (list word start dir) answers)))
   (dotimes (i (apply #'* (array-dimensions puzzle)))
-    (unless (row-major-aref puzzle i)
-      (setf (row-major-aref puzzle i)
+    (if* (not (row-major-aref puzzle i))
+       then (setf (row-major-aref puzzle i)
 	
-	(ecase fill-sym
-	  (:|ascii-lc| (code-char (+ (random 26) #.(char-code #\a))))
-	  (:|none| #\space)
-	  (:|unicode-nocjk| (loop (let ((c (random #.(expt 2 16))))
-				    (when (= 1 (aref .unicode-letters-bm. c))
-				      (return (code-char c))))))
-	  (:|unicode-cjk| (loop (let ((c (random #.(expt 2 16))))
-				  (when (= 1 (aref .unicode-letters-bm. c))
-				    (return (code-char c)))
-				  (when (cjk-p c)
-				    (return (code-char c))))))))))
+	      (ecase fill-sym
+		(:|ascii-lc| (code-char (+ (random 26) #.(char-code #\a))))
+		(:|none| #\space)
+		(:|unicode-nocjk| (loop (let ((c (random #.(expt 2 16))))
+					  (if* (= 1 (aref .unicode-letters-bm. c))
+					     then (return (code-char c))))))
+		(:|unicode-cjk| (loop (let ((c (random #.(expt 2 16))))
+					(if* (= 1 (aref .unicode-letters-bm. c))
+					   then (return (code-char c)))
+					(if* (cjk-p c)
+					   then (return (code-char c))))))))))
   (values puzzle
 	  (coerce
 	   (sort answers #'(lambda (x y)
@@ -583,9 +583,9 @@
 
 
 (defun unmark (puzzle row col)
-  (when (consp (aref puzzle row col))
-    (setf (aref puzzle row col) (car (aref puzzle row col)))
-    t))
+  (if* (consp (aref puzzle row col))
+     then (setf (aref puzzle row col) (car (aref puzzle row col)))
+	  t))
 
 (defun words-list (words-string)
   (do ((words nil)
@@ -627,15 +627,16 @@ This page available only with International Allegro CL post 6.0 beta")
 		(assoc "index" (request-query req :external-format
 					      :utf8-base)
 		       :test #'string=)))
-	   (when lookup
-	     (setq marked t)
-	     (mark-puzzle puzzle (read-from-string (cdr lookup)) answers)))
+	   (if* lookup
+	      then (setq marked t)
+		   (mark-puzzle puzzle (read-from-string (cdr lookup)) 
+				answers)))
 	 (let* ((rq (request-query req :external-format :utf8-base))
 		(words-string (cdr (assoc "words" rq :test #'string=)))
 		(fill (cdr (assoc "fill" rq :test #'string=))))
-	   (when words-string
-	     (multiple-value-setq (puzzle answers)
-	       (make-puzzle (words-list words-string) fill))))
+	   (if* words-string
+	      then (multiple-value-setq (puzzle answers)
+		     (make-puzzle (words-list words-string) fill))))
 	 (with-http-response (req ent)
 	   (with-http-body (req ent
 				:external-format :utf8-base)
@@ -689,9 +690,9 @@ Click on word to see its puzzle location.")))
 		   else (html
 			 (:p "No words entered")))
 		(:p ((:a :href "/wordpuzzle") "New Puzzle"))
-		(when marked
-		  (html
-		   (:p ((:a :href puzzle-url) "Clear Answer")))))))))))
+		(if* marked
+		   then (html
+			 (:p ((:a :href puzzle-url) "Clear Answer")))))))))))
     (with-http-response (req ent)
       (with-http-body (req ent)
 	(html (:html
@@ -774,13 +775,13 @@ The \"anyone can be provincial!\" page"))))))))))))
      (let ((lookup
 	    (assoc "char" (request-query req)
 		   :test #'string=)))
-       (when lookup
-	 (setq lookup
-	   (let ((*read-base* 16))
-	     (read-from-string
-	      (subseq (cdr lookup)
-		      #.(length "u+")
-		      #.(length "u+xxxx"))))))
+       (if* lookup
+	  then (setq lookup
+		 (let ((*read-base* 16))
+		   (read-from-string
+		    (subseq (cdr lookup)
+			    #.(length "u+")
+			    #.(length "u+xxxx"))))))
        (with-http-response (req ent)
 	 (with-http-body (req ent
 			      :external-format :utf8-base)
@@ -818,10 +819,10 @@ Glyph GIF (from Unicode web site -- not all characters have gifs):")
 			 ((:img :src uglyph
 				:alt (format nil "~s" (code-char lookup))
 				:border 2)))))))
-	      (when (cjk-p lookup)
-		(if* (<= #xac00 lookup #xd7a3)
-		   then (html (:p "Character is a Hangul Syllable."))
-		   else (html (:p #.(format nil "~
+	      (if* (cjk-p lookup)
+		 then (if* (<= #xac00 lookup #xd7a3)
+			 then (html (:p "Character is a Hangul Syllable."))
+			 else (html (:p #.(format nil "~
 Character is an ideograph from Chinese, Japanese, or Korean.")))))
 	      (:p #.(format nil "~
 Use browser `Back' button to return to puzzle."))))))))))

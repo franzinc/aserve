@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: cgi.cl,v 1.5.4.1 2001/10/22 16:12:57 layer Exp $
+;; $Id: cgi.cl,v 1.5.4.2 2002/01/21 21:58:52 layer Exp $
 
 ;; Description:
 ;;   common gateway interface (running external programs)
@@ -43,18 +43,41 @@
 			(query-string nil query-string-p)
 			auth-type
 			(timeout 200)
+			error-output
 			)
   ;; program is a string naming a external command to run.
   ;; invoke the program after setting all of the environment variables
   ;; according to the cgi specification.
   ;; http://hoohoo.ncsa.uiuc.edu/cgi/interface.html
   ;;
-  
+  ;; error-output can be
+  ;;   nil - inherit lisp's standard output
+  ;;   pathname or string - write to file of a given name
+  ;;   :output - mix in the error output with the output
+  ;;   function - call function when input's available from the error 
+  ;;		stream
   (let ((envs (list '("GATEWAY_INTERFACE" . "CGI/1.1")
 		    `("SERVER_SOFTWARE" 
 		      . ,(format nil "AllegroServe/~a"
 				 *aserve-version-string*))))
+	(error-output-arg)
+	(error-fcn)
 	(body))
+    
+    ; error check the error argument
+    (typecase error-output
+      ((or null pathname string) 
+       (setq error-output-arg error-output))
+      (symbol
+       (if* (eq error-output :output)
+	  then (setq error-output-arg error-output)
+	  else (setq error-output-arg :stream
+		     error-fcn error-output)))
+      (function
+       (setq error-output-arg :stream
+	     error-fcn error-output))
+      (t (error "illegal value for error-output: ~s" error-output)))
+    
     
     (let ((our-ip (socket:local-host (request-socket req))))
       (let ((hostname (socket:ipaddr-to-hostname our-ip)))
@@ -141,12 +164,12 @@
     (multiple-value-bind
 	(to-script-stream
 	 from-script-stream
-	 ignore-this
+	 from-script-error-stream
 	 pid)
 	(run-shell-command program
 			   :input (if* body then :stream)
 			   :output :stream
-			   :error-output :output
+			   :error-output error-output-arg
 			   :separate-streams t
 			   :wait nil
 			   :environment envs
@@ -167,16 +190,10 @@
 		    (setq to-script-stream nil))
 	    
 	    ; read the output from the script
-	    (multiple-value-bind (len buffs)
-		(read-script-data from-script-stream timeout)
-	      
-	      (ignore-errors (close from-script-stream))
-	      (setq from-script-stream nil)
-	      
-	      
-	      (if* (null len)
-		 then (failed-script-response req ent)
-		 else (successful-script-response req ent buffs len))))
+	    (read-script-data req ent
+			      from-script-stream from-script-error-stream
+			      error-fcn
+			      timeout))
     
     
 	;; cleanup forms:
@@ -184,61 +201,145 @@
 	   then (ignore-errors (close to-script-stream)))
 	(if* from-script-stream
 	   then (ignore-errors (close from-script-stream)))
+	(if* from-script-error-stream
+	   then (ignore-errors (close from-script-error-stream)))
 	(if* pid
 	   then ;; it may be bad to wait here...
-		(mp:with-timeout (60)
+		(mp:with-timeout (60) ; ok w-t
 		  (sys:reap-os-subprocess :pid pid :wait t)))))))
 
-    
-    
-    
-    
-(defun read-script-data (stream timeout)
-  ;; read all the script data.
-  ;; time is how long we should block waiting for a response
-  ;; from the script
-  ;; return  nil  - error occured, no data to return
-  ;; 2 values  count, buffers  - read count bytes into the given buffers
-  ;;   the buffers are header-block buffers and must be freed when done.
 
-  (let (buffs (total-len 0))
-    (block outer
-      (handler-case
-	  (loop
-	    (let ((buff (get-header-block))
-		  (start 0))
-	      (push buff buffs)
-	      (loop
-		(mp:with-timeout (timeout (error "cgi timed out"))
-		  (let ((len (read-sequence buff stream
-					    :start start)))
-		    (if* (<= len start)
-		       then ; end of file
-			    (incf total-len len)
-			    (return-from outer)
-		     elseif (eql len (length buff))
-		       then ; buffer is full
-			    (incf total-len len)
-			    (return) ; exit inner loop
-		       else (setq start len)))))))
-	(error (c)
-	  ; something went wrong reading
-	  ; give back buffs
-	  (warn "error during cgi script read: ~a" c)
-	  (dolist (buff buffs)
-	    (free-header-block buff))
-	
-	  (return-from read-script-data nil))))
+(defun read-script-data (req ent stream error-stream error-fcn timeout)
+  ;; read from the stream and the error-stream (if given) 
+  ;; do the cgi header processing and start sending output asap
+  ;;
+  ;; don't close the streams passed, they'll be closed by the caller
+  ;;
+  (let ((active-streams)
+	(buff)
+	(start 0))
     
-    (values total-len (nreverse buffs))))
+    (labels ((error-stream-handler ()
+	       ;; called when data available on error stream.
+	       ;; calls user supplied handler function
+	       (let ((retcode (funcall error-fcn req ent error-stream)))
+		 (if* retcode
+		    then ; signal to close off the error stream
+			 (setq active-streams
+			   (delete error-stream active-streams :key #'car)))))
+		 
+	     (data-stream-header-read ()
+	       ;; called when data available on standard output
+	       ;; and we're still reading in search of a full header
+	       ;;
+	       (if* (>= start (length buff))
+		  then ; no more room to read, must be bogus header
+		       (failed-script-response req ent)
+		       (return-from read-script-data)
+		  else (let ((len (read-sequence buff stream
+						 :start start)))
+			 (if* (<= len start)
+			    then ; eof, meaning no header
+				 (failed-script-response req ent)
+				 (return-from read-script-data)
+			    else (setq start len)
+				 (multiple-value-bind (resp headers bodystart)
+				     (parse-cgi-script-data buff start)
+				   (if* resp
+				      then ; got the header, switch
+					   ; to body
+					   (data-stream-body-process
+					    resp headers bodystart)
+					   ; never returns
+					   ))))))
+		 
+	     (data-stream-body-process (resp headers bodystart)
+	       ;; called when it's time to start returning the body
+	       (with-http-response (req ent :response resp
+					:format :binary)
+		 (with-http-body (req ent :headers headers)
+		   ; write out first block
+		   
+		   (write-all-vector buff
+				     *html-stream*
+				     :start bodystart
+				     :end start)
+		       
+		   ; now loop and read rest
+		   (setf (cdr (assoc stream active-streams :test #'eq))
+		     #'data-stream-body)
+		   
+		   (loop
+		     (if* (null active-streams) 
+			then (return))
+		     
+		     (let ((active
+			    (mp:wait-for-input-available 
+			     (mapcar #'car active-streams)
+			     :timeout timeout)))
+		       
+		       (if* (null active) 
+			  then ; timeout, just shut down streams
+			       (setq active-streams nil)
+			  else ; run handlers
+			       (mapc #'(lambda (x) 
+					 (funcall (cdr (assoc x active-streams 
+							      :test #'eq))))
+				     active)
+			       
+			       )))))
+	       (return-from read-script-data))
+	     
+	     (data-stream-body ()
+	       ;; process data coming back from the body
+	       (let ((len (read-sequence buff stream)))
+		 
+		 (if* (<= len 0)
+		    then ; end of file, remove this stream
+			 (setq active-streams
+			   (delete stream active-streams
+				   :key #'car))
+		    else ; send data to output
+			 (write-all-vector buff
+					   *html-stream*
+					   :start 0
+					   :end len)))))
+			       
+
+      (setq active-streams
+	(list (cons stream #'data-stream-header-read)))
+      
+      (if* error-stream
+	 then (push (cons error-stream #'error-stream-handler) 
+		    active-streams))
+      
+      (unwind-protect
+	  (progn
+	    (setq buff (get-header-block))
+	  
+						  
+			
+	    (loop
+	      ; this loop is for searching for a valid header
+	      
+	      (let ((active
+		     (mp:wait-for-input-available 
+		      (mapcar #'car active-streams) :timeout timeout)))
+		
+		(if* (null active)
+		   then ; must have timed out
+			(failed-script-response req ent)
+			(return-from read-script-data))
+		
+		; run the handlers
+		(mapc #'(lambda (x) 
+			  (funcall (cdr (assoc x active-streams :test #'eq))))
+		      active))))
+	; cleanup
+	(free-header-block buff)))))
     
     
       
-			    
-		    
-	    
-
-    
     
 
 (defun failed-script-response (req ent)
@@ -251,44 +352,42 @@
 
 
 
-(defun successful-script-response (req ent buffs len)
-  ;; We've got the response from the script.
-  ;; It begins with a mini-header which we have to parse
-  ;; which tells us how to respond.
-
-
-  ; scan for end of headers
-  (unwind-protect
-      (let* ((loc (search *crlf-crlf-usb8* (car buffs)
-			  :end2 (min (length (car buffs)) len)))
+(defun parse-cgi-script-data (buff end)
+  ;; if there's a valid header block in the buffer from 0 to end-1
+  ;; then return 
+  ;; 1. the response object denoting the response value to send back
+  ;; 2. a list of headers and values
+  ;; 3. the index in the buffer where the data begins after the header
+  ;;
+  ;; else return nil
+  (let* ((loc (search *crlf-crlf-usb8*  buff
+			  :end2 (min (length buff) end)))
 	     (loclflf (and (null loc)
 			   ;; maybe uses bogus lf-lf to end headers
-			   (search *lf-lf-usb8* (car buffs)
-				   :end2 (min (length (car buffs)) len))))
+			   (search *lf-lf-usb8*  buff
+				   :end2 (min (length buff) end))))
 	     (incr 2))
 	
 	(if* loclflf
 	   then (setq loc loclflf
 		      incr 1))
 	
-	(if*  (null loc) 
+	(if* (null loc) 
 	   then ; hmm.. no headers..bogus return
 		;(warn "no headers found")
-		(return-from successful-script-response 
-		  (failed-script-response req ent)))
+		(return-from parse-cgi-script-data nil))
 	    
         (incf loc incr) ; after last header crlf (lf), before final crlf (lf)
 	(let ((headers (parse-and-listify-header-block
-			(car buffs)
+			buff
 			loc))
 	      (resp *response-ok*))
 
 	  
 	  (incf loc incr) ; past the final crlf (lf)
 	      
-	  (let ((location (assoc :location headers :test #'eq)))
-	    (if* location
-	       then (setq resp *response-moved-permanently*)))
+	  (if* (assoc :location headers :test #'eq)
+	    then (setq resp *response-moved-permanently*))
 	      
 	      
 	  (let ((status (assoc :status headers :test #'eq))
@@ -299,9 +398,13 @@
 	       then (ignore-errors 
 		     (setq code (read-from-string (cdr status))))
 		    (if* (not (integerp code))
-		       then ; bogus status value
-			    (return-from successful-script-response 
-			      (failed-script-response req ent)))
+		       then ; bogus status value, just return nil
+			    ; eventually we'll get a failed response
+			    (logmess 
+			     (format nil
+				     "cgi script return bogus status value: ~s" 
+			     code))
+			    (return-from parse-cgi-script-data nil))
 		    (let ((space (find #\space (cdr status))))
 		      (if* space
 			 then (setq reason
@@ -309,37 +412,23 @@
 		    (setq resp (make-resp code reason))
 			
 		    (setq headers (delete status headers))))
+	  (values resp headers loc))))
 		
-	  (if* (null (assoc :content-length headers :test #'eq))
-	     then ; must add content length
-		  (push (cons :content-length
-			      (write-to-string
-			       (max 0 (- len loc))))
-			headers))
-		
-	  ; send back response
-	  (with-http-response (req ent :response resp)
-	    ;; can't allow string output stream here since
-	    ;; we're writing binary.  since we speicied content
-	    ;; length we shouldn't get a string output stream
-	    (with-http-body (req ent :headers headers)
-	      ; not write out the buffers
-	      (decf len loc) ; len will be byte remaining
-		  
-	      (dolist (buff buffs)
-		(let ((write-this-time 
-		       (min len (- (length buff) loc))))
-		  (if* (> write-this-time 0)
-		     then (write-sequence buff 
-					  *html-stream*
-					  :start loc
-					  :end (+ loc write-this-time)))
-		  (decf len write-this-time)
-		  (setq loc 0)))))))
-    ;; cleanup form
-    ;; free buffers
-    (dolist (buff buffs)
-      (free-header-block buff))
-    ))
+	  
+
+
 
 						    
+(defun write-all-vector (sequence stream &key (start 0) 
+					      (end (length sequence)))
+  ;; write everything in the vector before returning
+  (loop
+    (if* (< start end)
+       then (setq start (write-vector sequence stream 
+				      :start start
+				      :end end))
+       else (return)))
+  
+  end)
+
+	  

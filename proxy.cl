@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.8.4.6 2001/10/22 16:12:57 layer Exp $
+;; $Id: proxy.cl,v 1.8.4.7 2002/01/21 21:58:52 layer Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -1020,7 +1020,7 @@ cached connection = ~s~%" cond cached-connection))
 
     (incf *connections-made*)
     (socket:with-pending-connect
-	(mp:with-timeout (*connection-timed-out-wait*
+	(mp:with-timeout (*connection-timed-out-wait*   ; ok w-t
 			  (error "connection timed out"))
 	  (socket:make-socket :remote-host host
 			      :remote-port port

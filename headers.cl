@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.5.4.5 2001/10/22 16:12:57 layer Exp $
+;; $Id: headers.cl,v 1.5.4.6 2002/01/21 21:58:52 layer Exp $
 
 ;; Description:
 ;;   header parsing
@@ -90,18 +90,6 @@
 (defmacro header-block-header-index (index)
   ;; where in the buffer the 2byte entry for header 'index' is located
   `(- *header-block-size* 6  (ash ,index 1)))
-
-;; this must be kept in sync with the length of *http-headers*.
-;; we don't want to make it a defparameter and compute it at runtime
-;; since we want to take advantage of it being a constant, plus
-;; its size will effectively be hardwired into cache entries and
-;; thus a change in this value should be accompanied by a 
-;; clearing of the cache.
-(defconstant *headers-count* 51)
-
-(defmacro header-block-data-start ()
-  ;; return index right above the first data index object stored
-  `(- *header-block-size* 4 (* *headers-count* 2)))
 
 (eval-when (compile eval)
   ;; the headers from the http spec
@@ -175,6 +163,19 @@
 	("Warning" :p :p :mx)
 	("WWW-Authenticate" :nf :p nil)
 	)))
+
+;; number of headers.
+;; we take advantage of this being a constant in the code below and 
+;; in the proxy caches.  If this number should change all proxy caches
+;; should be removed.
+(defconstant *headers-count* #.(length *http-headers*))
+
+(defmacro header-block-data-start ()
+  ;; return index right above the first data index object stored
+  `(- *header-block-size* 4 (* *headers-count* 2)))
+
+
+
 
 (eval-when (compile eval)
   (defmacro build-header-lookup-table ()

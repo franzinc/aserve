@@ -7,7 +7,8 @@
 
 <body>
 
-<h1 align="center">AllegroServe - A Web Application Server</h1>
+<h1 align="center">AllegroServe - A Web Application Server<br>
+<small><small><small>version <font face="Courier New">1.2.21</font></small></small></small></h1>
 
 <p align="left"><strong><small>copyright(c) 2000-2001. Franz Inc</small></strong></p>
 
@@ -23,6 +24,8 @@
 <font face="Courier New">&nbsp; <a href="#f-publish-file">publish-file</a><br>
 &nbsp; <a href="#f-publish-directory">publish-directory</a><br>
 &nbsp; <a href="#f-publish">publish</a></font><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-publish-prefix">publish-prefix</a></font><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-publish-multi"><font face="Courier New">publish-multi</font></a><br>
 <a href="#generating-a-computed-response">Generating a Computed Response</a><br>
 <font face="Courier New">&nbsp; <a href="#f-with-http-response">with-http-response</a><br>
 &nbsp; <a href="#f-with-http-body">with-http-body</a><br>
@@ -49,7 +52,9 @@
 <font face="Courier New">&nbsp; <a href="#f-run-cgi-program">run-cgi-program</a><br>
 </font><a href="#form-processing">Form Processing</a><br>
 <font face="Courier New">&nbsp; <a href="#f-get-multipart-header">get-multipart-header</a><br>
+&nbsp; <a href="#f-parse-multipart-header">parse-multipart-header</a><br>
 &nbsp; <a href="#f-get-multipart-sequence">get-multipart-sequence</a></font> <br>
+&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-get-all-multipart-data"><font face="Courier New">get-all-multipart-data</font></a><br>
 &nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-form-urlencoded-">form-urlencoded-to-query</a><br>
 &nbsp; <a href="#f-query-to">query-to-form-urlencoded</a></font><br>
 <a href="#authorization">Authorization</a><br>
@@ -85,6 +90,15 @@
 <a href="#proxy">Proxy</a><br>
 <a href="#cache">Cache</a><br>
 <a href="#filters">Request Filters</a><br>
+<a href="#virtual_hosts">Virtual Hosts</a><br>
+<a href="#timeouts">Timeouts</a><br>
+<font face="Courier New">&nbsp; <a href="#f-wserver-io-timeout">wserver-io-timeout</a><br>
+&nbsp; <a href="#f-wserver-response-timeout">wserver-response-timeout</a></font><br>
+<a href="#miscellaneous">Miscellaneous</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-ensure-stream-lock">ensure-stream-lock</a></font><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-map-entities"><font face="Courier New">map-entities</font></a><br>
+<a href="#asaservice">Running AllegroServe as a Service on Windows NT</a><br>
+<a href="#international-chars-aserve">Using International Characters in AllegroServe</a><br>
 <a href="#debugging">Debugging</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-debug-on">net.aserve::debug-on</a><br>
 &nbsp; <a href="#f-debug-off">net.aserve::debug-off</a></font><br>
@@ -143,8 +157,8 @@ and after you start the server.</p>
 <p>The function <font face="Courier New">net.aserve:start</font> is used to start the
 server running.</p>
 
-<p><strong><font face="Courier New"><a name="f-start"></a>(start &amp;key port listeners
-chunking keep-alive server setuid setgid <br>
+<p><strong><font face="Courier New"><a name="f-start"></a>(start &amp;key port host
+listeners chunking keep-alive server setuid setgid <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; debug proxy proxy-proxy
 cache restore-cache accept-hook ssl os-processes external-format)</font></strong></p>
 
@@ -159,6 +173,12 @@ only need be concerned with <strong>:port</strong> and <strong>:listeners.
 
 <ul>
   <li>port -- the port on which to open the web server.&nbsp; 80 is the default.</li>
+  <li>host -- the host on which to run the server.&nbsp; If you don't specify this then the
+    server will listen on all TCP/IP network interfaces on the machine.&nbsp;&nbsp; If you
+    specify &quot;localhost&quot; then the server willl only accept connections from the same
+    machine.&nbsp;&nbsp; Other values for host can be used to run AllegroServe only a
+    particular network interface.&nbsp; Host can be a name (like &quot;foo.franz.com&quot;), a
+    dotted ip address &quot;192.168.0.1&quot; or an integer IP address.</li>
   <li>listeners -- the number of threads to process http requests.&nbsp;&nbsp;&nbsp;&nbsp; If
     a value isn't given for the <strong>:listeners</strong> argument then 5 is assumed. &nbsp;
     If&nbsp; the value is <strong>nil </strong>or <strong>0 </strong>then the server runs in <em>simple
@@ -274,10 +294,7 @@ determine which entity will handle the request are
   <li>the <strong>host</strong> to which the request is directed.&nbsp;&nbsp; This is not
     necessarily the host that is receiving the request due to virtual hosts and proxy
     servers.&nbsp; This value comes from the <strong>Host:</strong> header line, if one is
-    given.&nbsp; If the <strong>Host:</strong> header line isn't given then this value is <em>unspecified</em>
-    for this request.&nbsp;&nbsp;&nbsp; The <strong>Host:</strong> header line also may
-    include a port number, but we ignore that for the purposes of matching requests to
-    entities.</li>
+    given.&nbsp;</li>
 </ul>
 
 <p>&nbsp;</p>
@@ -299,7 +316,9 @@ an entity assigned, the old entity is replaced by the new entity.</p>
 <p>&nbsp;</p>
 
 <p><a name="f-publish-file"></a><strong><font face="Courier New">(publish-file &amp;key
-path host port&nbsp; file content-type class preload cache-p remove server)</font></strong></p>
+path host port&nbsp; file content-type class preload cache-p remove <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+authorizer server timeout plist)</font></strong></p>
 
 <p>This creates an entity that will return the contents of a file on the disk in response
 to a request.&nbsp;&nbsp; The <strong>url</strong> and <strong>file</strong>&nbsp; must be
@@ -308,11 +327,8 @@ given, the rest of the arguments are optional..&nbsp; The arguments have these m
 <ul>
   <li><strong>path </strong>-- a string that must match the name part of the url as described
     above in <strong>Components of a Request</strong></li>
-  <li><strong>host -- </strong>a string that must match (in a case insensitive manner) the
-    host part of the request.&nbsp;&nbsp; If this argument is not given then it will match the
-    host part of any request.&nbsp; If this argument is given and the request does not have a
-    host part specified, then it will not match.&nbsp; The host can also be a list of strings
-    to specify a list of hosts for this entity.</li>
+  <li><strong>host -- </strong>normally <strong>nil</strong>.&nbsp; If you wish to do virtual
+    hosting read <a href="#virtual_hosts">this section</a> describing how it's done.a</li>
   <li><strong>port</strong> -- this argument is currently unused and will likely be removed in
     future versions.</li>
   <li><strong>file </strong>-- the name of the file to return when a request to this entity is
@@ -346,6 +362,14 @@ given, the rest of the arguments are optional..&nbsp; The arguments have these m
   <li><strong>server</strong> -- if this entity should only be served by a particular server,
     then this specifies which server.&nbsp;&nbsp; See the section (to be written) on running
     multiple servers in the same Lisp process.</li>
+  <li><strong>timeout</strong> - specifies the number of seconds AllegroServe has to return
+    this file to the http client.&nbsp; If AllegroServe is running in a lisp that supports
+    timeouts on each I/O operation (e.g. Acl 6.1 or newer) then the default value for this
+    argument is a huge number, meaning in effect that there will be no time limit on the
+    transfer.&nbsp;&nbsp; If I/O timeouts are not supported then the default value of this
+    argument is <strong>nil</strong> meaning ignore this value and use the timeout value held
+    in the server object and retrieved with<strong> wserver-response-timeout</strong>..</li>
+  <li><strong>plist</strong> - initial property list for this entity</li>
 </ul>
 
 <p>The function that handles requests for files will respond correctly to <strong>If-Modified-Since</strong>
@@ -362,32 +386,43 @@ header lines and thus minimizes network traffic. </p>
 <p>&nbsp;</p>
 
 <p><a name="f-publish-directory"></a><strong><font face="Courier New">(publish-directory
-&amp;key prefix host port destination remove server <br>
+&amp;key prefix host port destination remove authorizer server <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-indexes filter)</font></strong></p>
+indexes filter timeout plist publisher access-file)</font></strong></p>
 
-<p>This creates a mapping from all urls whose name begins with<strong> prefix</strong> to
-files stored in the directory specified by the destination.&nbsp;&nbsp; The <strong>host</strong>,
-<strong>port, remove </strong>and <strong>server</strong> arguments are as described above
-for <strong>publish.</strong> &nbsp;&nbsp;&nbsp;&nbsp; When a request comes in for which
-there isn't an entity that matches it exactly,&nbsp; AllegroServe checks to see if a
-prefix of the request matches the request.&nbsp; If so, and if the resulting entity is a <strong>directory-entity</strong>
+<p><strong>publish-directory</strong> is used to publish a complete directory tree of
+files.&nbsp; This is similar to how web servers such as Apache publish files. &nbsp;
+AllegroServe publishes the files in&nbsp; the directory tree in a <em>lazy</em>
+manner.&nbsp;&nbsp; As files in the tree are referenced by client requests entities are
+created and published.&nbsp; </p>
+
+<p><strong>publish-directory</strong> creates a mapping from all urls whose name begins
+with<strong> prefix</strong> to files stored in the directory specified by the <strong>destination</strong>.&nbsp;&nbsp;
+The <strong>host</strong>, <strong>port, remove, authorizer, plist </strong>and <strong>server</strong>
+arguments are as described above for <strong>publish.</strong> &nbsp;&nbsp;&nbsp;&nbsp;
+The <strong>timeout</strong> argument defaults as described in <strong>publish-file</strong>.
+&nbsp; The <strong>access-file</strong> argument names the <a
+href="#directory-access-files">access file</a> name which will be used in this directory
+tree. When a request comes in for which there isn't an entity that matches it
+exactly,&nbsp; AllegroServe checks to see if a prefix of the request has been
+registered.&nbsp; If so, and if the resulting entity is a <strong>directory-entity</strong>
 as created by this function, then it strips the prefix off the given request and appends
 the remaining part of the request to the destination string.&nbsp; It then publishes that
-(using <strong>publish-file</strong> and computing the content-type from the file type).
-&nbsp;&nbsp; Next that <strong>file-entity </strong>is made to handle the request in the
-normal manner.</p>
+(normally using <strong>publish-file</strong> and computing the content-type from the file
+type). &nbsp;&nbsp; Next that <strong>file-entity </strong>is made to handle the request
+in the normal manner.</p>
 
 <p>If a request comes that maps to a directory rather than a file then AllegroServe tries
 to locate an index file for that directory.&nbsp; The <strong>indexes</strong> argument
 specifies a list of index files to search for.&nbsp; By default the list consists of two
 filenames &quot;index.html&quot; and &quot;index.htm&quot;.</p>
 
-<p>The valueof the <strong>filter </strong>argument is a function of three values: <strong>req</strong>
-<strong>ent</strong> and&nbsp; <strong>filename</strong>.&nbsp; <strong>req</strong> and <strong>ent</strong>
-are the request and entity objects that describe the current client request.
-&nbsp;&nbsp;&nbsp; <strong>filename</strong> is the name of a known file on the current
-machine which&nbsp; is being requested by the current request.</p>
+<p>The valueof the <strong>filter </strong>argument is a function of four values: <strong>req</strong>
+<strong>ent</strong>&nbsp; <strong>filename</strong> and <strong>info</strong>.&nbsp; <strong>req</strong>
+and <strong>ent</strong> are the request and entity objects that describe the current
+client request. &nbsp;&nbsp;&nbsp; <strong>filename</strong> is the name of a known file
+on the current machine which&nbsp; is being requested by the current request.&nbsp; <strong>info</strong>
+is the list of <a href="#directory-access-files">access information</a> for this file.</p>
 
 <p>If the filter returns <strong>nil</strong> then the normal operation&nbsp; is done by
 the directory-entity handler: the selected file is published and then the request to
@@ -401,22 +436,210 @@ to the filter for this file the filter may choose to publish a handler for this 
 face="Courier New">(failed-request req)</font> and the standard &quot;404 Not found&quot;
 will be sent back to the client.</p>
 
+<p>The <strong>publisher</strong> argument can be used to specify exactly what happens
+when a request comes that's handled by the <strong>directory-entity </strong>and a file is
+located on the disk that matches the incoming <strong>url</strong>.&nbsp;&nbsp; Nomally a <strong>publish-file</strong>
+is done to add that file.&nbsp; You may want to publish some other kind of entity to
+represent that file.&nbsp; The <strong>publisher</strong> argument, if non-nil, must be a
+function of&nbsp; four arguments:&nbsp; <strong>req ent filename</strong> <strong>info</strong>.&nbsp;
+The filename is a string naming the file that's been matched with the request.&nbsp;&nbsp;
+<strong>info</strong> is the list of <a href="#directory-access-files">access information</a>
+for this file.&nbsp; The <strong>publisher</strong> function must return an entity to be
+processed to send back a response.&nbsp;&nbsp; The <strong>publisher</strong> function may
+wish to publish that entity but it need not do so.</p>
+
+<p>&nbsp;</p>
+
+<h3><a name="directory-access-files"></a>Directory Access Files</h3>
+
+<p>When files are accessed and automatically published you may wish to set some of the
+parameters of the entity that is published. As mentioned above you can define a <strong>publisher</strong>
+function that has complete control in publishing the entity.&nbsp; A less powerful but
+easier to use alternative is to place <em>access files </em>in the directory tree being
+published.&nbsp;&nbsp; An access file specifies information that you want passed to the
+publisher function.&nbsp; You can modify these access files while the directory tree is
+published and their latest values will be used for publishing <em>subsequent</em> files.
+&nbsp;&nbsp; This is similar to they way Apache controls its publishing with <strong>.htaccess</strong>
+files (except that in AllegroServe once a file is published the access files have no
+effect on it).</p>
+
+<p>The name of an access file in AllegroServe is controlled by the <strong>:access-file</strong>
+argument to <strong>publish-directory.</strong>&nbsp;&nbsp; We'll assume the name chosen
+is <strong>access.cl</strong> in this document.&nbsp;&nbsp; If no <strong>:access-file</strong>
+argument is given to <strong>publish-directory</strong> then no access file checking is
+done. &nbsp;When a file is about to be published all access files from the <strong>destination</strong>
+directory all the way down to the directory containing the file to be published are read
+and used.&nbsp; For example if the <strong>destination</strong> in a <strong>publish-directory
+</strong>was given as &quot;/home/joe/html/&quot; and an http request comes in which
+references the file &quot;/home/joe/html/pics/archive/foo.jpg&quot;&nbsp; then
+AllegroServe will check for access files at <em>all</em> of these locations and in this
+order 
+
+<ul>
+  <li>/home/joe/html/access.cl</li>
+  <li>/home/joe/html/pics/access.cl</li>
+  <li>/home/joe/html/pics/archive/access.cl</li>
+</ul>
+
+<p>The information is collected as successive access files are read.&nbsp; The new
+information is placed before the existing information thus causing subdirectory &nbsp;
+access files to possibly shadow information in access files in directories above it.&nbsp;
+Also superdirectory access file information is automatically eliminated if it isn't marked
+as being <em>inherited<strong>.&nbsp; </strong></em></p>
+
+<p>The <strong>publisher </strong>function receives the collected information and can do
+with it what it wishes.&nbsp; We'll describe what the built-in publisher function does
+with the information.</p>
+
+<p>When we speak of <em>information<strong> </strong></em>in access files we are purposely
+being vague.&nbsp;&nbsp; We define what information must look like and what the standard
+publisher function does with certain information but we allow users to define their own
+kinds of information and use that in their own publisher function.</p>
+
+<p>Each access file consists of zero or more Lisp forms (and possibly lisp style
+comments).&nbsp; Each form is&nbsp; a list beginning with a keyword symbol and then
+followed by a property-list-like sequence of &nbsp; keywords and values.&nbsp;&nbsp;
+Nothing in the form is evaluated. &nbsp;&nbsp;&nbsp; The form cannot contain #. or #,.
+macros.</p>
+
+<p>One&nbsp; information form is used by AllegroServe's directory publisher code to decide
+if it's permitted to descend another directory level:</p>
+
+<p><strong>(:subdirectories&nbsp; :allow </strong><em>allow-list</em><strong> :deny </strong><em>deny-list</em><strong>
+:inherit </strong><em>inherit-value</em><strong>)</strong></p>
+
+<p>As AllegroServe descends from the <strong>destination</strong> directory toward the
+directory containing the file to be accessed it stops at each directory level accumlates
+the access information and then tests to see if it can descend further based on the <strong>:subdirectories
+</strong>information.&nbsp;&nbsp; If it cannot descend into the next subdirectory it gives
+up immediately and a <strong>404 - Not Found</strong> response is returned. &nbsp;&nbsp;
+See the section Allow Deny processing below for a description of how it uses the <strong>:allow</strong>
+and <strong>:deny</strong> values.</p>
+
+<p>These other information forms are used by the standard publisher function. &nbsp;&nbsp;
+Each takes an <strong>:inherit</strong> argument which defaults to false. &nbsp;
+Information not given with :<strong>:inherit t</strong> will be eliminated as AllegroServe
+descends directory levels.</p>
+
+<table border="1" width="100%">
+  <tr>
+    <th width="15%">name</th>
+    <th width="17%">args</th>
+    <th width="68%">meaning</th>
+  </tr>
+  <tr>
+    <td width="15%"><strong>:ip</strong></td>
+    <td width="17%"><strong>:patterns <br>
+    :inherit</strong></td>
+    <td width="68%">specifies a<a href="#c-location-authorizer"> location-authorizer</a>
+    restriction on which machines can see published files.&nbsp; The value of the <strong>:patterns</strong>
+    argument has the same form as the <strong>:patterns</strong> slot of a
+    location-authorizer.</td>
+  </tr>
+  <tr>
+    <td width="15%"><strong>:password</strong></td>
+    <td width="17%"><strong>:realm<br>
+    :allowed<br>
+    :inherit</strong></td>
+    <td width="68%">specifies a <a href="#c-password-authorizer">password-authorizer</a>
+    restriction on access to published files. &nbsp; See the password-authorizer documentation
+    for a description of the <strong>:realm</strong> and <strong>:allowed</strong> arguments</td>
+  </tr>
+  <tr>
+    <td width="15%"><strong>:files</strong></td>
+    <td width="17%"><strong>:allow<br>
+    :deny<br>
+    :inherit</strong></td>
+    <td width="68%">specifies which files are visible to be published.&nbsp; To be visible a
+    file must be allowed and not denied.&nbsp; What is tested is the filename only (that is
+    the part after the last directory separator in the files's complete name).&nbsp; See below
+    for the rules on how allow and denied is used.</td>
+  </tr>
+  <tr>
+    <td width="15%"><strong>:mime</strong></td>
+    <td width="17%"><strong>:types<br>
+    :inherit</strong></td>
+    <td width="68%">specifies which mime types are to be associated with which file types.
+    &nbsp; This list takes precedence over the built-in list inside AllegroServe.&nbsp; :types
+    is a list of mime specifiers.&nbsp;&nbsp; A mime specifier is a list beginning with a
+    string giving the mime type followed by the files types that should map to that mime type.
+    &nbsp; A file type in a list (e.g. (&quot;ReadMe&quot;)) refers to the whole file name
+    rather than the type component.</td>
+  </tr>
+</table>
+
+<h3>Allow and Deny Processing</h3>
+
+<p>The <strong>:files </strong>and <strong>:subdirectories</strong> information are used
+to determine if a file or subdirectory of a given name is accessible.&nbsp; AllegroServe
+will collect all the access file information for the directory containing the file or
+subdirectory and for all directories above it up to the directory given as the <strong>destination</strong>
+argument to <strong>publish-directory.&nbsp; </strong>Information from superdirectories
+will only be used <strong>:inherit t</strong> is given for that information.&nbsp; </p>
+
+<p>The rules is it that a given name is accessible if it is allowed and not denied. &nbsp;
+That is the filename or directory name must match one of the allow clauses and none of the
+deny clauses.&nbsp; There may be multiple allow and deny clauses since there may be
+multiple information forms of the type <strong>:files </strong>or <strong>:subdirectories</strong>.
+&nbsp;&nbsp; Each allow or deny argument can be a string or a list of strings or nil
+(which is the same as that argument not being given).<strong> </strong>&nbsp; The strings
+are regular expressions (which are not exactly like unix shell wildcard filename
+expressions).&nbsp;&nbsp; In particular <font face="Courier New">&quot;.*&quot;</font> is
+the regular expression that matches anything.</p>
+
+<p>The special cases are the following 
+
+<ul>
+  <li>if <strong>:allow</strong> is given as nil or is not given at all then that is the same
+    as specifying <font face="Courier New">&quot;.*&quot;</font> the regular expression that
+    matches everything.</li>
+  <li>if <strong>:deny</strong> is given as nil or is not given then that is the same as
+    specifying a regular expression that matches nothing.</li>
+  <li>if AllegroServe is looking for <strong>:files </strong>information and there is none to
+    be found in the accumulated information, then access is allowed.&nbsp;&nbsp; A similar
+    thing is true if AllegroServe is searching for <strong>:subdirectories</strong>
+    information and none is found.</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<p>.</p>
+
+<p>Here is a sample access file:</p>
+
+<p><font face="Courier New">; only connections to localhost will be able to access the
+files<br>
+(:ip :patterns ((:accept &quot;127.1&quot;) :deny) :inherit t)&nbsp;&nbsp;&nbsp; <br>
+(:password :realm &quot;mysite&quot; <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :allowed ((&quot;joe&quot; .
+&quot;mypassword&quot;)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+(&quot;sam&quot; . &quot;secret&quot;)) <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :inherit t) ;&nbsp; applies
+to subdirectories<br>
+; publish html and cgi files, but not those beginning with a period<br>
+(:files :allow (&quot;\\.html$&quot; &quot;\\.cgi$&quot;) :deny (&quot;^\\.&quot;)) <br>
+(:mime :types ((&quot;text/jil&quot; &quot;jil&quot; &quot;jlc&quot;) (&quot;text/c&quot;
+&quot;c&quot; &quot;cc&quot;)))</font></p>
+
 <p>&nbsp;</p>
 
 <p>&nbsp;</p>
 
 <p><a name="f-publish"></a><strong><font face="Courier New">(publish &amp;key path host
-port content-type function class format remove server)</font></strong></p>
+port content-type function class format remove server authorizer timeout plist)</font></strong></p>
 
 <p>This creates a mapping from a url to a <strong>computed-entity</strong>, that is an
 entity that computes its response every time a request comes in.&nbsp; The <strong>path</strong>,
-<strong>host</strong>, <strong>port</strong>, <strong>remove, server</strong> and <strong>class</strong>
-arguments are as in the other publish functions.&nbsp;&nbsp; The <strong>content-type</strong>
-sets a default value for the response to the request but this can be overridden.&nbsp; The
-<strong>format</strong> argument is either <strong>:text </strong>(the default) or <strong>:binary</strong>
-and it specifies the kind of value that will be sent back (after the response headers,
-which are always in text).&nbsp;&nbsp; This value is only important if the response is
-generated in a particular way (described below).</p>
+<strong>host</strong>, <strong>port</strong>, <strong>remove, server</strong> , <strong>authorizer
+</strong>and <strong>class</strong> arguments are as in the other publish
+functions.&nbsp;&nbsp;The <strong>timeout</strong> argument defaults to <strong>nil </strong>always.&nbsp;&nbsp;
+The <strong>content-type</strong> sets a default value for the response to the request but
+this can be overridden.&nbsp; The <strong>format</strong> argument is either <strong>:text
+</strong>(the default) or <strong>:binary</strong> and it specifies the kind of value that
+will be sent back (after the response headers, which are always in text).&nbsp;&nbsp; This
+value is only important if the response is generated in a particular way (described
+below).</p>
 
 <p>The <strong>function </strong>argument is&nbsp; a function of two arguments: an object
 of class <strong>http-request</strong> that holds a description of the request, and an
@@ -425,6 +648,78 @@ request.&nbsp;&nbsp; This function must generate a response to the http request,
 the response is only that the request wasn't found.</p>
 
 <p>&nbsp;</p>
+
+<p><a name="f-publish"></a><a name="f-publish-prefix"></a><strong><font face="Courier New">(publish-prefix
+&amp;key prefix host port content-type function class <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+format remove server authorizer timeout plist)</font></strong></p>
+
+<p>This is like <strong>publish </strong>except that it declares <strong>function</strong>
+to be the handler for all urls that begin with the string <strong>prefix</strong>.
+&nbsp;&nbsp; Note however that prefix handlers have lower priority than exact handlers.
+&nbsp; Thus if you declare a prefix handler for &quot;/foo&quot; and also a specific
+handler for &quot;/foo/bar.html&quot; then the specific handler will be chosen if
+&quot;/foo/bar.html&quot; is found in an http request.&nbsp;&nbsp; Typically a prefix
+handler is used to make available a whole directory of files since their complete names
+being with a common prefix (namely the directory in which the files are located).
+&nbsp;&nbsp; If you want to publish a whole directory then you probably want to use <strong>publish-directory</strong>
+since it has a number of features to support file publishing.</p>
+
+<p>&nbsp;</p>
+
+<p><a name="f-publish-multi"></a><strong><font face="Courier New">(publish-multi &amp;key
+path host port content-type items class remove server authorizer timeout)</font></strong></p>
+
+<p>Some web pages are created from information from various sources.&nbsp;&nbsp; <strong>publish-multi</strong>
+allows you to specify a sequence of places that supply data for the combined web page.
+&nbsp; The data for each page is cached by <strong>publish-multi</strong> so that minimal
+conputation is required each time the page is requested.&nbsp;&nbsp;&nbsp; </p>
+
+<p>The <strong>host, port, content-type, class, remove, server authorizer </strong>and<strong>
+timeout</strong> arguments are the same as those of the other publish functions.
+&nbsp;&nbsp; The <strong>items </strong>argument is unique to <strong>publish-multi</strong>
+and is a list of zero or more of the following objects 
+
+<ul>
+  <li>string or pathname - this is a reference to a file on the server.&nbsp; This item
+    contributes the contents of the file to the final web page.</li>
+  <li>symbol or function - this is a function of four arguments: <strong>req ent cached-time
+    cached-value</strong>.&nbsp;&nbsp; It returns two values:&nbsp; the new value and the last
+    modified time of the value.&nbsp;&nbsp; The function may look at the cached-value or
+    cached-time and realize that nothing has changed since that time that would cause this
+    function to return a new value.&nbsp; In that case it should return the cached-value and
+    cached-time that it received as arguments.&nbsp;&nbsp; If a value must always be computed
+    each time the function is called it may return <strong>nil</strong> for the last modified
+    time.&nbsp; This will result in no LastModified header being sent in the response.
+    &nbsp;&nbsp; The value the function returns can either be a string or an array of
+    unsigned-byte 8 values.&nbsp;&nbsp; It's preferred to return an array of unsigned-byte 8
+    values.&nbsp; If a string is returned then<strong> </strong>it will be converted to an
+    array of unsigned-byte 8 by using <strong>(string-to-octets string :null-terminate nil).
+    &nbsp;&nbsp; </strong>The cached-value argument to the function will be <strong>nil</strong>
+    or an unsigned-byte 8 array.</li>
+  <li><strong>(:string</strong> string<strong>) - </strong>this item supplies the given string
+    to the web page.</li>
+  <li>(<strong>:binary</strong> vector) - vector should be a one dimensional simple-array of
+    (unsigned-byte 8).&nbsp; This vector of bytes is added to the web page.</li>
+</ul>
+
+<p>Here's an example where we create a page from a fixed header and trailer page with a
+bit of dynamic content in the middle.</p>
+
+<pre>(publish-multi :path &quot;/thetime&quot;
+	       :items (list &quot;header.html&quot;
+			    #'(lambda (req ent old-time old-val)
+				(declare (ignore req ent old-time old-val))
+				(with-output-to-string (p)
+				  (html-stream p
+					       :br
+					       &quot;The time is &quot;
+					       (:princ (get-universal-time))
+					       (:b
+						&quot;Lisp Universal Time&quot;)
+					       :br)))
+			    &quot;footer.html&quot;))
+				   </pre>
 
 <h2><a name="generating-a-computed-response"></a>Generating a computed response </h2>
 
@@ -484,7 +779,7 @@ World!&lt;/body&gt;&lt;/html&gt;.</font></p>
 <hr>
 
 <p align="left"><a name="f-with-http-response"></a><strong><font face="Courier New">(with-http-response
-(req ent &amp;key timeout check-modified response content-type) <br>
+(req ent &amp;key timeout check-modified format response content-type) <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 &amp;rest body)</font></strong></p>
 
@@ -493,22 +788,35 @@ and then&nbsp; runs the code in the <strong>body</strong> which will actually se
 response.&nbsp; <strong>req</strong> and <strong>ent</strong> are the request and entity
 objects passed into the function designated to compute the response for the request.
 &nbsp;&nbsp;&nbsp; <strong>timeout </strong>sets a time limit for the computation of the
-response.&nbsp;&nbsp; The default is the value of the variable <strong>*http-response-timeout*</strong>
-(which is initially 120 meaning 120 seconds).&nbsp;&nbsp; If <strong>check-modified </strong>is
-true (the default) then the <strong>last-modified </strong>time stored in the entity
-object will be compared against the <strong>if-modified-since </strong>time of the request
-and if that indicates that the client already has the latest copy of this entity then a <strong>not-modified</strong>
-response will be automatically returned to the client and the <strong>body </strong>of
-this macro will not be run.&nbsp;&nbsp; <strong>response </strong>is an object containing
-the code and description of the http response we wish to return. &nbsp;&nbsp; The default
-value is the value of <strong>*response-ok*</strong> (which has a code of 200 and a string
-descriptor &quot;OK&quot;).&nbsp;&nbsp; <strong>content-type </strong>is a string
-describing the MIME type of the body (if any) sent after the headers.&nbsp; It has a form
-like &quot;text/html&quot;.&nbsp;&nbsp; If <strong>content-type</strong> isn't given here
-then the content-type value in the entity (which is set in the call to <strong>publish)</strong>
+response.&nbsp;&nbsp; If <strong>timeout</strong> is nil then the entity <strong>ent</strong>
+is checked for a timeout value.&nbsp; If that value is also nil then the timeout value is
+retreived from the current <strong>wserver</strong> object using <strong>wserver-response-timeout</strong>.
+&nbsp; If <strong>check-modified </strong>is true (the default) then the <strong>last-modified
+</strong>time stored in the entity object will be compared against the <strong>if-modified-since
+</strong>time of the request and if that indicates that the client already has the latest
+copy of this entity then a <strong>not-modified</strong> response will be automatically
+returned to the client and the <strong>body </strong>of this macro will not be
+run.&nbsp;&nbsp; <strong>response </strong>is an object containing the code and
+description of the http response we wish to return. &nbsp;&nbsp; The default value is the
+value of <strong>*response-ok*</strong> (which has a code of 200 and a string descriptor
+&quot;OK&quot;).&nbsp;&nbsp; <strong>content-type </strong>is a string describing the MIME
+type of the body (if any) sent after the headers.&nbsp; It has a form like
+&quot;text/html&quot;.&nbsp;&nbsp; If <strong>content-type</strong> isn't given here then
+the content-type value in the entity (which is set in the call to <strong>publish)</strong>
 will be used.</p>
 
-<p align="left">&nbsp;</p>
+<p align="left">The <strong>format</strong> argument specifies whether the code that
+writes the body of the response will want to write <strong>:text</strong> (e.g. <strong>write-char</strong>)
+or <strong>:binary</strong> (e.g. <strong>write-byte</strong>) when it writes the data of
+the body of the response. &nbsp;&nbsp;&nbsp;&nbsp; Based on the value of the <strong>format</strong>
+argument, AllegroServe will create the correct kind of response stream.&nbsp;&nbsp; If <strong>format
+</strong>is not specified here it will default to the value specified when <strong>publish</strong>
+was called to create the entity.&nbsp; If not <strong>:format </strong>argument was passed
+to <strong>publish</strong> then <strong>:binary</strong> format is assumed.
+&nbsp;&nbsp;&nbsp; If <strong>:binary</strong> is specified then you can write both text
+and binary to the stream&nbsp; since Allegro's binary streams also support text calls as
+well.&nbsp; If you specify <strong>:text</strong> then you may end up with a stream that
+supports only text operations.</p>
 
 <p align="left">An http response consists of a line describing the response code, followed
 by headers (unless it's the HTTP/0.9 protocol in which case there are no headers),
@@ -534,14 +842,6 @@ necessary to call <strong>with-http-body </strong>so that the other parts of the
 are sent out, e.g.<font face="Courier New"> </font>at a minimum you should put<font
 face="Courier New"> (with-http-body (req ent)) </font>in the body of a with-http-response</p>
 
-<p align="left">The <strong>format</strong> argument specifies whether the code in the <strong>body</strong>
-will want to write <strong>:text</strong> (e.g. <strong>write-char</strong>) or <strong>:binary</strong>
-(e.g. <strong>write-byte</strong>) when it writes the data of the body of the response.
-&nbsp;&nbsp;&nbsp;&nbsp; Based on the value of the <strong>format</strong> argument,
-AllegroServe will create the correct kind of response stream.&nbsp;&nbsp; If <strong>format
-</strong>is not specified here it will default to the value specified when <strong>publish</strong>
-was called to create the entity.</p>
-
 <p align="left">The <strong>headers</strong> argument is a list of conses, where the car
 is the header name (a keyword symbol) and the cdr is the header value.&nbsp; These headers
 are added to the headers sent as part of this response.</p>
@@ -554,6 +854,11 @@ The variable <strong>*html-stream*</strong> is bound to the value of <strong>(re
 req)</strong> before the <strong>body</strong> is evaluated.&nbsp;&nbsp; This makes it
 easy&nbsp; to use the <strong>html</strong> macro to generate html as part of the
 response. </p>
+
+<p align="left"><em>Note: there used to be a <strong>:format</strong> argument to <strong>with-http-body.
+</strong>That argument was never used by <strong>with-http-body</strong>.&nbsp; The <strong>:format
+</strong>argument has been moved to <strong>with-http-response </strong>so that it can now
+have an effect on the stream created.</em></p>
 
 <hr>
 
@@ -629,7 +934,7 @@ string.&nbsp;<br>
 <p>.&nbsp;&nbsp; </p>
 
 <p><a name="f-request-query-value"></a><font face="Courier New"><strong>(request-query-value
-key request &amp;key uri post test)</strong></font></p>
+key request &amp;key uri post external-format test)</strong></font></p>
 
 <p>This combines a call to <strong>request-query</strong> to retrieve the alist of query
 keys and values, with a call to <strong>assoc</strong> to search for the specific key, and
@@ -744,7 +1049,7 @@ send the results of&nbsp; the execution of those programs back the web client.
 variables and, in the case of a <strong>put</strong> or <strong>post</strong> request, the
 body of the request is sent to standard input of the program.</p>
 
-<p>CGI is a clumy and slow protocol for extending the behavior or a web server and is
+<p>CGI is a clumsy and slow protocol for extending the behavior or a web server and is
 falling out of favor.&nbsp; However there are legacy CGI applications you may need to call
 from AllegroServe.&nbsp;&nbsp; You invoke an external program using the CGI protocol with
 the <strong>run-cgi-program</strong> function.</p>
@@ -752,28 +1057,99 @@ the <strong>run-cgi-program</strong> function.</p>
 <p><a name="f-run-cgi-program"></a><font face="Courier New"><strong>(run-cgi-program req
 ent program &amp;key path-info path-translated<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-script-name query-string auth-type timeout)</strong></font></p>
+script-name query-string <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+auth-type timeout error-output)</strong></font></p>
 
 <p>In response to an http request, this runs <strong>program</strong> which must be a
 string naming an exectuable program or script followed optionally by command line
 arguments to pass to that program.&nbsp; Before the <strong>program </strong>is run the
 environment variables are set according the the CGI protocol.&nbsp; The <strong>timeout</strong>
 argument is how long AllegroServe should wait for a response from the <strong>program </strong>before
-giving up.&nbsp;&nbsp; The default is 200 seconds.&nbsp;&nbsp; The other keyword arguments
-allow the caller to specify values for the CGI environment variables that can't be
-computed automatically.&nbsp; <strong>path-info</strong> specifies the PATH_INFO
-environment variable, and similarly for<strong> path-translated, script-name, query-string</strong>
+giving up.&nbsp;&nbsp; The default is 200 seconds.&nbsp;&nbsp; The <strong>error-output </strong>argument
+specifies what should be done with data the cgi program sends to its standard error.
+&nbsp; This is described in detail below.&nbsp; The other keyword arguments allow the
+caller to specify values for the CGI environment variables that can't be computed
+automatically.&nbsp; <strong>path-info</strong> specifies the PATH_INFO environment
+variable, and similarly for<strong> path-translated, script-name, query-string</strong>
 and <strong>auth-type.</strong>&nbsp;&nbsp; If <strong>query-string</strong> is <em>not</em>
 given and the <strong>uri</strong> that invoked this request contains a query part then
 that query part is passed in the QUERY_STRING environment variable.</p>
 
-<p>&nbsp;</p>
+<p>cgi programs send their result to standard output (file descriptor 1 on Unix).&nbsp; If
+they encounter problems they often send informative messages to standard error (file
+descriptor 2 on Unix).&nbsp;&nbsp;&nbsp; The <strong>error-output</strong> argument to
+run-cgi-program allows the caller to specify what happens to data sent to standard error.
+&nbsp; The possibile values for <strong>error-output</strong> are:</p>
+
+<table border="1" width="100%">
+  <tr>
+    <td width="32%"><strong>nil</strong></td>
+    <td width="68%">The cgi program's standard error is made the same as the Lisp process'
+    standard error.&nbsp;&nbsp; This standard error may not be the same as the current binding
+    of *standard-error*.</td>
+  </tr>
+  <tr>
+    <td width="32%">pathname or string</td>
+    <td width="68%">A file with the given name is opened and standard error is directed to
+    that file.</td>
+  </tr>
+  <tr>
+    <td width="32%"><strong>:output</strong></td>
+    <td width="68%">Standard error is directed to the same place as standard output thus the
+    error messages will be mixed into the result of running the cgi program.</td>
+  </tr>
+  <tr>
+    <td width="32%">symbol or function</td>
+    <td width="68%">The function is run whenever there is data available to be read from
+    standard error.&nbsp; It must read that data.&nbsp; It must return a true value if it
+    detected an end of file during the read and <strong>nil</strong> otherwise. &nbsp;&nbsp;
+    The function takes arguments: req ent stream</td>
+  </tr>
+</table>
 
 <p>A typical way of publishing a CGI page is this:</p>
 
 <pre>(publish :path &quot;/cgi/myprog&quot;
          :function #'(lambda (req ent) 
                         (run-cgi-program req ent &quot;/server/cgi-bin/myprog&quot;)))</pre>
+
+<p>If you're concerned about capturing the error output then here's an example where we
+supply&nbsp; a function to collect all the error output into a string. Once collected we
+simply print it out here but in a real web server you would want to store it in a log
+file.</p>
+
+<pre>(defun cgierr (req ent)
+  (let ((error-buffer (make-array 10
+                                  :element-type 'character
+                                  :adjustable t
+                                  :fill-pointer 0)))
+    (net.aserve:run-cgi-program
+     req ent
+     &quot;aserve/examples/cgitest.sh 4&quot;
+     :error-output
+     #'(lambda (req ent stream)
+         (declare (ignore req ent))
+         (let (eof)
+           (loop
+             (let ((ch (read-char-no-hang stream nil :eof)))
+
+               (if* (null ch) then (return))
+
+               (if* (eq :eof ch)
+                  then (setq eof t)
+                       (return))
+
+               (vector-push-extend ch error-buffer)))
+           eof
+           )))
+
+    (format t &quot;error buffer is ~s~%&quot; error-buffer)
+    ))</pre>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
 
 <p><strong>Note: </strong>The ability to run CGI programs from AllegroServe was due to
 features added in Allegro Common Lisp version 6.1.&nbsp;&nbsp; This will not work in
@@ -824,10 +1200,14 @@ following to retrieve the value of each field in the form:
 
 <ol>
   <li>Call <strong>(get-multipart-header req)</strong> to return the MIME headers of the next
-    field.&nbsp; If this returns nil then there are no more fields to retrieve.</li>
+    field.&nbsp; If this returns nil then there are no more fields to retrieve.&nbsp; You'll
+    likely want to call <strong>parse-multipart-header</strong> on the result of <strong>get-multipart-header</strong>
+    in order to extract the imporant information from the header.</li>
   <li>Create a buffer and call <strong>(get-multipart-sequence req buffer)</strong> repeatedly
     to return the next chunk of data.&nbsp; When there is no more data to read for this field,
-    <strong>get-multipart-sequence</strong> will return nil.&nbsp; </li>
+    <strong>get-multipart-sequence</strong> will return nil.&nbsp;&nbsp;&nbsp;&nbsp; If you're
+    willing to store the whole multipart data item in a lisp object in memory you can call <strong>get-all-multipart-data</strong>
+    instead to return the entire item in one Lisp object.</li>
   <li>go back to step 1</li>
 </ol>
 
@@ -846,24 +1226,24 @@ recognized.&nbsp;&nbsp; </p>
 request)</font></strong></p>
 
 <p>This returns nil or&nbsp; the MIME headers for the next form field in alist form.
-&nbsp;&nbsp;&nbsp; If nil is returned then there is no more form data.&nbsp;&nbsp; </p>
+&nbsp;&nbsp;&nbsp; If nil is returned then there is no more form data.&nbsp;&nbsp; See <strong>parse-multipart-header</strong>
+for a simple way to extratacting information from the header.</p>
 
 <p>For an input field such as <strong>&lt;input type=&quot;text&quot;
 name=&quot;textthing&quot;&gt; </strong>the value returned by <strong>get-multipart-header</strong>
 would be</p>
 
-<pre>((&quot;Content-Disposition&quot;
-
+<pre>((:content-disposition
       (:param &quot;form-data&quot; (&quot;name&quot; . &quot;textthing&quot;))))</pre>
 
 <p>For an input field such as <strong>&lt;input type=&quot;file&quot;
 name=&quot;thefile&quot;&gt; </strong>the value returned by <strong>get-multipart-header</strong>
 would be something like</p>
 
-<pre>((&quot;Content-Disposition&quot;
+<pre>((:content-disposition
       (:param &quot;form-data&quot; (&quot;name&quot; . &quot;thefile&quot;)
                           (&quot;filename&quot; . &quot;C://down//550mhz.gif&quot;)))
- (&quot;Content-Type&quot; &quot;image/gif&quot;))</pre>
+ (:content-type &quot;image/gif&quot;))</pre>
 
 <p>Note that the filename is expressed in the syntax of the operating system on which the
 web browser is running.&nbsp; This syntax may or may not make sense to the Lisp pathname
@@ -871,6 +1251,43 @@ functions of the AllegroServe web server as it may be running on a totally diffe
 operating system.</p>
 
 <p>&nbsp;</p>
+
+<hr>
+
+<p><a name="f-parse-multipart-header"></a><strong><font face="Courier New">(parse-multipart-header
+header)</font></strong></p>
+
+<p>This take the value of get-multipart-header and returns values that describe the
+important information in the header.</p>
+
+<p>The first value returned is 
+
+<ul>
+  <li><strong>:eof</strong>&nbsp; - this header says that there are no more multipart items.
+    &nbsp; This value is returned when the value of <strong>header </strong>is <strong>nil.</strong></li>
+  <li><strong>:data</strong> - the next multipart item is a simple form value.&nbsp; The
+    second value returned is a string naming the value.&nbsp; You can retrieve the value
+    itself using repeated calls to <strong>get-multipart-sequence</strong> or one call to <strong>get-all-multipart-data</strong>.
+  </li>
+  <li><strong>:file </strong>- the next multipart item is a file the user is uploading to the
+    server.&nbsp;&nbsp;&nbsp; The second value returned in the name of the form item for which
+    this file was given.&nbsp; The third value is the name of the file as specified by the
+    user to his browser.&nbsp; The fourth value returned is the MIME Content-Type that the
+    browser is guessing applies to this contents of the file.&nbsp;&nbsp; The contents of the
+    file can be retrieved using repeated calls to <strong>get-multipart-sequence</strong> or
+    one call to <strong>get-all-multipart-data</strong>. </li>
+  <li><strong>:nofile</strong> - If a form contains a place for a filename but no filename was
+    entered before the form was submitted then this type of header is sent.&nbsp; The values
+    returned are the same as those for <strong>:file. </strong>The third value (the filename)
+    will always be the empty string. </li>
+  <li><strong>nil</strong> - This header has a form not recognized by <strong>parse-multipart-header</strong>.
+    &nbsp;&nbsp;&nbsp; If you encounter this please let us know about it since we would like
+    enhance <strong>parse-multipart-header</strong> to understand this type of header.
+    &nbsp;&nbsp; If you encounter this&nbsp; type of header you still have to read the
+    contents of the data item that follows the header in order to read the next header.
+    &nbsp;&nbsp; A call to <strong>(get-all-multipart-data req :limit 1000) </strong>will read
+    and throw away the following value so you can then read the next header.</li>
+</ul>
 
 <hr>
 
@@ -897,6 +1314,35 @@ external-format </strong>(which defaults to<strong> </strong>the value of <stron
 so the program should be sure to make use of the index returned by <strong>get-multipart-sequence</strong>.</p>
 
 <p>&nbsp;</p>
+
+<hr>
+
+<p><a name="f-get-all-multipart-data"></a><font face="Courier New"><strong>(get-all-multipart-data
+request &amp;key&nbsp; type size external-format limit)</strong></font></p>
+
+<p>This retrieves the complete data object following the last multipart header.
+&nbsp;&nbsp; It returns it as a lisp object.&nbsp;&nbsp; If <strong>type</strong> is<strong>
+:text</strong> (the default) then the result is returned as a lisp string.&nbsp;&nbsp; If <strong>type</strong>
+is <strong>:binary</strong> then the result is returned as an array of&nbsp; element-type
+(unsigned-byte 8).&nbsp;&nbsp;&nbsp; <strong>size </strong>(which defaults to 4096) is the
+size of the internal buffers used by this function to retrieve the data.&nbsp;&nbsp; You
+usually won't need to specify a value for this but but if you know the values retrieved
+are either very small or very large it may may the operation run faster to specify an
+appropriate <strong>size</strong>.&nbsp;&nbsp;&nbsp; <strong>external-format</strong> is
+used when <strong>type</strong> is <strong>:text</strong> to convert&nbsp; the octet
+stream into characters.&nbsp; It defaults to the value of <strong>*default-aserve-external-format*</strong>.
+&nbsp; <strong>limit </strong>can be given an integer value that specifies the maximum
+size of data you're willing to retrieve.&nbsp; By default there is no limit.&nbsp; This
+can be dangerous as a user may try to upload a huge data file which will take up so much
+Lisp heap space that it takes down the server.&nbsp;&nbsp; If a <strong>limit</strong> is
+given and that limit is reached, <strong>get-all-multipart-data</strong> will continue to
+read the data from the client until it reaches the end of the data, however it will <em>not</em>
+save it and will return the symbol <strong>:limit</strong> to indicate that the data being
+send to the sever exceeded the limit.&nbsp; It will return a second value which is the
+size of the data the client tried to upload to the server.&nbsp;&nbsp;&nbsp; If your
+application intends to handle very large amounts of data being uploaded to the server you
+would be better off using <strong>get-multipart-sequence</strong> since with that you can
+write the data buffer by buffer to the disk instead of storing it in the Lisp heap.</p>
 
 <hr>
 
@@ -1198,7 +1644,7 @@ site that depends on cookies to work.</p>
 <p>&nbsp;</p>
 
 <p><a name="f-set-cookie-header"></a><strong><font face="Courier New">(set-cookie-header
-request &amp;key name value expires domain path secure external-format)</font></strong></p>
+request &amp;key name value expires domain path secure encode-value external-format)</font></strong></p>
 
 <p>This function should be called between the calls to <strong>with-http-response </strong>and
 <strong>with-http-body</strong>.&nbsp;&nbsp; It can be called more than once.&nbsp; Each
@@ -1211,7 +1657,12 @@ printable string.&nbsp;&nbsp;&nbsp; The web browser doesn't care about the <stro
 and <strong>value</strong>, it just stores them and sends them back to the web server.
 &nbsp;&nbsp;&nbsp; If you use the <strong>get-cookie-values </strong>function to retrieve
 the cookie <strong>name</strong> and <strong>value</strong> pairs, then it will
-automatically decode the uriencoding.<br>
+automatically decode the uriencoding.</p>
+
+<p>You can disable the encoding of the value by specifying a <strong>nil</strong> value to
+<strong>encode-value</strong>.&nbsp;&nbsp;&nbsp; This should only be necessary if you are
+working with buggy http client applications.<br>
+<br>
 If the <strong>path </strong>argument isn't given, it will default to &quot;/&quot; which
 will allow this cookie to match all requests.<br>
 If the <strong>domain</strong> argument isn't given then it will default to the host to
@@ -1957,27 +2408,26 @@ The two pages are&nbsp; <strong>/cache-stats</strong>&nbsp; and&nbsp; <strong>/c
 <p>After AllegroServe reads a request and before it checks the locators to find an entity
 to handle the request, AllegroServe runs the request through a set of filters. </p>
 
-<p>A filter is a function of one argument: the http-request object. The filter examines
-and possibily alters the request object. The idea is that filters can do large scale and
-simple url rewriting, such as changing all requests for one machine to another machine.
-The filtering occurs before the test to see if this is a proxy request so a filter can
-change a proxy request to a non proxy request or vice versa. </p>
-
-<p align="left">The currently active filters are the value of a slot in the wserver object
-</p>
-<div align="left">
-
-<pre>&nbsp;(wserver-filters wserver)</pre>
-</div>
-
-<p align="left">This slot can be setf'ed to a list of functions or new filter can be
-pushed onto the list.</p>
+<blockquote>
+  <p>A filter is a function of one argument: the http-request object. The filter examines
+  and possibily alters the request object. The idea is that filters can do large scale and
+  simple url rewriting, such as changing all requests for one machine to another machine.
+  The filtering occurs before the test to see if this is a proxy request so a filter can
+  change a proxy request to a non proxy request or vice versa. </p>
+  <p align="left">The currently active filters are found in two places.&nbsp; First the <strong>vhost-filters</strong>
+  function of the applicable <strong>vhost</strong> returns a set of <strong>vhost</strong>
+  specific filters.&nbsp;&nbsp; Next the <strong>wserver-filters</strong> function on the
+  current <strong>wserver</strong> object returns a set of server global filters.
+  &nbsp;&nbsp;&nbsp; Both of these functions are <strong>setf</strong>'able to change the
+  set of filters.</p>
+</blockquote>
 
 <p>&nbsp;</p>
 
 <p>A filter function returns <strong>:done</strong> if no more filters should be run after
 this one. If the filter returns anything else then subsequent filters in the list are run
-as well. </p>
+as well.&nbsp;&nbsp; If a filters in the <strong>vhost</strong> list returns <strong>:done</strong>
+then the server global filters are not even checked.</p>
 
 <p>When a filter function runs it's most likely going to be looking at two slots in the
 request object, which are accessed via these functions: 
@@ -2024,6 +2474,433 @@ values mentioned above are set appropriately for the destination. If the new des
 is not served by the current allegroserve wserver, then the filter will have to make sure
 to turn it into a proxy request (and this will only work if this AllegroServe was started
 with proxying enabled).</p>
+
+<p>&nbsp;</p>
+
+<hr>
+
+<h2><a name="virtual_hosts"></a>Virtual Hosts</h2>
+
+<p>It is possible for a single web sever to act like two or more indepenent web servers.
+&nbsp; This is known as <em>virtual hosting</em>.&nbsp; AllegroServe supports the ability
+to run any number of virtual hosts in a single instance of AllegroServe.</p>
+
+<p>AllegroServe runs on a single machine and listens for requests on one port on one or
+more more IP addresses.&nbsp;&nbsp; When a request arrives there is usually a header line
+labelled <font face="Courier New">Host</font> whose value is the specific hostname typed
+into the browser by the user.&nbsp;&nbsp; Thus if hostnames <font face="Courier New">www.foo.com</font>
+and <font face="Courier New">www.bar.com </font>both point to the same machine then it's
+possible for the webserver on that machine to distinguish a request for <font
+face="Courier New">http://www.foo.com</font> from a request for <font face="Courier New">http://www.bar.com</font>
+by looking at the <font face="Courier New">Host</font> header.</p>
+
+<p>In order to make AllegroServe easy to use you can ignore the virtual hosting facility
+until you plan to use it.&nbsp;&nbsp; As long as you don't specify a <strong>:host</strong>
+argument to any of the publish functions when adding content to your site, everything you
+publish will be visible from your web server no matter which hostname the web browser uses
+to access your site.&nbsp; If you decide you want to make use of virtual hosting, then
+read on.</p>
+
+<h3>vhost class</h3>
+
+<p>In AllegroServe a virtual host is denoted by a instance of class <strong>vhost</strong>.
+&nbsp;&nbsp; The contents of a vhost object are:</p>
+
+<table border="1" width="83%">
+  <tr>
+    <th width="26%">Accessor Function</th>
+    <th width="57%">What</th>
+    <th width="17%">initarg</th>
+  </tr>
+  <tr>
+    <td width="26%">vhost-log-stream</td>
+    <td width="57%">Stream to which to write logging information on requests to this virtual
+    host</td>
+    <td width="17%"><strong>:log-stream</strong></td>
+  </tr>
+  <tr>
+    <td width="26%">vhost-error-stream</td>
+    <td width="57%">Unused by AllegroServe but applications may wish to store here a stream to
+    which to write a log of errors</td>
+    <td width="17%"><strong>:error-stream</strong></td>
+  </tr>
+  <tr>
+    <td width="26%">vhost-names</td>
+    <td width="57%">A list of all the names for this virtual host.&nbsp; </td>
+    <td width="17%"><strong>:names</strong></td>
+  </tr>
+  <tr>
+    <td width="26%">vhost-filters</td>
+    <td width="57%">list of <a href="#filters">filter functions</a> </td>
+    <td width="17%"><strong>:filters</strong></td>
+  </tr>
+</table>
+
+<p>The defaults values for the two streams in a vhost object is the <strong>wserver-log-stream</strong>
+from the server object.</p>
+
+<p>Every instance of AllegroServe has a default vhost object that can be retrieved from
+the <strong>wserver </strong>object via the function <strong>wserver-default-vhost.
+&nbsp;&nbsp; </strong>If a request comes in for a virtual host that's not known, then it's
+assumed to be for the default virtual host.</p>
+
+<p>There are two ways to create virtual hosts in AllegroServe: implicitly or explicitly.
+&nbsp;&nbsp; If a publish function is called with a <strong>:host</strong> value that
+names a host not known to be a virtual host then a <strong>vhost</strong> instance will be
+created automatically and stored in the <strong>wserver</strong>'s hash table that maps
+names to <strong>vhost </strong>objects.&nbsp; This is implicit virtual host creation.</p>
+
+<p>If you know ahead of time the virtual hosts you'll be serving then it's better to setup
+all the virtual hosts explicitly.&nbsp;&nbsp; You create a <strong>vhost</strong> instance
+with <strong>make-instance</strong> and you register each virtual host in the <strong>wserver-vhosts</strong>
+table using <strong>gethash.</strong>&nbsp;&nbsp;&nbsp;&nbsp; Following is an example of
+setting up a server to have two virtual hosts, one that responds to three names and one
+that responds to two names.&nbsp;&nbsp; Since we are using the default vhost to represent
+the first virtual host, this virtual host will also receive requests for names we haven't
+mentioned explicitly.</p>
+
+<p>&nbsp;</p>
+
+<pre>(defun setup-virtual-hosts (server)
+  (let ((vhost-table (wserver-vhosts server))
+	(foo-names '(&quot;localhost&quot; &quot;www.foo.com&quot; &quot;foo.com&quot;))
+	(bar-names '(&quot;www.bar.com&quot; &quot;store.bar.com&quot;)))
+    
+    (let ((default-vhost (wserver-default-vhost server)))
+      (setf (vhost-names default-vhost) foo-names)
+      (dolist (name foo-names)
+	(setf (gethash name vhost-table) default-vhost)))
+    
+    (let ((bar-vhost (make-instance 'vhost :names bar-names)))
+      (dolist (name bar-names)
+	(setf (gethash name vhost-table) bar-vhost)))))
+
+</pre>
+
+<p>When a request comes in, AllegroServe will determine which vhost is the intended target
+and if none is found it will select the default vhost as the intended target.&nbsp; The
+vhost so determined will be stored in the<strong> http-request </strong>object in the slot
+accessed by <strong>request-vhost</strong> function.</p>
+
+<h3><a name="host_arg"></a>host argument to publish functions</h3>
+
+<p>We now are in a position to describe what values the <strong>:host</strong> argument to
+the publish functions can take on.&nbsp;&nbsp; The <strong>:host</strong> argument can be <strong>nil</strong>
+or one of: 
+
+<ol>
+  <li>a string naming a virtual host.&nbsp; If there is no virtual host with this name a new
+    virtual host object is created. </li>
+  <li>a vhost object</li>
+  <li>the symbol <strong>:wild</strong></li>
+  <li>a list of items of the above items</li>
+</ol>
+
+<p>If the value of the <strong>:host </strong>argument is <strong>nil</strong>, then its
+value is assumed to be <strong>:wild</strong>.</p>
+
+<p>The value of the <strong>:host </strong>argument is converted into a list of one or
+more vhost objects and/or the symbol <strong>:wild.</strong>&nbsp;&nbsp;&nbsp; The meaning
+of a vhost is clear: it means that this entity will be visible on this virtual host.
+&nbsp; The meaning of <strong>:wild </strong>is that this entity will be visible on <em>all</em>
+virtual hosts, except it can be shadowed by a entity specified for a particular virtual
+host.&nbsp; Thus you could publish an entity for<strong> :path &quot;/&quot; </strong>and <strong>:host
+:wild</strong> and it will be used for all virtual hosts that don't specify a entity for <strong>:path
+&quot;/&quot;</strong>.&nbsp; Note that when a request comes in and the search is done for
+an entity to match the request every step of the way we look first for a vhost specific
+handler and then a <strong>:wild</strong> handler&nbsp;&nbsp; It is <em>not</em> the case
+that we first do a complete search for a vhost specific handler and then restart the
+search this time looking for a <strong>:wild</strong> handler.</p>
+
+<p>&nbsp;</p>
+
+<hr>
+
+<h2><a name="timeouts"></a>Timeouts</h2>
+
+<p>A web server is a program that provides resources to client program connecting over the
+network.&nbsp; The resources a web server has to offer is limited and it's important that
+network problems or buggy clients don't cause those resources to be unavailable to new
+clients.&nbsp;&nbsp; AllegroServe uses timeouts to ensure that no client can hold a web
+server resource for more than a certain amount of time.</p>
+
+<p>Three common ways for a resource to be held are 
+
+<ol>
+  <li>A client stops sending a request in the middle of the request.&nbsp;&nbsp; This can
+    happen if the client machine crashes or&nbsp; if the client's machine loses network
+    connectivity with the&nbsp; machine running AllegroServe.</li>
+  <li>A client stops reading the response to its request.&nbsp;&nbsp;&nbsp; The networking
+    code will automatically stop the sender from writing new data if the receiver has a lot of
+    existing data to read. </li>
+  <li>The response function to an http request can take a very long time, or may even be in an
+    infinite loop.&nbsp;&nbsp; This could be due to a bug in a http response function or
+    something unexpected, like a database query taking a long time to finish.</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<h3>Acl 6.0 or older</h3>
+
+<p>For AllegroServe running in Acl 6.0 or <em>older</em> timeouts are done this way:</p>
+
+<p><strong>net.aserve::*read-request-timeout*</strong>&nbsp; - number of seconds
+AllegroServe allows for the request line (the first line) and all following header lines.
+&nbsp; The default is 20 seconds.</p>
+
+<p><strong>net.aserve::*read-request-body-timeout* </strong>- number of seconds
+AllegroServe allows for the body of the request (if any) to be read.&nbsp;&nbsp; The
+default is 60 seconds.</p>
+
+<p><strong>(wserver-response-timeout wserver)</strong> - the number of seconds
+AllegroServe allows for an http request&nbsp; function to be run and finished sending back
+its response.&nbsp; The initial value for this slot of the wserver object is found in <strong>*http-response-timeout*
+</strong>which defaults to 120 seconds.&nbsp; You can alter this timeout value with the <strong>:timeout</strong>
+argument to <strong>with-http-response</strong> or by specifying a <strong>:timeout</strong>
+when publishing the entity.</p>
+
+<h3>Acl 6.1 or newer</h3>
+
+<p>In Acl 6.1 we added the capability of having each I/O operation to a socket stream time
+out.&nbsp;&nbsp; This means that we don't have to predict how long it should take to get a
+request or send a response.&nbsp; As long as we're making progress reading or writing we
+know that the client on the other end of the network connection is alive and well.
+&nbsp;&nbsp; We still need a timeout to handle case (3) above but we can allow a lot more
+time for the http response since we aren't using this timer to catch dead clients as well.
+&nbsp;&nbsp; Thus we have these timeout values:</p>
+
+<p><a name="f-wserver-io-timeout"></a><strong>(wserver-io-timeout wserver)</strong> - the
+number of seconds that AllegroServe will wait for any read or write operation to the
+socket to finish.&nbsp;&nbsp; The value is initialized to the value of *http-io-timeout*
+&nbsp; which defaults to 60 seconds.</p>
+
+<p><a name="f-wserver-response-timeout"></a><strong>(wserver-response-timeout wserver)</strong>
+-&nbsp; the number of seconds AllegroServe allows for an http request function to be run
+and finished sending back its response. The initial value for this slot of the wserver
+object is found in <strong>*http-response-timeout*</strong> which defaults to 300 seconds.
+You can alter this timeout value with the :timeout argument to <strong>with-http-response</strong>
+or by specifying a <strong>:timeout </strong>argument to the publish function creating the
+entity.</p>
+
+<p><strong>publish-directory </strong>and <strong>publish-file </strong>default their <strong>timeout</strong>
+argument in a way that makes sense based on whether the Lisp supports I/O timeouts.
+&nbsp;&nbsp; If I/O timeouts are supported then there is no reason to do a global timeout
+for the whole response if you're just sending back a file.&nbsp;&nbsp; Thus in this case
+the <strong>timeout</strong> argument defaults to a huge number.</p>
+
+<p>&nbsp;</p>
+
+<hr>
+
+<h2><a name="miscellaneous"></a>Miscellaneous</h2>
+
+<p><a name="f-ensure-stream-lock"></a><strong><font face="Courier New">(ensure-stream-lock
+stream)</font></strong></p>
+
+<p>The function adds a <a
+href="http://www.franz.com/support/documentation/6.1/doc/multiprocessing.htm#process-locks-1">process
+lock</a> to <strong>stream</strong>'s property list (under the indicator<strong> :lock</strong>)
+if no such lock is present.&nbsp;&nbsp; Then it returns the object <strong>stream</strong>.</p>
+
+<p>The AllegroServe logging functions make use of the stream's lock to ensure that only
+one thread at a time write log information to the stream.&nbsp;&nbsp; If the logging
+functions find that a a log stream doesn't have a lock associated with it then the log
+information will still be written to the stream but under heavy load the log information
+from multiple threads will become intermixed. </p>
+
+<p>&nbsp;</p>
+
+<p><a name="f-map-entities"></a><font face="Courier New"><strong>(map-entities function
+locator)</strong></font></p>
+
+<p>When<strong> </strong>one of the<strong> </strong>publish functions is called enties
+are placed in <em>locator<strong> </strong></em>objects.&nbsp;&nbsp; The locator objects
+are then checked when http requests come in to find the appropriate entity.&nbsp; <strong>map-entities</strong>
+will apply the given <strong>function</strong> of one argument to all the entities in the
+given<strong> locator</strong>.&nbsp;&nbsp; One common use of <strong>map-entities</strong>
+is to find entities that you no longer wish to be published.&nbsp; For that reason <strong>map-entities</strong>
+will remove the entity the passed to the <strong>function</strong> if the <strong>function</strong>
+returns the keyword symbol <strong>:remove</strong> as its value.</p>
+
+<p>&nbsp;</p>
+
+<hr>
+
+<h2><a name="asaservice"></a>Running AllegroServe as a Service on Windows NT</h2>
+
+<p>On Windows NT (and Windows 2000 and Windows XP) when you log off all the programs you
+are running are terminated.&nbsp;&nbsp; If you want to run AllegroServe on your machine
+after you log out you have to start it as a <strong>Windows Service.&nbsp; </strong>This
+is easy to do thanks to code contributed by Ahmon Dancy.&nbsp;&nbsp; </p>
+
+<p>The first step is to download the <a href="http://opensource.franz.com/ntservice">ntservice
+code and documentation</a> from the Franz <a href="http://opensource.franz.com">opensource
+site</a>.&nbsp; Read the documentation carefully especially as regards the different
+capabilities of the accounts under which you may choose to run AllegroServe.&nbsp;&nbsp; </p>
+
+<p>You'll probably want to build an AllegroServe application that can run either normally
+or as a service,.&nbsp; You can run it normally to debug it and then start it as a service
+when you're satisifed that it works.</p>
+
+<p>Following is an example of how this can be done.&nbsp;&nbsp; I've decided that if the <font
+face="Courier New">/service</font> argument is given on the command line when I start my
+application then I'll start my application as a service, otherwise I start it normally.
+&nbsp;&nbsp;&nbsp;&nbsp; Here is the <strong>restart-init-function</strong> (to <strong>generate-application</strong>)
+that I define:</p>
+
+<pre>(defun start-aserve-application ()
+  (flet ((start-application ()
+	   (net.aserve:start :port 8020)
+	   (loop (sleep 100000))))
+    (if* (member &quot;/service&quot; (sys:command-line-arguments) :test #'equalp)
+     then ; start as  a service
+	  (ntservice:start-service #'start-application)
+     else ; start as a normal app
+	  (start-application)))))</pre>
+
+<p>&nbsp;</p>
+
+<p>I use <font face="Courier New">(loop (sleep 100000))</font> to ensure that the <strong>restart-init-function</strong>
+never returns.</p>
+
+<p>&nbsp;</p>
+
+<p>In order to register my application as a service to the operating system I call <strong>ntservice:create-service</strong>
+like this:</p>
+
+<pre>(ntservice:create-service &quot;aservetest&quot; &quot;Aserve Test Service&quot;
+     &quot;c:\\acl61\\testservice\\testapp\\testapp.exe -- /service&quot;)</pre>
+
+<p>Note that I use &quot;<font face="Courier New">--</font>&quot; before the &quot;<font
+face="Courier New">/service</font>&quot;.&nbsp; This is <em>very </em>important.
+&nbsp;&nbsp; The &quot;<font face="Courier New">--</font>&quot; separates the arguments
+used to start up the program from the arguments passed to the program itself. &nbsp;&nbsp;
+The call to <strong>ntservice:create-service</strong> is done only once and need not be
+done from within your application.&nbsp; </p>
+
+<p>Once an application is registered as a service you can start it by going to the Control
+Panel, selecting Administrative Tools and then Services.&nbsp;&nbsp; Locate the service
+you just added, right click on it and select <strong>start</strong>.&nbsp;&nbsp; You can
+stop the service with a a right click as well. </p>
+
+<p>&nbsp;</p>
+
+<hr>
+
+<h2><a name="international-chars-aserve"></a>Using International Characters in
+AllegroServe</h2>
+
+<p>A <em>character set</em> is a collection of characters and a rule to encode them as a
+sequence of octets.&nbsp;&nbsp; The default character set for web protocols is Latin1
+(also known as ISO 8859-1).&nbsp;&nbsp; The Latin1 character set represents nearly every
+character and punctuation needed for western European languages (which includes English).
+&nbsp;&nbsp; </p>
+
+<p>If you want to work with characters outside the Latin1 set you'll want to use the <a
+href="http://www.franz.com/support/documentation/6.1/doc/iacl.htm">International version
+of Allegro CL</a> which represents characters internally by their 16-bit <a
+href="http://www.unicode.org">Unicode</a> value.&nbsp;&nbsp;&nbsp; In this section we'll
+assume that you're using International Allegro CL.</p>
+
+<p>What the web protocols refer to as <strong>charset</strong> (character set) Allegro CL
+refers to as an <strong>external-format</strong>.&nbsp; Allegro CL uses a different term
+since it always uses 16-bit Unicode to represent characters internally.&nbsp; 16 bit
+unicode can represent nearly all characters on the planet.&nbsp; It's only when those
+characters are read from or written to devices outside of Lisp that the actual encoding of
+those characters into octets matters.&nbsp;&nbsp;&nbsp; Thus the <strong>external-format</strong>
+specifies how characters are encoded and specifies which Unicode characters are part of
+the character set that the external-format defines.&nbsp; Attempts to write a Unicode
+character that's not part of the character set results in a question mark being written.</p>
+
+<p>External-formats are also used in Allegro CL to do certain character to character
+transformations.&nbsp; In particular on the Windows platform external formats are used to
+convert the lisp end of line (a single #\newline character) to the #\return #\linefeed
+character that is standard on Windows.&nbsp;&nbsp; Thus an external format such as <strong>:utf-8</strong>
+&nbsp; has a different effect on Windows than on Unix, and this is not desireable for web
+applications.&nbsp;&nbsp; The function call <font face="Courier New">(crlf-base-ef&nbsp;:utf-8)</font>
+returns an external format on Windows and on Unix that simply does the character encoding
+part of the external format, and thus this is the external format you would want to use in
+a web application.</p>
+
+<h3>server to client (browser) character transfer</h3>
+
+<p>When a web server returns a response to a client it sends back a response line, a
+header and optionally a body.&nbsp;&nbsp; The response line and header are always sent
+using a subset of the Latin1 character set (the subset corresponding the the US ASCII
+character set).&nbsp;&nbsp; The body is sent using the full Latin1 character set, unless
+otherwise specified.&nbsp; To specify the character set of the body you add an extra
+parameter to the Content-Type header.&nbsp;&nbsp; Instead of specifying a content type of
+&quot;text/html&quot; you might specify &quot;text/html;&nbsp;charset=iso-8859-2&quot;.
+&nbsp;&nbsp; This alerts the http client that it must interpret the octets comprising the
+body of the response according to the iso-8859-2 character set.&nbsp;&nbsp; This however
+is <em>not<strong> </strong></em>enough to make AllegroServe encode the Unicode characters
+it's sending to the client using the approrpriate external format.&nbsp; You would have to
+do this:</p>
+
+<pre>(with-http-response (req ent)
+  (with-http-body (req ent :external-format (crlf-base-ef :iso8859-2))
+     ... generate and write page here..
+))</pre>
+
+<p>Note that the charset names and external format name are similar but not identical.
+&nbsp; Check <a href="http://www.iana.org/assignments/character-sets">here</a> for the
+charset names and check <a
+href="http://www.franz.com/support/documentation/6.1/doc/iacl.htm#external-formats-1">here</a>
+for the Allegro CL external format names.</p>
+
+<p>In order to make it easier to specify external formats in AllegroServe you can specify
+a default external format when you start the server (with the <strong>:external-format</strong>
+argument to the <strong>start</strong> function).&nbsp;&nbsp; The variable <strong>*default-aserve-external-format*
+</strong>will then be bound to this external format in each of the threads that processes
+http requests.&nbsp;&nbsp; It's the value of <strong>*default-aserve-external-format*</strong>
+that is used as the default argument to the :external-format argument to <strong>with-http-body</strong>.</p>
+
+<p>The default value of the <strong>:external-forma</strong>t argument to the <strong>start</strong>
+function, and thus the default value of *<strong>default-aserve-external-format*</strong>,
+is <strong>(crlf-base-ef :latin1-base</strong>).&nbsp;&nbsp; This means that regardless of
+the locale in which you run AllegroServe, AllegroServe will by default using the Latin1
+character set, which is what is expected by web clients..</p>
+
+<p>A very useful character set is <strong>utf-8</strong> which is the whole Unicode
+character set and thus comprises all of the characters you can store inside Lisp.
+&nbsp;&nbsp; The corresponding Allegro CL external format is the value of <font
+face="Courier New"><strong>(crlf-base-ef :utf-8)</strong></font>.&nbsp;&nbsp; Specifying
+this character set allows you to write web pages that can characters from nearly every
+language in the world (whether the web browser can find the glyphs to display all those
+characters is another matter). </p>
+
+<h3>client (browser) to server character transfer</h3>
+
+<p>The brower sends characters to the web server when the user enters data into a form and
+submits the form.&nbsp;&nbsp; The important thing to remember is that the browser will
+encode characters using the character set that was specified for the web page containing
+the form.&nbsp; If you fail to specify a <strong>charset</strong> when the page was given
+to the web browser then the web browser will decide on its own how to encode characters
+that aren't part of the default character set ( which is of course Latin1). &nbsp;&nbsp;
+The browser will <em>not</em> tell you which encoding it chose. &nbsp; Therefore if you
+ever plan on allowing&nbsp; non-Latin1 characters to be specified in your forms you'll
+want to specify a <strong>charset</strong> for the page containing the form. </p>
+
+<p>You can specify the charset in the Content-Type field of the header that's sent with
+the page (as we described above) or you can put it in the page itself using a meta tag:</p>
+
+<pre>&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=utf-8&quot;&gt;</pre>
+
+<p>Retrieving form data in AllegroServe is done with the <strong>request-query</strong>
+function and that function takes an <strong>:external-format</strong> argument so you can
+specify how the form data can be decoded.&nbsp;&nbsp; If your form sends multipart data
+then you can use the <strong>:external-format</strong> argument to <strong>get-multipart-sequence</strong>
+to retrieve the form data and decode the data.</p>
+
+<h3>examples</h3>
+
+<p>The AllegroServe test page has links to a few pages that show how international
+characters work with AllegroServe.&nbsp; One of these is the the International Character
+Display page.&nbsp; This page&nbsp; shows what happens when the <strong>charset</strong>
+and <strong>external-format</strong> are set to different values and a page containing
+international characters is displayed.&nbsp; It demonstrates how it important is is that
+those two character set specifications be kept in sync, and it shows that <strong>utf-8</strong>
+is most likely the best choice for a character set for your web pages.</p>
 
 <p>&nbsp;</p>
 

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.6.6.6 2001/10/22 16:12:57 layer Exp $
+;; $Id: t-aserve.cl,v 1.6.6.7 2002/01/21 21:58:52 layer Exp $
 
 ;; Description:
 ;;   test iserve
@@ -48,11 +48,17 @@
 (defvar *x-ssl*   nil) ; true when we want to do ssl client calls
 (defvar *proxy-wserver* nil)
 
+; if true run timeout test
+(defvar *test-timeouts* nil)
+
 ; stack of old values
 (defvar *save-x-proxy* nil)
 (defvar *save-proxy-wserver* nil)
 
-(defun test-aserve ()
+; remember where we were loaded from so we can run manually
+(defparameter *aserve-load-truename* *load-truename*)
+
+(defun test-aserve (test-timeouts)
   ;; run the allegroserve tests three ways:
   ;;  1. normally
   ;   2. through an allegroserve proxy to test the proxy
@@ -72,11 +78,17 @@
 		   (test-publish-file port)
 		   (test-publish-directory port)
 		   (test-publish-computed port)
+		   (test-publish-multi port)
+		   (test-publish-prefix port)
 		   (test-authorization port)
 		   (test-encoding)
 		   (test-forms port)
 		   (test-client port)
 		   (test-cgi port)
+		   (if* (member :ics *features*)
+		      then (test-international port))
+		   (if* test-timeouts 
+		      then (test-timeouts port))
 		   ))
 	    (format t "~%~%===== test direct ~%~%")
 	    (do-tests)
@@ -98,7 +110,7 @@
 		    (format t "~%~%===== test through ssl ~%~%")
 		    (setq port (start-aserve-running 
 				(merge-pathnames 
-				 "server.pem" *load-truename*)))
+				 "server.pem" *aserve-load-truename*)))
 		    (do-tests)
 	       else (format t "~%>> it isn't so ssl tests skipped~%~%")))
 	; cleanup forms:
@@ -232,7 +244,7 @@
 				   :protocol protocol
 				   :keep-alive keep-alive)
 	      (test 200 code)
-	      (test (format nil "text/plain" port)
+	      (test (format nil "text/plain")
 		    (cdr (assoc :content-type headers :test #'eq))
 		    :test #'equal)
 	      #+ignore (if* (eq protocol :http/1.1)
@@ -261,6 +273,12 @@
     (publish-file :path "/frob2" :file dummy-2-name
 		  :content-type "text/plain"
 		  :preload t)
+    
+    ;; publish with no preload and no cache
+    (publish-file :path "/frob2-npl" :file dummy-2-name
+		  :content-type "text/plain"
+		  :preload nil)
+    
 
     ;; 
     (dolist (cur-prefix (list prefix-local prefix-dns))
@@ -272,7 +290,7 @@
 				 :protocol protocol
 				 :keep-alive keep-alive)
 	    (test 200 code)
-	    (test (format nil "text/plain" port)
+	    (test (format nil "text/plain")
 		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
 	    #+ignore (if* (eq protocol :http/1.1)
@@ -280,7 +298,28 @@
 				   (cdr (assoc :transfer-encoding headers 
 					       :test #'eq))
 				   :test #'equalp))
-	    (test dummy-2-contents body :test #'equal)))))
+	    (test dummy-2-contents body :test #'equal))
+	  
+	  ; try partial gets
+	  (multiple-value-bind (body code headers)
+	      (x-do-http-request (format nil "~a/frob2-npl" cur-prefix)
+				 :protocol protocol
+				 :keep-alive keep-alive
+				 :headers '((:range . "bytes=100-400"))
+				 )
+	    (test 206 code)
+	    (test "text/plain"
+		  (cdr (assoc :content-type headers :test #'eq))
+		  :test #'equal)
+	    (test (subseq dummy-2-contents 100 401)
+		  body :test #'equal)
+	    
+	    (test "bytes 100-400/8178"
+		  (cdr (assoc :content-range headers :test #'eq))
+		  :test #'equal)
+	    
+	    )
+	  )))
 
     
     ;;;; remove published file test
@@ -1110,67 +1149,289 @@
 
 (defun test-publish-directory (port)
   (let ((prefix-local (format nil "http://localhost:~a" port))
+	(prefix-dns   (format nil "http://~a:~a" 
+			      (long-site-name)
+			      port))
+	(test-dir)
 	(step 0))
+    
     (multiple-value-bind (ok whole dir)
-	(match-regexp "\\(.*[/\\]\\).*" (namestring *load-truename*))
+	(match-regexp "\\(.*[/\\]\\).*" (namestring *aserve-load-truename*))
       (declare (ignore whole))
       (if* (not ok) 
 	 then (error "can't find the server.pem directory"))
       
+      (setq test-dir dir))
+      
 	
-      (publish-directory :prefix "/test-pd/"
-			 :destination dir
-			 :filter #'(lambda (req ent filename)
-				     (declare (ignore ent))
-				     (test t
-					   (values 
-					    (match-regexp "server.pem"
-							  filename))
-					   :test #'equal)
-				     (case step
-				       (0 (failed-request req)
-					  t)
-				       (1 nil))))
+    (publish-directory :prefix "/test-pd/"
+		       :destination test-dir
+		       :filter #'(lambda (req ent filename info)
+				   (declare (ignore ent info))
+				   (test t
+					 (values 
+					  (match-regexp "server.pem"
+							filename))
+					 :test #'equal)
+				   (case step
+				     (0 (failed-request req)
+					t)
+				     (1 nil))))
       
-      ; in step 0 we have the filter return a 404 code
-      (test 404 (values2 
-		 (x-do-http-request (format nil "~a/test-pd/server.pem" 
-					    prefix-local))))
+    ; in step 0 we have the filter return a 404 code
+    (test 404 (values2 
+	       (x-do-http-request (format nil "~a/test-pd/server.pem" 
+					  prefix-local))))
       
-      ; in step 1 we have it return the actual file
-      (setq step 1)
-      (test 200 (values2
-		 (x-do-http-request (format nil "~a/test-pd/server.pem"
-					    prefix-local))))
+    ; in step 1 we have it return the actual file
+    (setq step 1)
+    (test 200 (values2
+	       (x-do-http-request (format nil "~a/test-pd/server.pem"
+					  prefix-local))))
       
-      ; remove entry so subsequent tests won't see it
-      (publish-file :path "/test-pd/server.pem" :remove t)
-      )))
+    ; remove entry so subsequent tests won't see it
+    (publish-file :path "/test-pd/server.pem" :remove t)
+      
+    ; remove directory publish and see if that worked
+    (publish-directory :prefix "/test-pd/" :remove t)
+      
+    ; now it shouldn't exist
+    (test 404 (values2 
+	       (x-do-http-request (format nil "~a/test-pd/server.pem" 
+					  prefix-local))))
+      
+    ; test publish directory with virtual hosts
+    (publish-directory :prefix "/test-foo/"
+		       :destination test-dir
+		       :host "localhost")
+    ; so it will work with localhost
+    (test 200 (values2
+	       (x-do-http-request (format nil "~a/test-foo/server.pem"
+					  prefix-local))))
+      
+    ; but not the dns name
+    (test 404 (values2
+	       (x-do-http-request (format nil "~a/test-foo/server.pem"
+					  prefix-dns))))
+    ; remove all refs
+    (publish-directory :prefix "/test-foo/"
+		       :host "localhost"
+		       :remove t)
+    (publish-file :path "/test-foo/server.pem" 
+		  :host "localhost"
+		  :remove t)
+      
+    ; now doesn't exist
+    (test 404 (values2
+	       (x-do-http-request (format nil "~a/test-foo/server.pem"
+					  prefix-local))))
 
-			 
+    ;; now try using the access control
+    (publish-directory :prefix "/acc-test/"
+		       :destination (concatenate 'string test-dir "testdir/")
+		       :access-file "access.cl")
+    
+    
+    ; forbidden to access this file
+    (test 404
+	  (values2 (x-do-http-request (format nil "~a/acc-test/access.cl"
+					      prefix-local
+					      ))))
+    
+    ; and this file
+    (test 404
+	  (values2 (x-do-http-request (format nil "~a/acc-test/bbb.ign"
+					      prefix-local))))
+    
+    ; and any CVS file in this dir and those below
+    (test 404
+	  (values2 (x-do-http-request (format nil "~a/acc-test/CVS/Root"
+					      prefix-local))))
+    
+    (test 404
+	  (values2 (x-do-http-request (format nil "~a/acc-test/subc/ccc.html"
+					      prefix-local))))
+    
+    ; subdir subd can't be accessed from this or any subdir
+    ; due to :inherit in the access file
+    (test 404
+	  (values2 (x-do-http-request (format nil "~a/acc-test/subd/ddee.html"
+					      prefix-local))))
+    (test 404
+	  (values2 (x-do-http-request (format nil "~a/acc-test/suba/subd/ddd.html"
+					      prefix-local))))
+    
+    ; but this one is ok, and has content type specified by access file
+    (multiple-value-bind (res code headers)
+	(x-do-http-request (format nil "~a/acc-test/aaa.foo"
+				   prefix-local))
+      (declare (ignore res))
+      (test 200 code)
+      (test "foo/bar" (cdr (assoc :content-type headers :test #'eq)) 
+	    :test #'equal))
+    
+    ; test getting mime type from the standard place since it isn't
+    ; specified
+    (multiple-value-bind (res code headers)
+	(x-do-http-request (format nil "~a/acc-test/ccc.html"
+				   prefix-local))
+      (declare (ignore res))
+      (test 200 code)
+      (test "text/html" (cdr (assoc :content-type headers :test #'eq)) 
+	    :test #'equal))
+    
+    ; now try full name mime type
+    (multiple-value-bind (res code headers)
+	(x-do-http-request (format nil "~a/acc-test/readme"
+				   prefix-local))
+      (declare (ignore res))
+      (test 200 code)
+      (test "frob/frib" (cdr (assoc :content-type headers :test #'eq)) 
+	    :test #'equal))
+    
+    ; test blocking via ip address, can't access if not using localhost
+    (test 404 (values2 (x-do-http-request (format nil "~a/acc-test/ccc.html"
+						  prefix-dns))))
+    
+    
+    ; now down a directory the ip restriction isn't inherited
+    (test 200 (values2 (x-do-http-request 
+			(format nil "~a/acc-test/suba/foo.html" prefix-dns))))
+    (test 200 (values2 (x-do-http-request 
+			(format nil "~a/acc-test/suba/foo.html" prefix-local))))
+    ; this is blocked since we only match files named 'foo'
+    (test 404 (values2 (x-do-http-request 
+			(format nil "~a/acc-test/suba/access.cl" prefix-local))))
+    
+    ; and we can't go down another directory level since that's blocked
+    (test 404 (values2 (x-do-http-request 
+			(format nil "~a/acc-test/suba/subsuba/foo.html" prefix-local))))
+    
+    ;; now try password and ip authorized
+    ; no password
+    (test 401 (values2 (x-do-http-request 
+			(format nil "~a/acc-test/subb/foo.html"
+				prefix-local))))
+    
+    ; wrong ip but password ok
+    (test 404 (values2 (x-do-http-request 
+			(format nil "~a/acc-test/subb/foo.html"
+				prefix-dns)
+			:basic-authorization '("joe"  . "eoj")
+			)))
+    
+    ; good password and ip
+    (test 200 (values2 (x-do-http-request 
+			(format nil "~a/acc-test/subb/foo.html"
+				prefix-local)
+			:basic-authorization '("joe"  . "eoj")
+			)))
+    
+    
+    ))
+
+
+;; publish-multi tests
+(defun test-publish-multi (port)
+  (let ((prefix-local (format nil "http://localhost:~a" port)))
+    (with-open-file (p "aservemulti.xx" 
+		     :direction :output
+		     :if-exists :supersede)
+      (write-sequence "bar" p))
+    (publish-multi :path "/multi-test"
+		   :items (list '(:string "foo")
+				"aservemulti.xx"  ; file
+				#'(lambda (req ent time value)
+				    (declare (ignore req ent time value))
+				    "baz")
+				#'(lambda (req ent time value)
+				    (declare (ignore req ent time value))
+				    (string-to-octets "bof" 
+						      :null-terminate nil))))
+    
+    
+    (test "foobarbazbof" 
+	  (values (x-do-http-request  (format nil "~a/multi-test" prefix-local)))
+	  :test #'equal)
+    
+    (ignore-errors (delete-file "aservemulti.xx"))
+    ))
+		   
+
+
+;; publish-prefix tests
+;;
+(defun test-publish-prefix (port)
+  (let ((prefix-local (format nil "http://localhost:~a" port))
+	(prefix-dns   (format nil "http://~a:~a" 
+			      (long-site-name)
+			      port))
+	(got-here))
+    (publish-prefix :prefix "/pptest"
+		    :function
+		    #'(lambda (req ent)
+			(incf got-here)
+			(with-http-response (req ent)
+			  (with-http-body (req ent)
+			    (html "foo")))))
+    (dolist (prefix (list prefix-local prefix-dns))
+      (setq got-here 0)
+      (test 200 (values2
+		 (x-do-http-request (format nil "~a/pptest"
+					    prefix))))
+      (test 1 got-here)
+      (test 200 (values2
+		 (x-do-http-request (format nil "~a/pptest/fred"
+					    prefix))))
+      (test 2 got-here)
+      (test 200 (values2
+		 (x-do-http-request (format nil "~a/pptest#asdfasdf"
+					    prefix))))
+      
+      (test 3 got-here)
+      (test 200 (values2
+		 (x-do-http-request (format nil "~a/pptestasdfasdf#asdfasdf"
+					    prefix))))
+      
+      (test 4 got-here)
+      (test 404 (values2
+		 (x-do-http-request (format nil "~a/pptes"
+					    prefix))))
+      (test 4 got-here))))
+    
+    
+    
+			
+
+
+		   
+    
+
 		       
 (defun test-cgi (port)
   ;; currently we only have a test program on unix since
   ;; that where our shell script works
   ;;
+  (declare (ignorable port))
   #+(and unix (version>= 6 1))
-  (let ((prefix-local (format nil "http://localhost:~a" port)))
+  (let ((prefix-local (format nil "http://localhost:~a" port))
+	(error-buffer))
     (publish :path "/cgi-0"
-	    :function #'(lambda (req ent)
-			  (net.aserve:run-cgi-program 
-			   req ent "aserve/examples/cgitest.sh")))
+	     :function #'(lambda (req ent)
+			   (net.aserve:run-cgi-program 
+			    req ent "aserve/examples/cgitest.sh")))
     (publish :path "/cgi-1"
-	    :function #'(lambda (req ent)
-			  (net.aserve:run-cgi-program 
-			   req ent "aserve/examples/cgitest.sh 1")))
+	     :function #'(lambda (req ent)
+			   (net.aserve:run-cgi-program 
+			    req ent "aserve/examples/cgitest.sh 1")))
     (publish :path "/cgi-2"
-	    :function #'(lambda (req ent)
-			  (net.aserve:run-cgi-program 
-			   req ent "aserve/examples/cgitest.sh 2")))
+	     :function #'(lambda (req ent)
+			   (net.aserve:run-cgi-program 
+			    req ent "aserve/examples/cgitest.sh 2")))
     (publish :path "/cgi-3"
-	    :function #'(lambda (req ent)
-			  (net.aserve:run-cgi-program 
-			   req ent "aserve/examples/cgitest.sh 3")))
+	     :function #'(lambda (req ent)
+			   (net.aserve:run-cgi-program 
+			    req ent "aserve/examples/cgitest.sh 3")))
     
     ;; verify that the various headers work
     (test 200 (values2 
@@ -1183,9 +1444,9 @@
     
     ; verify that a redirect is requested
     (multiple-value-bind (body code headers)
-	       (x-do-http-request (format nil "~a/cgi-2"
-					  prefix-local)
-				  :redirect nil)
+	(x-do-http-request (format nil "~a/cgi-2"
+				   prefix-local)
+			   :redirect nil)
       (test "go to franz" body :test #'equal)
       (test 301 code)
       (test "http://www.franz.com" (cdr (assoc :location headers))
@@ -1197,17 +1458,149 @@
     ; verify that the unauthorized response is made
     (test 401 (values2 
 	       (x-do-http-request (format nil "~a/cgi-3"
-					  prefix-local))))))
+					  prefix-local))))
+
+    ; test error output processing
+    (publish :path "/cgi-4"
+	     :function #'(lambda (req ent)
+			   (net.aserve:run-cgi-program 
+			    req ent "aserve/examples/cgitest.sh 4"
+			    :error-output
+			    #'(lambda (req ent stream)
+				(declare (ignore req ent))
+				(let (eof)
+				  (loop
+				    (let ((ch (read-char-no-hang stream 
+								 nil :eof)))
+	     
+				      (if* (null ch) then (return))
+	     
+				      (if* (eq :eof ch) 
+					 then (setq eof t)
+					      (return))
+	     
+				      (vector-push-extend ch error-buffer)))
+				  eof
+				  )))))
+    (setq error-buffer (make-array 10 
+				  :element-type 'character
+				  :adjustable t
+				  :fill-pointer 0))
+        
+    (multiple-value-bind (body rescode)
+	(x-do-http-request (format nil "~a/cgi-4" prefix-local))
+      (test "okay
+" body :test #'equal)
+      (test 200 rescode)
+      (test "stuff-on-error-stream
+" error-buffer :test #'equal))
+    ))
    
 	    
 	
-	
+(defun test-timeouts (port)
+  ;; test aserve timing out when the client is non responsive
+  (let (#+ignore (prefix-local (format nil "http://localhost:~a" port)))
+    
+    (if* *x-ssl* 
+       then ; we don't get the same timeout behavior since we're
+	    ; not directly connected to the server socket, so
+	    ; don't try the tests
+	    (return-from test-timeouts nil))
+    
+    (format t "timeout tests.. expect pauses~%")(force-output)
+    
+    ;; try making a connection and not sending any headers.
+    ;; we should timeout
+    (let ((sock (socket:make-socket :remote-host "localhost"
+				    :remote-port port)))
+      (unwind-protect
+       (progn
+       (format sock "GET /timeouttest HTTP/1.0~c~cfoo: bar~c~c"
+	       #\return #\newline #\return #\newline)
+       (force-output sock)
+       
+       ; try sending data periodically but in enough time to
+       ; bypass the timeout.  This only works in the io-timeout
+       ; situation.
+       #+io-timeout
+       (dotimes (i 3)
+	 (sleep (max 1 (- net.aserve:*http-io-timeout* 10)))
+	 (format t "send packet~%")(force-output)
+	 (format sock "brap: brop~c~c" #\return #\newline)
+	 (force-output sock)
+	 )
+       
+       ; now sleep for longer than it should take for the timeout to occur
+       (sleep (+ 3 (max *http-response-timeout* *http-io-timeout*)))
+       (test-error
+	;; now we should get a connection reset by peer
+	(progn (format sock "brap: brop~c~c" #\return #\newline)
+	       (force-output sock)
+	       (format sock "brap: brop~c~c" #\return #\newline)
+	       (force-output sock))
+	:condition-type 'errno-stream-error
+	))
+       (ignore-errors (close sock :abort t))))))
+       
+
+(defun test-international (port)
+  (declare (ignorable port))
+  #+(and allegro ics (version>= 6 1))
+  (let ((prefix-local (format nil "http://localhost:~a" port))
+	(Privyet! (coerce '(#\cyrillic_capital_letter_pe
+			    #\cyrillic_small_letter_er
+			    #\cyrillic_small_letter_i
+			    #\cyrillic_small_letter_ve
+			    #\cyrillic_small_letter_ie
+			    #\cyrillic_small_letter_te
+			    #\!)
+			  'string)))
+    (publish 
+     :path "/simple-form-itest"
+     :function
+     #'(lambda (req ent)
+	 ; simulate starting aserve with :external-format :koi8-r arg
+	 (let ((*default-aserve-external-format* :koi8-r))
+	   (with-http-response (req ent)
+	     (with-http-body (req ent :external-format :koi8-r)
+	       (let ((text (request-query-value "text" req)))
+		 (if* text
+		    then (html
+			  (:html
+			   (:head (:title "result"))
+			   (test Privyet! text :test #'string=)
+			   (:body "test text: {" (:princ text) "}")))
+		    else ;; filler -- test normally doesn't go here
+			 (html
+			  (:html
+			   (:head (:title "foobar"))
+			   (:body))))))))))
+  
+    (let* ((result
+	    (x-do-http-request 
+	     (format nil "~a/simple-form-itest?text=%F0%D2%C9%D7%C5%D4%21"
+		     prefix-local)
+	     :external-format :octets))
+	   (begin (position #\{ result))
+	   (end (position #\} result))
+	   (test-string
+	    (if* begin
+	       then (octets-to-string
+		     (string-to-octets (subseq result (1+ begin) end)
+				       :external-format :octets)
+		     :external-format :koi8-r))))
+      (test t (not (null begin)))  ; verify we found begin 
+      (test t (not (null end)))    ; and end markers
+      (test Privyet! test-string :test #'string=))))
+  
+  
   
 
 
     
 (if* user::*do-aserve-test* 
-   then (test-aserve)
+   then (test-aserve *test-timeouts*)
    else (format t 
 		" (net.aserve.test::test-aserve) will run the aserve test~%"))
 

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.48.2.8 2001/10/22 16:12:57 layer Exp $
+;; $Id: main.cl,v 1.48.2.9 2002/01/21 21:58:52 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -47,10 +47,13 @@
    ; #:debug-on			
    #:denied-request
    #:enable-proxy
+   #:ensure-stream-lock
+   #:entity-plist
    #:failed-request
    #:form-urlencoded-to-query
    #:get-basic-authorization
    #:get-cookie-values
+   #:get-all-multipart-data
    #:get-multipart-header
    #:get-multipart-sequence
    #:get-request-body
@@ -61,17 +64,26 @@
    #:locator		; class
    #:location-authorizer  ; class
    #:location-authorizer-patterns
+   #:map-entities
+   #:parse-multipart-header
    #:password-authorizer  ; class
    #:process-entity
    #:publish
    #:publish-file
    #:publish-directory
+   #:publish-multi
+   #:publish-prefix
    #:query-to-form-urlencoded
    #:reply-header-slot-value 
    #:run-cgi-program
    #:set-basic-authorization
    #:standard-locator
    #:unpublish-locator
+   #:vhost
+   #:vhost-log-stream
+   #:vhost-error-stream
+   #:vhost-names
+   #:vhost-plist
 
    #:request-method
    #:request-protocol
@@ -107,17 +119,22 @@
    #:with-http-body
    
    #:wserver
+   #:wserver-default-vhost
    #:wserver-enable-chunking
    #:wserver-enable-keep-alive
    #:wserver-external-format
    #:wserver-filters
    #:wserver-locators
+   #:wserer-io-timeout
    #:wserver-log-function
    #:wserver-log-stream
+   #:wserver-response-timeout
    #:wserver-socket
+   #:wserver-vhosts
 
    #:*aserve-version*
    #:*default-aserve-external-format*
+   #:*http-io-timeout*
    #:*http-response-timeout*
    #:*mime-types*
    #:*response-accepted*
@@ -137,7 +154,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 10))
+(defparameter *aserve-version* '(1 2 21))
 
 (eval-when (eval load)
     (require :sock)
@@ -280,8 +297,27 @@
 ;; more specials
 (defvar *max-socket-fd* 0) ; the maximum fd returned by accept-connection
 (defvar *aserve-debug-stream* nil) ; stream to which to seen debug messages
+(defvar *debug-connection-reset-by-peer* nil) ; true to signal these too
 (defvar *default-aserve-external-format* :latin1-base) 
 (defvar *worker-request*)  ; set to current request object
+
+(defvar *read-request-timeout* 20)
+(defvar *read-request-body-timeout* 60)
+(defvar *http-response-timeout* 
+    #+io-timeout 300 ; 5 minutes for timeout if we support i/o timeouts
+    #-io-timeout 120 ; 2 minutes if we use this for i/o timeouts too.
+    )
+
+; this is only useful on acl6.1 where we do timeout on I/O operations
+(defvar *http-io-timeout* 120)
+
+; usually set to the default server object created when aserve is loaded.
+; users may wish to set or bind this variable to a different server
+; object so it is the default for publish calls.
+; Also bound to the current server object in accept threads, thus
+; user response functions can use this to find the current wserver object.
+(defvar *wserver*)   
+
 
 ; type of socket stream built.
 ; :hiper is possible in acl6
@@ -347,12 +383,12 @@
     :initarg :log-function
     :initform nil	; no logging initially
     :accessor wserver-log-function)
-   
+
    (log-stream
     ;; place for log-function to store stream to log to if
-    ;; it makes sense to do so
+    ;; it makes sense to do so.  
     :initarg :log-stream
-    :initform  t 	; initially to *standard-output*
+    :initform *initial-terminal-io*
     :accessor wserver-log-stream)
 
    (accept-hook
@@ -368,7 +404,32 @@
     :initarg :external-format
     :initform :latin1-base
     :accessor wserver-external-format)
+
+   (vhosts
+    ;; map names to vhost objects
+    :initform (make-hash-table :test #'equalp)
+    :accessor wserver-vhosts)
    
+   (default-vhost
+       ;; vhost representing situations with no virtual host
+       :initarg :default-vhost
+     :initform (make-instance 'vhost)
+     :accessor wserver-default-vhost)
+
+   (response-timeout
+    ;; seconds a response is allowed to take before it gives up
+    :initarg :response-timeout
+    :initform *http-response-timeout*
+    :accessor wserver-response-timeout)
+   
+   (io-timeout
+    ;; seconds an I/O operation to an http client is allowed to take
+    ;; before an error is signalled.  This is only effective on
+    ;; acl6.1 or newer.
+    :initarg :io-timeout
+    :initform *http-io-timeout*
+    :accessor wserver-io-timeout)
+    
    ;;
    ;; -- internal slots --
    ;;
@@ -437,19 +498,49 @@
 		 then (socket:local-port sock)
 		 else "-no socket-")))))
      
-     
-     
+
+;;;;; virtual host class
+(defclass vhost ()
+  ((log-stream :accessor vhost-log-stream
+	       :initarg :log-stream
+	       :initform (ensure-stream-lock *standard-output*))
+   (error-stream :accessor vhost-error-stream
+		 :initarg :error-stream
+		 :initform (ensure-stream-lock *standard-output*))
+   (names :accessor vhost-names
+	  :initarg :names
+	  :initform nil)
+   
+   ; vhost specific filters, see wserver-filters for doc
+   (filters :accessor vhost-filters
+	    :initarg :filters
+	    :initform nil)
+
+   ; property list for users to store per-vhost specific info
+   (plist  :accessor vhost-plist
+	   :initarg :plist
+	   :initform nil)
+   ))
+
+(defmethod print-object ((vhost vhost) stream)
+  (print-unreadable-object (vhost stream :type t :identity t)
+    (format stream "~{ ~a~}"
+	    (let ((names (vhost-names vhost)))
+	      (if* (or (null names) (consp names)) 
+		 then names
+		 else (list names))))))
 
 
 ;;;;;; macros 
 
 (defmacro with-http-response ((req ent
-				&key (timeout '*http-response-timeout*)
-				     (check-modified t)
-				     (response '*response-ok*)
-				     content-type
-				     )
-			       &rest body)
+			       &key timeout
+				    (check-modified t)
+				    (response '*response-ok*)
+				    content-type
+				    format
+				    )
+			      &rest body)
   ;;
   ;; setup to response to an http request
   ;; do the checks that can shortciruit the request
@@ -457,16 +548,23 @@
   (let ((g-req (gensym))
 	(g-ent (gensym))
 	(g-timeout (gensym))
+	(g-format (gensym))
 	(g-check-modified (gensym)))
-    `(let ((,g-req ,req)
-	   (,g-ent ,ent)
-	   (,g-timeout ,timeout)
-	   (,g-check-modified ,check-modified)
-	   )
+    `(let* ((,g-req ,req)
+	    (,g-ent ,ent)
+	    (,g-format ,format)
+	    (,g-timeout ,(or timeout 
+			     
+			     `(or
+			       (entity-timeout ,g-ent)
+			       (wserver-response-timeout *wserver*))))
+	    (,g-check-modified ,check-modified)
+	    )
        (catch 'with-http-response
-	 (compute-strategy ,g-req ,g-ent)
+	 ;(format t "timeout is ~d~%" ,g-timeout)
+	 (compute-strategy ,g-req ,g-ent ,g-format)
 	 (up-to-date-check ,g-check-modified ,g-req ,g-ent)
-	 (mp::with-timeout ((if* (and (fixnump ,g-timeout)
+	 (mp::with-timeout ((if* (and (fixnump ,g-timeout)  ; ok w-t
 				      (> ,g-timeout 0))
 			       then ,g-timeout
 			       else 9999999)
@@ -480,7 +578,7 @@
 	   )))))
 
 
-#+(and allegro (version>= 6 0 pre-final 1))
+#+(and allegro (version>= 6 0))
 (defun warn-if-crlf (external-format)
   (let ((ef (find-external-format external-format)))
     (if* (not (eq (crlf-base-ef ef) ef))
@@ -489,31 +587,30 @@ External-format `~s' passed to make-http-client-request filters line endings.
 Problems with protocol may occur." (ef-name ef)))))
 
 (defmacro with-http-body ((req ent
-			   &key format headers 
+			   &key headers 
 				(external-format 
-				 *default-aserve-external-format*))
+				 '*default-aserve-external-format*))
 			  &rest body)
   (declare (ignorable external-format))
   (let ((g-req (gensym))
 	(g-ent (gensym))
-	(g-format (gensym))
 	(g-headers (gensym))
 	(g-external-format (gensym))
 	)
     `(let ((,g-req ,req)
 	   (,g-ent ,ent)
-	   (,g-format ,format)
 	   (,g-headers ,headers)
 	   #+(and allegro (version>= 6 0 pre-final 1))
 	   (,g-external-format (find-external-format ,external-format))
 	   )
-       (declare (ignore-if-unused ,g-req ,g-ent ,g-format ,g-external-format))
+       (declare (ignore-if-unused ,g-req ,g-ent ,g-external-format))
        ,(if* body 
 	   then `(compute-response-stream ,g-req ,g-ent))
        (if* ,g-headers
 	  then (bulk-set-reply-headers ,g-req ,g-headers))
        (send-response-headers ,g-req ,g-ent :pre)
-       (if* (not (member :omit-body (request-reply-strategy ,g-req)))
+       (if* (not (member :omit-body (request-reply-strategy ,g-req) 
+			 :test #'eq))
 	  then (let ((*html-stream* (request-reply-stream ,g-req)))
 		 #+(and allegro (version>= 6 0 pre-final 1))
 		 (if* (and (streamp *html-stream*)
@@ -524,7 +621,7 @@ Problems with protocol may occur." (ef-name ef)))))
 			   ,g-external-format))
 		 (progn ,@body)))
        
-       (if* (member :keep-alive (request-reply-strategy ,g-req))
+       (if* (member :keep-alive (request-reply-strategy ,g-req) :test #'eq)
 	  then ; force the body to be read so we can continue
 	       (get-request-body ,g-req))
        (send-response-headers ,g-req ,g-ent :post))))
@@ -718,7 +815,7 @@ by keyword symbols and not by strings"
    
    (method  ;; keyword giving the command in this request :get .. etc.
     :initarg :method
-    :reader request-method)
+    :accessor request-method)
    
    (uri  ;; uri object holding the current request with the scheme, host
          ;; and port filled in.
@@ -748,6 +845,11 @@ by keyword symbols and not by strings"
    (raw-request  ;; the actual command line from the browser
     :initarg :raw-request
     :reader request-raw-request)
+   
+   (vhost  ;; the virtual host to which this request is directed
+    :initarg :vhost
+    :initform (wserver-default-vhost *wserver*)
+    :accessor request-vhost)
    
    ;;
    ;; -- internal slots --
@@ -835,7 +937,8 @@ by keyword symbols and not by strings"
 (defparameter *response-ok* (make-resp 200 "OK"))
 (defparameter *response-created* (make-resp 201 "Created"))
 (defparameter *response-accepted* (make-resp 202 "Accepted"))
-
+(defparameter *response-partial-content*
+    (make-resp 206 "Partial Content"))
 (defparameter *response-moved-permanently* (make-resp 301 "Moved Permanently"))
 (defparameter *response-found* (make-resp 302 "Found"))
 (defparameter *response-see-other* (make-resp 303 "See Other"))
@@ -845,7 +948,8 @@ by keyword symbols and not by strings"
 (defparameter *response-bad-request* (make-resp 400 "Bad Request"))
 (defparameter *response-unauthorized* (make-resp 401 "Unauthorized"))
 (defparameter *response-not-found* (make-resp 404 "Not Found"))
-
+(defparameter *response-requested-range-not-satisfiable*
+    (make-resp 416 "Requested range not satisfiable"))
 (defparameter *response-internal-server-error*
     (make-resp 500 "Internal Server Error"))
 (defparameter *response-not-implemented* (make-resp 501 "Not Implemented"))
@@ -862,25 +966,21 @@ by keyword symbols and not by strings"
 	  *response-temporary-redirect*
 	  *response-bad-request*
 	  *response-unauthorized*
-	  *response-not-found*))
+	  *response-not-found*
+	  *response-requested-range-not-satisfiable*
+	  *response-partial-content*
+	  ))
 
 (defvar *crlf* (make-array 2 :element-type 'character :initial-contents
 			   '(#\return #\linefeed)))
 
-(defvar *read-request-timeout* 20)
-(defvar *read-request-body-timeout* 60)
-(defvar *http-response-timeout* 120) ; amount of time for an http response
-
 (defvar *thread-index*  0)      ; globalcounter to gen process names
 
-; usually set to the default server object created when aserve is loaded.
-; users may wish to set or bind this variable to a different server
-; object so it is the default for publish calls.
-(defvar *wserver*)   
 
 				    
 			      
 (defun start (&key (port 80 port-p) 
+		   host
 		   (listeners 5)
 		   (chunking t)
 		   (keep-alive t)
@@ -934,8 +1034,7 @@ by keyword symbols and not by strings"
 	     then ; ssl defaults to port 443
 		  (setq port 443)))
 	    
-  (if* accept-hook
-     then (setf (wserver-accept-hook server) accept-hook))
+  (setf (wserver-accept-hook server) accept-hook)
   
   
   ; shut down existing server
@@ -991,6 +1090,7 @@ by keyword symbols and not by strings"
   
   (let* ((main-socket (socket:make-socket :connect :passive
 					  :local-port port
+					  :local-host host
 					  :reuse-address t
 					  :format :bivalent
 					  
@@ -1105,6 +1205,13 @@ by keyword symbols and not by strings"
 		   then (schedule-finalization 
 			 sock 
 			 #'check-for-open-socket-before-gc))
+		
+		#+io-timeout
+		(socket:socket-control 
+		 sock 
+		 :read-timeout (wserver-io-timeout *wserver*)
+		 :write-timeout (wserver-io-timeout *wserver*))
+		       
 		(process-connection sock))
 	    
 	    (:loop ()  ; abort out of error without closing socket
@@ -1165,18 +1272,33 @@ by keyword symbols and not by strings"
 	    (if* (not (member :notrap *debug-current* :test #'eq))
 	       then (handler-case (process-connection sock)
 		      (error (cond)
-			(logmess 
-			 (format nil "~agot error ~a~%" 
-				 (if* *worker-request*
-				    then (format 
-					  nil 
-					  "while processing command ~s~%"
-					  (request-raw-request 
-					   *worker-request*))
-				    else "")
-				 cond
-				 ))))
-	       else (process-connection sock))
+			(if* (connection-reset-error cond)
+			   thenret ; don't print these errors,
+			   else (logmess 
+				 (format nil "~agot error ~a~%" 
+					 (if* *worker-request*
+					    then (format 
+						  nil 
+						  "while processing command ~s~%"
+						  (request-raw-request 
+						   *worker-request*))
+					    else "")
+					 cond
+					 )))))
+	       else ; in debugging mode where we don't ignore errors
+		    ; still, we want to ignore connection-reset-by-peer
+		    ; since they are often not errors
+		    (catch 'out-of-connection
+		      (handler-bind 
+			  ((stream-error 
+			    #'(lambda (c)
+				(if* (and 
+				      (not *debug-connection-reset-by-peer*)
+				      (connection-reset-error c))
+				   then (throw 'out-of-connection nil)))))
+			(process-connection sock)))
+		      
+		    )
 	  (abandon ()
 	      :report "Abandon this request and wait for the next one"
 	    nil))
@@ -1185,7 +1307,15 @@ by keyword symbols and not by strings"
     
       )))
 
+(defun connection-reset-error (c)
+  ;; return true if this is what results from a connection reset
+  ;; by peer 
+  (if* (typep c 'stream-error)
+     then (or (eq (stream-error-identifier c) :connection-reset)
+	      #+unix (eq (stream-error-code c) 32) ; sigpipe
+	      )))
 
+	  
 
   
 (defun http-accept-thread ()
@@ -1217,6 +1347,12 @@ by keyword symbols and not by strings"
 		   then ; new ip address by which this machine is known
 			(push localhost ipaddrs)
 			(setf (wserver-ipaddrs *wserver*) ipaddrs))
+		
+		#+io-timeout
+		(socket:socket-control 
+		 sock 
+		 :read-timeout (wserver-io-timeout *wserver*)
+		 :write-timeout (wserver-io-timeout *wserver*))
 		
 		; another useful test to see if we're losing file
 		; descriptors
@@ -1317,13 +1453,13 @@ by keyword symbols and not by strings"
       (let ((req))
 	;; get first command
 	(loop
-	  (mp:with-timeout (*read-request-timeout* 
-			    (debug-format :info "request timed out on read~%")
-			    ; this is too common to log, it happens with
-			    ; every keep alive socket when the user stops
-			    ; clicking
-			    ;;(log-timed-out-request-read sock)
-			    (return-from process-connection nil))
+	  (with-timeout-local (*read-request-timeout* 
+			       (debug-format :info "request timed out on read~%")
+			       ; this is too common to log, it happens with
+			       ; every keep alive socket when the user stops
+			       ; clicking
+			       ;;(log-timed-out-request-read sock)
+			       (return-from process-connection nil))
 	    (setq req (read-http-request sock)))
 	  (if* (null req)
 	     then ; end of file, means do nothing
@@ -1358,7 +1494,7 @@ by keyword symbols and not by strings"
   ;; do a force-output but don't get hung up if we get blocked on output
   ;; this happens enough with sockets that it's a real concern
   ; 30 seconds is enough time to wait
-  (mp:with-timeout (30) 
+  (with-timeout-local (30) 
     (force-output stream)))
 
   
@@ -1452,6 +1588,13 @@ by keyword symbols and not by strings"
 				   then (setf (uri-port uri) port)))
 			
 			(setf (uri-scheme uri) :http)  ; always http
+			
+			;; set virtual host in the request
+			(let ((vhost 
+			       (gethash host (wserver-vhosts *wserver*))))
+			  (setf (request-vhost req)
+			    (or vhost (wserver-default-vhost *wserver*))))
+					      
 			))))
 	  
 	    
@@ -1531,7 +1674,7 @@ by keyword symbols and not by strings"
 			     then ; must be no body
 				  ""
 			     else ; read until the end of file
-				  (mp:with-timeout 
+				  (with-timeout-local
 				      (*read-request-body-timeout* 
 				       nil)
 				    (let ((ans (make-array 
@@ -2041,8 +2184,119 @@ in get-multipart-sequence"))
 		 (return-from get-multipart-sequence nil)))))))
 
   
+(defun parse-multipart-header (header)
+  ;; look for known patterns in the mulitpart header and return
+  ;; the information we can find.  Header is the return value from
+  ;; get-multipart-header
+  ;;
+  ;; return values:
+  ;; 1.  nil, :eof, :file, :data, :nofile   - description of the header
+  ;; 2. name  - name of the item
+  ;; 3. filename - if type is :file then this is the filename
+  ;; 4. content-type - if type is :file this this is the content-type
+  (if* (and (consp header) (consp (car header)))
+     then (let ((cd (assoc :content-disposition header :test #'eq))
+		(ct (assoc :content-type header :test #'eq))
+		(name)
+		(filename)
+		(content-type))
+	    (if* (and cd
+		      (consp (cadr cd))
+		      (eq :param (car (cadr cd)))
+		      (equal "form-data" (cadr (cadr cd))))
+	       then (let ((fd (cddr (cadr cd))))
+		      (let ((aname (assoc "name" fd :test #'equal)))
+			(if* aname then (setq name (cdr aname))))
+		      (let ((afname (assoc "filename" fd :test #'equal)))
+			(if* afname then (setq filename (cdr afname))))))
+	    (if* (and (consp ct) (stringp (cadr ct)))
+	       then (setq content-type (cadr ct)))
+	    
+	    (values (if* filename 
+		       then (if* (equalp filename "")
+			       then :nofile
+			       else :file)
+		       else :data)
+		    name
+		    filename
+		    content-type))
+   elseif (null header)
+     then :eof
+     else nil ; doesn't match anything we know about
+	  ))
+		      
+	  
+(defun get-all-multipart-data (req &key (type :text) 
+					(size 4096)
+					(external-format 
+					 *default-aserve-external-format*)
+					(limit nil)
+					)
+  ;; retreive all the data for one multipart item
+  ;;
+  (let (res buffer (total-size 0) index)
+    (loop
+      (if* (null buffer)
+	 then (setq buffer 
+		(ecase  type 
+		  (:text (make-string size))
+		  (:binary (make-array size :element-type '(unsigned-byte 8))))
+		index 0))
+      (let ((nextindex (get-multipart-sequence 
+			req buffer 
+			:start index
+			:external-format external-format)))
+	(if* (null nextindex)
+	   then (if* (> index 0)
+		   then (incf total-size index)
+			(push buffer res))
+		(return))
+	(if* (>= nextindex (length buffer))
+	   then ; full buffer
+		(incf total-size (length buffer))
+		(if* (and limit (> total-size limit))
+		   then ; we in the overlimit stage, just
+			; keep reading but don't save
+			(setq index 0)
+		   else ; save away this full buffer
+			(push buffer res)
+			(setq buffer nil))
+	   else (setq index nextindex))))
+      
+    ; read it all, data in res
+    (if* (zerop total-size)
+       then (case type
+	      (:text "")
+	      (:binary (make-array 0 :element-type '(unsigned-byte 8))))
+     elseif (and limit (> total-size limit))
+       then (values :limit total-size)	; over limit return
+     elseif (null (cdr res))
+       then ; just one buffer
+	    (subseq (car res) 0 total-size)
+       else ; multiple buffers, must build result
+	    (let ((result (case type
+			    (:text (make-string total-size))
+			    (:binary (make-array total-size
+						 :element-type
+						 '(unsigned-byte 8))))))
+	      (do ((to 0)
+		   (buffs (nreverse res) (cdr buffs)))
+		  ((null buffs))
+		(replace result (car buffs)
+			 :start1 to)
+		(incf to (length (car buffs))))
+	      result))))
 
-
+		     
+	      
+		
+	  
+	  
+		
+    
+    
+  
+  
 
 ;; end multipart code
 
@@ -2058,11 +2312,12 @@ in get-multipart-sequence"))
   ;; read length bytes into sequence, timing out after timeout
   ;; seconds
   ;; return nil if things go wrong.
-  (mp:with-timeout (timeout nil)
+  (declare (ignorable timeout))
+  (with-timeout-local (timeout nil)
     (let ((got 0))
       (loop
 	(let ((this (rational-read-sequence string sock :start got)))
-	  (if* (<= this 0)
+	  (if* (<= this got)
 	     then (return nil) ; eof too early
 	     else (setq  got    this)
 		  (if* (>= got length ) then (return string))))))))
@@ -2171,11 +2426,15 @@ in get-multipart-sequence"))
       (setf (request-query-alist req) res))))
 			
 
-(defun request-query-value (key req &key (post t) (uri t) (test #'equal))
+(defun request-query-value (key req &key (post t) (uri t) (test #'equal)
+					 (external-format 
+						   *default-aserve-external-format*))
   ;; access the value of the given key in the request's 
   ;; request query.  We do this so often that it's useful
   ;; to make this a function
-  (cdr (assoc key (request-query req :post post :uri uri) :test test)))
+  (cdr (assoc key (request-query req :post post :uri uri
+				 :external-format external-format)
+	      :test test)))
 
 
 	
@@ -2518,7 +2777,20 @@ in get-multipart-sequence"))
 		    (if* port
 		       then (values (car parts) port))))))
 
-	    
+;-------
+
+(defun ensure-stream-lock (stream)
+  ;; ensure that the stream has a lock object on it so that
+  ;; it can be used as log stream.
+  ;;
+  ;; return the stream object passed in.
+  ;;
+  (if* (and (streamp stream)
+	    (null (getf (excl::stream-property-list stream) :lock)))
+     then (setf (getf (excl::stream-property-list stream) :lock)
+	    (mp:make-process-lock)))
+  stream)
+	  
 	
 		
 	

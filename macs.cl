@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: macs.cl,v 1.10.8.3 2001/10/22 16:12:57 layer Exp $
+;; $Id: macs.cl,v 1.10.8.4 2002/01/21 21:58:52 layer Exp $
 
 ;; Description:
 ;;   useful internal macros
@@ -43,6 +43,8 @@
 
 (in-package :net.aserve)
 
+;; add features based on the capabilities of the host lisp
+#+(version>= 6 1) (pushnew :io-timeout *features*) ; support i/o timeouts
 
 ;; Note for people using this code in non-Allegro lisps.
 ;;
@@ -190,6 +192,34 @@
   nil)
 
 
+;---------------
+; acl 6.1 and newer support timeouts on read/write for hiper streams
+; Thus we can avoid using global timeouts in certain cases.
+;
 
+; with-timeout-local: use with-timeout if that all we've got
+; else use read-write timeouts
+; 
+#-(version>= 6 1)
+(defmacro with-timeout-local ((time &rest actions) &rest body)
+  ;; same as with-timeout 
+  `(mp:with-timeout (,time ,@actions) ,@body))   ; ok w-t
+
+
+#+(version>= 6 1)
+(defmacro with-timeout-local ((time &rest actions) &rest body)
+  (declare (ignore time))
+  (let ((g-blocktag (gensym)))
+    `(block ,g-blocktag
+       (handler-bind ((socket-error 
+		       #'(lambda (c)
+			   (if* (member (stream-error-identifier c) 
+					'(:read-timeout :write-timeout)
+					:test #'eq)
+			      then ; must handle this
+				   (return-from ,g-blocktag
+				     (progn ,@actions))))))
+	 ,@body))))
+			 
 
 

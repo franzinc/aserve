@@ -1,4 +1,8 @@
 *******************************************************************************
+Mon Jan 21 13:58:24 PST 2002
+merge from trunk to acl6 branch
+cmd: join.sh trunk trunk_to_acl6_merge6 trunk_to_acl6_merge7 aserve
+*******************************************************************************
 merge from acl61 to acl6 branch
 cmd: ../../join.sh acl61 acl61 acl61_to_acl6_merge1 aserve
 *******************************************************************************
@@ -32,6 +36,187 @@ command: ../../join.sh trunk trunk_to_acl61_merge1 trunk_to_acl61_merge2 aserve
 merge from trunk to acl61 branch
 command: ../../join.sh trunk acl61 trunk_to_acl61_merge1 aserve
 *******************************************************************************
+2002-01-15  John Foderaro  <jkf@tiger.franz.com>
+1.2.21
+	* main.cl - fix bug where the value of 
+	  *default-aserve-external-format* was captured at macroexpansion
+	  time rather than run time.  All code using with-http-body
+	  should be recompiled.
+
+	* publish.cl - allow mime types to be specified for filenames that
+	  don't have a type component (e.g. ReadMe files).
+	* publish.cl - set-cookie-header takes an encode-value argument
+	 to control whether it does encoding of its argument.
+
+2002-01-07  John Foderaro  <jkf@tiger.franz.com>
+
+	* main.cl - fix problem of restarting aserve in non-ssl mode
+	  after starting it is ssl mode.
+
+2002-01-06  John Foderaro  <jkf@tiger.franz.com>
+
+	* add :nofile return code to parse-multipart-header
+
+2002-01-04  John Foderaro  <jkf@tiger.franz.com>
+1.2.20
+	* main.cl - add two higher level functions to aid retrieving
+	  multipart data: parse-multipart-header and get-all-multipart-data.
+	  The examples now show using both the low level and higher
+	  level functions for retrieving multipart form data.
+
+2001-12-03  John Foderaro  <jkf@tiger.franz.com>
+1.2.19
+	* main.cl: add ensure-stream-lock function to put a lock object
+	  on a stream that the logging functions then can use.
+
+2001-11-30    <jkf@CROW>
+
+	* doc/aserve.html - add documentation on using AllegroServe as 
+	  an NT service,  and a description of how to write
+	  web pages that handle international characters
+	* main.cl - add :external-format argument to request-query-value
+
+2001-11-28  John Foderaro  <jkf@tiger.franz.com>
+
+	* log.cl - use locking around writes to the log if the
+	 stream has a lock on it's property list.
+
+2001-11-28    <jkf@main.verada.com>
+
+	* add :binary type to publish-multi
+	* chat.cl - add the ability to upload pictures
+
+2001-11-26  John Foderaro  <jkf@tiger.franz.com>
+1.2.18
+	* decode.cl - handle character set decoding inside uri queries
+	* publish.cl - access file caching
+	
+
+2001-11-15  John Foderaro  <jkf@tiger.franz.com>
+1.2.17
+	* added new publish fcn: publish-prefix 
+>>>	* incompatible changes:
+	  redid the way access files are processed, see the
+	  document for the latest spec.
+	  notable changes:
+	        :ignore is now :deny 
+	        :block is gone from :subdirectories but I've added
+	             :allow and :deny for fine tuned blocking
+	        :inherit now defaults to nil
+	        you can have multiple forms of the same kind of 
+	        information in a single access file and they will
+	        all be used.
+
+2001-11-06  John Foderaro  <jkf@tiger.franz.com>
+
+	* fix bug causing infinite loop when reading truncated form body
+
+2001-11-05  John Foderaro  <jkf@tiger.franz.com>
+1.2.16
+	* failed request now identifies AllegroServe as the server
+	  and gives its version number
+	* if AllegroServe isn't setup to proxy it will not match proxy
+	  requests with local web pages.
+
+2001-11-05    <jkf@main.verada.com>
+
+	* log.cl - write to log files under the protection of a process
+	  lock found on the stream-property-list of the stream associated
+	  with the :lock indicator.  If no such lock is found, write
+	  to the streame anyway.
+	* examples/chat.cl - improve the speed of deleting messages by
+	  binary searching the existing messages.
+
+2001-10-31  John Foderaro  <jkf@tiger.franz.com>
+1.2.15
+	* start now takes a host argument to allow you to bind the server
+	  to a specific host
+	* publish-multi will not return 304 (not modified) unless the
+	  request is a get or a head
+	* files published with publish-file will now obey a single
+	  range specifier so they will be download accelerator friendly
+
+2001-10-26  John Foderaro  <jkf@tiger.franz.com>
+
+	* add entity-plist slot to entities and use it to link
+	  file entities to their parent directory entities with
+	  the :parent indicator
+	* add map-entities function
+	* print vhosts in a why that shows their host names
+
+2001-10-24  John Foderaro  <jkf@tiger.franz.com>
+1.2.14
+	* added access files for publish-directory.  These allow
+	  .htaccess-like controlling of what publish-directory publishes.
+>>>	* incompatible change: added an extra argument to the 
+	  publish-directory filter function and publisher functions.
+
+2001-10-19  John Foderaro  <jkf@tiger.franz.com>
+1.2.13
+	* added publish-multi 
+	* while debugging (:notrap) we ignore connection reset by peer errors
+	  by default since they are frequent and not errors in most 
+	  cases. You can have them recognized by setting
+	  *debug-connection-reset-by-peer*  to t.
+	  
+
+2001-10-18  John Foderaro  <jkf@tiger.franz.com>
+
+	* The initial log stream (which is used then to initialize vhost
+	  log streams) is now *initial-terminal-io* and not
+	  *standard-output*.
+	* random messages (written by logmess) are now sent to the
+	  vhost-error-stream of the default-vhost of the server.
+	  This allows one to separate these random messages from the
+	  the request logs
+	* logs of proxy activity is now sent to the vhost-error-stream
+	  of the default-vhost of the server.  we may rethink this later.
+	* support vhost specific request filters
+
+2001-10-17  John Foderaro  <jkf@tiger.franz.com>
+
+	* cgi.cl: redo cgi so that it doesn't buffer data... also  
+	  can now process standard error from scripts
+
+2001-10-16  John Foderaro  <jkf@tiger.franz.com>
+1.2.12
+	
+>>>	* incompatible change:  the format argument to with-http-body
+	  has been moved to with-http-response. 
+	  The format argument to with-http-body was ignored, but on
+	  with-http-response it will be obeyed and will override
+	  the format specified in the entity.
+	    
+	  The internal generic function compute-strategy now takes
+	  three arguments.  This function isn't part of the 
+	  external interface to AllegroServe but some users have
+	  specialized it.
+
+2001-10-15  John Foderaro  <jkf@tiger.franz.com>
+
+	* add timeout value to each entity object to serve as a default
+	  that's checked before the wserver-response-timeout.
+	* add a timeout argument to publish functions to set this 
+	  entity timeout value.
+	* add a publisher argument to publish-directory so users can 
+	  control what kind of entity is created when the real file is
+	  eventually found.
+
+2001-10-12  John Foderaro  <jkf@tiger.franz.com>
+
+	* using socket stream i/o timeouts in acl6.1
+	* moved the *http-response-timeout* to a slot in the wserver
+	  object so it can be server dependent.
+	* documented timeouts in aserve.html
+	* added timeout test to t-aserve.cl but disabled running them
+	  by default since they take a long time.
+
+2001-10-10  John Foderaro  <jkf@tiger.franz.com>
+1.2.11
+	* upgraded support for virtual hosts, introducting
+	  an object to denote a virtual host so that each
+	  virtual host can do its own logging.
+	  See aserve.html for details on Virtual Hosts.
 
 2001-10-08  John Foderaro  <jkf@tiger.franz.com>
 

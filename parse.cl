@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.22.10.5 2001/10/22 16:12:57 layer Exp $
+;; $Id: parse.cl,v 1.22.10.6 2002/01/21 21:58:52 layer Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -158,152 +158,8 @@
       (values cmd url prot))))
 
 
-#+ignore (eval-when (compile load eval)
-  (defun dual-caseify (str)
-    ;; create a string with each characater doubled
-    ;; but with upper case following the lower case
-    (let ((newstr (make-string (* 2 (length str)))))
-      (dotimes (i (length str))
-	(setf (schar newstr (* 2 i)) (char-downcase (schar str i)))
-	(setf (schar newstr (1+ (* 2 i))) (char-upcase (schar str i))))
-      newstr)))
 
 
-#+ignore (defparameter *header-to-slot*
-    ;; headers that are stored in specific slots, we create
-    ;; a list of objects to help quickly parse those slots
-    '#.(let (res)
-	(dolist (head *fast-headers*)
-	  (push (cons
-		 (dual-caseify (concatenate 'string (string (car head)) ":"))
-		 (third head))
-		res))
-	res))
-
-#+ignore (defparameter *header-to-keyword*
-    ;; headers that we've seen so far that are stored on the alist
-    ;; we use this to avoid interning.
-    ;; we should order this for fast searching
-    '(
-      ("content-type" . :content-type)
-      ("accept-encoding" . :accept-encoding) 
-      ("accept-charset" . :accept-charset) 
-      ("accept-language" . :accept-language)
-      ("pragma" . :pragma) 
-      ("referer" . :referer)
-      ("if-modified-since" . :if-modified-since) 
-      ("cookie" . :cookie)
-      ("authorization" . :authorization)
-      ))
-
-
-#+ignore (defun read-request-headers (req sock buffer)
-  ;; read in the headers following the command and put the
-  ;; info in the req object
-  ;; if an error occurs, then return nil
-  ;;
-  (let ((last-value-slot nil)
-	(last-value-assoc nil)
-	(end))
-    (loop
-      (multiple-value-setq (buffer end)(read-sock-line sock buffer 0))
-      (if* (null end) 
-	 then ; error
-	      (return-from read-request-headers nil))
-      (if* (eq 0 end)
-	 then ; blank line, end of headers
-	      (return t))
-    
-      (if* (eq #\space (schar buffer 0))
-	 then ; continuation of previous line
-	      (if* last-value-slot
-		 then ; append to value in slot
-		      (setf (slot-value req last-value-slot)
-			(concatenate 
-			    'string
-			  (slot-value req last-value-slot)
-			  (buffer-substr buffer 0 end)))
-	       elseif last-value-assoc
-		 then (setf (cdr last-value-assoc)
-			(concatenate 'string
-			  (cdr last-value-assoc) (buffer-substr buffer 0 end)))
-		 else ; continuation with nothing to continue
-		      (return-from read-request-headers nil))
-	 else ; see if this is one of the special header lines
-	    
-	      (setq last-value-slot nil)
-	      (dolist (possible *header-to-slot*)
-		(if* (buffer-match-ci buffer 0 (car possible))
-		   then ; store in the slot
-			(setf (slot-value req (cdr possible))
-			  (concatenate 
-			      'string
-			    (or (slot-value req (cdr possible)) "")
-			    (buffer-substr buffer
-					   (1+ (ash (the fixnum 
-						      (length (car possible)))
-						    -1))
-					   end)))
-					
-			(setq last-value-slot (cdr possible))
-			(return)))
-	    
-	      (if* (null last-value-slot)
-		 then ; wasn't a built in header, so put it on
-		      ; the alist
-		      (let ((colonpos (find-it #\: buffer 0 end))
-			    (key)
-			    (value))
-			  
-			(if* (null colonpos)
-			   then ; bogus!
-				(return-from read-request-headers nil)
-			   else (setq key (buffer-substr
-					   buffer
-					   0
-					   colonpos)
-				      value
-				      (buffer-substr
-				       buffer
-				       (+ 2 colonpos)
-				       end)))
-			
-			; downcase the key
-			(dotimes (i (length key))
-			  (let ((ch (schar key i)))
-			    (if* (upper-case-p ch)
-			       then (setf (schar key i) 
-				      (char-downcase ch)))))
-			
-			(let ((ent (assoc key *header-to-keyword*
-					  :test #'equal)))
-			  (if* (null ent)
-			     then (push (setq ent
-					  (cons key
-						(intern
-						 (if* (eq *current-case-mode*
-							  :case-sensitive-lower)
-						    then key
-						    else (string-upcase key))
-						 :keyword)))
-					*header-to-keyword*))
-			  (setq key (cdr ent)))
-					
-							  
-			; now add or append
-			
-			(let* ((alist (request-headers req))
-			       (ent (assoc key alist :test #'eq)))
-			  (if* (null ent)
-			     then (push (setq ent (cons key "")) alist)
-				  (setf (request-headers req) alist))
-			  (setf (cdr ent)
-			    (concatenate 'string
-			      (cdr ent)
-			      value))
-			  
-			  (setq last-value-assoc ent)
-			  )))))))
 
 
 (defun new-read-request-headers (req sock)
@@ -750,11 +606,35 @@
       (if* (>= i len) then (return))
       (incf i))
     (nreverse res)))
-		 
+
+
+(defun parse-range-value (str)
+  ;; parse the value passed to a Range header
+  ;; return  (n .  m) n and m integers meaning bytes from n to m inclusive
+  ;;         (nil . m) meaning the last m bytes 
+  ;;	     (n . nil) meaning bytes from n to the end
+  ;;
+  (let ((top (split-on-character str #\=))
+	(res))
+    (and (equalp (car top) "bytes")
+	 (stringp (cadr top))
+	 (dolist (range (split-on-character (cadr top) #\,))
+	   (let ((startend (split-on-character range #\-))
+		 (first)
+		 (second))
+	     (if* (not (equal "" (car startend)))
+		then (setq first (string-to-number (car startend))))
+	     (if* (not (equal "" (cadr startend)))
+		then (setq second (string-to-number (cadr startend))))
+	     (push (cons first second) res))))
+    (nreverse res)))
+		     
+	   
+	
 
 ;; this isn't needed while the web server is running, it just
 ;; needs to be run periodically as new mime types are introduced.
-#+ignore
+#+ignore-until-mime-table-changed
 (defun generate-mime-table (&optional (file "/etc/mime.types"))
   ;; generate a file type to mime type table based on file type
   (let (res)
@@ -793,7 +673,59 @@
 		   then (return nil)))))))
 		
   
-			     
+;----
+(defun split-namestring (file)
+  ;; split the namestring into root and tail and then the tail
+  ;; into name and type
+  ;; 
+  ;; any of the return value can be nil if the corresponding item
+  ;; isn't present.
+  ;;
+  ;; rules for splitting the tail into name and type components:
+  ;;  if the last period in the tail is at the beginning or end of the
+  ;;  tail, then the name is exactly the tail and type is nil.
+  ;;  Thus .foo and bar.  are just names, no type
+  ;;  but .foo.c  has a name of ".foo" and a type of "c"
+  ;;  Thus if there is a non-nil type then it means that 
+  ;;    1. there will be a non nil name as well
+  ;;    2. to reconstruct the filename you need to add a period between
+  ;;       the name and type.
+  ;;
+  (let ((pos (min (or (or (position #\/ file :from-end t) most-positive-fixnum)
+		      #+mswindows (position #\\ file :from-end t))))
+	root
+	tail)
+    
+    (if* (equal file "") then (return-from split-namestring nil))
+    
+    (if* (and pos (< pos most-positive-fixnum))
+       then ; we have root and tail
+	    (if* (eql pos (1- (length file)))
+	       then ; just have root
+		    (return-from split-namestring
+		      (values file nil nil nil)))
+	    
+    
+	    (setq root (subseq file 0 (1+ pos))
+		  tail (subseq file (1+ pos)))
+       else (setq tail file))
+    
+    
+    ; split the tail
+    (let ((pos (position #\. tail :from-end t)))
+      (if* (or (null pos)
+	       (zerop pos)
+	       (equal pos (1- (length tail))))
+	 then ; name begins or ends with . so it's not
+	      ; a type separator
+	      (values root tail tail nil)
+	 else ; have all pieces
+	      (values root tail
+		      (subseq tail 0 pos)
+		      (subseq tail (1+ pos)))))))
+
+			      
+		
 
     
 

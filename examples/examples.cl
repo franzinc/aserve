@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.10.6.6 2001/10/22 16:12:57 layer Exp $
+;; $Id: examples.cl,v 1.10.6.7 2002/01/21 21:58:52 layer Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -77,6 +77,7 @@
 			 ((:a :href "pic") "Sample jpeg") :br
 			 ((:a :href "pic-redirect") "Redirect to previous picture") :br
 			 ((:a :href "pic-gen") "generated jpeg") "- hit reload to switch images" :br
+			 ((:a :href "pic-multi") "test of publish-multi") " - click more than once on this link" :br
 			 ((:a :href "cookietest") "test cookies") :br
 			 ((:a :href "secret") "Test manual authorization")
 			 " (name: " (:b "foo") ", password: " (:b "bar") ")"
@@ -96,7 +97,9 @@
 			 ((:a :href "timeout") "Test timeout")
 			 "  this will take a while to time out."
 			 :br
-			 ((:a :href "getfile") "Client to server file transfer")
+			 ((:a :href "getfile-old") "Client to server file transfer") " - the old way"
+			 :br
+			 ((:a :href "getfile") "Client to server file transfer") " - the new way, with 1,000,000 byte file transfer limit"
 			 :br
 			 ((:a :href "missing-link") "Missing Link")
 			 " should get an error when clicked"
@@ -231,8 +234,8 @@
 	 :function
 	 (let ((selector 0)) ; chose one of two pictures
 	   #'(lambda (req ent)
-	       (with-http-response (req ent)
-		 (with-http-body (req ent :format :binary)
+	       (with-http-response (req ent :format :binary)
+		 (with-http-body (req ent)
 		   ; here is where you would generate the picture.
 		   ; we're just reading it from a file in this example
 		   (let ((stream (request-reply-stream req)))
@@ -274,7 +277,35 @@
 		    ((:a :href "pic") "This location"))))))))
 		    
 		    
-	 
+
+;; this publish-multi example is simple but really doesn't show
+;; the full power of publish-multi.
+;; It doesn't show that we can include the contents of files
+;; The :function case doesn't make use of the old cached value to
+;; decide if it wants to return the old value or create a new one.
+(publish-multi :path "/pic-multi"
+	       :content-type "text/html"
+	       :items  (list 
+			'(:string "<html><body>The first line is constant<br>")
+			(let (last-clicked)
+			  #'(lambda (req ent old-time cached-value)
+			      (declare (ignore req ent old-time cached-value))
+			      (if* (null last-clicked)
+				 then (setq last-clicked 
+					(get-universal-time))
+				      "this is your <b>first</b> click<br>"
+				 else (let* ((new (get-universal-time))
+					    (diff (- new last-clicked)))
+					(setq last-clicked new)
+					(format nil "~d seconds since the last click<br>" diff)))))
+			'(:string "The last line is constant</body></html>")))
+
+					       
+					 
+
+					 
+
+
 
 
 ;;
@@ -454,7 +485,6 @@
 	 :content-type "text/html"
 	 :authorizer (make-instance 'location-authorizer
 		       :patterns '((:accept "127.0" 8)
-				   (:accept "tiger.franz.com")
 				   :deny))
 	 :function
 	 #'(lambda (req ent)
@@ -472,33 +502,41 @@
 ;; with one url but since there's a lot of code it helps in the
 ;; presentation to separate the two.
 ;;
+(publish :path "/getfile-old"
+	 :content-type "text/html; charset=utf-8"
+	 :function #'(lambda (req ent) (getfile-function 
+					req ent "/getfile-got-old")))
+
 (publish :path "/getfile"
 	 :content-type "text/html; charset=utf-8"
-	 :function
-	 #'(lambda (req ent)
-	     (with-http-response (req ent)
-	       (with-http-body (req ent)
-		 (html (:head "get file")
-		       (:body
-			((:form :enctype "multipart/form-data"
-				:method "post"
-				:action "getfile-got")
-			 "Let me know what file to grab"
-			 :br
-			 ((:input :type "file" 
-				  :name "thefile"
-				  :value "*.txt"))
-			 :br
-			 ((:input :type "text" :name "textthing"))
-			 "Enter some text"
-			 :br
-			 ((:input :type "checkbox" :name "checkone"))
-			 "check box one"
-			 :br
-			 ((:input :type "checkbox" :name "checktwo"))
-			 "check box two"
-			 :br
-			 ((:input :type "submit")))))))))
+	 :function #'(lambda (req ent) (getfile-function 
+					req ent "/getfile-got")))
+
+
+(defun getfile-function (req ent posturl)
+  (with-http-response (req ent)
+    (with-http-body (req ent)
+      (html (:head "get file")
+	    (:body
+	     ((:form :enctype "multipart/form-data"
+		     :method "post"
+		     :action posturl)
+	      "Let me know what file to grab"
+	      :br
+	      ((:input :type "file" 
+		       :name "thefile"
+		       :value "*.txt"))
+	      :br
+	      ((:input :type "text" :name "textthing"))
+	      "Enter some text"
+	      :br
+	      ((:input :type "checkbox" :name "checkone"))
+	      "check box one"
+	      :br
+	      ((:input :type "checkbox" :name "checktwo"))
+	      "check box two"
+	      :br
+	      ((:input :type "submit"))))))))
 
 
 (publish :path "/secret-auth"
@@ -517,9 +555,14 @@
 
 
 
-
-;; this called with the file from 
-(publish :path "/getfile-got"
+;;
+;; this demonstrates the use of the low level multipart access functions.
+;; In this code we parse the result of get-multipart-header ourselves
+;; and we use get-multipart-sequence.
+;; In the example that follows (associate with path "/getfile-got")
+;; we show now to use the higher level functions to retrive multipart
+;; data
+(publish :path "/getfile-got-old"
 	 :content-type "text/html; charset=utf-8"
 	 :function
 	 #'(lambda (req ent)
@@ -537,6 +580,8 @@
 		   ; we can get the filename from the header if 
 		   ; it was an <input type="file"> item.  If there is
 		   ; no filename, we just create one.
+		   (pprint h)
+		   (pprint (multiple-value-list (parse-multipart-header h)))
 		   (let ((cd (assoc :content-disposition h :test #'eq))
 			 (filename)
 			 (sep))
@@ -559,22 +604,23 @@
 				     (setq filename
 				       (subseq filename (1+ sep) 
 					       (length filename)))))
-		     (if* filename
+		     (if* (and filename (not (equal filename "")))
 			then (push filename files-written)
-		     (with-open-file (pp filename :direction :output
-				      :if-exists :supersede
-				      :element-type '(unsigned-byte 8))
-		       (format t "writing file ~s~%" filename)
-		       (let ((buffer (make-array 4096
-						 :element-type 
-						 '(unsigned-byte 8))))
+			     (with-open-file (pp filename :direction :output
+					      :if-exists :supersede
+					      :element-type '(unsigned-byte 8))
+			       (format t "writing file ~s~%" filename)
+			       (let ((buffer (make-array 4096
+							 :element-type 
+							 '(unsigned-byte 8))))
 			 
-			 (loop (let ((count (get-multipart-sequence 
-					     req 
-					     buffer)))
-				 (if* (null count) then (return))
-				 (write-sequence buffer pp :end count)))))
-			else ; no filename, just grab as a text
+				 (loop (let ((count (get-multipart-sequence 
+						     req 
+						     buffer)))
+					 (if* (null count) then (return))
+					 (write-sequence buffer pp :end count)))))
+		      elseif (null filename)
+			then  ; no filename, just grab as a text
 			     ; string
 			     (let ((buffer (make-string 1024)))
 			       (loop
@@ -601,6 +647,92 @@
 				       "-- Non-file items Returned: -- " :br
 				       (dolist (ts (reverse text-strings))
 					 (html (:princ-safe ts) :br))))))))))
+
+
+;;
+;; this retrieves data from a multipart form using the high level
+;; functions.  You can compare this code to that above to see which
+;; method you prefer
+;; 
+(publish :path "/getfile-got"
+	 :content-type "text/html; charset=utf-8"
+	 :function
+	 #'(lambda (req ent)
+	     
+	     (with-http-response (req ent)
+	       (let ((files-written)
+		     (text-strings)
+		     (overlimit)
+		     )
+		 (loop
+		   (multiple-value-bind (kind name filename content-type)
+		       (parse-multipart-header
+			(get-multipart-header req))
+		     
+		     (case kind
+		       (:eof (return)) ; no more to read
+		       (:data
+			(push (cons name (get-all-multipart-data req))
+			      text-strings))
+		       (:file
+			(let ((contents (get-all-multipart-data 
+					 req 
+					 :type :binary
+					 :limit 1000000 ; abitrary limit
+					 )))
+			  ; find the tail of the filename, can't use
+			  ; lisp pathname code since the filename syntax
+			  ; may not correspond to this lisp's native os
+			  (let ((sep (max (or (position #\/ filename
+							:from-end t) -1)
+					  (or (position #\\ filename
+							:from-end t) -1))))
+			    (if* sep
+			       then (setq filename 
+				      (subseq filename (1+ sep)))))
+			  (if* (eq contents :limit)
+			     then ; tried to give us too much
+				  (setq overlimit t)
+			   elseif (equal filename "") ; no file given
+			     thenret ; ignore
+			     else
+				  (with-open-file (p filename 
+						   :direction :output
+						   :if-exists :supersede
+						   :element-type '(unsigned-byte 8))
+				    (format 
+				     t "writing file ~s, content-type ~s~%"
+				     filename content-type)
+				    (push filename files-written)
+				    (write-sequence contents p)))))
+		       (t ; all else ignore but read to next header
+			(get-all-multipart-data req :limit 1000)))))
+			  
+
+	       
+	       
+		 ;; now send back a response for the browser
+	       
+		 (with-http-body (req ent
+				      :external-format :utf8-base)
+		   (html (:html (:head (:title "form example"))
+				(:body "-- processed the form, files written --"
+				       (dolist (file (nreverse files-written))
+					 (html :br "file: "
+					       (:b (:prin1-safe file))))
+				       (if* overlimit
+					  then (html :br
+						     "File given was over our "
+						     "limit in the size we "
+						     "will accept"))
+				       :br
+				       "-- Non-file items Returned: -- " :br
+				       (dolist (ts (reverse text-strings))
+					 (html 
+					  "item name: " (:princ-safe (car ts))
+					  ", item value: " 
+					  (:princ-safe (cdr ts)) 
+					  :br))))))))))
 
 	     
 
@@ -751,7 +883,7 @@
  :content-type "text/html; charset=utf-8"
  :function
 
- #-(and allegro ics (version>= 6 0 pre-final 1))
+ #-(and allegro ics (version>= 6 0))
  #'(lambda (req ent)
      (with-http-response (req ent)
        (with-http-body (req ent)
@@ -759,7 +891,7 @@
 This page available only with International Allegro CL post 6.0 beta")
 		*html-stream*))))
 
- #+(and allegro ics (version>= 6 0 pre-final 1))
+ #+(and allegro ics (version>= 6 0))
  #'(lambda (req ent)
      (let* ((body (get-request-body req))
 	    (text (if* body
@@ -843,16 +975,16 @@ The \"anyone can be provincial!\" page"))))
  :content-type "text/html"
  :function
 
- #-(and allegro ics (version>= 6 0 pre-final 1))
+ #-(and allegro ics (version>= 6 0))
  #'(lambda (req ent)
      (with-http-response (req ent)
        (with-http-body (req ent)
 	 (princ #.(format nil "~
-This page available only with International Allegro CL post 6.0 beta")
+This page available only with International Allegro CL post 6.0")
 		*html-stream*))))
 
  ;; Need pre-final.1's :try-variant change to find-external-format
- #+(and allegro ics (version>= 6 0 pre-final 1))
+ #+(and allegro ics (version>= 6 0))
  #'(lambda (req ent)
      (let* ((body (get-request-body req))
 	    (query (if* body
