@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.17 2002/09/06 17:12:15 jkf Exp $
+;; $Id: htmlgen.cl,v 1.18 2002/09/06 17:52:01 jkf Exp $
 
 ;; Description:
 ;;   html generator
@@ -377,7 +377,7 @@
 	      (html-process-print ent)))
     (if* (atom form)
        then (if* (keywordp form)
-	       then (funcall print-handler ent :set nil nil nil stream)
+	       then (funcall print-handler ent :set nil nil nil nil stream)
 	     elseif (stringp form)
 	       then (write-string form stream)
 	       else (princ form stream))
