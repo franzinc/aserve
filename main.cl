@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.65 2000/08/25 15:27:22 jkf Exp $
+;; $Id: main.cl,v 1.66 2000/08/25 17:21:26 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -251,6 +251,10 @@
 #+unix
 (ff:def-foreign-call (setgid "setgid") ((x :int)) :returning :int)
 
+
+;; more specials
+(defvar *max-socket-fd* 0) ; the maximum fd returned by accept-connection
+(defvar *aserve-debug-stream* nil) ; stream to which to seen debug messages
 
 ;; specials from other files
 (defvar *header-block-sresource*)
@@ -774,6 +778,7 @@ by keyword symbols and not by strings"
 		   setuid
 		   setgid
 		   proxy
+		   debug-stream  ; stream to which to send debug messages
 		   )
   ;; -exported-
   ;;
@@ -784,6 +789,12 @@ by keyword symbols and not by strings"
   
   (declare (ignore debug))  ; for now
 
+  (if* debug-stream 
+     then (setq *aserve-debug-stream* 
+	    (if* (eq debug-stream t)
+	       then *standard-output*
+	       else debug-stream)))
+  
   (if* (eq server :new)
      then (setq server (make-instance 'wserver)))
   
@@ -793,6 +804,7 @@ by keyword symbols and not by strings"
 
   (if* proxy 
      then (enable-proxy :server server))
+
   
   (let* ((main-socket (socket:make-socket :connect :passive
 					  :local-port port
@@ -941,6 +953,8 @@ by keyword symbols and not by strings"
 	      (let ((sock (socket:accept-connection main-socket))
 		    (localhost))
 		
+		; optional.. useful if we find that sockets aren't being
+		; closed
 		(if* *watch-for-open-sockets*
 		   then (schedule-finalization 
 			 sock 
@@ -952,6 +966,14 @@ by keyword symbols and not by strings"
 		   then ; new ip address by which this machine is known
 			(push localhost ipaddrs)
 			(setf (wserver-ipaddrs *wserver*) ipaddrs))
+		
+		; another useful test to see if we're losing file
+		; descriptors
+		(let ((fd (excl::stream-input-fn sock)))
+		  (if* (> fd *max-socket-fd*)
+		     then (setq *max-socket-fd* fd)
+			  (logmess (format nil 
+					   "Maximum socket file desciptor number is now ~d" fd))))
 		
 		
 		(setq error-count 0) ; reset count

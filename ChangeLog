@@ -1,3 +1,10 @@
+2000-08-25  John Foderaro  <jkf@tiger.franz.com>
+
+	* fix bug which caused file descriptors to remain open
+	  forever if a "connection reset by peer" error occured.
+	  Added the ability to track sockets opened by aserve to
+	  ensure that they were closed before being gc'ed away.
+
 2000-08-24  John Foderaro  <jkf@tiger.franz.com>
 
 	* rewrote the get-multipart-xxx functions to use an

@@ -156,9 +156,9 @@
 					   :format :bivalent))
 
 	    (if* *watch-for-open-sockets*
-		   then (schedule-finalization 
-			 sock 
-			 #'check-for-open-socket-before-gc))
+	       then (schedule-finalization 
+		     sock 
+		     #'check-for-open-socket-before-gc))
 	    
 	    (net.aserve::format-dif :xmit sock "~a ~a ~a~a"
 				    (string-upcase (string method))
@@ -288,7 +288,9 @@
 		(force-output rsock)))))
     
       ;; cleanup forms
-      (if* sock then (ignore-errors (close sock)))
+      (if* sock 
+	 then (ignore-errors (force-output sock))
+	      (ignore-errors (close sock :abort t)))
       (free-sresource *header-block-sresource* outbuf)
       (free-sresource *header-block-sresource* clibuf))))
 

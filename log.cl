@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: log.cl,v 1.11 2000/06/26 04:51:34 jkf Exp $
+;; $Id: log.cl,v 1.12 2000/08/25 17:21:26 jkf Exp $
 
 ;; Description:
 ;;   iserve's logging
@@ -40,7 +40,8 @@
   (multiple-value-bind (csec cmin chour cday cmonth cyear)
       (decode-universal-time (get-universal-time))
     
-    (format t "~a: ~2,'0d/~2,'0d/~2,'0d - ~2,'0d:~2,'0d:~2,'0d - ~a~%"
+    (format (or *aserve-debug-stream* *initial-terminal-io*)
+	    "~a: ~2,'0d/~2,'0d/~2,'0d - ~2,'0d:~2,'0d:~2,'0d - ~a~%"
 	    (mp:process-name sys:*current-process*)
 	    cmonth cday (mod cyear 100)
 	    chour cmin csec
