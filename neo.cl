@@ -215,7 +215,7 @@
 	
 
 
-(defmacro header-slot-value (name obj)
+(defmacro header-slot-value (obj name)
   ;; name is a string naming the header value (all lower case)
   ;; retrive the slot's value from the http-request obj obj.
   (let (ent)
@@ -225,7 +225,7 @@
        else ; must get it from the alist
 	    `(cdr (assoc ,name (alist ,obj) :test #'equal)))))
 
-(defsetf header-slot-value (name obj) (newval)
+(defsetf header-slot-value (obj name) (newval)
   ;; set the header value regardless of where it is stored
   (let (ent)
     (if* (setq ent (assoc name *fast-headers* :test #'equal))
@@ -240,12 +240,12 @@
 			       (alist ,nobj)))
 		 (setf (cdr ,genvar) ,newval))))))
 
-(defmacro header-slot-value-integer (name obj)
+(defmacro header-slot-value-integer (obj name)
   ;; if the header value exists and has an integer value
   ;; return two values: the value of the integer and t
   ;; else return nil
   
-  `(header-decode-integer (header-slot-value ,name ,obj)))
+  `(header-decode-integer (header-slot-value ,obj ,name)))
 
 
 
@@ -776,7 +776,7 @@
   ;; return a string that holds the body of the http-request
   ;;
   (multiple-value-bind (length believe-it)
-      (header-slot-value-integer "content-length" req)
+      (header-slot-value-integer req "content-length")
       (if* believe-it
 	 then ; we know the length
 	      (let ((ret (make-string length)))
@@ -784,7 +784,7 @@
 					    *read-request-body-timeout*))
 	 else ; no content length given
 	      (if* (equalp "keep-alive" 
-			   (header-slot-value "connection" req))
+			   (header-slot-value req "connection"))
 		 then ; must be no body
 		      ""
 		 else ; read until the end of file

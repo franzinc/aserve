@@ -12,9 +12,9 @@
 <h2 align="left">Introduction</h2>
 
 <p><strong>Neo</strong> is a webserver currently being written at <a
-href="http://www.franz.com">Franz Inc</a>.&nbsp;&nbsp; The name <strong>neo</strong> is
-just an internal project name and isn't intended to be the name of&nbsp; the final
-product.&nbsp;&nbsp;&nbsp; Neo is designed to work with the <a href="htmlgen.html">htmlgen</a>
+href="http://www.franz.com">Franz Inc</a>.&nbsp;&nbsp; <em>The name <strong>neo</strong>
+is just an internal project name and isn't intended to be the name of&nbsp; the final
+product.</em>&nbsp;&nbsp;&nbsp; Neo is designed to work with the <a href="htmlgen.html">htmlgen</a>
 system for generating dynamic html, as one of the big advantages of&nbsp; a web server
 written in Common Lisp is the ability to generate html dynamically.&nbsp; In this document
 we'll consider the web server and dynamic html generation to be parts of the same product.</p>
@@ -50,8 +50,8 @@ we'll consider the web server and dynamic html generation to be parts of the sam
   <li><strong>publish </strong>zero or more urls</li>
 </ul>
 
-<p>We mention <strong>publish</strong> twice to emphasize that you can publish urls either
-before or after you start the server.</p>
+<p>We mention <strong>publish</strong> twice to emphasize that you can publish urls before
+and after you start the server.</p>
 
 <p>&nbsp;</p>
 
@@ -95,7 +95,7 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
   <li>server -- if this is a passed a value it must be a <strong>wserver</strong> object,
     which denotes&nbsp; a particular instance of a web server.&nbsp;&nbsp; This is for support
     of running multiple independent web servers in the same lisp image.&nbsp; This will be
-    describe in a later section (eventually).</li>
+    described in a later section (eventually).</li>
   <li>debug -- if given a number this will print debugging messages whose associated codes are
     this number or less.&nbsp;&nbsp;&nbsp; This is really an internal switch and may be
     removed in future versions.</li>
@@ -127,12 +127,20 @@ determine which entity will handle the request are
     the part we're referring to in this item is just <strong>/files/foo.</strong></li>
   <li>the host to which the request is directed.&nbsp;&nbsp; This is not necessarily the host
     that is receiving the request due to virtual hosts and proxy servers.&nbsp; This value
-    comes from the <strong>Host:</strong> header line, if one is given.&nbsp; If one isn't
-    given then this value is unspecified for this request.</li>
+    comes from the <strong>Host:</strong> header line, if one is given.&nbsp; If the <strong>Host:</strong>
+    header line isn't given then this value is unspecified for this request.</li>
   <li>the port to which the request was directed.&nbsp; Again, this information comes from <strong>Host:</strong>
     header line, if it is present in the request.&nbsp; If it is not present then this value
     is unspecified.</li>
 </ul>
+
+<p>&nbsp;</p>
+
+<p>A request contains other information and while that information isn't used to determine
+which entity will handle the request it can be used by the entity handling the request in
+any way it sees fit.</p>
+
+<p>&nbsp;</p>
 
 <p>The following functions create entities and specify which request they will handle:</p>
 
@@ -166,8 +174,9 @@ optional too in the future).&nbsp; The arguments have these meanings:
   <li><strong>class</strong> -- a Clos class name or class object to be used to hold this
     entity.&nbsp; The class must be a subclass of&nbsp; <strong>file-entity</strong>.
     &nbsp;&nbsp; </li>
-  <li><strong>preload</strong> -- read the contents of the file in immediately and store it in
-    a lisp object.&nbsp; This will speed up the reponse to this request.</li>
+  <li><strong>preload</strong> --if true it instructions <strong>neo</strong> to read the
+    contents of the file in immediately and store it in a lisp object.&nbsp; This will speed
+    up the reponse to this request.</li>
   <li><strong>server</strong> -- if this entity should only be served by a particular server,
     then this specifies which server.&nbsp;&nbsp; See the section (to be written) on running
     multiple servers in the same Lisp process.</li>
@@ -248,6 +257,7 @@ the browser window:</p>
                        (with-http-response (req ent)
                           (with-http-body (req ent)
                              (html &quot;Hello World!&quot;)))))
+
 </pre>
 
 <p align="left">This example works regardless of whether the request comes in from an old
@@ -327,7 +337,7 @@ headers)&nbsp; &amp;rest body)</font></strong></p>
 
 <p align="left">This macro causes the whole http response to be sent out.&nbsp; The macro
 itself will send out everything except the body of the response.&nbsp; That is the
-responsibilty of the code supplied as the <strong>body </strong> form of the macro.
+responsibility of the code supplied as the <strong>body </strong>form of the macro.
 &nbsp;&nbsp; In cases where there is no body to the response being sent it is still
 necessary to call <strong>with-http-body </strong>so that the other parts of the response
 are sent out, e.g.<font face="Courier New"> (with-http-body (req ent))</font></p>
@@ -336,13 +346,13 @@ are sent out, e.g.<font face="Courier New"> (with-http-body (req ent))</font></p
 will want to write <strong>:text</strong> (e.g. <strong>write-char</strong>) or <strong>:binary</strong>
 (e.g. <strong>write-byte</strong>) when it writes the data of the body of the response.
 &nbsp;&nbsp;&nbsp; Based on the value of the <strong>format</strong> argument, Neo will
-create the correct kind of response stream.&nbsp;&nbsp; If <strong>format </strong> is not
+create the correct kind of response stream.&nbsp;&nbsp; If <strong>format </strong>is not
 specified here it will default to the value specified when <strong>publish</strong> was
 called to create the entity.</p>
 
 <p align="left">The <strong>headers</strong> argument is a list of conses, where the car
-is the header name and the cdr is the header value.&nbsp; These headers are added to the
-headers sent as part of this response.</p>
+is the header name (a string) and the cdr is the header value.&nbsp; These headers are
+added to the headers sent as part of this response.</p>
 
 <p align="left">Within the <strong>body </strong>forms the code call <strong>(resp-stream
 req)</strong> to obtain a stream to which it can write to supply the body of the response.</p>
@@ -360,8 +370,21 @@ browser sends the result of a form with&nbsp; a POST method.</p>
 
 <hr>
 
-<p>(url-argument-list request)</p>
+<p><strong><font face="Courier New">(header-slot-value request header-name)</font></strong></p>
 
-<p>Return an aliast o</p>
+<p>Return the value given in the request for the given header-name (a string).
+&nbsp;&nbsp;&nbsp;&nbsp; The header-name string should be all lower case.&nbsp; If the
+header wasn't present in this request then nil will be returned.&nbsp;&nbsp; <strong>header-slot-value</strong>
+is a macro that will expand into a fast accessor if the <strong>header-name</strong> is a
+constant string.</p>
+
+<hr>
+
+<p><strong><font face="Courier New">(url-argument-alist request)</font></strong></p>
+
+<p>Decode and return an alist of the arguments to this url.&nbsp;&nbsp; The arguments
+begin at the first question mark and continue until the end of the url.&nbsp;&nbsp; Each
+item in the alist is a cons where the car is a string giving the name of the argument and
+the cdr is a string giving the value of the argument.</p>
 </body>
 </html>

@@ -1,7 +1,7 @@
 ;; neo
 ;; url publishing
 ;;
-;; $Id: publish.cl,v 1.10 1999/07/29 21:36:00 jkf Exp $
+;; $Id: publish.cl,v 1.11 1999/08/10 17:16:37 jkf Exp $
 ;;
 
 
@@ -10,8 +10,10 @@
 
 (defclass entity ()
   ;; an object to be published
-  ;; host and port may be nil, meaning "don't care"
-  ((host :initarg :host
+  ;; host and port may be nil, meaning "don't care", or a list of
+  ;; items or just an item
+  ((host 
+    :initarg :host
 	 :initform nil
 	 :reader host)
    (port :initarg :port
@@ -429,7 +431,7 @@
      then ; we dont' even care
 	  (return-from up-to-date-check nil))
   
-  (let ((if-modified-since (header-slot-value "if-modified-since" req)))
+  (let ((if-modified-since (header-slot-value req "if-modified-since")))
     (if* if-modified-since
        then (setq if-modified-since
 	      (date-to-universal-time if-modified-since)))
@@ -463,7 +465,7 @@
 	    (if* (and (wserver-enable-keep-alive *wserver*)
 		      (>= (wserver-free-workers *wserver*) 2)
 		      (equalp "keep-alive" 
-			      (header-slot-value "connection" req)))
+			      (header-slot-value req "connection" )))
 	       then (push :keep-alive strategy))
 	    
      elseif (and  ;; assert: get command
@@ -475,7 +477,7 @@
 	    (if* (and (wserver-enable-keep-alive *wserver*)
 		      (>= (wserver-free-workers *wserver*) 2)
 		      (equalp "keep-alive" 
-			      (header-slot-value "connection" req)))
+			      (header-slot-value req "connection")))
 	       then ; a keep alive is requested..
 		    ; we may want reject this if we are running
 		    ; short of processes to handle requests.
@@ -512,7 +514,7 @@
   (let ((keep-alive (and (wserver-enable-keep-alive *wserver*)
 			 (>= (wserver-free-workers *wserver*) 2)
 			 (equalp "keep-alive" 
-				 (header-slot-value "connection" req))))
+				 (header-slot-value req "connection"))))
 	(strategy))
     
     (if*  (eq (command req) :get)

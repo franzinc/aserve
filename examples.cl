@@ -192,7 +192,7 @@
 	 :content-type "text/html"
 	 :function
 	 #'(lambda (req ent)
-	     (let ((auth-val (header-slot-value "authorization" req)))
+	     (let ((auth-val (header-slot-value req "authorization")))
 	       (if* (and (stringp auth-val)
 			 (equal (base64-decode 
 				 (cadr (split-into-words auth-val)))
