@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: urian.cl,v 1.1 2001/01/22 16:17:30 jkf Exp $
+;; $Id: urian.cl,v 1.2 2001/05/11 21:43:53 jkf Exp $
 
 ;; Description:
 ;;   urian example
@@ -52,12 +52,23 @@
 
 (eval-when (compile load eval)
   (require :aserve)
-  ;; hack since fi devel directories don't put phtml in right spot.
-  ;; This hack not needed for user installed lisps.
-  (let ((sys:*require-search-list*
-	 (cons ':first (cons #p"sys:xmlutils;.fasl"
-			     sys:*require-search-list*))))
-    (require :phtml)))
+  (handler-case (require :phtml)
+    ; didn't find it, check to see if it's where it would be in 
+    ; a non-user file layout
+    (error (c)
+      (declare (ignore c))
+      (let (name)
+	(if* (or (probe-file (setq name (concatenate 'string
+					  (directory-namestring *load-truename*)
+					  "../xmlutils/phtml.fasl")))
+		 (probe-file (setq name (concatenate 'string
+					  (directory-namestring *load-truename*)
+					  "../../xmlutils/phtml.fasl"))))
+		 
+	   then (load name)
+	   else (format t " not at ~s~%, tn is ~s~%" name
+			*load-truename*)
+		(error "can't locate phtml module"))))))
 
 (defpackage :urian
   (:use :net.html.generator :net.aserve :net.html.parser))

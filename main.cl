@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.99 2001/03/22 17:47:40 jkf Exp $
+;; $Id: main.cl,v 1.100 2001/05/11 21:42:21 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -256,8 +256,8 @@
 (progn 
     (ff:def-foreign-call (setuid "setuid") ((x :int)) :returning :int)
     (ff:def-foreign-call (setgid "setgid") ((x :int)) :returning :int)
-    (ff:def-foreign-call (getpid "getpid") () :returning :int)
-    (ff:def-foreign-call (unix-fork "fork") () :returning :int)
+    (ff:def-foreign-call (getpid "getpid") (:void) :returning :int)
+    (ff:def-foreign-call (unix-fork "fork") (:void) :returning :int)
     (ff:def-foreign-call (unix-kill "kill") ((pid :int) (sig :int))
       :returning :int)
     

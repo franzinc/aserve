@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.12 2001/04/13 17:12:51 jkf Exp $
+;; $Id: htmlgen.cl,v 1.13 2001/05/11 21:42:21 jkf Exp $
 
 ;; Description:
 ;;   html generator
@@ -595,7 +595,7 @@
 (def-std-html :dt        t nil)
 
 (def-std-html :em        t nil)
-(def-std-html :embed     nil nil)
+(def-std-html :embed     t nil)
 
 (def-std-html :fieldset        t nil)
 (def-std-html :font        t nil)
