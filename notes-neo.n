@@ -1,3 +1,23 @@
+todo list:
+
+done -- 1. get complete set of mime types by one-time 
+	   parsing of /etc/mime.types
+
+2. support cookies
+
+3. make authorization easier to use
+
+4. good logging 
+     correct format
+     include ip addresse
+
+5. server side includes
+
+
+
+-----------------
+
+
 publishing urls
 
  support the publishing of files, computing the mime type based

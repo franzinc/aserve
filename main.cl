@@ -389,7 +389,8 @@
   
   (if* (and debug (numberp debug))
      then (setq *ndebug* debug))
-  
+
+  (build-mime-types-table) 
   
   ; first kill off old processes if any
   (let ((proc (wserver-accept-thread server)))

@@ -1,7 +1,7 @@
 ;; neo
 ;; url publishing
 ;;
-;; $Id: publish.cl,v 1.11 1999/08/10 17:16:37 jkf Exp $
+;; $Id: publish.cl,v 1.12 1999/08/16 18:59:53 jkf Exp $
 ;;
 
 
@@ -42,19 +42,32 @@
 
 
 (defclass file-entity (entity)
-    ;; a file to be published
-    (
-     (file  :initarg :file :reader file)
-     (contents :initarg :contents :reader contents
-	       :initform nil)
-     (dependencies 
-      ;; list of (filename . lastmodifiedtime) 
-      ;; for each of the files that this file includes
-      :initarg :dependencies
-		   :initform nil
-		   :accessor dependencies)
+  ;; a file to be published
+  (
+   (file  :initarg :file :reader file)
+   (contents :initarg :contents :reader contents
+	     :initform nil)
+   (cache-p 
+    ;; true if the contents should be cached when accessed
+    :initarg :cache-p
+    :initform nil
+    :accessor cache-p)
      
-     ))
+   (ssi
+    ;; true if we should look for server side includes when
+    ;; accessing this file
+    :initarg :ssi
+    :initform nil
+    :accessor ssi)
+     
+   (dependencies 
+    ;; list of (filename . lastmodifiedtime) 
+    ;; for each of the files that this file includes
+    :initarg :dependencies
+    :initform nil
+    :accessor dependencies)
+     
+   )) 
 
 
 (defclass computed-entity (entity)
@@ -72,21 +85,73 @@
 	      :initform "")
    (recurse   :initarg :recurse	   ; t to descend to sub directories
 	      :initform nil
-	      :reader recurse
-	      ))
+	      :reader recurse)
+   
+   (cache-p 
+    ;; settting for file entities created:
+    ;; true if the contents should be cached when accessed
+    :initarg :cache-p
+    :initform nil
+    :accessor cache-p)   
+    
+   (ssi
+    ;; settting for file entities created:
+    ;; true if we should look for server side includes when
+    ;; accessing this file
+    :initarg :ssi
+    :initform nil
+    :accessor ssi)
+   )
   )
 
 
 ; we can specify either an exact url or one that handles all
 ; urls with a common prefix.
 ;
+(defparameter *file-type-to-mime-type*
+    ;; this list constructed by generate-mime-table in parse.cl
+    '(("application/postscript" "ps" "eps") ("application/pgp" "pgp")
+      ("audio/x-aiff" "aif" "aifc" "aiff") ("text/plain" "asc" "txt")
+      ("audio/ulaw" "au") ("video/x-msvideo" "avi") 
+      ("application/x-bcpio" "bcpio")
+      ("application/octet-stream" "bin") ("application/x-netcdf" "cdf")
+      ("application/x-cpio" "cpio") ("application/x-csh" "csh")
+      ("application/x-dvi" "dvi") ("text/x-setext" "etx")
+      ("application/andrew-inset" "ez") ("image/gif" "gif")
+      ("application/x-gtar" "gtar") ("application/x-gunzip" "gz")
+      ("application/x-hdf" "hdf") ("text/html" "html") ("image/ief" "ief")
+      ("image/jpeg" "jpe" "jpeg" "jpg") ("application/x-latex" "latex")
+      ("application/x-troff-man" "man") ("application/x-troff-me" "me")
+      ("application/x-mif" "mif") ("video/quicktime" "mov" "qt")
+      ("video/x-sgi-movie" "movie") ("video/mpeg" "mp2" "mpe" "mpeg" "mpg")
+      ("application/x-troff-ms" "ms") ("application/x-netcdf" "nc")
+      ("application/oda" "oda") ("image/x-portable-bitmap" "pbm")
+      ("application/pdf" "pdf") ("image/x-portable-graymap" "pgm")
+      ("application/x-chess-pgn" "pgn") ("image/x-portable-anymap" "pnm")
+      ("image/x-portable-pixmap" "ppm") ("application/postscript" "ps")
+      ("image/x-cmu-raster" "ras") ("image/x-rgb" "rgb")
+      ("application/x-troff" "roff") ("application/rtf" "rtf")
+      ("text/richtext" "rtx") ("application/x-sh" "sh")
+      ("application/x-shar" "shar") ("audio/basic" "snd")
+      ("application/x-wais-source" "src") ("application/x-sv4cpio" "sv4cpio")
+      ("application/x-sv4crc" "sv4crc") ("application/x-troff" "t" "tr")
+      ("application/x-tar" "tar") ("application/x-tcl" "tcl")
+      ("application/x-tex" "tex") ("application/x-texinfo" "texi" "texinfo")
+      ("image/tiff" "tif" "tiff") ("text/tab-separated-values" "tsv")
+      ("application/x-ustar" "ustar") ("audio/x-wav" "wav")
+      ("image/x-xbitmap" "xbm") ("image/x-xpixmap" "xpm")
+      ("image/x-xwindowdump" "xwd") ("application/zip" "zip")))
 
-(defvar *mime-types* (make-hash-table :test #'equal))
-(setf (gethash "html" *mime-types*) "text/html")
-(setf (gethash "htm"  *mime-types*) "text/html")
-(setf (gethash "gif"  *mime-types*) "image/gif")
-(setf (gethash "jpg"  *mime-types*) "image/jpeg")
+(defvar *mime-types* nil)
 
+(defun build-mime-types-table ()
+  (if* (null *mime-types*)
+     then (setf *mime-types* (make-hash-table :test #'equalp))
+	  (dolist (ent *file-type-to-mime-type*)
+	    (dolist (type (cdr ent))
+	      (setf (gethash type *mime-types*) (car ent))))))
+  
+  
 
 
 (defun unpublish (&key all)
@@ -152,7 +217,8 @@
 	     
 
 (defun publish-file (&key (server *wserver*)
-			  host port url file content-type class preload)
+			  host port url file content-type class preload
+			  cache-p ssi)
   ;; return the given file as the value of the url
   ;; for the given host.
   ;; If host is nil then return for any host
@@ -169,7 +235,7 @@
 		   then (error "~s should have been ~d bytes but was ~d"
 			       file
 			       size
-				       got))
+			       got))
 		(setq ent (make-instance (or class 'file-entity)
 			    :host host
 			    :port port
@@ -177,13 +243,19 @@
 			    :file file
 			    :content-type content-type
 			    :contents  guts
-			    :last-modified lastmod))))
+			    :last-modified lastmod
+			    :cache-p cache-p
+			    :ssi     ssi
+			    ))))
        else (setq ent (make-instance (or class 'file-entity)
 			:host host
 			:port port
 			:url  url
 			:file file
-			:content-type content-type)))
+			:content-type content-type
+			:cache-p cache-p
+			:ssi ssi
+			)))
   
     (setf (gethash url (wserver-exact-url server)) ent)))
 

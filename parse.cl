@@ -669,8 +669,24 @@
       (incf i))
     (nreverse res)))
 		 
-      
-	      
+
+;; this isn't needed while the web server is running, it just
+;; needs to be run periodically as new mime types are introduced.
+#+ignore
+(defun generate-mime-table (&optional (file "/etc/mimepa.types"))
+  ;; generate a file type to mime type table based on file type
+  (let (res)
+    (with-open-file (p file :direction :input)
+      (loop
+	(let ((line (read-line p nil nil)))
+	  (if* (null line) then (return))
+	  (if* (and (> (length line) 0)
+		    (eq #\# (schar line 0)))
+	     thenret ; comment
+	     else ; real stuff
+		  (let ((data (split-into-words line)))
+		    (if* data then (push data res)))))))
+    (nreverse res)))
   
   
 					 
