@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.23 2000/03/20 17:25:32 jkf Exp $
+;; $Id: main.cl,v 1.24 2000/03/21 17:12:23 jkf Exp $
 
 ;; Description:
 ;;   iserve's main loop
@@ -781,7 +781,7 @@
 	    (setq req (read-http-request sock)))
 	  (if* (null req)
 	     then ; end of file, means do nothing
-		  (logmess "eof when reading request")
+		  ; (logmess "eof when reading request")
 		  ; end this connection by closing socket
 		  (return-from process-connection nil)
 	     else ;; got a request

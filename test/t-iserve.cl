@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-iserve.cl,v 1.2 2000/03/21 06:32:46 jkf Exp $
+;; $Id: t-iserve.cl,v 1.3 2000/03/21 17:12:23 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -77,39 +77,194 @@
 (defvar *dummy-file-value* nil)
 (defvar *dummy-file-name*  "iservetest.xx")
 
-(defun build-dummy-file (length)
-  (let ((strp (make-string-output-stream)))
+(defun build-dummy-file (length line-length name)
+  ;; write a dummy file named  name  (if name isn't nil)
+  ;; of a given   length   with lines no longer than
+  ;; line-length.
+  ;; Return the string holding the contents of the file.
+  (let ((strp (make-string-output-stream))
+	(result))
     (dotimes (i length)
       (write-char (code-char (+ #.(char-code #\a) (mod i 26))) strp)
-      (if* (zerop (mod i 70))
+      (if* (zerop (mod (1+ i) line-length))
 	 then (terpri strp)))
     (terpri strp)
-    (setq *dummy-file-value* (get-output-stream-string strp))
-    (with-open-file (p *dummy-file-name* :direction :output
-		     :if-exists :supersede)
-      (write-sequence *dummy-file-value* p))))
+    (setq result (get-output-stream-string strp))
+    (if* name
+       then (with-open-file (p name :direction :output
+			     :if-exists :supersede)
+	      (write-sequence result p)))
+    
+    result))
   
 
 (defun test-publish-file (port)
-  (build-dummy-file 8055)
-  
-  (publish-file :path "/frob" :file *dummy-file-name*
-		:content-type "text/plain")
-  
-  (dolist (protocol '(:http/1.0 :http/1.1))
+  (let (dummy-1-contents 
+	(dummy-1-name "xxiservetest.txt")
+	dummy-2-contents
+	(dummy-2-name "xx2iservetest.txt")
+	(prefix-local (format nil "http://localhost:~a" port))
+	(prefix-dns   (format nil "http://~a:~a" 
+			      (long-site-name)
+			      port)))
+    
+    (setq dummy-1-contents (build-dummy-file 8055 70 dummy-1-name))
+
+    
+    ;; basic publish file test
+    ;;
+    ;; publish a file and retrieve it.
+    ;; the result will be the same since given that we know the
+    ;; length of the file, chunking won't be needed
+    ;; 
+    (publish-file :path "/frob" :file dummy-1-name
+		  :content-type "text/plain")
+
+    ;; 
+    (dolist (cur-prefix (list prefix-local prefix-dns))
+      (dolist (keep-alive '(nil t))
+	(dolist (protocol '(:http/1.0 :http/1.1))
+	  (format t "test 1 - ~s~%" (list keep-alive protocol))
+	  (multiple-value-bind (code headers body)
+	      (do-http-request (format nil "~a/frob" cur-prefix)
+		:protocol protocol
+		:keep-alive keep-alive)
+	    (test 200 code)
+	    (test (format nil "text/plain" port)
+		  (cdr (assoc "content-type" headers :test #'equal))
+		  :test #'equal)
+	    #+ignore (if* (eq protocol :http/1.1)
+			then (test "chunked"
+				   (cdr (assoc "transfer-encoding" headers 
+					       :test #'equal))
+				   :test #'equalp))
+	    (test dummy-1-contents body :test #'equal)))))
+
+
+    (setq dummy-2-contents (build-dummy-file 8055 65 dummy-2-name))
+
+    
+    ;; preload publish file test
+    ;;
+    ;; publish a file and retrieve it.
+    ;; ** Preload this time **
+    ;;
+    ;; the result will be the same since given that we know the
+    ;; length of the file, chunking won't be needed
+    ;; 
+    (publish-file :path "/frob2" :file dummy-2-name
+		  :content-type "text/plain"
+		  :preload t)
+
+    ;; 
+    (dolist (cur-prefix (list prefix-local prefix-dns))
+      (dolist (keep-alive '(nil t))
+	(dolist (protocol '(:http/1.0 :http/1.1))
+	  (format t "test 2 - ~s~%" (list keep-alive protocol))
+	  (multiple-value-bind (code headers body)
+	      (do-http-request (format nil "~a/frob2" cur-prefix)
+		:protocol protocol
+		:keep-alive keep-alive)
+	    (test 200 code)
+	    (test (format nil "text/plain" port)
+		  (cdr (assoc "content-type" headers :test #'equal))
+		  :test #'equal)
+	    #+ignore (if* (eq protocol :http/1.1)
+			then (test "chunked"
+				   (cdr (assoc "transfer-encoding" headers 
+					       :test #'equal))
+				   :test #'equalp))
+	    (test dummy-2-contents body :test #'equal)))))
+
+    
+    ;;;; remove published file test
+    ;;
+    ; verify it's still there
+    (test 200 (values (do-http-request (format nil "~a/frob" prefix-local))))
+    (test 200 (values (do-http-request (format nil "~a/frob" prefix-dns))))
+    
+    ; remove it
+    (publish-file :path "/frob" :remove t)
+    
+    ; verify that it's not there:
+    (test 404 (values (do-http-request (format nil "~a/frob" prefix-local))))
+    (test 404 (values (do-http-request (format nil "~a/frob" prefix-dns))))
+    
+    ;; likewise for frob2
+    
+    ; verify it's still there
+    (test 200 (values (do-http-request (format nil "~a/frob2" prefix-local))))
+    (test 200 (values (do-http-request (format nil "~a/frob2" prefix-dns))))
+    
+    ; remove it
+    (publish-file :path "/frob2" :remove t)
+    
+    ; verify that it's not there:
+    (test 404 (values (do-http-request (format nil "~a/frob2" prefix-local))))
+    (test 404 (values (do-http-request (format nil "~a/frob2" prefix-dns))))
+    
+    
+
+    
+    ;; now add different files for localhost and the dns names
+    ;; and verify that we get served different files based on
+    ;; the virtual host we choose
+    (publish-file :path "/checkit" 
+		  :host "localhost"
+		  :file dummy-1-name
+		  :content-type "text/plain")
+    
+    (publish-file :path "/checkit" 
+		  :host (long-site-name)
+		  :file dummy-2-name
+		  :content-type "text/plain")
+    
     (multiple-value-bind (code headers body)
-	(do-http-request (format nil "http://localhost:~a/frob" port)
-	  :protocol protocol
-	  :keep-alive t)
-      (test 200 code)
-      (test (format nil "text/plain" port)
-	    (cdr (assoc "content-type" headers :test #'equal))
-	    :test #'equal)
-      #+ignore (if* (eq protocol :http/1.1)
-	 then (test "chunked"
-		    (cdr (assoc "transfer-encoding" headers :test #'equal))
-		    :test #'equalp))
-      (test *dummy-file-value* body :test #'equal))))
+	(do-http-request (format nil "~a/checkit" prefix-local))
+      (declare (ignore headers))
+      (test 200 (and :df-test code))
+      (test dummy-1-contents body :test #'equal))
+    
+    (multiple-value-bind (code headers body)
+	(do-http-request (format nil "~a/checkit" prefix-dns))
+      (declare (ignore headers))
+      (test 200 (and :df-test code))
+      (test dummy-2-contents body :test #'equal))
+
+    ;; remove the localhost one
+    (publish-file :path "/checkit" 
+		  :host "localhost"
+		  :remove t)
+    ; verify it's gone:
+    (test 404 (values (do-http-request (format nil "~a/checkit" 
+					       prefix-local))))
+    ; but the the dns one is still there
+    (test 200 (values (do-http-request (format nil "~a/checkit" prefix-dns))))
+    
+    ; remove the dns one
+    (publish-file :path "/checkit" 
+		  :host (long-site-name)
+		  :remove t)
+    
+    ; verify it's gone too
+    (test 404 (values (do-http-request (format nil "~a/checkit" 
+					       prefix-dns))))
+
+    
+    
+    
+    
+    
+    
+    ; cleanup
+    (delete-file dummy-1-name)
+    (delete-file dummy-2-name)
+    ))
+    
+
+
+
+
 
 	
   

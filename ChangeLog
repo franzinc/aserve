@@ -1,4 +1,6 @@
-2000-03-20  John Foderaro  <jkf@tiger.franz.com>
+2000-03-21  John Foderaro  <jkf@tiger.franz.com>
+
+	* add t-iserve.cl and begin to add automated tests
 	* add cookies and authorization to client module
 	* load client module into iserve
 	
