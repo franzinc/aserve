@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.131 2001/12/03 18:23:18 jkf Exp $
+;; $Id: main.cl,v 1.132 2002/01/04 19:55:20 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -53,6 +53,7 @@
    #:form-urlencoded-to-query
    #:get-basic-authorization
    #:get-cookie-values
+   #:get-all-multipart-data
    #:get-multipart-header
    #:get-multipart-sequence
    #:get-request-body
@@ -64,6 +65,7 @@
    #:location-authorizer  ; class
    #:location-authorizer-patterns
    #:map-entities
+   #:parse-multipart-header
    #:password-authorizer  ; class
    #:process-entity
    #:publish
@@ -152,7 +154,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 19))
+(defparameter *aserve-version* '(1 2 20))
 
 (eval-when (eval load)
     (require :sock)
@@ -2182,8 +2184,115 @@ in get-multipart-sequence"))
 		 (return-from get-multipart-sequence nil)))))))
 
   
+(defun parse-multipart-header (header)
+  ;; look for known patterns in the mulitpart header and return
+  ;; the information we can find.  Header is the return value from
+  ;; get-multipart-header
+  ;;
+  ;; return values:
+  ;; 1.  nil, :eof, :file, :data   - description of the header
+  ;; 2. name  - name of the item
+  ;; 3. filename - if type is :file then this is the filename
+  ;; 4. content-type - if type is :file this this is the content-type
+  (if* (and (consp header) (consp (car header)))
+     then (let ((cd (assoc :content-disposition header :test #'eq))
+		(ct (assoc :content-type header :test #'eq))
+		(name)
+		(filename)
+		(content-type))
+	    (if* (and cd
+		      (consp (cadr cd))
+		      (eq :param (car (cadr cd)))
+		      (equal "form-data" (cadr (cadr cd))))
+	       then (let ((fd (cddr (cadr cd))))
+		      (let ((aname (assoc "name" fd :test #'equal)))
+			(if* aname then (setq name (cdr aname))))
+		      (let ((afname (assoc "filename" fd :test #'equal)))
+			(if* afname then (setq filename (cdr afname))))))
+	    (if* (and (consp ct) (stringp (cadr ct)))
+	       then (setq content-type (cadr ct)))
+	    
+	    (values (if* filename then :file else :data)
+		    name
+		    filename
+		    content-type))
+   elseif (null header)
+     then :eof
+     else nil ; doesn't match anything we know about
+	  ))
+		      
+	  
+(defun get-all-multipart-data (req &key (type :text) 
+					(size 4096)
+					(external-format 
+					 *default-aserve-external-format*)
+					(limit nil)
+					)
+  ;; retreive all the data for one multipart item
+  ;;
+  (let (res buffer (total-size 0) index)
+    (loop
+      (if* (null buffer)
+	 then (setq buffer 
+		(ecase  type 
+		  (:text (make-string size))
+		  (:binary (make-array size :element-type '(unsigned-byte 8))))
+		index 0))
+      (let ((nextindex (get-multipart-sequence 
+			req buffer 
+			:start index
+			:external-format external-format)))
+	(if* (null nextindex)
+	   then (if* (> index 0)
+		   then (incf total-size index)
+			(push buffer res))
+		(return))
+	(if* (>= nextindex (length buffer))
+	   then ; full buffer
+		(incf total-size (length buffer))
+		(if* (and limit (> total-size limit))
+		   then ; we in the overlimit stage, just
+			; keep reading but don't save
+			(setq index 0)
+		   else ; save away this full buffer
+			(push buffer res)
+			(setq buffer nil))
+	   else (setq index nextindex))))
+      
+    ; read it all, data in res
+    (if* (zerop total-size)
+       then (case type
+	      (:text "")
+	      (:binary (make-array 0 :element-type '(unsigned-byte 8))))
+     elseif (and limit (> total-size limit))
+       then (values :limit total-size)	; over limit return
+     elseif (null (cdr res))
+       then ; just one buffer
+	    (subseq (car res) 0 total-size)
+       else ; multiple buffers, must build result
+	    (let ((result (case type
+			    (:text (make-string total-size))
+			    (:binary (make-array total-size
+						 :element-type
+						 '(unsigned-byte 8))))))
+	      (do ((to 0)
+		   (buffs (nreverse res) (cdr buffs)))
+		  ((null buffs))
+		(replace result (car buffs)
+			 :start1 to)
+		(incf to (length (car buffs))))
+	      result))))
 
-
+		     
+	      
+		
+	  
+	  
+		
+    
+    
+  
+  
 
 ;; end multipart code
 

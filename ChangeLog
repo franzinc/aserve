@@ -1,3 +1,10 @@
+2002-01-04  John Foderaro  <jkf@tiger.franz.com>
+1.2.20
+	* main.cl - add two higher level functions to aid retrieving
+	  multipart data: parse-multipart-header and get-all-multipart-data.
+	  The examples now show using both the low level and higher
+	  level functions for retrieving multipart form data.
+
 2001-12-03  John Foderaro  <jkf@tiger.franz.com>
 1.2.19
 	* main.cl: add ensure-stream-lock function to put a lock object
