@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.32 2001/01/02 16:52:28 jkf Exp $
+;; $Id: proxy.cl,v 1.33 2001/01/03 18:25:49 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -34,6 +34,8 @@
 
 (in-package :net.aserve)
 
+; denotes a request from the browser
+(defconstant *browser-level* 100) ;
 
 (defparameter *extra-lifetime-factor* 1.1)
 
@@ -43,6 +45,9 @@
 
 ; true if we are to save cached connections
 (defparameter *connection-caching* t) 
+
+
+
 
 ; statistics about connection caching
 
@@ -288,7 +293,7 @@
 			(net.uri:copy-uri uri :scheme nil :host nil))
 		      (handle-request req)
 		 else ; must really proxy
-		      (proxy-cache-request req ent t 0))))))
+		      (proxy-cache-request req ent t *browser-level*))))))
 
 
   
@@ -298,7 +303,8 @@
 
 		     
 
-(defun proxy-request (req ent &key pcache-ent (respond t) (level 0))
+(defun proxy-request (req ent &key pcache-ent (respond t) 
+				   (level *browser-level*))
   ;; a request has come in with an http scheme given in uri
   ;; and a machine name which isn't ours.
   ;; 
