@@ -89,6 +89,8 @@
 <a href="#timeouts">Timeouts</a><br>
 <font face="Courier New">&nbsp; <a href="#f-wserver-io-timeout">wserver-io-timeout</a><br>
 &nbsp; <a href="#f-wserver-response-timeout">wserver-response-timeout</a></font><br>
+<a href="#miscellaneous">Miscellaneous</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-map-entities"><font face="Courier New">map-entities</font></a><br>
 <a href="#debugging">Debugging</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-debug-on">net.aserve::debug-on</a><br>
 &nbsp; <a href="#f-debug-off">net.aserve::debug-off</a></font><br>
@@ -2527,6 +2529,24 @@ argument in a way that makes sense based on whether the Lisp supports I/O timeou
 &nbsp;&nbsp; If I/O timeouts are supported then there is no reason to do a global timeout
 for the whole response if you're just sending back a file.&nbsp;&nbsp; Thus in this case
 the <strong>timeout</strong> argument defaults to a huge number.</p>
+
+<p>&nbsp;</p>
+
+<hr>
+
+<h2><a name="miscellaneous"></a>Miscellaneous</h2>
+
+<p><a name="f-map-entities"></a><font face="Courier New"><strong>(map-entities function
+locator)</strong></font></p>
+
+<p>When<strong> </strong>one of the<strong> </strong>publish functions is called enties
+are placed in <em>locator<strong> </strong></em>objects.&nbsp;&nbsp; The locator objects
+are then checked when http requests come in to find the appropriate entity.&nbsp; <strong>map-entities</strong>
+will apply the given <strong>function</strong> of one argument to all the entities in the
+given<strong> locator</strong>.&nbsp;&nbsp; One common use of <strong>map-entities</strong>
+is to find entities that you no longer wish to be published.&nbsp; For that reason <strong>map-entities</strong>
+will remove the entity the passed to the <strong>function</strong> if the <strong>function</strong>
+returns the keyword symbol <strong>:remove</strong> as its value.</p>
 
 <hr>
 
