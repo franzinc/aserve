@@ -23,7 +23,7 @@
 ;;
 
 ;;
-;; $Id: macs.cl,v 1.6 2000/03/16 17:53:28 layer Exp $
+;; $Id: macs.cl,v 1.7 2000/03/20 17:25:32 jkf Exp $
 
 ;; Description:
 ;;   useful internal macros
@@ -35,7 +35,7 @@
 (eval-when (compile load eval)
  (require :uri))
 
-;; macros used by neo
+;; macros used by iserve
 (defpackage :net.iserve
   (:use :common-lisp :excl :net.html.generator :net.uri))
 

@@ -1,4 +1,9 @@
 2000-03-20  John Foderaro  <jkf@tiger.franz.com>
+1.1.6
+	* convert references to neo to iserve
+	* minor fixups in tutorial
+	
+2000-03-20  John Foderaro  <jkf@tiger.franz.com>
 1.1.5
 	* include iservelogo.gif in the ftp distribution
 	* fix problem where the response to a file entity request

@@ -22,10 +22,10 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: log.cl,v 1.6 2000/03/16 17:53:28 layer Exp $
+;; $Id: log.cl,v 1.7 2000/03/20 17:25:32 jkf Exp $
 
 ;; Description:
-;;   neo's logging
+;;   iserve's logging
 
 ;;- This code in this file obeys the Lisp Coding Standard found in
 ;;- http://www.franz.com/~jkf/coding_standards.html

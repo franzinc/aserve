@@ -22,10 +22,10 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.2 2000/03/16 17:53:30 layer Exp $
+;; $Id: examples.cl,v 1.3 2000/03/20 17:25:32 jkf Exp $
 
 ;; Description:
-;;   neo examples
+;;   Allegro iServe examples
 
 ;;- This code in this file obeys the Lisp Coding Standard found in
 ;;- http://www.franz.com/~jkf/coding_standards.html
@@ -34,7 +34,7 @@
 
 
 ;; examples of web pages
-(defpackage :net.iserve.examples ;; neo example
+(defpackage :net.iserve.examples ;; iserve example
   (:use :common-lisp :excl :net.html.generator :net.iserve))
 
 (in-package :net.iserve.examples)
@@ -57,11 +57,11 @@
 	     (with-http-response (req ent)
 	       (with-http-body (req ent)
 		 (html
-		  (:head (:title "Welcome to Neo"))
+		  (:head (:title "Welcome to Allegro iServe"))
 		  (:body 
 		   (:center ((:img :src "iservelogo.gif")))
 		   (:h1 "Welcome to Allegro iServe")
-		   (:p "These links show off some of Neo's capabilities. ")
+		   (:p "These links show off some of iServe's capabilities. ")
 		   (:i "This server's host name is "
 		    (:princ-safe (header-slot-value req "host")))
 		   :p
@@ -244,7 +244,7 @@
        (with-http-response (req ent)
 	 (with-http-body (req ent)
 	   (html (:head (:title "Allegro Apropos"))
-		 ((:body :background "neoweb/fresh.jpg")
+		 ((:body :background "iserveweb/fresh.jpg")
 		  "New Apropos of "
 		  ((:form :action "apropos"
 			  :method "get")
@@ -293,7 +293,7 @@
 
 
 ;; a preloaded picture file
-(publish-file :path "/neoweb/fresh.jpg"
+(publish-file :path "/iserveweb/fresh.jpg"
 	      :file (example-file "fresh.jpg")
 	      :content-type "image/jpeg"
 	      :preload t)

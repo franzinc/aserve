@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.25 2000/03/20 15:56:36 jkf Exp $
+;; $Id: publish.cl,v 1.26 2000/03/20 17:25:32 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -1174,7 +1174,9 @@
 			       *crlf*)
 		 else (dformat sock "Connection: Close~a" *crlf*))
       
-	      (dformat sock "Server: neo/0.1~a" *crlf*)
+	      (dformat sock "Server: Allegro-iServe/~a~a" 
+		       *iserve-version-string*
+		       *crlf*)
       
 	      (if* (request-reply-content-type req)
 		 then (dformat sock "Content-Type: ~a~a" 

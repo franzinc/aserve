@@ -3,11 +3,17 @@ copyright (c) 1999,2000 Franz Inc.
 
 
 
-!! Note: this readme is for people receiving the binary only
-         distribution of iserve.
+!!! Very Important Note !!!!!!
 
-         If you received a source distribution, then follow
-         the instructions in source-readme.txt instead.
+     This readme.txt is for people receiving the binary only
+     distribution of iserve.
+
+     If you received a source distribution, then follow
+     the instructions in source-readme.txt instead.
+
+!!! Very Important Note !!!!!!
+
+
 
 
 
@@ -19,7 +25,7 @@ people can see what directions we are taking in our design.
 
 == The files in this distribution:
 
-iserve.fasl -- This includes the neo web server and htmlgen html generation
+iserve.fasl -- This includes the iserve web server and htmlgen html generation
     code.
 
 doc/iserve.html -- documentation on the web server
@@ -39,7 +45,7 @@ other files are present to support the examples in examples/examples.cl.
 
 1. cd to the directory containing the distribution and start Allegro cl 5.0.1
    (or start Allegro cl 5.0.1 and use the toplevel ":cd" command to cd 
-   to the directory containing the neo distribution).
+   to the directory containing the iserve distribution).
 
 2. load iserve.fasl
     
@@ -66,7 +72,7 @@ Notes:
 
     if you're running on a PC (or running as root on Unix) you can allocate 
     port 80, so you don't have to specify a port when running
-    the neo:start function.
+    the iserve:start function.
 
 
 

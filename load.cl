@@ -1,6 +1,6 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.16 2000/03/20 15:56:36 jkf Exp $
+;; $Id: load.cl,v 1.17 2000/03/20 17:25:32 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -112,7 +112,17 @@
     (copy-files-to (list file)
 		   (format nil "iserve-dist/~a" file)
 		   :root *iserve-root*)))
-		
+
+
+;; checklist for publishing iserve source for source-master:
+;; 1. incf version number, edit ChangeLog and commit
+;; 2. start lisp and load iserve/load to compile all files
+;; 3. cd to the iserve directory
+;; 4. (make-src-distribution)
+;; 5. (ftp-publish-src)
+;; 6. on beast run /fi/sa/bin/iserve-sync
+;; 
+
 
 (defparameter iserve-version-name 
     (apply #'format nil "iserve-~d.~d.~d" 
@@ -131,17 +141,26 @@
   ;; make a source distribution of iserve
   ;;
     
-  (run-shell-command "rm -fr iserve-src")
+  (run-shell-command 
+   (format nil "rm -fr ~aiserve-src" *iserve-root*))
     
   (run-shell-command 
-   (format nil "mkdir iserve-src iserve-src/~a iserve-src/~a/htmlgen"
+   (format nil "mkdir ~aiserve-src ~aiserve-src/~a ~aiserve-src/~a/htmlgen"
+	   *iserve-root*
+	   
+	   *iserve-root*
 	   iserve-version-name
+	   
+	   *iserve-root*
 	   iserve-version-name
 	   ))
   
   (run-shell-command 
-   (format nil "mkdir iserve-src/~a/doc iserve-src/~a/examples"
+   (format nil "mkdir ~aiserve-src/~a/doc ~aiserve-src/~a/examples"
+	   *iserve-root*
 	   iserve-version-name
+	   
+	   *iserve-root*
 	   iserve-version-name))
 	   
   (dolist (file (append (mapcar #'(lambda (file) (format nil "~a.cl" file))
@@ -149,18 +168,21 @@
 			*iserve-other-files*))
     (copy-files-to
      (list file)
-     (format nil "iserve-src/~a/~a" iserve-version-name file))))
+     (format nil "iserve-src/~a/~a" iserve-version-name file)
+     :root *iserve-root*)))
 
 
 (defun ftp-publish-src ()
   ;; assuming tha we've made the source distribution, tar it
   ;; and copy it to the ftp directory
   (run-shell-command
-   (format nil "(cd iserve-src ; tar cfz ~a.tgz ~a)"
+   (format nil "(cd ~aiserve-src ; tar cfz ~a.tgz ~a)"
+	   *iserve-root*
 	   iserve-version-name
 	   iserve-version-name))
   (run-shell-command 
-   (format nil "cp iserve-src/~a.tgz /net/candyman/home/ftp/pub/iserve"
+   (format nil "cp ~aiserve-src/~a.tgz /net/candyman/home/ftp/pub/iserve"
+	   *iserve-root*
 	   iserve-version-name)))
 
   

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.22 2000/03/20 15:56:36 jkf Exp $
+;; $Id: main.cl,v 1.23 2000/03/20 17:25:32 jkf Exp $
 
 ;; Description:
 ;;   iserve's main loop
@@ -115,8 +115,17 @@
 (in-package :net.iserve)
 
 
-(defparameter *iserve-version* '(1 1 5))
+(defparameter *iserve-version* '(1 1 6))
 
+
+
+(defparameter *iserve-version-string*
+    ;; for when we need it in string format
+    (format nil "~d.~d.~d" 
+	    (car *iserve-version*)
+	    (cadr *iserve-version*)
+	    (caddr *iserve-version*)))
+	    
 ;;;;;;;  debug support 
 
 (defvar *ndebug* 0)         ; level for printing debugging info
