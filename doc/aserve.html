@@ -1,13 +1,10 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<html>
-<head>
-  <title>AllegroServe</title>
-  <meta content="Microsoft FrontPage 3.0" name="GENERATOR">
-</head>
-<body>
+<html><head><title>AllegroServe</title>
+  
+  <meta name="GENERATOR" content="Microsoft FrontPage 3.0"></head><body>
 <h1 align="center">AllegroServe - A Web Application Server<br>
-<small><small><small>version <font face="Courier New">1.2.34</font></small></small></small></h1>
-<p align="left"><strong><small>copyright(c) 2000-2003. Franz Inc</small></strong></p>
+<small><small><small>version <font face="Courier New">1.2.36</font></small></small></small></h1>
+<p align="left"><strong><small>copyright(c) 2000-2004. Franz Inc</small></strong></p>
 <h2 align="left">Table of Contents</h2>
 <p align="left"><a href="#introduction">Introduction</a><br>
 <a href="#running-AllegroServe">Running AllegroServe</a><br>
@@ -23,10 +20,8 @@ function</a><font face="Courier New"><br>
 &nbsp;&nbsp; </font>&nbsp; <a href="#directory-access-files">Directory
 Access Files</a><font face="Courier New"><br>
 &nbsp; <a href="#f-publish">publish</a></font><br>
-&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a
- href="#f-publish-prefix">publish-prefix</a></font><br>
-&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-publish-multi"><font
- face="Courier New">publish-multi</font></a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-publish-prefix">publish-prefix</a></font><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-publish-multi"><font face="Courier New">publish-multi</font></a><br>
 <a href="#generating-a-computed-response">Generating a Computed Response</a><br>
 <font face="Courier New">&nbsp; <a href="#f-with-http-response">with-http-response</a><br>
 &nbsp; <a href="#f-with-http-body">with-http-body</a><br>
@@ -34,8 +29,10 @@ Access Files</a><font face="Courier New"><br>
 &nbsp; <a href="#f-header-slot-value">header-slot-value</a><br>
 &nbsp; <a href="#f-reply-header-slot-value">reply-header-slot-value</a><br>
 &nbsp; <a href="#f-request-query">request-query</a></font><br>
-&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a
- href="#f-request-query-value">request-query-value</a></font><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-request-query-value">request-query-value</a><br>
+</font><a href="#request-variables">Request Variables</a><font face="Courier New"><br>
+&nbsp; <a href="#f-request-variable-value">request-variable-value</a><br>
+</font>
 <a href="#request-object-readers">Request Object Readers and Accessors</a><br>
 <font face="Courier New">&nbsp; <a href="#f-request-method">request-method</a><br>
 &nbsp; <a href="#f-request-uri">request-uri</a><br>
@@ -57,24 +54,20 @@ Access Files</a><font face="Courier New"><br>
 &nbsp; <a href="#f-parse-multipart-header">parse-multipart-header</a><br>
 &nbsp; <a href="#f-get-multipart-sequence">get-multipart-sequence</a></font>
 <br>
-&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-get-all-multipart-data"><font
- face="Courier New">get-all-multipart-data</font></a><br>
-&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a
- href="#f-form-urlencoded-">form-urlencoded-to-query</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-get-all-multipart-data"><font face="Courier New">get-all-multipart-data</font></a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-form-urlencoded-">form-urlencoded-to-query</a><br>
 &nbsp; <a href="#f-query-to">query-to-form-urlencoded</a></font><br>
 <a href="#authorization">Authorization</a><br>
 <font face="Courier New">&nbsp; <a href="#f-get-basic-authorization">get-basic-authorization</a><br>
 &nbsp; <a href="#f-set-basic-authorization">set-basic-authorization</a><br>
 &nbsp; <a href="#c-password-authorizer">password-authorizer</a><br>
 &nbsp; <a href="#c-location-authorizer">location-authorizer</a></font><br>
-&nbsp;&nbsp;&nbsp;&nbsp; <a href="#c-function-authorizer"><font
- face="Courier New">function-authorizer</font></a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <a href="#c-function-authorizer"><font face="Courier New">function-authorizer</font></a><br>
 <a href="#cookies">Cookies</a><br>
 <font face="Courier New">&nbsp; <a href="#f-set-cookie-header">set-cookie-header</a><br>
 &nbsp; <a href="#f-get-cookie-values">get-cookie-values</a></font><br>
 <a href="#varaibles">Variables</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a
- href="#v-aserve-version">*aserve-version*</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#v-aserve-version">*aserve-version*</a><br>
 &nbsp; <a href="#v-default-aserve-external-format">*default-aserve-external-format*</a><br>
 &nbsp; <a href="#v-http-response-timeout">*http-response-timeout*</a><br>
 &nbsp; <a href="#v-mime-types">*mime-types*</a></font><br>
@@ -103,10 +96,8 @@ Access Files</a><font face="Courier New"><br>
 <font face="Courier New">&nbsp; <a href="#f-wserver-io-timeout">wserver-io-timeout</a><br>
 &nbsp; <a href="#f-wserver-response-timeout">wserver-response-timeout</a></font><br>
 <a href="#miscellaneous">Miscellaneous</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a
- href="#f-ensure-stream-lock">ensure-stream-lock</a></font><br>
-&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-map-entities"><font
- face="Courier New">map-entities</font></a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-ensure-stream-lock">ensure-stream-lock</a></font><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-map-entities"><font face="Courier New">map-entities</font></a><br>
 <a href="#asaservice">Running AllegroServe as a Service on Windows NT</a><br>
 <a href="#international-chars-aserve">Using International Characters in
 AllegroServe</a><br>
@@ -117,8 +108,7 @@ AllegroServe</a><br>
 <br>
 </p>
 <h2 align="left">In<a name="introduction"></a>troduction</h2>
-<p><strong>AllegroServe </strong>is a webserver&nbsp; written at <a
- href="http://www.franz.com">Franz Inc</a>.&nbsp;&nbsp;AllegroServe is
+<p><strong>AllegroServe </strong>is a webserver&nbsp; written at <a href="http://www.franz.com">Franz Inc</a>.&nbsp;&nbsp;AllegroServe is
 designed to work
 with the <a href="htmlgen.html">htmlgen</a> system for generating
 dynamic html, as one of
@@ -189,7 +179,7 @@ default.</li>
   <li>host -- the host on which to run the server.&nbsp; If you don't
 specify this then the server will listen on all TCP/IP network
 interfaces on the machine.&nbsp;&nbsp; If you specify "localhost" then
-the server willl only accept connections from the same
+the server will only accept connections from the same
 machine.&nbsp;&nbsp; Other values for host can be used to run
 AllegroServe only a particular network interface.&nbsp; Host can be a
 name (like "foo.franz.com"), a dotted ip address "192.168.0.1" or an
@@ -204,7 +194,7 @@ If a positive number is given as the value of <strong>:listeners</strong>
 then the server runs in <em>threaded server mode<strong>.</strong></em><strong>
     </strong>&nbsp; In this mode separate lisp lightweight processes
 are started to handle requests from clients, the number of request
-handing threads is equal to the value of the <strong>:listeners</strong>
+handling threads is equal to the value of the <strong>:listeners</strong>
 keyword argument.&nbsp; In this mode the <strong>start </strong>function
 returns after starting the other threads.</li>
   <li>chunking -- if true then the server will use the chunked transfer
@@ -215,7 +205,7 @@ sort of error.&nbsp;&nbsp; The default is true.</li>
 if requested by the web client, and if there are sufficient free
 threads to handle new requests coming in. &nbsp;&nbsp; This is an
 optimization and should be left on.&nbsp;&nbsp; The default is true.</li>
-  <li>server -- if this is a passed a value it must be a <strong>wserver</strong>
+  <li>server -- if this is passed a value it must be a <strong>wserver</strong>
 object, which denotes&nbsp; a particular instance of a web
 server.&nbsp;&nbsp; This is for support of running multiple independent
 web servers in the same lisp image.&nbsp; This will be described in a
@@ -243,7 +233,7 @@ the server given in the request.&nbsp; If proxy-proxy is given&nbsp; a
 value of a host and an optional port then the request is forwarded to
 the proxy server at that address.&nbsp;&nbsp; Valid values for
 proxy-proxy look like "proxy.myfirm.com" and
-"localhost:8000".&nbsp;&nbsp; If no port is not specified, port 80 is
+"localhost:8000".&nbsp;&nbsp; If no port is&nbsp; specified, port 80 is
 assumed.</li>
   <li>cache -- if true (and if proxy is true as well) cache locally the
 work done by the proxy server.&nbsp; The value of this variable
@@ -363,7 +353,7 @@ an entity assigned, the old entity is replaced by the new entity.</p>
 &amp;key
 path host port&nbsp; file content-type class preload cache-p remove <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-authorizer server timeout plist hook)</font></strong></p>
+authorizer server timeout plist hook headers)</font></strong></p>
 <p>This creates an entity that will return the contents of a file on
 the disk in response
 to a request.&nbsp;&nbsp; The <strong>url</strong> and <strong>file</strong>&nbsp;
@@ -375,7 +365,7 @@ have these meanings: </p>
 of the url as described above in <strong>Components of a Request</strong></li>
   <li><strong>host -- </strong>normally <strong>nil</strong>.&nbsp;
 If you wish to do virtual hosting read <a href="#virtual_hosts">this
-section</a> describing how it's done.a</li>
+section</a> describing how it's done.</li>
   <li><strong>port</strong> -- this argument is currently unused and
 will likely be removed in future versions.</li>
   <li><strong>file </strong>-- the name of the file to return when a
@@ -404,7 +394,7 @@ true as well.</li>
 will cache the last value read for this file.&nbsp; When asked for this
 file <strong>AllegroServe</strong> will check to see if the file has
 changed on disk (using the last modified time as a measure).&nbsp; If
-the file hasn't changed AllegroServe will returned the cached value,
+the file hasn't changed AllegroServe will return the cached value,
 otherwise <strong>AllegroServe</strong> will read in and cache the new
 contents of the file and will return that as a response.</li>
   <li><strong>remove </strong>-- instead of adding an entity, remove
@@ -429,7 +419,13 @@ object and retrieved with<strong> wserver-response-timeout</strong>..</li>
   <li><strong>plist</strong> - initial property list for this entity</li>
   <li><strong>hook</strong> - a function of three arguments: req,ent
 and extra. &nbsp;&nbsp; See <a href="#entity-hook-function">entity
-hook function</a>.</li>
+hook function</a>.</li><li><span style="font-weight: bold;">headers</span>
+- a list of cons's, with the car being a&nbsp; keyword symbol naming a
+header and the cdr being a string which is the header value.&nbsp;
+These headers are added to the response send back to the browser when
+this file is accessed.&nbsp; <br>
+  </li>
+
 </ul>
 <p>The function that handles requests for files will respond correctly
 to <strong>If-Modified-Since</strong>
@@ -462,7 +458,7 @@ is
 usually <strong>nil</strong> but will be one of the following symbols
 to tell&nbsp; the
 hook function if it's being called in a special context.</p>
-<table width="100%" border="1">
+<table border="1" width="100%">
   <tbody>
     <tr>
       <td width="21%"><strong>:illegal-range</strong></td>
@@ -485,11 +481,10 @@ AllegroServe is returning a "304 - Not Modified" response.</td>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
 <p><a name="f-publish-directory"></a><strong><font face="Courier New">(publish-directory
-&amp;key prefix host port destination remove authorizer server <br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+&amp;key prefix host port destination remove authorizer server <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 indexes filter timeout plist publisher access-file<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-hook)</font></strong></p>
+hook headers)</font></strong></p>
 <p><strong>publish-directory</strong> is used to publish a complete
 directory tree of
 files.&nbsp; This is similar to how web servers such as Apache publish
@@ -503,7 +498,7 @@ whose name begins
 with<strong> prefix</strong> to files stored in the directory specified
 by the <strong>destination</strong>.&nbsp;&nbsp;
 The <strong>host</strong>, <strong>port, remove, authorizer, plist,
-hook </strong>and <strong>server</strong>
+hook, headers </strong>and <strong>server</strong>
 arguments are as described above for <strong>publish-file.</strong>
 &nbsp;&nbsp;&nbsp;&nbsp; The <strong>timeout</strong> argument
 defaults as described in <strong>publish-file</strong>.
@@ -534,7 +529,7 @@ argument
 specifies a list of index files to search for.&nbsp; By default the
 list consists of two
 filenames "index.html" and "index.htm".</p>
-<p>The valueof the <strong>filter </strong>argument is a function of
+<p>The value of the <strong>filter </strong>argument is a function of
 four values: <strong>req</strong>
 <strong>ent</strong>&nbsp; <strong>filename</strong> and <strong>info</strong>.&nbsp;
 <strong>req</strong>
@@ -586,7 +581,7 @@ function may
 wish to publish that entity but it need not do so.</p>
 <div align="center">
 <center>
-<table cellpadding="5" width="86%" border="1">
+<table border="1" width="86%" cellpadding="5">
   <tbody>
     <tr>
       <td width="100%">Note:&nbsp; <strong>publish-directory</strong>
@@ -705,10 +700,10 @@ and <strong>:deny</strong> values.</p>
 function. &nbsp;&nbsp;
 Each takes an <strong>:inherit</strong> argument which defaults to
 false. &nbsp;
-Information not given with :<strong>:inherit t</strong> will be
+Information not given with&nbsp; <strong>:inherit t</strong> will be
 eliminated as AllegroServe
 descends directory levels.</p>
-<table width="100%" border="1">
+<table border="1" width="100%">
   <tbody>
     <tr>
       <th width="15%">name</th>
@@ -771,9 +766,9 @@ subdirectory and for all directories above it up to the directory given
 as the <strong>destination</strong>
 argument to <strong>publish-directory.&nbsp; </strong>Information
 from superdirectories
-will only be used <strong>:inherit t</strong> is given for that
+will only be used if <strong>:inherit t</strong> is given for that
 information.&nbsp; </p>
-<p>The rules is it that a given name is accessible if it is allowed and
+<p>The rule is it that a given name is accessible if it is allowed and
 not denied. &nbsp;
 That is the filename or directory name must match one of the allow
 clauses and none of the
@@ -830,15 +825,16 @@ to subdirectories<br>
 <p>&nbsp;</p>
 <p><a name="f-publish"></a><strong><font face="Courier New">(publish
 &amp;key path host
-port content-type function class format remove server authorizer
-timeout plist hook)</font></strong></p>
+port content-type function class format remove server <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; authorizer
+timeout plist hook headers)</font></strong></p>
 <p>This creates a mapping from a url to a <strong>computed-entity</strong>,
 that is an
 entity that computes its response every time a request comes in.&nbsp;
 The <strong>path</strong>,
 <strong>host</strong>, <strong>port</strong>, <strong>remove, server</strong>
 , <strong>authorizer,
-hook </strong>and <strong>class</strong> arguments are as in the
+hook, headers </strong>and <strong>class</strong> arguments are as in the
 other publish
 functions.&nbsp;&nbsp;The <strong>timeout</strong> argument defaults
 to <strong>nil </strong>always.&nbsp;&nbsp;
@@ -866,11 +862,10 @@ request.&nbsp;&nbsp; This function must generate a response to the http
 request, even if
 the response is only that the request wasn't found.</p>
 <p>&nbsp;</p>
-<p><a name="f-publish"></a><a name="f-publish-prefix"></a><strong><font
- face="Courier New">(publish-prefix
+<p><a name="f-publish"></a><a name="f-publish-prefix"></a><strong><font face="Courier New">(publish-prefix
 &amp;key prefix host port content-type function class <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-format remove server authorizer timeout plist hook)</font></strong></p>
+format remove server authorizer timeout plist hook headers)</font></strong></p>
 <p>This is like <strong>publish </strong>except that it declares <strong>function</strong>
 to be the handler for all urls that begin with the string <strong>prefix</strong>.
 &nbsp;&nbsp; Note however that prefix handlers have lower priority than
@@ -882,7 +877,7 @@ handler for "/foo/bar.html" then the specific handler will be chosen if
 prefix
 handler is used to make available a whole directory of files since
 their complete names
-being with a common prefix (namely the directory in which the files are
+begin with a common prefix (namely the directory in which the files are
 located).
 &nbsp;&nbsp; If you want to publish a whole directory then you probably
 want to use <strong>publish-directory</strong>
@@ -894,8 +889,10 @@ be run if the <strong>function</strong> supplied makes use of it.</p>
 <p>&nbsp;</p>
 <p><a name="f-publish-multi"></a><strong><font face="Courier New">(publish-multi
 &amp;key
-path host port content-type items class remove server authorizer
-timeout hook)</font></strong></p>
+path host port content-type items class remove server <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+authorizer
+timeout hook headers)</font></strong></p>
 <p>Some web pages are created from information from various
 sources.&nbsp;&nbsp; <strong>publish-multi</strong>
 allows you to specify a sequence of places that supply data for the
@@ -905,7 +902,7 @@ so that minimal
 computation is required each time the page is
 requested.&nbsp;&nbsp;&nbsp; </p>
 <p>The <strong>host, port, content-type, class, remove, server,
-authorizer, hook </strong>and<strong>
+authorizer, hook, headers </strong>and<strong>
 timeout</strong> arguments are the same as those of the other publish
 functions.
 &nbsp;&nbsp; The <strong>items </strong>argument is unique to <strong>publish-multi</strong>
@@ -965,7 +962,7 @@ the browser window:</p>
 comes in from an old
 HTTP/0.9 browser or a modern HTTP/1.1 browser.&nbsp; It may or may not
 send the response
-back with Chunked transfer encoding and it may or may not keep the
+back with chunked transfer encoding and it may or may not keep the
 connection alive after
 sending back the response.&nbsp;&nbsp; The user code doesn't have to
 deal with those
@@ -989,8 +986,7 @@ World!&lt;/body&gt;&lt;/html&gt;.</font></p>
 <p align="left">The macros and functions used in computing responses
 are these:</p>
 <hr>
-<p align="left"><a name="f-with-http-response"></a><strong><font
- face="Courier New">(with-http-response
+<p align="left"><a name="f-with-http-response"></a><strong><font face="Courier New">(with-http-response
 (req ent &amp;key timeout check-modified format response content-type) <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 &amp;rest body)</font></strong></p>
@@ -1008,7 +1004,7 @@ response.&nbsp;&nbsp; If <strong>timeout</strong> is nil then the
 entity <strong>ent</strong>
 is checked for a timeout value.&nbsp; If that value is also nil then
 the timeout value is
-retreived from the current <strong>wserver</strong> object using <strong>wserver-response-timeout</strong>.
+retrieved from the current <strong>wserver</strong> object using <strong>wserver-response-timeout</strong>.
 &nbsp; If <strong>check-modified </strong>is true (the default) then
 the <strong>last-modified
 </strong>time stored in the entity object will be compared against the <strong>if-modified-since
@@ -1072,8 +1068,7 @@ function.&nbsp; You must
 always call <strong>with-http-body </strong>inside the call to <strong>with-http-response</strong>.</p>
 <p align="left">&nbsp;</p>
 <hr>
-<p align="left"><a name="f-with-http-body"></a><strong><font
- face="Courier New">(with-http-body
+<p align="left"><a name="f-with-http-body"></a><strong><font face="Courier New">(with-http-body
 (req ent &amp;key format headers external-format)&nbsp; &amp;rest body)</font></strong></p>
 <p align="left">This macro causes the whole http response to be sent
 out.&nbsp; The macro
@@ -1225,7 +1220,18 @@ is returned.
 have an associated
 value then the empty string is returned.</p>
 <hr>
-<p>&nbsp;</p>
+<h2><a name="request-variables"></a>Request Variables</h2>
+<p>Every request has zero or or more <span style="font-style: italic;">request variables</span>.&nbsp;&nbsp; A request variable is named by a lisp string.&nbsp; The value of a request variable can be any<br>
+lisp object.&nbsp; <br>
+<br>
+&nbsp;Initially a request has zero request variables.<br>
+</p>
+<p style="font-family: courier new,courier,monospace; font-weight: bold;"><a name="f-request-variable-value"></a>(request-variable-value req "name")</p>
+<p>Return the value of the request variable named "name".&nbsp; Return nil if there is no such request variable.</p>
+<p>You&nbsp; can use&nbsp; <span style="font-family: courier new,courier,monospace;">(setf (request-variable req "name") value)</span> to set the value of a request variable.<br>
+<br>
+&nbsp;</p>
+
 <h2><a name="request-object-readers"></a>Request Object Reader and
 Accessors</h2>
 <p>The request object contains information about the http request being
@@ -1290,8 +1296,7 @@ the response will
 be made (in Lisp's universal time format).&nbsp; This defaults to the
 time when the
 request arrived.</p>
-<p><a name="f-request-reply-headers"></a><strong><font
- face="Courier New">(request-reply-headers
+<p><a name="f-request-reply-headers"></a><strong><font face="Courier New">(request-reply-headers
 request)</font></strong> - accessor - an alist of some of the headers
 to send out with the
 reply (other headers values are stored in specific slots of the request
@@ -1305,8 +1310,7 @@ isn't used, instead the headers to be sent are passed as the <strong>:header</st
 argument to <strong>with-http-body</strong>, or <strong>(setf
 reply-header-slot-value)</strong>
 is called.</p>
-<p><a name="f-request-reply-content-length"></a><strong><font
- face="Courier New">(request-reply-content-length
+<p><a name="f-request-reply-content-length"></a><strong><font face="Courier New">(request-reply-content-length
 request) </font></strong>&nbsp;&nbsp;&nbsp; - accessor -&nbsp; the
 value to send as the
 Content-Length of this response.&nbsp;&nbsp; This is computed
@@ -1347,7 +1351,7 @@ its environment
 variables and, in the case of a <strong>put</strong> or <strong>post</strong>
 request, the
 body of the request is sent to standard input of the program.</p>
-<p>CGI is a clumsy and slow protocol for extending the behavior or a
+<p>CGI is a clumsy and slow protocol for extending the behavior of a
 web server and is
 falling out of favor.&nbsp; However there are legacy CGI applications
 you may need to call
@@ -1356,8 +1360,7 @@ CGI protocol with
 the <strong>run-cgi-program</strong> function.</p>
 <p><a name="f-run-cgi-program"></a><font face="Courier New"><strong>(run-cgi-program
 req
-ent program &amp;key path-info path-translated<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+ent program &amp;key path-info path-translated<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 script-name query-string <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 auth-type timeout error-output env)</strong></font></p>
@@ -1367,7 +1370,7 @@ string naming an exectuable program or script followed optionally by
 command line
 arguments to pass to that program.&nbsp; Before the <strong>program </strong>is
 run the
-environment variables are set according the the CGI protocol.&nbsp; The
+environment variables are set according to the CGI protocol.&nbsp; The
 <strong>timeout</strong>
 argument is how long AllegroServe should wait for a response from the <strong>program
 </strong>before
@@ -1413,7 +1416,7 @@ argument to
 run-cgi-program allows the caller to specify what happens to data sent
 to standard error.
 &nbsp; The possibile values for <strong>error-output</strong> are:</p>
-<table width="100%" border="1">
+<table border="1" width="100%">
   <tbody>
     <tr>
       <td width="32%"><strong>nil</strong></td>
@@ -1513,7 +1516,7 @@ following to retrieve the value of each field in the form: </p>
 MIME headers of the next field.&nbsp; If this returns nil then there
 are no more fields to retrieve.&nbsp; You'll likely want to call <strong>parse-multipart-header</strong>
 on the result of <strong>get-multipart-header</strong> in order to
-extract the imporant information from the header.</li>
+extract the important information from the header.</li>
   <li>Create a buffer and call <strong>(get-multipart-sequence req
 buffer)</strong> repeatedly to return the next chunk of data.&nbsp;
 When there is no more data to read for this field, <strong>get-multipart-sequence</strong>
@@ -1538,7 +1541,7 @@ request)</font></strong></p>
 in alist form.
 &nbsp;&nbsp;&nbsp; If nil is returned then there is no more form
 data.&nbsp;&nbsp; See <strong>parse-multipart-header</strong>
-for a simple way to extratacting information from the header.</p>
+for a simple way to extract information from the header.</p>
 <p>For an input field such as <strong>&lt;input type="text"
 name="textthing"&gt; </strong>the value returned by <strong>get-multipart-header</strong>
 would be</p>
@@ -1556,10 +1559,9 @@ totally different
 operating system.</p>
 <p>&nbsp;</p>
 <hr>
-<p><a name="f-parse-multipart-header"></a><strong><font
- face="Courier New">(parse-multipart-header
+<p><a name="f-parse-multipart-header"></a><strong><font face="Courier New">(parse-multipart-header
 header)</font></strong></p>
-<p>This take the value of get-multipart-header and returns values that
+<p>This takes the value of get-multipart-header and returns values that
 describe the
 important information in the header.</p>
 <p>The first value returned is </p>
@@ -1592,7 +1594,7 @@ or <span style="font-weight: bold;">get-multipart-data</span>.<br>
   </li>
   <li><strong>nil</strong> - This header has a form not recognized by <strong>parse-multipart-header</strong>.
 &nbsp;&nbsp;&nbsp; If you encounter this please let us know about it
-since we would like enhance <strong>parse-multipart-header</strong> to
+since we would like to enhance <strong>parse-multipart-header</strong> to
 understand this type of header. &nbsp;&nbsp; If you encounter
 this&nbsp; type of header you still have to read the contents of the
 data item that follows the header in order to read the next header.
@@ -1601,8 +1603,7 @@ data item that follows the header in order to read the next header.
 then read the next header.</li>
 </ul>
 <hr>
-<p><a name="f-get-multipart-sequence"></a><strong><font
- face="Courier New">(get-multipart-sequence
+<p><a name="f-get-multipart-sequence"></a><strong><font face="Courier New">(get-multipart-sequence
 request buffer &amp;key start end external-format)</font></strong></p>
 <p>This retrieves the next chunk of data for the current form field and
 stores it in <strong>buffer</strong>.
@@ -1647,7 +1648,7 @@ size of the internal buffers used by this function to retrieve the
 data.&nbsp;&nbsp; You
 usually won't need to specify a value for this but but if you know the
 values retrieved
-are either very small or very large it may may the operation run faster
+are either very small or very large it may make the operation run faster
 to specify an
 appropriate <strong>size</strong>.&nbsp;&nbsp;&nbsp; <strong>external-format</strong>
 is
@@ -1668,7 +1669,7 @@ read the data from the client until it reaches the end of the data,
 however it will <em>not</em>
 save it and will return the symbol <strong>:limit</strong> to indicate
 that the data being
-send to the sever exceeded the limit.&nbsp; It will return a second
+sent to the sever exceeded the limit.&nbsp; It will return a second
 value which is the
 size of the data the client tried to upload to the
 server.&nbsp;&nbsp;&nbsp; If your
@@ -1737,8 +1738,7 @@ in the entity.</p>
 Authorization Method
 &nbsp; defined by the http specification.&nbsp;&nbsp;&nbsp; The <strong>password-authorizer</strong>
 class described below make use of these functions.</p>
-<p><a name="f-get-basic-authorization"></a><strong><font
- face="Courier New">(get-basic-authorization
+<p><a name="f-get-basic-authorization"></a><strong><font face="Courier New">(get-basic-authorization
 request)</font></strong></p>
 <p>This function retrieves the Basic authorization information
 associated with this
@@ -1748,8 +1748,7 @@ strings.&nbsp; If there is no Basic authorization information with this
 request, <strong>nil</strong>
 is returned.</p>
 <p>&nbsp;</p>
-<p><a name="f-set-basic-authorization"></a><strong><font
- face="Courier New">(set-basic-authorization
+<p><a name="f-set-basic-authorization"></a><strong><font face="Courier New">(set-basic-authorization
 request realm)</font></strong></p>
 <p>This adds a header line that requests Basic authorization in the
 given realm (a
@@ -1815,7 +1814,7 @@ password.
 &nbsp;&nbsp;&nbsp; When you create this class of object you should
 supply values for the
 two slots:</p>
-<table width="100%" border="1">
+<table border="1" width="100%">
   <tbody>
     <tr>
       <td width="13%"><big><strong>Slot Name</strong></big></td>
@@ -1838,7 +1837,7 @@ the browser displays when asking for a name and password. </td>
     </tr>
   </tbody>
 </table>
-<p>An example of it's use is the following where we allow access only
+<p>An example of its use is the following where we allow access only
 if the user enters a
 name of <strong>joe</strong> and a password of <strong>eoj</strong>
 or a name of <strong>fred</strong>
@@ -1860,7 +1859,7 @@ no pattern
 matches, then the request is accepted.&nbsp; </p>
 <p>The single slot of an object of class <strong>location-authorizer</strong>
 is</p>
-<table width="100%" border="1">
+<table border="1" width="100%">
   <tbody>
     <tr>
       <td width="13%"><big><strong>Slot Name</strong></big></td>
@@ -1903,8 +1902,7 @@ is assumed to match, and thus the request will be denied.&nbsp; </li>
 </ul>
 <p>The example of using a <strong>location-authorizer</strong> only
 permits connections
-coming in via the loopback network (which occurs if you specify <a
- href="http://localhost/whatever">http://localhost/whatever</a>) or if
+coming in via the loopback network (which occurs if you specify <a href="http://localhost/whatever">http://localhost/whatever</a>) or if
 they come from one
 particular machine (tiger.franz.com).&nbsp; Note that we end the
 pattern list with <strong>:deny</strong>
@@ -1918,7 +1916,7 @@ request is authorized.&nbsp;&nbsp; The function take three arguments,
 the http-request
 object, the entity and the authorizer object.&nbsp;&nbsp; It must
 return one of the four
-value that the <strong>authorize</strong> function returns, namely <strong>t,
+values that the <strong>authorize</strong> function returns, namely <strong>t,
 nil :deny</strong>
 or <strong>:done.</strong></p>
 <p>A function-authorizer is created as follows</p>
@@ -2036,8 +2034,7 @@ AllegroServe:</p>
 - a list of three values: (major-version minor-version
 sub-minor-version) which is usually
 printed with periods separating the values (i.e. X.Y.Z).</p>
-<p><a name="v-default-aserve-external-format"></a><strong><font
- face="Courier New">*default-aserve-external-format*</font></strong>
+<p><a name="v-default-aserve-external-format"></a><strong><font face="Courier New">*default-aserve-external-format*</font></strong>
 - a symbol or external format object which is the default value for
 those AllegroServe
 functions that take an external-format argument.&nbsp;&nbsp; http
@@ -2051,8 +2048,7 @@ affect its value in
 other threads.&nbsp;&nbsp; You should decide the default external
 format before you start
 AllegroServe running.</p>
-<p><a name="v-http-response-timeout"></a><strong><font
- face="Courier New">*http-response-timeout*</font></strong>
+<p><a name="v-http-response-timeout"></a><strong><font face="Courier New">*http-response-timeout*</font></strong>
 - the default value for the timeout argument to
 with-http-response.&nbsp;&nbsp; [in future
 versions of AllegroServe we'll treat this value like
@@ -2241,8 +2237,9 @@ string is returned.</li>
   <li>the response code (for example, 200, meaning that the request
 succeeded)</li>
   <li>an alist of headers where the <strong>car</strong> of each entry
-is a lowercase string with the header name and the <strong>cdr</strong>
-is a string with the value of that header item.</li>
+is a keyword symbol or a lowercase string with the header name and the <strong>cdr</strong>
+is a string with the value of that header item.&nbsp;&nbsp; A keyword symbol is returned for standard headers.<br>
+</li>
   <li>the uri object denoting the page accessed.&nbsp; This is normally
 computed from the <strong>uri</strong> value passed in but if
 redirection was done then this reflects the target of the
@@ -2254,7 +2251,7 @@ string.&nbsp;&nbsp; The scheme of the
 <strong>uri</strong> must be nil or "http".&nbsp;&nbsp; The keyword
 arguments to
 <strong>do-http-request </strong>are</p>
-<table width="100%" border="1">
+<table border="1" width="100%">
   <tbody>
     <tr>
       <th width="22%">Name</th>
@@ -2372,18 +2369,17 @@ keep-alive request.</td>
     <tr>
       <td width="22%">headers</td>
       <td width="16%">nil</td>
-      <td width="62%">an alist of conses <font face="Courier New">("header-name"
+      <td width="62%">an alist of conses <font face="Courier New">(header-name
 . "header-value")</font> for additional headers to send with the
-request.</td>
+request.&nbsp;&nbsp; The header-name should be a keyword symbol naming the header, but it can be a string as well.<br>
+</td>
     </tr>
     <tr>
       <td width="22%">proxy</td>
       <td width="16%">nil</td>
       <td width="62%">the name and optionally the port number of a
 proxying web server through which this request should be
-made.&nbsp;&nbsp; The form is of the argument is <a
- href="http://www.machine.com">"www.machine.com"</a> or <a
- href="http://www.machine.com:8000">"www.machine.com:8000"</a> if the
+made.&nbsp;&nbsp; The form is of the argument is <a href="http://www.machine.com">"www.machine.com"</a> or <a href="http://www.machine.com:8000">"www.machine.com:8000"</a> if the
 web server is listening on port 8000 rather than 80.&nbsp;&nbsp;
 Proxying web servers are often used when clients are behind firewalls
 that prevent direct access to the internet. &nbsp; Another use is to
@@ -2424,7 +2420,7 @@ as an argument. &nbsp; At this point the client-request object contains
 the information on the headers of the response.&nbsp;&nbsp; The
 function should return true if the body of the response should be
 skipped and <strong>nil</strong> returned as the first value from
-do-http-request.&nbsp; If skip-body is not a function then if its value
+do-http-request.&nbsp; If skip-body is not a function and if its value
 is true then reading the body is skipped and <strong>nil</strong>
 returned in its place.</td>
     </tr>
@@ -2442,13 +2438,11 @@ objects on a page.
 &nbsp; If the form has input elements named&nbsp; <strong>width</strong>
 and <strong>height</strong>
 then you can send a request that specifies that information in this way:</p>
-<pre><font face="Courier New">(do-http-request <a
- href="http://www.foo.com/myform.html">"http://www.foo.com/myform.html"</a> <br>                 :query '(("width" . 23) ("height" . 45)))</font></pre>
+<pre><font face="Courier New">(do-http-request <a href="http://www.foo.com/myform.html">"http://www.foo.com/myform.html"</a> <br>                 :query '(("width" . 23) ("height" . 45)))</font></pre>
 <p>The above assumes that the method on the form is "GET".&nbsp;&nbsp;
 If the
 method is "POST" then a similar call will work:</p>
-<pre><font face="Courier New">(do-http-request <a
- href="http://www.foo.com/myform.html">"http://www.foo.com/myform.html"</a>  <strong>:method :post</strong>
+<pre><font face="Courier New">(do-http-request <a href="http://www.foo.com/myform.html">"http://www.foo.com/myform.html"</a>  <strong>:method :post</strong>
                  :query '(("width" . 23) ("height" . 45)))</font></pre>
 <p><br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </p>
@@ -2463,7 +2457,7 @@ the response.</p>
 <p>The public fields of a <strong>client-request</strong> that are
 filled in after a call
 to <strong>make-http-client-request</strong> are:</p>
-<table width="100%" border="1">
+<table border="1" width="100%">
   <tbody>
     <tr>
       <th width="31%">Accessor</th>
@@ -2489,7 +2483,7 @@ this request.</td>
 <p>After <strong>read-client-response-headers</strong> is called, the
 following fields of
 the <strong>client-request</strong> objects are set:</p>
-<table width="100%" border="1">
+<table border="1" width="100%">
   <tbody>
     <tr>
       <th width="39%">Accessor</th>
@@ -2525,8 +2519,7 @@ all web servers returning the same string for any given response code.</td>
 <h2><a name="c-cookie-jar"></a>cookie-jar</h2>
 <p>A <strong>cookie-jar</strong> is a respository for cookies.&nbsp;
 Cookies are stored in
-a jar when a response from a client request includes <font
- face="Courier New">Set-Cookie</font>
+a jar when a response from a client request includes <font face="Courier New">Set-Cookie</font>
 headers.&nbsp;&nbsp; Cookies from a jar are sent along with a request
 when they are
 applicable to the given request.&nbsp;&nbsp; We won't describe the
@@ -2537,10 +2530,8 @@ access a site that uses cookies to implement persistence, then you
 should create a <strong>cookie-jar</strong>
 object and pass that same object in with each request.&nbsp;&nbsp; More
 information on
-cookies can be found <a
- href="http://developer.netscape.com:80/docs/manuals/js/client/jsref/cookies.htm">here</a>.</p>
-<p>A <strong>cookie-jar</strong> is created with <font
- face="Courier New">(make-instance
+cookies can be found <a href="http://developer.netscape.com:80/docs/manuals/js/client/jsref/cookies.htm">here</a>.</p>
+<p>A <strong>cookie-jar</strong> is created with <font face="Courier New">(make-instance
 'cookie-jar).</font></p>
 <p>&nbsp;</p>
 <p><strong><font face="Courier New">(cookie-jar-items&nbsp; cookie-jar)</font></strong></p>
@@ -2549,10 +2540,8 @@ form:</p>
 <p><strong>(hostname cookie-item ...)</strong></p>
 <p>The <strong>hostname</strong> is a string which is matched against
 the suffix of the
-name of the host in the request (that is, a hostname of&nbsp; <font
- face="Courier New">".foo.com"</font>
-matches <font face="Courier New">"a.foo.com"</font> and <font
- face="Courier New">"b.foo.com"</font>.
+name of the host in the request (that is, a hostname of&nbsp; <font face="Courier New">".foo.com"</font>
+matches <font face="Courier New">"a.foo.com"</font> and <font face="Courier New">"b.foo.com"</font>.
 ).&nbsp;&nbsp;&nbsp; The hostname should have at least two periods in
 it.
 &nbsp;&nbsp;&nbsp; The following <strong>cookie-item</strong> objects
@@ -2560,7 +2549,7 @@ in the list all
 apply to that hostname. &nbsp;&nbsp; A <strong>cookie-item</strong> is
 a defstruct object
 and has these fields</p>
-<table width="100%" border="1">
+<table border="1" width="100%">
   <tbody>
     <tr>
       <th width="29%">Accessor</th>
@@ -2593,10 +2582,8 @@ secure connection.</td>
 </table>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
-<p><a name="f-make-http-client-request"></a><strong><font
- face="Courier New">(make-http-client-request
-uri &amp;key method protocol keep-alive<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<p><a name="f-make-http-client-request"></a><strong><font face="Courier New">(make-http-client-request
+uri &amp;key method protocol keep-alive<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 accept cookies headers proxy<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 basic-authorization query<br>
@@ -2650,8 +2637,7 @@ You should use <strong>client-request-read-sequence</strong>
 to read the body of the response</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
-<p><a name="f-client-request-read-sequence"></a><strong><font
- face="Courier New">(client-request-read-sequence
+<p><a name="f-client-request-read-sequence"></a><strong><font face="Courier New">(client-request-read-sequence
 buffer client-request<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 &amp;key start end)</font></strong></p>
@@ -2830,7 +2816,7 @@ are <strong>setf</strong>'able to change the set of filters.</p>
 should be run after
 this one. If the filter returns anything else then subsequent filters
 in the list are run
-as well.&nbsp;&nbsp; If a filters in the <strong>vhost</strong> list
+as well.&nbsp;&nbsp; If a filter in the <strong>vhost</strong> list
 returns <strong>:done</strong>
 then the server global filters are not even checked.</p>
 <p>When a filter function runs it's most likely going to be looking at
@@ -2878,7 +2864,7 @@ raw uri: </p>
 ensure that the three
 values mentioned above are set appropriately for the destination. If
 the new destination
-is not served by the current allegroserve wserver, then the filter will
+is not served by the current Allegroserve wserver, then the filter will
 have to make sure
 to turn it into a proxy request (and this will only work if this
 AllegroServe was started
@@ -2886,7 +2872,7 @@ with proxying enabled).</p>
 <p>&nbsp;</p>
 <hr>
 <h2><a name="virtual_hosts"></a>Virtual Hosts</h2>
-<p>It is possible for a single web sever to act like two or more
+<p>It is possible for a single web server to act like two or more
 indepenent web servers.
 &nbsp; This is known as <em>virtual hosting</em>.&nbsp; AllegroServe
 supports the ability
@@ -2897,13 +2883,11 @@ more more IP addresses.&nbsp;&nbsp; When a request arrives there is
 usually a header line
 labelled <font face="Courier New">Host</font> whose value is the
 specific hostname typed
-into the browser by the user.&nbsp;&nbsp; Thus if hostnames <font
- face="Courier New">www.foo.com</font>
+into the browser by the user.&nbsp;&nbsp; Thus if hostnames <font face="Courier New">www.foo.com</font>
 and <font face="Courier New">www.bar.com </font>both point to the
 same machine then it's
 possible for the webserver on that machine to distinguish a request for
-<font face="Courier New">http://www.foo.com</font> from a request for <font
- face="Courier New">http://www.bar.com</font>
+<font face="Courier New">http://www.foo.com</font> from a request for <font face="Courier New">http://www.bar.com</font>
 by looking at the <font face="Courier New">Host</font> header.</p>
 <p>In order to make AllegroServe easy to use you can ignore the virtual
 hosting facility
@@ -2916,9 +2900,9 @@ to access your site.&nbsp; If you decide you want to make use of
 virtual hosting, then
 read on.</p>
 <h3>vhost class</h3>
-<p>In AllegroServe a virtual host is denoted by a instance of class <strong>vhost</strong>.
+<p>In AllegroServe a virtual host is denoted by an instance of class <strong>vhost</strong>.
 &nbsp;&nbsp; The contents of a vhost object are:</p>
-<table width="83%" border="1">
+<table border="1" width="83%">
   <tbody>
     <tr>
       <th width="26%">Accessor Function</th>
@@ -3016,12 +3000,12 @@ of a vhost is clear: it means that this entity will be visible on this
 virtual host.
 &nbsp; The meaning of <strong>:wild </strong>is that this entity will
 be visible on <em>all</em>
-virtual hosts, except it can be shadowed by a entity specified for a
+virtual hosts, except it can be shadowed by an entity specified for a
 particular virtual
 host.&nbsp; Thus you could publish an entity for<strong> :path "/" </strong>and
 <strong>:host
 :wild</strong> and it will be used for all virtual hosts that don't
-specify a entity for <strong>:path
+specify an entity for <strong>:path
 "/"</strong>.&nbsp; Note that when a request comes in and the search is
 done for
 an entity to match the request every step of the way we look first for
@@ -3034,7 +3018,7 @@ search this time looking for a <strong>:wild</strong> handler.</p>
 <p>&nbsp;</p>
 <hr>
 <h2><a name="timeouts"></a>Timeouts</h2>
-<p>A web server is a program that provides resources to client program
+<p>A web server is a program that provides resources to a client program
 connecting over the
 network.&nbsp; The resources a web server has to offer is limited and
 it's important that
@@ -3129,8 +3113,7 @@ the <strong>timeout</strong> argument defaults to a huge number.</p>
 <h2><a name="miscellaneous"></a>Miscellaneous</h2>
 <p><a name="f-ensure-stream-lock"></a><strong><font face="Courier New">(ensure-stream-lock
 stream)</font></strong></p>
-<p>The function adds a <a
- href="http://www.franz.com/support/documentation/6.1/doc/multiprocessing.htm#process-locks-1">process
+<p>The function adds a <a href="http://www.franz.com/support/documentation/6.1/doc/multiprocessing.htm#process-locks-1">process
 lock</a> to <strong>stream</strong>'s property list (under the
 indicator<strong> :lock</strong>)
 if no such lock is present.&nbsp;&nbsp; Then it returns the object <strong>stream</strong>.</p>
@@ -3148,7 +3131,7 @@ from multiple threads will become intermixed. </p>
 function
 locator)</strong></font></p>
 <p>When<strong> </strong>one of the<strong> </strong>publish
-functions is called enties
+functions is called entities
 are placed in <em>locator<strong> </strong></em>objects.&nbsp;&nbsp;
 The locator objects
 are then checked when http requests come in to find the appropriate
@@ -3158,7 +3141,7 @@ the entities in the
 given<strong> locator</strong>.&nbsp;&nbsp; One common use of <strong>map-entities</strong>
 is to find entities that you no longer wish to be published.&nbsp; For
 that reason <strong>map-entities</strong>
-will remove the entity the passed to the <strong>function</strong> if
+will remove the entity&nbsp; passed to the <strong>function</strong> if
 the <strong>function</strong>
 returns the keyword symbol <strong>:remove</strong> as its value.</p>
 <p>&nbsp;</p>
@@ -3172,10 +3155,8 @@ on your machine
 after you log out you have to start it as a <strong>Windows
 Service.&nbsp; </strong>This
 is easy to do thanks to code contributed by Ahmon Dancy.&nbsp;&nbsp; </p>
-<p>The first step is to download the <a
- href="http://opensource.franz.com/ntservice">ntservice
-code and documentation</a> from the Franz <a
- href="http://opensource.franz.com">opensource
+<p>The first step is to download the <a href="http://opensource.franz.com/ntservice">ntservice
+code and documentation</a> from the Franz <a href="http://opensource.franz.com">opensource
 site</a>.&nbsp; Read the documentation carefully especially as regards
 the different
 capabilities of the accounts under which you may choose to run
@@ -3184,7 +3165,7 @@ AllegroServe.&nbsp;&nbsp; </p>
 run either normally
 or as a service,.&nbsp; You can run it normally to debug it and then
 start it as a service
-when you're satisifed that it works.</p>
+when you're satisfied that it works.</p>
 <p>Following is an example of how this can be done.&nbsp;&nbsp; I've
 decided that if the <font face="Courier New">/service</font> argument
 is given on the command line when I start my
@@ -3202,9 +3183,8 @@ never returns.</p>
 <p>In order to register my application as a service to the operating
 system I call <strong>ntservice:create-service</strong>
 like this:</p>
-<pre>(ntservice:create-service "aservetest" "Aserve Test Service"<br>     "c:\\acl61\\testservice\\testapp\\testapp.exe -- /service")</pre>
-<p>Note that I use "<font face="Courier New">--</font>" before the "<font
- face="Courier New">/service</font>".&nbsp; This is <em>very </em>important.
+<pre>(ntservice:create-service "aservetest" "Aserve Test Service"<br>     "c:\\acl62\\testservice\\testapp\\testapp.exe -- /service")</pre>
+<p>Note that I use "<font face="Courier New">--</font>" before the "<font face="Courier New">/service</font>".&nbsp; This is <em>very </em>important.
 &nbsp;&nbsp; The "<font face="Courier New">--</font>" separates the
 arguments
 used to start up the program from the arguments passed to the program
@@ -3218,7 +3198,7 @@ Panel, selecting Administrative Tools and then Services.&nbsp;&nbsp;
 Locate the service
 you just added, right click on it and select <strong>start</strong>.&nbsp;&nbsp;
 You can
-stop the service with a a right click as well. </p>
+stop the service with&nbsp; a right click as well. </p>
 <p>&nbsp;</p>
 <hr>
 <h2><a name="international-chars-aserve"></a>Using International
@@ -3234,8 +3214,7 @@ character and punctuation needed for western European languages (which
 includes English).
 &nbsp;&nbsp; </p>
 <p>If you want to work with characters outside the Latin1 set you'll
-want to use the <a
- href="http://www.franz.com/support/documentation/6.1/doc/iacl.htm">International
+want to use the <a href="http://www.franz.com/support/documentation/6.1/doc/iacl.htm">International
 version
 of Allegro CL</a> which represents characters internally by their
 16-bit <a href="http://www.unicode.org">Unicode</a>
@@ -3267,7 +3246,7 @@ convert the lisp end of line (a single #\newline character) to the
 character that is standard on Windows.&nbsp;&nbsp; Thus an external
 format such as <strong>:utf-8</strong>
 &nbsp; has a different effect on Windows than on Unix, and this is not
-desireable for web
+desirable for web
 applications.&nbsp;&nbsp; The function call <font face="Courier New">(crlf-base-ef&nbsp;:utf-8)</font>
 returns an external format on Windows and on Unix that simply does the
 character encoding
@@ -3280,7 +3259,7 @@ response line, a
 header and optionally a body.&nbsp;&nbsp; The response line and header
 are always sent
 using a subset of the Latin1 character set (the subset corresponding
-the the US ASCII
+the&nbsp; US ASCII
 character set).&nbsp;&nbsp; The body is sent using the full Latin1
 character set, unless
 otherwise specified.&nbsp; To specify the character set of the body you
@@ -3302,8 +3281,7 @@ do this:</p>
 not identical.
 &nbsp; Check <a href="http://www.iana.org/assignments/character-sets">here</a>
 for the
-charset names and check <a
- href="http://www.franz.com/support/documentation/6.1/doc/iacl.htm#external-formats-1">here</a>
+charset names and check <a href="http://www.franz.com/support/documentation/6.1/doc/iacl.htm#external-formats-1">here</a>
 for the Allegro CL external format names.</p>
 <p>In order to make it easier to specify external formats in
 AllegroServe you can specify
@@ -3321,7 +3299,7 @@ function, and thus the default value of *<strong>default-aserve-external-format*
 is <strong>(crlf-base-ef :latin1-base</strong>).&nbsp;&nbsp; This
 means that regardless of
 the locale in which you run AllegroServe, AllegroServe will by default
-using the Latin1
+use the Latin1
 character set, which is what is expected by web clients..</p>
 <p>A very useful character set is <strong>utf-8</strong> which is the
 whole Unicode
@@ -3330,7 +3308,7 @@ inside Lisp.
 &nbsp;&nbsp; The corresponding Allegro CL external format is the value
 of <font face="Courier New"><strong>(crlf-base-ef :utf-8)</strong></font>.&nbsp;&nbsp;
 Specifying
-this character set allows you to write web pages that can characters
+this character set allows you to write web pages that can use characters
 from nearly every
 language in the world (whether the web browser can find the glyphs to
 display all those
@@ -3369,13 +3347,13 @@ to retrieve the form data and decode the data.</p>
 <h3>examples</h3>
 <p>The AllegroServe test page has links to a few pages that show how
 international
-characters work with AllegroServe.&nbsp; One of these is the the
+characters work with AllegroServe.&nbsp; One of these is&nbsp; the
 International Character
 Display page.&nbsp; This page&nbsp; shows what happens when the <strong>charset</strong>
 and <strong>external-format</strong> are set to different values and a
 page containing
 international characters is displayed.&nbsp; It demonstrates how it
-important is is that
+important it is that
 those two character set specifications be kept in sync, and it shows
 that <strong>utf-8</strong>
 is most likely the best choice for a character set for your web pages.</p>
@@ -3409,7 +3387,7 @@ enabled.</p>
 <p>This function turns off the given list of features.</p>
 <p>&nbsp;</p>
 <p>The list of debug features are:</p>
-<table width="100%" border="1">
+<table border="1" width="100%">
   <tbody>
     <tr>
       <td width="18%"><strong>:info</strong></td>
@@ -3444,5 +3422,4 @@ Specifying <strong>:all </strong>to <strong>debug-on</strong> or <strong>debug-o
 Specifying <strong>:log</strong>
 is the same as specifying all features except <strong>:notrap.</strong></p>
 <p>&nbsp;</p>
-</body>
-</html>
+</body></html>

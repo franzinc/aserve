@@ -1,9 +1,10 @@
-(sys:defpatch "aserve" 4
+(sys:defpatch "aserve" 5
   "v1: aserve version 1.2.25, various fixes from 1.2.24 released with 6.2;
 htmlgen fix :comment and :prin1-safe when html-print'ing;
 v2: aserve version 1.2.27;
 v3: aserve version 1.2.31;
-v4: aserve version 1.2.34."
+v4: aserve version 1.2.34;
+v5: aserve version 1.2.37."
   :type :system
   :post-loadable t)
 
@@ -32,7 +33,7 @@ v4: aserve version 1.2.34."
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: packages.cl,v 1.1.4.11 2003/12/23 21:06:14 layer Exp $
+;; $Id: packages.cl,v 1.1.4.12 2004/07/29 16:09:52 layer Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe
@@ -48,7 +49,8 @@ v4: aserve version 1.2.34."
 (in-package :user)
 
 (eval-when (compile load eval)
- (require :uri))
+  (require :uri)
+  (require :streamc))
 
 
 (defpackage :net.aserve
@@ -115,6 +117,7 @@ v4: aserve version 1.2.34."
    #:request-raw-uri
    #:request-socket
    #:request-uri
+   #:request-variable-value
    #:request-wserver
    
    #:request-reply-code

@@ -2,7 +2,8 @@
 ;;
 ;; htmlgen.cl
 ;;
-;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA 
+;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA  - All rights reserved.
+;; copyright (c) 2000-2004 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
@@ -24,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.8.6.5.2.5 2003/12/22 21:52:11 layer Exp $
+;; $Id: htmlgen.cl,v 1.8.6.5.2.6 2004/07/29 16:09:53 layer Exp $
 
 ;; Description:
 ;;   html generator

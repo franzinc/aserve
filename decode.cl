@@ -2,7 +2,8 @@
 ;;
 ;; decode.cl
 ;;
-;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA 
+;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA  - All rights reserved.
+;; copyright (c) 2000-2004 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
@@ -24,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: decode.cl,v 1.8.10.5.14.4 2003/12/23 20:54:22 layer Exp $
+;; $Id: decode.cl,v 1.8.10.5.14.5 2004/07/29 16:09:52 layer Exp $
 
 ;; Description:
 ;;   decode/encode code

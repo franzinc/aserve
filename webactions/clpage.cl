@@ -1,7 +1,8 @@
-(sys:defpatch "webactions" 3
+(sys:defpatch "webactions" 4
   "v1: add extended maps and authorizers;
 v2: webactions 1.4: add flags to map entries;
-v3: Add hook to allow processing of session objects before they are reaped."
+v3: Add hook to allow processing of session objects before they are reaped;
+v4: webactions 1.10."
   :type :system
   :post-loadable t)
 
@@ -10,7 +11,7 @@ v3: Add hook to allow processing of session objects before they are reaped."
 ;; clpage.cl
 ;; common lisp server pages
 ;;
-;; copyright (c) 2003 Franz Inc, Oakland, CA  - All rights reserved.
+;; copyright (c) 2003-2004 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
@@ -31,7 +32,7 @@ v3: Add hook to allow processing of session objects before they are reaped."
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: clpage.cl,v 1.1.2.4 2003/12/22 22:01:54 layer Exp $
+;; $Id: clpage.cl,v 1.1.2.5 2004/07/29 16:09:53 layer Exp $
 
 
 (eval-when (compile load eval) (require :aserve))
@@ -46,7 +47,6 @@ v3: Add hook to allow processing of session objects before they are reaped."
 	   #:find-clp-module
 	   #:find-clp-module-function
 	   #:publish-clp
-	   #:request-variable-value
 	   ))
 
 
@@ -330,6 +330,7 @@ v3: Add hook to allow processing of session objects before they are reaped."
 	(chcount 0)
 	(ch)
 	(res)
+	(lasttag)
 	(backbuffer (make-array 10 :element-type 'character
 				:initial-element #\space))
 	(backindex 0))
@@ -369,7 +370,8 @@ v3: Add hook to allow processing of session objects before they are reaped."
 	  (incf chcount)
 	  (if* (eq ch #\<)
 	     then 
-		  (setq res (parse-clp-tag p filename))
+		  (multiple-value-setq  (res lasttag)
+		    (parse-clp-tag p filename))
 		  ;(format t "res is ~s~%" res)
 		  (if* res
 		     then (savestring p pos-start 
@@ -379,7 +381,10 @@ v3: Add hook to allow processing of session objects before they are reaped."
 				chstart chcount))
 	   elseif (eq ch #\")
 	     then (if* (or (match-buffer backbuffer backindex "=ferh")
-			   (match-buffer backbuffer backindex "=noitca"))
+			   (match-buffer backbuffer backindex "=noitca")
+			   (and (equalp lasttag "frame")
+				(match-buffer backbuffer backindex "=crs"))
+			   )
 		     then (savestring p pos-start (- chcount chstart))
 			  ; scan for tag name
 			  (let ((savepos (file-position p)))
@@ -439,16 +444,17 @@ v3: Add hook to allow processing of session objects before they are reaped."
 (defun parse-clp-tag (p filename)
   ;; just read a <.. now see if there's a clp tag to read
   ;;
-  (macrolet ((no-tag-found ()
+  (macrolet ((no-tag-found (tag)
 	       `(progn (file-position p start-pos) ; restore position
-		       (return-from parse-clp-tag nil))))
+		       (return-from parse-clp-tag 
+			 (values nil ,tag)))))
     
     (let ((start-pos (file-position p))
 	  (chars))
       (loop
 	(let ((ch (read-char p nil nil)))
 	  (if* (null ch)
-	     then (no-tag-found))
+	     then (no-tag-found nil))
 	
 	  (if* (member ch *clp-end-tagname*)
 	     then ; seen end of tag
@@ -478,7 +484,7 @@ v3: Add hook to allow processing of session objects before they are reaped."
 					     then 
 						  (return-from parse-clp-tag
 						    clptag))))))
-		      (no-tag-found)))
+		      (no-tag-found tag)))
 	     else (push ch chars)))))))
 			
 	
@@ -608,6 +614,9 @@ v3: Add hook to allow processing of session objects before they are reaped."
 	
 	
     
+
+
+
 (defun scan-for-end-tag (p module fcn)
   ;; look for </module_fcn>
   ;; leave the file position after the tag
@@ -617,21 +626,64 @@ v3: Add hook to allow processing of session objects before they are reaped."
   ;; 
   ;; return  nil if the end tag wasn't found
   ;;
-  (let ((searchfor (format nil "</~a_~a>" module fcn))
-	(chcount 0))
+  
+  ;; we define a search obj as a cons holding how far we've
+  ;; matched so far and the string we're matching
+  (macrolet ((create-search-obj (string)
+	       `(cons 0 ,string))
+	     
+	     (init-search-obj (obj)
+	       ;; set back to initial state
+	       `(setf (car ,obj) 0))
+	     
+	     (end-of-search-p (obj)
+	       ;; see if we've matched all characters
+	       `(equal (car ,obj) (length (cdr ,obj))))
+	     
+	     (search-string (obj)
+	       `(cdr ,obj))
+	     
+	     (search-counter (obj)
+	       `(car ,obj))
+	     
+	     (match-search-string (obj ch)
+	       `(if* (eql ,ch (schar (search-string ,obj) 
+				      (search-counter ,obj)))
+		   then (incf (search-counter ,obj))
+		   else (init-search-obj ,obj))))
+	     
+    (let ((end-tag   (create-search-obj (format nil "</~a_~a>" module fcn)))
+	  (start-tag (create-search-obj (format nil "<~a_~a>" module fcn)))
+	  (nest-level 0)
+	  (ch)
+	  (chcount 0))
 
-    (loop
-      (dotimes (i (length searchfor)
-		 ; matched
-		 (return-from scan-for-end-tag
-		   (- chcount (length searchfor))))
-	(let ((ch (read-char p nil nil)))
-	  (incf chcount)
-	  (if* (null ch) then (return-from scan-for-end-tag nil))  ; eof
-	  (if* (not (eq ch (aref searchfor i)))
-	     then ;(format t "ch: ~s~%" ch)
-		  (return)))))))
+    
+      (loop
+	
+	(if* (end-of-search-p end-tag)
+	   then (if* (> nest-level 0)
+		   then (decf nest-level)
+			(init-search-obj end-tag)
+		   else (return (- chcount (length (search-string end-tag))))))
+	
+	(if* (end-of-search-p start-tag)
+	   then (incf nest-level)
+		(init-search-obj start-tag))
+	    
 
+    
+	; get next character ...
+	(if* (null (setq ch (read-char p nil nil)))
+	   then ; no end tag found
+		(return nil))
+	
+	(incf chcount)
+
+	;; and look for matches
+	(match-search-string end-tag ch)
+	(match-search-string start-tag ch)))))
+	    
 
 (defun collect-comment (p)
   ;; return a text object holding a whole comment
@@ -731,25 +783,6 @@ to separate the module part from the function name part, ~s doesn't" name))
 
 
 
-;;------- support for storing variables in the request object
-
-(defun request-variable-value (req name)
-  ;; get the value of the named variable in the request variable list
-  ;;
-  (cdr (assoc name (getf (request-reply-plist req) 'variables) 
-	      :test #'equal)))
-
-(defsetf request-variable-value .inv-request-variable-value)
-
-(defun .inv-request-variable-value (req name newvalue)
-  (let ((ent (assoc name (getf (request-reply-plist req) 'variables) 
-		    :test #'equal)))
-    (if* ent
-       then (setf (cdr ent) newvalue)
-       else ; must add an ent
-	    (push (cons name newvalue) 
-		  (getf (request-reply-plist req) 'variables))
-	    newvalue)))
 
 
 (provide :webactions)

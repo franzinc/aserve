@@ -2,7 +2,8 @@
 ;;
 ;; main.cl
 ;;
-;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA 
+;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA  - All rights reserved.
+;; copyright (c) 2000-2004 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
@@ -23,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.48.2.10.2.9 2003/12/23 20:54:22 layer Exp $
+;; $Id: main.cl,v 1.48.2.10.2.10 2004/07/29 16:09:52 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -37,7 +38,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 34))
+(defparameter *aserve-version* '(1 2 37))
 
 (eval-when (eval load)
     (require :sock)
@@ -494,6 +495,8 @@ Problems with protocol may occur." (ef-name ef)))))
        (declare (ignore-if-unused ,g-req ,g-ent ,g-external-format))
        ,(if* body 
 	   then `(compute-response-stream ,g-req ,g-ent))
+       (if* (entity-headers ,g-ent)
+	  then (bulk-set-reply-headers ,g-req (entity-headers ,g-ent)))
        (if* ,g-headers
 	  then (bulk-set-reply-headers ,g-req ,g-headers))
        (send-response-headers ,g-req ,g-ent :pre)
@@ -1168,7 +1171,13 @@ by keyword symbols and not by strings"
     ;; need to restrict the print level
     (loop
 
-      (let ((sock (car (mp:process-run-reasons sys:*current-process*))))
+      (let ((sock (dolist (rr (mp:process-run-reasons sys:*current-process*))
+		    (if* (streamp rr) then (return rr)))))
+	(if* (null sock)
+	   then ; started without a stream to process, must be because
+		;; we're being told to die, so abandon thread
+		(return-from http-worker-thread nil))
+	
 	(restart-case
 	    (if* (not (member :notrap *debug-current* :test #'eq))
 	       then (handler-case (process-connection sock)
@@ -1352,9 +1361,10 @@ by keyword symbols and not by strings"
   
 	
   (unwind-protect
-      (let ((req))
+      (let (req error-obj)
 	;; get first command
 	(loop
+	  
 	  (with-timeout-local (*read-request-timeout* 
 			       (debug-format :info "request timed out on read~%")
 			       ; this is too common to log, it happens with
@@ -1362,11 +1372,24 @@ by keyword symbols and not by strings"
 			       ; clicking
 			       ;;(log-timed-out-request-read sock)
 			       (return-from process-connection nil))
-	    (setq req (read-http-request sock)))
+	    (multiple-value-setq (req error-obj)
+	      (ignore-errors (read-http-request sock))))
 	  (if* (null req)
 	     then ; end of file, means do nothing
 		  ; (logmess "eof when reading request")
 		  ; end this connection by closing socket
+		  (if* error-obj
+		     then (brief-logmess 
+			   (format nil "While reading http request~:_ from ~a:~:_ ~a" 
+				   (socket:ipaddr-to-dotted 
+				    (socket::remote-host sock))
+				   error-obj)))
+
+		  ; notify the client if it's still listening
+		  (ignore-errors
+		   (format sock "HTTP/1.0 400 Bad Request~a~a" *crlf* *crlf*)
+		   (force-output sock))
+		   
 		  (return-from process-connection nil)
 	     else ;; got a request
 		  (setq *worker-request* req) 
@@ -1542,72 +1565,12 @@ by keyword symbols and not by strings"
 
 (defmethod get-request-body ((req http-request)
 			     &key (external-format :octets ef-supplied))
-  (let ((result
-	 ;; return a string that holds the body of the http-request
-	 ;;  cache it for later too
-	 (or (request-request-body req)
-	     (setf (request-request-body req)
-	       (if* (member (request-method req) '(:put :post))
-		  then (multiple-value-bind (length believe-it)
-			   (header-slot-value-integer req :content-length)
-			 (if* believe-it
-			    then	; we know the length
-				 (prog1 (let ((ret (make-string length)))
-					  (read-sequence-with-timeout 
-					   ret length 
-					   (request-socket req)
-					   *read-request-body-timeout*))
-	    
-					; netscape (at least) is buggy in that 
-					; it sends a crlf after
-					; the body.  We have to eat that crlf.
-					; We could check
-					; which browser is calling us but it's 
-					; not clear what
-					; is the set of buggy browsers 
-				   (let ((ch (read-char-no-hang
-					      (request-socket req)
-					      nil nil)))
-				     (if* (eq ch #\return)
-					then ; now look for linefeed
-					     (setq ch (read-char-no-hang 
-						       (request-socket req)
-						       nil nil))
-					     (if* (eq ch #\linefeed)
-						thenret 
-						else (unread-char 
-						      ch (request-socket req)))
-				      elseif ch
-					then (unread-char ch (request-socket
-							      req)))))
-				      
-				      
-			    else	; no content length given
-			  
-				 (if* (equalp "keep-alive" 
-					      (header-slot-value req
-								 :connection))
-				    then ; must be no body
-					 ""
-				    else ; read until the end of file
-					 (with-timeout-local
-					     (*read-request-body-timeout* 
-					      nil)
-					   (let ((ans (make-array 
-						       2048 
-						       :element-type 'character
-						       :fill-pointer 0))
-						 (sock (request-socket req))
-						 (ch))
-					     (loop (if* (eq :eof 
-							    (setq ch
-							      (read-char 
-							       sock nil :eof)))
-						      then (return  ans)
-						      else (vector-push-extend
-							    ch ans))))))))
-		  else ""		; no body
-		       )))))
+  (let* ((result
+	  ;; return a string that holds the body of the http-request
+	  ;;  cache it for later too
+	  (or (request-request-body req)
+	      (setf (request-request-body req)
+		(get-request-body-retrieve req)))))
     (if* ef-supplied			; spr27296
        then (values
 	     (octets-to-string
@@ -1616,6 +1579,83 @@ by keyword symbols and not by strings"
        else result)))
 
 
+(defun get-request-body-retrieve (req)
+  ;; get the guts of the body into a string.
+  ;; we'll always use the :octets external format to retrieve the string
+  ;; so the characters may not be correct however later external
+  ;; format processing will fix that.
+  (let ((original-ef (stream-external-format (request-socket req))))
+    
+    ; must read using the octets external format because the 
+    ; content length is in terms of octets
+    (setf (stream-external-format (request-socket req))
+      (find-external-format :octets))
+    
+    (unwind-protect
+	(if* (member (request-method req) '(:put :post))
+	   then (multiple-value-bind (length believe-it)
+		    (header-slot-value-integer req :content-length)
+		  (if* believe-it
+		     then	; we know the length
+			  (prog1 (let ((ret (make-string length)))
+				   (read-sequence-with-timeout 
+				    ret length 
+				    (request-socket req)
+				    *read-request-body-timeout*))
+	    
+			    ; netscape (at least) is buggy in that 
+			    ; it sends a crlf after
+			    ; the body.  We have to eat that crlf.
+			    ; We could check
+			    ; which browser is calling us but it's 
+			    ; not clear what
+			    ; is the set of buggy browsers 
+			    (let ((ch (read-char-no-hang
+				       (request-socket req)
+				       nil nil)))
+			      (if* (eq ch #\return)
+				 then ; now look for linefeed
+				      (setq ch (read-char-no-hang 
+						(request-socket req)
+						nil nil))
+				      (if* (eq ch #\linefeed)
+					 thenret 
+					 else (unread-char 
+					       ch (request-socket req)))
+			       elseif ch
+				 then (unread-char ch (request-socket
+						       req)))))
+				      
+				      
+		     else	; no content length given
+			  
+			  (if* (equalp "keep-alive" 
+				       (header-slot-value req
+							  :connection))
+			     then ; must be no body
+				  ""
+			     else ; read until the end of file
+				  (with-timeout-local
+				      (*read-request-body-timeout* 
+				       nil)
+				    (let ((ans (make-array 
+						2048 
+						:element-type 'character
+						:fill-pointer 0))
+					  (sock (request-socket req))
+					  (ch))
+				      (loop (if* (eq :eof 
+						     (setq ch
+						       (read-char 
+							sock nil :eof)))
+					       then (return  ans)
+					       else (vector-push-extend
+						     ch ans))))))))
+	   else ""		; no body
+		)
+      ; uwp cleanup
+      (setf (stream-external-format (request-socket req)) original-ef)
+      )))
 
 ;; multipart code
 ;; used when enctype=multipart/form-data is used
@@ -2578,6 +2618,7 @@ in get-multipart-sequence"))
   data	 ; list of buffers
   create ; create new object for the buffer
   init	 ; optional - used to init buffers taken off the free list
+  (lock  (mp:make-process-lock))
   )
 
 (defun create-sresource (&key create init)
@@ -2588,7 +2629,7 @@ in get-multipart-sequence"))
   ;; size
   (let (to-return)
     ;; force new ones to be allocated
-    (mp:without-scheduling 
+    (mp:with-process-lock ((sresource-lock sresource))
       (let ((buffers (sresource-data sresource)))
 	(if* size
 	   then ; must get one of at least a certain size
@@ -2624,7 +2665,7 @@ in get-multipart-sequence"))
   ;; return a resource to the pool
   ;; we silently ignore nil being passed in as a buffer
   (if* buffer 
-     then (mp:without-scheduling
+     then (mp:with-process-lock ((sresource-lock sresource))
 	    ;; if debugging
 	    (if* (member buffer (sresource-data sresource) :test #'eq)
 	       then (error "freeing freed buffer"))
@@ -2803,4 +2844,29 @@ in get-multipart-sequence"))
        then (push (setq obj (make-resp code "unknown code")) *responses*))
     obj))
   
+
+
+;===============
+; initially in the webactions codde, now here:
+;;------- support for storing variables in the request object
+
+(defun request-variable-value (req name)
+  ;; get the value of the named variable in the request variable list
+  ;;
+  (cdr (assoc name (getf (request-reply-plist req) 'variables) 
+	      :test #'equal)))
+
+(defsetf request-variable-value .inv-request-variable-value)
+
+(defun .inv-request-variable-value (req name newvalue)
+  (let ((ent (assoc name (getf (request-reply-plist req) 'variables) 
+		    :test #'equal)))
+    (if* ent
+       then (setf (cdr ent) newvalue)
+       else ; must add an ent
+	    (push (cons name newvalue) 
+		  (getf (request-reply-plist req) 'variables))
+	    newvalue)))
+
+
 

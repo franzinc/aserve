@@ -3,7 +3,7 @@
 ;; websession.cl
 ;; session support for webactions
 ;;
-;; copyright (c) 2003 Franz Inc, Oakland CA  - All rights reserved.
+;; copyright (c) 2003-2004 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
@@ -23,7 +23,7 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-;; $Id: websession.cl,v 1.1.2.2 2003/12/22 21:52:11 layer Exp $
+;; $Id: websession.cl,v 1.1.2.3 2004/07/29 16:09:53 layer Exp $
 
 (in-package :net.aserve)
 

@@ -3,7 +3,8 @@
 ;; parse.cl
 ;;
 ;;
-;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA 
+;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA  - All rights reserved.
+;; copyright (c) 2000-2004 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
@@ -25,7 +26,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.22.10.6.14.3 2003/09/24 17:12:02 layer Exp $
+;; $Id: parse.cl,v 1.22.10.6.14.4 2004/07/29 16:09:52 layer Exp $
 
 ;; Description:
 ;;   parsing and encoding code  

@@ -3,7 +3,7 @@
 ;; clp.cl
 ;; clp functions named clp_xxx
 ;;
-;; copyright (c) 2003 Franz Inc, Oakland CA  - All rights reserved.
+;; copyright (c) 2003-2004 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: clp.cl,v 1.1.2.2 2003/12/22 21:52:11 layer Exp $
+;; $Id: clp.cl,v 1.1.2.3 2004/07/29 16:09:53 layer Exp $
 
 
 (in-package :net.aserve)
@@ -194,11 +194,35 @@
 		  then (cvt-to-integer
 			(locate-any-value req args name)))
 	  value (cvt-to-integer value))
-    ;(format   t "name ~s ... value ~s~%" name value)
+    ;(format   t "eq: name ~s ... value ~s~%" name value)
     (if* (and name value
 	      (eql name value))
        then ; process the body
 	    (emit-clp-entity req ent body))))
+
+(def-clp-function clp_ifneq (req ent args body)
+  ;; name=varname
+  ;; value=val
+  ;;
+  ;; compare the value of varname against the value.  If it's
+  ;; not eq then then process the body.
+  ;;
+  ;; if name or value cannot be turned into an integer value then
+  ;; it's assume to not be greater than.
+  ;;
+  (let ((name  (cdr (assoc "name" args  :test #'equal)))
+	(value (cdr (assoc "value" args :test #'equal))))
+    (setq name (if* name
+		  then (cvt-to-integer
+			(locate-any-value req args name)))
+	  value (cvt-to-integer value))
+    ;(format   t "neq: name ~s ... value ~s~%" name value)
+    (if* (or (null name) (null value)
+	      (not (eql name value)))
+       then ; process the body
+	    (emit-clp-entity req ent body))))
+
+
 
 
 
@@ -238,6 +262,23 @@
 		  then (locate-any-value req args name)))
     ;(format   t "name ~s ... value ~s~%" name value)
     (if* (equal name value)
+       then ; process the body
+	    (emit-clp-entity req ent body))))
+
+(def-clp-function clp_ifnequal (req ent args body)
+  ;; name=varname
+  ;; value=val
+  ;;
+  ;; compare the value of varname against the value, which
+  ;; are both strings
+  ;;
+  ;;
+  (let ((name  (cdr (assoc "name" args  :test #'equal)))
+	(value (cdr (assoc "value" args :test #'equal))))
+    (setq name (if* name
+		  then (locate-any-value req args name)))
+    ;(format   t "name ~s ... value ~s~%" name value)
+    (if* (not (equal name value))
        then ; process the body
 	    (emit-clp-entity req ent body))))
 

@@ -3,7 +3,7 @@
 ;; webaction.cl
 ;; framework for building dynamic web sites
 ;;
-;; copyright (c) 2003 Franz Inc, Oakland CA  - All rights reserved.
+;; copyright (c) 2003-2004 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: webact.cl,v 1.1.2.2 2003/12/22 21:52:11 layer Exp $
+;; $Id: webact.cl,v 1.1.2.3 2004/07/29 16:09:53 layer Exp $
 
 
 
@@ -99,7 +99,7 @@
    
    ))
 
-(defparameter *webactions-version* "1.5")
+(defparameter *webactions-version* "1.10")
 	      
 (defvar *name-to-webaction* (make-hash-table :test #'equal))
 
@@ -143,7 +143,7 @@
 			     ))
 	(wa (or (gethash name *name-to-webaction*)
 		(make-instance 'webaction))))
-    
+
     (setf (directory-entity-access-file ent) access-file)
     
     (setf (webaction-name wa) name)
@@ -193,7 +193,8 @@
 		
     
     (setf (gethash name *name-to-webaction*) wa)
-    
+
+    (remove-old-webaction-pages wa server)
 
     ;; if we have an index page for the site, then redirect
     ;; the project-prefix to it
@@ -223,6 +224,17 @@
     
     ent))
 
+
+(defun remove-old-webaction-pages (wa server)
+  ;; unpublish all pages from the previous time this webaction-project
+  ;; was defined
+  
+  (map-entities #'(lambda (ent)
+		    
+		    (if* (eq (getf (entity-plist ent) 'webaction) wa)
+		       then :remove))
+		    
+		(find-locator :exact server)))
 
 (defun redirect-to (req ent dest)
   (with-http-response (req ent
@@ -357,9 +369,20 @@
 			  
 			(loop
 			  (if* (stringp (car actions))
-			     then (modify-request-path req 
-						       (webaction-project-prefix wa)
-						       (car actions))
+			     then (if* redirect
+				     then  ; redir so client will send
+					  ; new request meaning we have to
+					  ; pass the cookie value in
+					  (modify-request-path 
+					   req 
+					   (webaction-project-prefix wa)
+					   (locate-action-path
+					    wa (car actions) websession))
+					   
+				     else (modify-request-path 
+					   req 
+					   (webaction-project-prefix wa)
+					   (car actions)))
 				  (return)
 				  
 			   elseif (symbolp (car actions))
@@ -385,7 +408,8 @@
 				   elseif (stringp following)
 				     then (modify-request-path 
 					   req (webaction-project-prefix wa)
-					   following)
+					   (locate-action-path
+					    wa following websession))
 					  (return)
 					  
 				     else ; bogus ret from action fcn
@@ -576,7 +600,8 @@
 (defun relative-to-absolute-path (prefix relative-path)
   ;; add on the project prefix so that the resulting path
   ;; is reachable via a browser
-  (if* (not (eq #\/ (aref relative-path 0)))
+  (if* (or (zerop (length relative-path))
+	   (not (eq #\/ (aref relative-path 0))))
      then ; relative path
 	  (concatenate 'string prefix relative-path)
      else relative-path))

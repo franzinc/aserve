@@ -1,36 +1,33 @@
-*******************************************************************************
-merge from trunk to acl62 branch on 12/23/03
-command:
-join.sh trunk trunk_to_acl62_merge_122203 trunk_to_acl62_merge_122303 aserve
-*******************************************************************************
+2004-06-09  John Foderaro  <jkf@tiger.franz.com>
+1.2.37
+	* main.cl - return a 400 response if there's an error reading
+	    the request.  
+	    Use process locks when allocating sresources rather
+	    then without-scheduling.
 
-*******************************************************************************
-merge from trunk to acl62 branch on 12/22/03
-command:
-join.sh trunk trunk_to_acl62_merge_102203_2 trunk_to_acl62_merge_122203 aserve
-*******************************************************************************
+2004-04-29  John Foderaro  <jkf@tiger.franz.com>
 
-2003-10-22  Kevin Layer  <layer@crikey>
+	* main.cl - http-worker-thread don't expect the stream
+	    to process to be the first and only thing on the
+	    run-reasons list.  Acl7.0 will add things as well.
 
-	* packages.cl: update defpatch
+2004-03-04  John Foderaro  <jkf@tiger.franz.com>
 
-*******************************************************************************
-2nd merge from trunk to acl62 branch on 10/22/03
-command:
-join.sh trunk trunk_to_acl62_merge_102203 trunk_to_acl62_merge_102203_2 aserve
-*******************************************************************************
+	* main.cl - ensure that get-request-body always reads from
+	 a stream with the :octets external format so that the
+	 content-length header value is meaningful.
 
-*******************************************************************************
-merge from trunk to acl62 branch on 10/22/03
-command:
-join.sh trunk trunk_to_acl62_merge_092403 trunk_to_acl62_merge_102203 aserve
-*******************************************************************************
+2004-03-03    <jkf@main.verada.com>
+1.2.36
+	* main.cl: add request-variable-value (moved from webactions)
 
-*******************************************************************************
-merge from trunk to acl62 branch on 9/24/03
-command:
-join.sh trunk trunk_to_acl62_merge_070703 trunk_to_acl62_merge_092403 aserve
-*******************************************************************************
+2004-01-09  John Foderaro  <jkf@tiger.franz.com>
+1.2.35
+	* publish.cl, main.cl, test/t-aserve.cl: add a slot to 
+	  all entities holding
+	  the extra headers to add to the response.  Add a :headers
+	  argument to all publish functions that allows one
+	  to store a value in the new headers slot.
 
 2003-12-23  John Foderaro  <jkf@tiger.franz.com>
 1.2.34
@@ -91,41 +88,6 @@ join.sh trunk trunk_to_acl62_merge_070703 trunk_to_acl62_merge_092403 aserve
 
 	* move the require of :uri to before the first
 	  reference to it in packages.cl
-
-2003-07-08  Kevin Layer  <layer@crikey>
-
-	* packages.cl: fmakunbound 'get-request-body so there are not
-	  conflicts with earlier patch versions
-
-2003-07-07  Kevin Layer  <layer@crikey>
-
-	* packages.cl: v2 of the patch for 6.2
-
-*******************************************************************************
-merge from trunk to acl62 branch on 7/7/03
-command:
-join.sh trunk trunk_to_acl62_merge3 trunk_to_acl62_merge_070703 aserve
-*******************************************************************************
-
-*******************************************************************************
-Tue Apr 29 10:00:00 PDT 2003
-merge from trunk to acl62 branch
-command:
-join.sh trunk trunk_to_acl62_merge2 trunk_to_acl62_merge3 aserve
-*******************************************************************************
-
-*******************************************************************************
-Fri Jan 10 08:19:16 PST 2003
-merge from trunk to acl62 branch
-command:
-join.sh trunk trunk_to_acl62_merge1 trunk_to_acl62_merge2 aserve
-*******************************************************************************
-
-*******************************************************************************
-Mon Jun 17 11:27:39 PDT 2002
-merge from trunk to acl62 branch
-cmd: join.sh trunk acl62 trunk_to_acl62_merge1 aserve
-*******************************************************************************
 
 2003-05-09    <jkf@main.verada.com>
 1.2.27

@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.3.10.3.2.2 2003/12/22 21:52:10 layer Exp $
+# $Id: makefile,v 1.3.10.3.2.3 2004/07/29 16:09:52 layer Exp $
 #
 # On Windows, this makefile requires the use of GNU make from Redhat
 # (http://sources.redhat.com/cygwin/).
