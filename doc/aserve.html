@@ -792,8 +792,8 @@ the <strong>run-cgi-program</strong> function.</p>
 ent program &amp;key path-info path-translated<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 script-name query-string <br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; auth-type
-timeout error-output)</strong></font></p>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+auth-type timeout error-output)</strong></font></p>
 
 <p>In response to an http request, this runs <strong>program</strong> which must be a
 string naming an exectuable program or script followed optionally by command line
@@ -824,7 +824,7 @@ run-cgi-program allows the caller to specify what happens to data sent to standa
     of *standard-error*.</td>
   </tr>
   <tr>
-    <td width="32%"><strong></strong>pathname or string<strong></strong></td>
+    <td width="32%">pathname or string</td>
     <td width="68%">A file with the given name is opened and standard error is directed to
     that file.</td>
   </tr>
@@ -834,11 +834,11 @@ run-cgi-program allows the caller to specify what happens to data sent to standa
     error messages will be mixed into the result of running the cgi program.</td>
   </tr>
   <tr>
-    <td width="32%"><strong></strong>symbol or function<strong></strong></td>
+    <td width="32%">symbol or function</td>
     <td width="68%">The function is run whenever there is data available to be read from
     standard error.&nbsp; It must read that data.&nbsp; It must return a true value if it
-    detected an end of file during the read and <strong>nil</strong> otherwise.
-    &nbsp;&nbsp; The function takes arguments: req ent stream</td>
+    detected an end of file during the read and <strong>nil</strong> otherwise. &nbsp;&nbsp;
+    The function takes arguments: req ent stream</td>
   </tr>
 </table>
 
@@ -2073,21 +2073,19 @@ simple url rewriting, such as changing all requests for one machine to another m
 The filtering occurs before the test to see if this is a proxy request so a filter can
 change a proxy request to a non proxy request or vice versa. </p>
 
-<p align="left">The currently active filters are the value of a slot in the wserver object
-</p>
-<div align="left">
-
-<pre>&nbsp;(wserver-filters wserver)</pre>
-</div>
-
-<p align="left">This slot can be setf'ed to a list of functions or new filter can be
-pushed onto the list.</p>
+<p align="left">The currently active filters are found in two places.&nbsp; First the <strong>vhost-filters</strong>
+function of the applicable <strong>vhost</strong> returns a set of <strong>vhost</strong>
+specific filters.&nbsp;&nbsp; Next the <strong>wserver-filters</strong> function on the
+current <strong>wserver</strong> object returns a set of server global filters.
+&nbsp;&nbsp;&nbsp; Both of these functions are <strong>setf</strong>'able to change the
+set of filters.</p>
 
 <p>&nbsp;</p>
 
 <p>A filter function returns <strong>:done</strong> if no more filters should be run after
 this one. If the filter returns anything else then subsequent filters in the list are run
-as well. </p>
+as well.&nbsp;&nbsp; If a filters in the <strong>vhost</strong> list returns <strong>:done</strong>
+then the server global filters are not even checked.</p>
 
 <p>When a filter function runs it's most likely going to be looking at two slots in the
 request object, which are accessed via these functions: 
@@ -2176,18 +2174,23 @@ read on.</p>
     <td width="26%">vhost-log-stream</td>
     <td width="57%">Stream to which to write logging information on requests to this virtual
     host</td>
-    <td width="17%">:log-stream</td>
+    <td width="17%"><strong>:log-stream</strong></td>
   </tr>
   <tr>
     <td width="26%">vhost-error-stream</td>
     <td width="57%">Unused by AllegroServe but applications may wish to store here a stream to
     which to write a log of errors</td>
-    <td width="17%">:error-stream</td>
+    <td width="17%"><strong>:error-stream</strong></td>
   </tr>
   <tr>
     <td width="26%">vhost-names</td>
     <td width="57%">A list of all the names for this virtual host.&nbsp; </td>
-    <td width="17%">:names</td>
+    <td width="17%"><strong>:names</strong></td>
+  </tr>
+  <tr>
+    <td width="26%">vhost-filters</td>
+    <td width="57%">list of <a href="#filters">filter functions</a> </td>
+    <td width="17%"><strong>:filters</strong></td>
   </tr>
 </table>
 
