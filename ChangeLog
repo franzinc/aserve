@@ -1,3 +1,9 @@
+2003-12-12  Kevin Layer  <layer@relay.known.net>
+
+	* makefile: set base version to 6.2
+	* proxy.cl: fix typo in proxy-failure-response, include requested
+	  uri, too
+
 2003-10-31  John Foderaro  <jkf@tiger.franz.com>
 
 	* cgi.cl - transfer data from script back to http client
