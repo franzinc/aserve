@@ -1,3 +1,10 @@
+2003-12-08    <jkf@main.verada.com>
+
+	* set the prefix and suffix values for a websession key
+	when the project starts to be used rather when it's defined
+	thus causing a saved image to use different prefix and suffix
+	each time it's run.
+
 2003-12-02    <jkf@main.verada.com>
 
 	* clp_value now takes external-format argument

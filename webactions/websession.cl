@@ -23,7 +23,7 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-;; $Id: websession.cl,v 1.2 2003/10/27 17:00:05 jkf Exp $
+;; $Id: websession.cl,v 1.3 2003/12/08 14:17:49 jkf Exp $
 
 (in-package :net.aserve)
 
@@ -33,14 +33,16 @@
   ;; describes how a set of sessions is managed
   ((prefix :initarg :prefix
 	   ;; string that preceeds all keys
+	   :initform ""
 	   :accessor sm-prefix)
 
    (suffix  :initarg :suffix
 	    ;; number against which the counter will be xored
+	    :initform ""
 	    :accessor sm-suffix)
    
    (counter :initarg :counter
-	    :initform 0
+	    :initform nil
 	    :accessor sm-counter)
    
    ;; how long a session will last if no reference made to it
@@ -87,8 +89,15 @@
 
 
 (defmethod initialize-websession-master ((sm websession-master))
-  ;; prepare the session master to emit keys
+  ;; we no longer do this here.. we wait until we start to use
+  ;; the keys that way a saved image will get new info when
+  ;; it starts
+  nil
   
+  )
+
+(defun compute-prefix-suffix (sm)
+  ;; compute the prefix string and suffix value
   ; randomize the random number generator
   (dotimes (i (logand (get-universal-time) #xfff)) (random 256))
   
@@ -104,18 +113,27 @@
     (setq val 0)
     (dotimes (i 4)
       (setq val (+ (ash val 8) (random 255))))
-    (setf (sm-suffix sm) val)
-    
-    (setf (sm-counter sm) (random 255)))
-  
-  )
+    (setf (sm-suffix sm) val))
+)
 
+
+
+(defvar *websession-counter-lock* (mp:make-process-lock))
 
 (defmethod next-websession-id ((sm websession-master))
-  (let ((counterval (incf (sm-counter sm))))
-    (concatenate 'string (sm-prefix sm)
-		 (format nil "~x" (random #xfffffff))
-		 (format nil "~x" (logxor (sm-suffix sm) counterval)))))
+  (mp:with-process-lock (*websession-counter-lock*)
+    
+    (let ((counterval (sm-counter sm)))
+      
+      (if* (null counterval)
+	 then (compute-prefix-suffix sm)
+	      (setq counterval (random 255)))
+      
+      (setf (sm-counter sm) (1+ counterval))
+		  
+      (concatenate 'string (sm-prefix sm)
+		   (format nil "~x" (random #xfffffff))
+		   (format nil "~x" (logxor (sm-suffix sm) counterval))))))
 
     
   
