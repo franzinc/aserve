@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.19 2002/09/10 16:30:12 jkf Exp $
+;; $Id: htmlgen.cl,v 1.20 2002/09/13 02:01:13 jkf Exp $
 
 ;; Description:
 ;;   html generator
@@ -61,12 +61,13 @@
 							      print
 							      name-attr
 							      )))
-  key	; keyword naming this
+  key		; keyword naming this tag
   has-inverse	; t if the / form is used
-  macro  ; the macro to define this
-  special  ; if true then call this to process the keyword
-  print    ; function used to handle this in html-print
-  name-attr ; attribute symbols which can name this object for subst purposes
+  macro  	; the macro to define this
+  special       ; if true then call this to process the keyword and return
+                ; the macroexpansion
+  print         ; function used to handle this in html-print
+  name-attr     ; attribute symbols which can name this object for subst purposes
   )
 
 
@@ -464,11 +465,42 @@
   
 					 
 		      
-      
+;; --  defining how html tags are handled. --
+;;
+;; most tags are handled in a standard way and the def-std-html
+;; macro is used to define such tags
+;;
+;; Some tags need special treatment and def-special-html defines
+;; how these are handled.  The tags requiring special treatment
+;; are the pseudo tags we added to control operations
+;; in the html generator.
+;; 
+;;
+;; tags can be found in three ways:
+;;  :br	    		- singleton, no attributes, no body
+;;  (:b "foo")          - no attributes but with a body
+;;  ((:a href="foo") "balh")  - attributes and body
+;;
   
   
 
 (defmacro def-special-html (kwd fcn print-fcn)
+  ;; kwd - the tag we're defining behavior for.
+  ;; fcn - function to compute the macroexpansion of a use of this
+  ;;       tag. args to fcn are: 
+  ;;		ent - html-process object holding info on this tag
+  ;;		args - list of attribute-values following tag
+  ;;		argsp - true if there is a body in this use of the tag
+  ;;		body - list of body forms.
+  ;; print-fcn - function to print an lhtml form with this tag 
+  ;;	    args to fcn are:
+  ;;		ent - html-process object holding info on this tag
+  ;;		cmd - one of :set, :unset, :full
+  ;;		args - list of attribute-value pairs
+  ;;		subst - subsitution list
+  ;;		unknown - function to call for unknown tags
+  ;;		stream - stream to write to
+  ;;		
   `(setf (gethash ,kwd *html-process-table*) 
      (make-html-process ,kwd nil nil ,fcn ,print-fcn nil)))
 
