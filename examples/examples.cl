@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.26 2001/12/01 00:20:35 jkf Exp $
+;; $Id: examples.cl,v 1.27 2001/12/03 19:06:34 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -483,7 +483,6 @@
 	 :content-type "text/html"
 	 :authorizer (make-instance 'location-authorizer
 		       :patterns '((:accept "127.0" 8)
-				   (:accept "tiger.franz.com")
 				   :deny))
 	 :function
 	 #'(lambda (req ent)
