@@ -235,7 +235,26 @@
       (close main-socket))))
 
 
-
+(defun start-cmd ()
+  ;; start using the command line arguments
+  (let ((port 8001))
+    (do* ((args (cdr (sys:command-line-arguments)) (cdr args))
+	  (arg (car args) (car args)))
+	((null args))
+      (if* (equal "-f" arg)
+	 then (load (cadr args))
+	      (pop args)
+       elseif (equal "-p" arg)
+	 then (setq port (read-from-string (cadr args)))
+	      (pop args)
+       elseif (equal "-I" arg)
+	 then (pop args)
+	 else (warn "unknown arg ~s" arg)))
+    (dotimes (i 20)
+      (handler-case (start :port port)
+	(error (cond)
+	  (format t " got error ~s~%" cond)
+	  (format t "restarting~%"))))))
 
 
 (defun process-connection (sock)

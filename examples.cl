@@ -36,7 +36,6 @@
 				 :expansion-free-percent-new
 				 :expansion-free-percent-old
 				 :quantum
-				 :open-old-area-fence
 				 )))))
 			     
 				   
@@ -51,7 +50,7 @@
 		       
 
 
-(publish-file :url "/pic" :file "neoweb/prfile9.jpg"
+(publish-file :url "/pic" :file "prfile9.jpg"
 	      :mime-type "image/jpeg")
 
 
@@ -96,7 +95,7 @@
 			  :test #'equal)))
        (with-http-response (*response-ok* req "text/html")
 	 (html (:head (:title "Allegro Apropos"))
-	       ((:body :background "neoweb/fresh.jpg")
+	       ((:body :background "fresh.jpg")
 		"New Apropos of "
 		((:form :action "/apropos"
 			:method "get")
@@ -143,6 +142,6 @@
 
 				  
 (publish-file :url "/neoweb/fresh.jpg"
-	      :file "neoweb/fresh.jpg"
+	      :file "fresh.jpg"
 	      :mime-type "image/jpeg"
 	      :preload t)
