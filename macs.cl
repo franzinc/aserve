@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: macs.cl,v 1.14 2001/10/12 21:51:29 jkf Exp $
+;; $Id: macs.cl,v 1.15 2001/10/16 17:55:41 jkf Exp $
 
 ;; Description:
 ;;   useful internal macros
@@ -203,7 +203,7 @@
 #-(version>= 6 1)
 (defmacro with-timeout-local ((time &rest actions) &rest body)
   ;; same as with-timeout 
-  `(with-timeout (,time ,@actions) ,@body))   ; ok w-t
+  `(mp:with-timeout (,time ,@actions) ,@body))   ; ok w-t
 
 
 #+(version>= 6 1)

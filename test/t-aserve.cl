@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.32 2001/10/16 16:58:20 jkf Exp $
+;; $Id: t-aserve.cl,v 1.33 2001/10/16 17:55:41 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -1270,7 +1270,9 @@
        (force-output sock)
        
        ; try sending data periodically but in enough time to
-       ; bypass the timeout
+       ; bypass the timeout.  This only works in the io-timeout
+       ; situation.
+       #+io-timeout
        (dotimes (i 3)
 	 (sleep (max 1 (- net.aserve:*http-io-timeout* 10)))
 	 (format t "send packet~%")(force-output)
