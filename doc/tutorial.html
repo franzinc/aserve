@@ -431,11 +431,15 @@ data associated with this header.</p>
 <p>An example demonstrating this is too large to include here but can be found in the
 iServe examples.cl file (search in that file for&nbsp; &quot;getfile-got&quot;)</p>
 
-<h1>Authenticating a request</h1>
+<h1>Authorizing a request</h1>
 
 <p>You don't necessarily want to allow everyone to access every page you publish.
 &nbsp;&nbsp; We will describe common ways to check whether someone has permission to
-access a page.</p>
+access a page.&nbsp;&nbsp; There are two ways to do the authorization checks.&nbsp; You
+can do write the tests yourself in the entity function, or you can create an <strong>authorizer
+</strong>object an attach it to the entity.&nbsp;&nbsp;&nbsp; Below we'll show you how to
+write the code to do the checks manually.&nbsp;&nbsp; The Allegro iServe manual describes
+the <strong>authorizer</strong> objects. </p>
 
 <h2>password</h2>
 
@@ -536,9 +540,13 @@ object is stored in the variable <strong>*wserver*</strong>.&nbsp;&nbsp;&nbsp; T
 functions use the value of <strong>*wserver* </strong>as the default server into which
 they publish entities.</p>
 
-<h1>The entity lookup algorithm</h1>
+<p>&nbsp;</p>
 
 <h1>Debugging a computed response handler</h1>
+
+<p>to be filled in</p>
+
+<p>&nbsp;</p>
 
 <p>&nbsp;</p>
 

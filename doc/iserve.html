@@ -11,7 +11,7 @@
 
 <h2 align="left">Introduction</h2>
 
-<p><strong>Allegro iSeve </strong>is a webserver&nbsp; written at <a
+<p><strong>Allegro iServe </strong>is a webserver&nbsp; written at <a
 href="http://www.franz.com">Franz Inc</a>.&nbsp;&nbsp;iServe is designed to work with the <a
 href="htmlgen.html">htmlgen</a> system for generating dynamic html, as one of the big
 advantages of&nbsp; a web server written in Common Lisp is the ability to generate html
@@ -28,12 +28,13 @@ generation to be parts of the same product.</p>
     the user.&nbsp; </li>
   <li>easy to use.&nbsp;&nbsp; The typical scenarios should be easy to program with just
     knowledge of simple html.</li>
-  <li>usable in commerical applications .</li>
+  <li>usable in commercial applications .</li>
   <li>support the latest http protocol (currently HTTP/1.1)</li>
   <li>runnable in multiple configuration.&nbsp;&nbsp;&nbsp; We want to support a program that
     just wants to make some part of it visible or configurable by one user through a web
     server.&nbsp; We also want to support&nbsp; a web site running on a multiprocessor taking
-    many hits per second.&nbsp;&nbsp; And we want so support levels inbetween those scenarios.</li>
+    many hits per second.&nbsp;&nbsp; And we want so support levels in between those
+    scenarios.</li>
 </ul>
 
 <p>&nbsp;</p>
@@ -99,7 +100,7 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
     will only succeed if the current user id is <strong>root</strong>.&nbsp;&nbsp; You would
     want to use this argument if you plan on opening port <strong>80</strong> on Unix, as you
     would have to start the server as <strong>root</strong> but then would want to change the
-    user id to an account with fewer priviledges before allowing possibly malicious people to
+    user id to an account with fewer privileges before allowing possibly malicious people to
     connect to it.</li>
   <li>setgid -- after opening the port, change the group&nbsp; id of this process to the given
     number (only numbers are allowed, not names).&nbsp; This will only have an effect on Unix</li>
@@ -274,7 +275,7 @@ the response is only that the request wasn't found.</p>
 depending on whether keep-alive is being done, chunking is possible, whether the response
 is text or binary, whether the client already has the most recent data, and whether the
 size of the body of the response is known before the headers are sent.&nbsp; iServe
-handles the complexity of determing the optimal response strategy and the user need only
+handles the complexity of determining the optimal response strategy and the user need only
 use a few specific macros in the computation of the response in order ot take advantage of
 iServe's strategy computation</p>
 
@@ -298,7 +299,7 @@ possibilities, it just uses <strong>with-http-response</strong> and <strong>with
 and the rest is automatic.&nbsp; The <strong>html</strong> macro is part of the htmlgen
 package that accompanies iServe.&nbsp;&nbsp; In the case above we are being lazy and not
 putting out the html directives that should be found on every page of html since most
-browsers are accomodating.&nbsp;&nbsp; Here's the function that generates the correct
+browsers are accommodating.&nbsp;&nbsp; Here's the function that generates the correct
 html:</p>
 <div align="left">
 
@@ -339,7 +340,7 @@ entity object will be compared against the <strong>if-modified-since </strong>ti
 request and if that indicates that the client already has the latest copy of this entity
 then a <strong>not-modified</strong> response will be automatically returned to the client
 and the <strong>body </strong>of this macro will not be run.&nbsp;&nbsp; <strong>response </strong>is
-an object contaning the code and description of the http response we wish to return.
+an object containing the code and description of the http response we wish to return.
 &nbsp;&nbsp; The default value is the value of <strong>*response-ok*</strong> (which has a
 code of 200 and a string descriptor &quot;OK&quot;).&nbsp;&nbsp; <strong>content-type </strong>is
 a string describing the MIME type of the body (if any) sent after the headers.&nbsp; It
@@ -447,7 +448,7 @@ a keyword symbol naming the http protocol requested.&nbsp; It is either :http/0.
 :http/1.0 or :http/1.1.</p>
 
 <p><font face="Courier New"><strong>(request-protocol-string request) </strong></font>-
-reader - a string naming the http protcol requested. It is either &quot;HTTP/0.9&quot;,
+reader - a string naming the http protocol requested. It is either &quot;HTTP/0.9&quot;,
 &quot;HTTP/1.0&quot; or &quot;HTTP/1.1&quot;.</p>
 
 <p><strong><font face="Courier New">(request-socket request)</font></strong> - reader -
@@ -526,7 +527,7 @@ defines the form
     <strong>req)</strong> to retrieve the alist of form names and values.&nbsp;&nbsp; This
     method has a few disadvantages - the amount of data that can be sent is limited since the
     size of urls is limited.&nbsp; Also the data is visible to everyone seeing the url and
-    that may not be desireable.&nbsp; </li>
+    that may not be desirable.&nbsp; </li>
   <li><strong>&lt;form method=&quot;post&quot;&gt; - </strong>The data is send in the body of
     the request.&nbsp;&nbsp;&nbsp; The neo url handler code calls <strong>(get-request-body
     req)</strong> to retrieve the body from the web browser and then <strong>(decode-form-urlencoded
@@ -534,7 +535,7 @@ defines the form
   <li><strong>&lt;form method=&quot;post&quot; enctype=&quot;multipart/form-data&quot;&gt; - </strong>The
     data is sent in the body of the request in MIME format, with each field in its own
     separate MIME entity.&nbsp;&nbsp;&nbsp; This method is only necessary when one of the
-    fields in the form is a <strong>&lt;input type=&quot;file&quot;&gt;</strong> ssince that
+    fields in the form is a <strong>&lt;input type=&quot;file&quot;&gt;</strong> since that
     causes the whole contents of a file to be sent from the browser to the web server. &nbsp;
     When sending a file you would like to include information such as the file name and
     content-type of the file, and by sending it in MIME format there is room for this
@@ -542,7 +543,7 @@ defines the form
     form next.</li>
 </ul>
 
-<h3>Retreving multipart/form-data information</h3>
+<h3>Retrieving multipart/form-data information</h3>
 
 <p>If you create a form with <strong>&lt;form method=&quot;post&quot;
 enctype=&quot;multipart/form-data&quot;&gt;</strong> then your url handler must do the
@@ -742,10 +743,11 @@ and a password of<strong> derf</strong>.</p>
 <p>This authorizer class checks the IP address of the request to see if it is permitted
 access to the entity.&nbsp; The&nbsp; authorizer can specify a sequence of&nbsp; patterns
 and for each pattern a command of <strong>:accept </strong>(permit the access) or <strong>:deny</strong>
-(forbid the access).&nbsp;&nbsp;&nbsp; The single slot of an object of class <strong>location-authorizer</strong>
-is</p>
+(forbid the access).&nbsp;&nbsp;&nbsp; The first pattern that matches determines if the
+request is accepted or denied.&nbsp; If the pattern list is empty or if no pattern
+matches, then the request is accepted.&nbsp; </p>
 
-<p>&nbsp;</p>
+<p>The single slot of an object of class <strong>location-authorizer</strong> is</p>
 
 <table border="1" width="100%">
   <tr>
@@ -764,12 +766,48 @@ is</p>
 <p>A pattern can be 
 
 <ul>
-  <li>:accept -- this is a pattern that matches all IP address and causes the access to be
-    authorized</li>
-  <li>:deny -- this is a pattern that matches all IP address and causes the access to be
-    rejected</li>
-  <li>(:accept ipaddress [bits]) -- [.......... to be continued ........]</li>
+  <li><strong>:accept</strong> -- this is a pattern that matches all IP address and causes the
+    access to be authorized</li>
+  <li><strong>:deny</strong> -- this is a pattern that matches all IP address and causes the
+    access to be rejected</li>
+  <li><strong>(:accept ipaddress [bits])</strong> --&nbsp; if the request's IP address matches
+    the most significant <strong>bits</strong> of <strong>ipaddress</strong> then this access
+    is accepted.&nbsp;&nbsp; <strong>bits</strong> is optional and defaults to 32 (the whole
+    address).&nbsp; The ipaddress can be an integer (the 32 bit IP address) or it can be a
+    string in either dotted form &quot;123.23.43.12&quot;&nbsp; or a host name
+    &quot;foo.bar.com&quot;.&nbsp;&nbsp; In the case of a host name, a lookup must be done to
+    map the host name to an&nbsp; IP address.&nbsp;&nbsp; If this lookup fails then it is
+    assumed that the pattern doesn't match.&nbsp;&nbsp; If <strong>ipaddress</strong> is a
+    string, then the first time it is examined during authorization it is converted to an
+    integer IP address and that value replaces the string in the pattern (thus caching the
+    result of the conversion to an IP address).</li>
+  <li><strong>(:deny ipaddress [bits])</strong> -- just like the case above except the request
+    is rejected if it matches the <strong>ipaddress</strong>.&nbsp;&nbsp; One difference is
+    this: if the <strong>ipaddress </strong> is a hostname and that host name cannot be
+    translated to an IP address, then it is assumed to match, and thus the request will be
+    denied.&nbsp; </li>
 </ul>
+
+<p>The example of using a <strong>location-authorizer</strong> only permits connections
+coming in via the loopback network (which occurs if you specify <a
+href="http://localhost/whatever">http://localhost/whatever</a>) or if they come from one
+particular machine (tiger.franz.com).&nbsp; Note that we end the pattern list with <strong>:deny</strong>
+so that anything not matching the preceding patterns will be denied.</p>
+
+<pre>(publish :path &quot;/local-secret-auth&quot;
+    :content-type &quot;text/html&quot;
+    :authorizer (make-instance 'location-authorizer
+                         :patterns '((:accept &quot;127.0&quot; 8)
+                                     (:accept &quot;tiger.franz.com&quot;)
+                                     :deny))
+    :function
+    #'(lambda (req ent)
+        (with-http-response (req ent)
+           (with-http-body (req ent)
+               (html (:head (:title &quot;Secret page&quot;))
+                     (:body (:b &quot;Congratulations. &quot;)
+                       &quot;You made it to the secret page&quot;))))))
+</pre>
 
 <h2>Cookies</h2>
 
@@ -833,6 +871,125 @@ header of the request.&nbsp;&nbsp; Each <strong>name</strong> <strong>value</str
 will be in a cons whose <strong>car</strong> is the <strong>name</strong> and whose <strong>cdr</strong>
 is the <strong>value</strong>.&nbsp;&nbsp; The names and values will be decoded (in other
 words the decoding done by <strong>set-cookie-header</strong> will be undone).</p>
+
+<p>&nbsp;</p>
+
+<hr>
+
+<h2>iServe request processing protocol</h2>
+
+<p>We'll describe here the steps iServe goes through from the time it receives a request
+until a response to that request has been sent back to the browser.&nbsp;&nbsp;&nbsp; We
+want the protocol to be open so that users can extend iServe's behavior to suit their
+needs.&nbsp; However given that iServe is a new program and will be undergoing extensive
+review from its users, we expect that the protocol will change.&nbsp;&nbsp; It shouldn't
+lose any of its current extensibility but the names and argument lists of generic
+functions may change.&nbsp; </p>
+
+<p>When a client connects to the port on which iServe is listening, iServe passes that
+connected socket to a free worker thread which then wakes up and calls the internal
+function <strong>net.iserve::process-connection</strong>.&nbsp;&nbsp; If there are no free
+worker threads then iServe waits for one to be available.</p>
+
+<p>In each worker thread the variable <strong>*wserver*</strong> is bound to the <strong>wserver</strong>
+object that holds all the information about the webserver on which the connection was made
+(remember that one iServe process can be running more than one webserver).&nbsp;&nbsp; <strong>process-connection</strong>
+reads the request from the socket (but doesn't read past the header lines).
+&nbsp;&nbsp;&nbsp; If the request can't be read within <strong>*read-request-timeout* </strong>seconds
+(currently 20) then the request is rejected.&nbsp;&nbsp;&nbsp; The request is stored in an
+object of class <strong>http-request</strong>.&nbsp;&nbsp;&nbsp; Next <strong>process-connection</strong>
+calls <strong>handle-request</strong> to do all the work of the request and then <strong>log-request</strong>
+to log the action of the request.&nbsp; Finally if the response to the request indicated
+that the connection was to be kept open rather than being closed after the response, then <strong>process-connection</strong>
+loops back to the top to read the next request.</p>
+
+<p><strong><font face="Courier New">&nbsp;</font></strong></p>
+
+<p><strong><font face="Courier New">(handle-request (req http-request))</font></strong>
+&nbsp;&nbsp; [generic function]</p>
+
+<p>This generic function must locate the entity to handle this request and then cause it
+to respond to the request.&nbsp;&nbsp; If there is no matching entity then <strong>handle-request</strong>
+must send a response back to the client itself.&nbsp; <strong>handle-request</strong> uses
+locators to find the entity (more on this below), and then if an entity is found and that
+entity has an authorizer, it calls <strong>authorize</strong> to see if this request is
+allowed to access the selected entity.&nbsp; If the entity passes the authorization then <strong>process-entity</strong>
+is called to cause the entity to be respond to the request.&nbsp; If there is no entity to
+respond then <strong>failed-request</strong> is called to send back a failure message.</p>
+
+<p>A <strong>locator</strong> is an object used to map requests into entities.
+&nbsp;&nbsp; The value of <strong>(wserver-locators *wserver*)</strong> is a list of
+locator objects.&nbsp;&nbsp; <strong>handle-request</strong> calls </p>
+
+<p><strong><font face="Courier New">(standard-locator (req http-request) (loc locator)) </font>
+</strong>[generic function]</p>
+
+<p>on each successive locator in that list until one return an entity object.
+&nbsp;&nbsp;&nbsp; iServe has two built-in locator classes, <strong>locator-exact</strong>
+and <strong>locator-prefix</strong>, that are subclasses of <strong>locator.&nbsp;&nbsp; </strong>When
+you call <strong>publish</strong> or <strong>publish-file</strong> you are adding the
+entity to locator of class <strong>locator-exact</strong> found in the <strong>wserver-locators
+</strong>list.&nbsp;&nbsp; When you call <strong>publish-directory</strong> you are adding
+to the locator of class <strong>locator-prefix.</strong>&nbsp;&nbsp;&nbsp; Users are free
+to define new locator classes.&nbsp;&nbsp;&nbsp; Locators should define the <strong>standard-locator</strong>
+method as well as </p>
+
+<p><strong><font face="Courier New">(unpublish-locator (loc locator))</font></strong>
+&nbsp;&nbsp; [generic&nbsp; function]</p>
+
+<p>which if called should remove all published entities from the locator.</p>
+
+<p>&nbsp;</p>
+
+<p>Let's return to <strong>handle-request.</strong>&nbsp; It has called <strong>standard-locator</strong>
+and found an entity.&nbsp;&nbsp; Next it checks to see if the entity has an authorizer
+value and if so calls</p>
+
+<p><strong><font face="Courier New">(authorize (auth authorizer) (req http-request) (ent
+entity)) </font></strong>&nbsp; [generic function]</p>
+
+<p>The return value will be one of 
+
+<ul>
+  <li><strong>t -- </strong>The request is authorized,&nbsp; call <strong>process-entity</strong>
+    to make the entity respond.</li>
+  <li><strong>nil</strong> -- The request is not authorized, call <strong>failed-request </strong>to
+    send back a response.</li>
+  <li><strong>:deny</strong> -- The request is denied and we want the user to know that it was
+    denied rather than sending a generic failed message, call <strong>denied-request</strong>
+    to send back a response.</li>
+  <li><strong>:done</strong> -- The <strong>authorize</strong> function has sent back a
+    response, there is nothing more for <strong>handle-request</strong> to do for this
+    request.</li>
+</ul>
+
+<p>If there is no authorizer for this entity then we just call <strong>process-entity.</strong>
+&nbsp;&nbsp; If there is no entity, then we call <strong>failed-request</strong>. </p>
+
+<p>&nbsp;</p>
+
+<p><strong><font face="Courier New">(failed-request (req http-request))</font></strong>
+&nbsp;&nbsp; [generic function]</p>
+
+<p>send back a response to the effect that the url request doesn't exist on this server.</p>
+
+<p>&nbsp;</p>
+
+<p><strong><font face="Courier New">(denied-request (req http-request))</font></strong>
+&nbsp; [generic function]</p>
+
+<p>send back a response to the effect that access to the requested url was denied. </p>
+
+<p>&nbsp;</p>
+
+<p><strong><font face="Courier New">(process-entity&nbsp; (req http-request) (ent entity))</font></strong>
+&nbsp;&nbsp; [generic function]</p>
+
+<p>Send back a response appropriate to the given entity.&nbsp;&nbsp;&nbsp;&nbsp; The
+macros with-http-response and with-http-body should be used in the code that sends the
+response.</p>
+
+<p>&nbsp;</p>
 
 <p>&nbsp;</p>
 
