@@ -1,3 +1,21 @@
+2000-08-24  John Foderaro  <jkf@tiger.franz.com>
+
+	* rewrote the get-multipart-xxx functions to use an
+	  (unsigned-byte 8) buffer since character buffers have
+	  issues with international code.   This eliminates the
+	  extra <cr><lf> at the end problem with get-multipart-sequence.
+	  The file transfer should be faster, especially if you 
+	  pass get-multipart-sequence a 4096 byte (unsigned-byte 8) vector.
+	
+	  !! Eliminte the raw argument from get-multipart-sequence. Now
+	  transfers are all 'raw'
+	  If a character array is passed to get-multipart-sequence then
+	  we just copy into each character the code-char of the 
+	  item in the buffer (which corresponds to the latin1-base
+	  external format).  We will allow external-format select
+	  soon.
+	  
+
 2000-08-21  John Foderaro  <jkf@tiger.franz.com>
 
 	*  add :proxy arg to net.aserve:start so you can enable the proxy

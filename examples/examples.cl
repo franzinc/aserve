@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.12 2000/08/17 14:03:35 jkf Exp $
+;; $Id: examples.cl,v 1.13 2000/08/24 18:18:32 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -433,6 +433,7 @@
 				  :value "*.txt"))
 			 :br
 			 ((:input :type "text" :name "textthing"))
+			 "Enter some text"
 			 :br
 			 ((:input :type "checkbox" :name "checkone"))
 			 "check box one"
@@ -468,8 +469,8 @@
 	     
 	     (with-http-response (req ent)
 	       (let ((h nil)
-		     (counter 0)
 		     (files-written)
+		     (text-strings)
 		     )
 		 (loop
 		   ; get headers for the next item
@@ -479,7 +480,7 @@
 		   ; we can get the filename from the header if 
 		   ; it was an <input type="file"> item.  If there is
 		   ; no filename, we just create one.
-		   (let ((cd (assoc "content-disposition" h :test #'equalp))
+		   (let ((cd (assoc :content-disposition h :test #'eq))
 			 (filename)
 			 (sep))
 		     (if* (and cd (consp (cadr cd)))
@@ -501,36 +502,46 @@
 				     (setq filename
 				       (subseq filename (1+ sep) 
 					       (length filename)))))
-		     (if* (null filename)
-			then (setq filename (format nil "tempfile~d"
-						    (incf counter))))
-		     
-		     (push filename files-written)
+		     (if* filename
+			then (push filename files-written)
 		     (with-open-file (pp filename :direction :output
 				      :if-exists :supersede
 				      :element-type '(unsigned-byte 8))
 		       (format t "writing file ~s~%" filename)
-		       (let ((buffer (make-array 1024
-						 :element-type '(unsigned-byte 8))))
+		       (let ((buffer (make-array 4096
+						 :element-type 
+						 '(unsigned-byte 8))))
 			 
 			 (loop (let ((count (get-multipart-sequence 
 					     req 
-					     buffer
-					     :raw t)))
+					     buffer)))
 				 (if* (null count) then (return))
 				 (write-sequence buffer pp :end count)))))
-		
-		     ))
+			else ; no filename, just grab as a text
+			     ; string
+			     (let ((buffer (make-string 1024)))
+			       (loop
+			       (let ((count (get-multipart-sequence
+					     req buffer)))
+				 (if* count
+				    then (push (subseq buffer 0 count)
+					       text-strings)
+				    else (return))))))))
+		 
 	       
 	       
 		 ;; now send back a response for the browser
 	       
 		 (with-http-body (req ent)
 		   (html (:html (:head (:title "form example"))
-				(:body "proceessed the form, files written"
+				(:body "-- proceessed the form, files written --"
 				       (dolist (file (nreverse files-written))
 					 (html :br "file: "
-					       (:b (:prin1-safe file))))))))))))
+					       (:b (:prin1-safe file))))
+				       :br
+				       "-- Non-file items Returned: -- " :br
+				       (dolist (ts (reverse text-strings))
+					 (html (:princ-safe ts) :br))))))))))
 
 	     
 
