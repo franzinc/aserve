@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.122 2001/10/26 18:55:37 jkf Exp $
+;; $Id: main.cl,v 1.123 2001/10/26 19:12:21 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1279,7 +1279,7 @@ by keyword symbols and not by strings"
 		    ; since they are often not errors
 		    (catch 'out-of-connection
 		      (handler-bind 
-			  ((socket-error 
+			  ((stream-error 
 			    #'(lambda (c)
 				(if* (and 
 				      (not *debug-connection-reset-by-peer*)
