@@ -1,3 +1,12 @@
+
+2004-09-08  John Foderaro  <jkf@tiger.franz.com>
+
+	* publish.cl - handle international characters
+	    emitted by a page where aserve's strategy was
+	    to use a string output stream as an intermediary
+	    storage device.
+	    
+
 2004-10-19  John Foderaro  <jkf@tiger.franz.com>
 1.2.38
 	* cgi.cl (parse-cgi-script-data): fix bug where find

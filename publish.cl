@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.79 2004/08/27 18:14:50 layer Exp $
+;; $Id: publish.cl,v 1.80 2004/11/08 16:36:22 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -2063,7 +2063,9 @@
 	       then (eq time :post)
 	       else (eq time :pre))
 	    )
-	   (*print-pretty* nil))
+	   (*print-pretty* nil)
+	   (sos-ef) ; string output stream external format
+	   )
       
       
       
@@ -2081,10 +2083,20 @@
 	 then ; must get data to send from the string output stream
 	      (setq content 
 		(if* (request-reply-stream req)
-		   then (get-output-stream-string 
+		   then (setq sos-ef (stream-external-format 
+				      (request-reply-stream req)))
+			(get-output-stream-string 
 			 (request-reply-stream req))
+			
 		   else ; no stream created since no body given
 			""))
+	      
+	      (if* (and sos-ef (not (eq (stream-external-format sock) sos-ef)))
+		 then ; must do ext format conversion now
+		      ; so we can compute the length
+		      (setq content
+			(string-to-octets content :external-format sos-ef)))
+	      
 	      (setf (request-reply-content-length req) (length content)))
       	
       (if* (and send-headers
