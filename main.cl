@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.95 2001/01/31 21:59:02 jkf Exp $
+;; $Id: main.cl,v 1.96 2001/02/06 20:46:14 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -55,6 +55,7 @@
    #:get-multipart-sequence
    #:get-request-body
    #:handle-request
+   #:handle-uri		; add-on component..
    #:header-slot-value
    #:http-request  	; class
    #:locator		; class
@@ -131,7 +132,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 1 38))
+(defparameter *aserve-version* '(1 1 39))
 
 
 (provide :aserve)
@@ -2284,21 +2285,76 @@ in get-multipart-sequence"))
 ;;-----------------
 
 
-(defun string-to-number (string start end)
+(defun string-to-number (string &optional (start 0) (end (length string)))
   ;; convert the string into a number.
-  ;; the number is decimal
+  ;; the number is integer base 10
   ;; this is faster than creating a string input stream and
   ;; doing a lisp read
   ;; string must be a simple string
-  (let ((ans 0))
-    (do ((i start (1+ i)))
+  ;;
+  ;; we allow whitespace before and after the number, anything else
+  ;; will cause us to return 0
+  ;;
+  (let ((ans)
+	(state :pre))
+    (do ((i start)
+	 (ch)
+	 (digit))
 	((>= i end)
-	 ans)
-      (let ((digit (- (char-code (schar string i)) #.(char-code #\0))))
-	(if* (<= 0 digit 9)
-	   then (setq ans (+ (* ans 10) digit))
-	   else (return ans))))))
+	 (if* (member state '(:number :post) :test #'eq)
+	    then ans
+	    else nil))
+      
+      (setq ch (schar string i)
+	    digit (- (char-code ch) #.(char-code #\0)))
+      
+      (case state
+	(:pre (if* (member ch '(#\space #\tab #\newline #\return) :test #'eq)
+		 then (incf i)
+		 else (setq state :number-first)))
+	(:number-first
+	 (if* (<= 0 digit 9)
+	    then (setq ans digit)
+		 (incf i)
+		 (setq state :number) ; seen a digit
+	    else (return-from string-to-number nil) ; bogus
+		 ))
+	(:number
+	 (if* (<= 0 digit 9)
+	    then (setq ans (+ (* ans 10) digit))
+		 (incf i)
+	    else (setq state :post)))
+	
+	(:post 
+	 (if* (member ch '(#\space #\tab #\newline #\return) :test #'eq)
+	    then (incf i)
+	    else (return-from string-to-number nil)))))))
+	
+(defun get-host-port (string &optional (port 80))
+  ;; return the host and port from the string 
+  ;; which should have the form: "www.foo.com" or "www.foo.com:9000"
+  ;;
+  ;; port is the default value for the port arg
+  ;;
+  ;; return two values:
+  ;;	host	string
+  ;;	port	integer
+  ;; or nil if there host string is malformed.
+  ;;
+  (let ((parts (split-on-character string #\:)))
+    (if* (null (cdr parts))
+       then (values (car parts) port)
+     elseif (null (cddr parts))
+       then ; exactly two
+	    (if* (equal "" (cadr parts))
+	       then ; treat nothing after a colon like no colon present
+		    (values (car parts) port)
+	       else (setq port (string-to-number (cadr parts)))
+		    (if* port
+		       then (values (car parts) port))))))
 
+	    
+	
 		
 	
 ;;-------------------

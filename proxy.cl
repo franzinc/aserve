@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.37 2001/01/22 16:17:29 jkf Exp $
+;; $Id: proxy.cl,v 1.38 2001/02/06 20:46:15 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -232,8 +232,9 @@
 
 (defstruct uri-info
   ;; information on how to handle a uri or set of uris
-  host	; string naming the host of the uri
-  path  ; string in regexp form denoting the path. nil means all
+  host	    ; string naming the host of the uri
+  (port 80) 
+  path      ; string in regexp form denoting the path. nil means all
   path-regexp ; compiled regular expression for the path (or nil)
   
   ; nil or number of extra seconds of lifetime to add to uri
@@ -248,6 +249,9 @@
   
   ; called on links to determine at which level they should be followed
   scan-function 
+  
+  ; true if we should follow links to a site different than this page
+  offsite
   )
 
 
@@ -2488,32 +2492,43 @@ cached connection = ~s~%" cond cached-connection))
 			(extra-lifetime nil el-p)
 			(scan-depth nil sd-p)
 			(exclude nil ex-p)
-			(scan-function nil sf-p))
+			(scan-function nil sf-p)
+			(offsite t ofs-p)
+			)
   
   ;; store info about how to handle this uri during the scan
-  
-  ;* should convert host of foo:80 to foo since in find-uri-info
-  ;  we treat 80 specially.
+
+  ;; host can be "foo.com" or "foo.com:8000"
+  ;;
   
   (let ((pcache (wserver-pcache server))
 	(table)
-	(uri-info))
+	(uri-info)
+	(ahost)
+	(aport)
+	)
     (if* (null pcache) then (error "proxying isn't enabled"))
     (setq table (pcache-uri-info-table pcache))
     
-    (dolist (ent (gethash host table))
-      (if* (equal path (uri-info-path ent))
+    (multiple-value-setq (ahost aport) (get-host-port host))
+    (if* (null ahost)
+       then (error "bad form for the host:port ~s" host))
+    
+    (dolist (ent (gethash ahost table))
+      (if* (and (equal path (uri-info-path ent))
+		(eql aport (uri-info-port ent)))
 	 then (return (setq uri-info ent))))
     
     (if* (null uri-info)
        then ; add new one
 	    (setq uri-info (make-uri-info 
-			    :host host 
+			    :host ahost 
+			    :port aport
+			    :offsite offsite
 			    :path path
-			    :path-regexp
-			    (if* path
-			       then (compile-regexp path))))
-	    (push uri-info (gethash host table)))
+			    :path-regexp (if* path
+					    then (compile-regexp path))))
+	    (push uri-info (gethash ahost table)))
     
     ; set fields
     (if* el-p
@@ -2534,6 +2549,9 @@ cached connection = ~s~%" cond cached-connection))
     (if* sf-p
        then (setf (uri-info-scan-function uri-info) scan-function))
     
+    (if* ofs-p
+       then (setf (uri-info-offsite uri-info) offsite))
+    
     uri-info))
 
 	      
@@ -2545,17 +2563,18 @@ cached connection = ~s~%" cond cached-connection))
   (let ((pcache (wserver-pcache *wserver*))
 	(path (net.uri:uri-path uri))
 	(host (net.uri:uri-host uri))
-	(port (net.uri:uri-port uri)))
+	(port (or (net.uri:uri-port uri) 80)))
     (if* pcache
-       then (if* (not (eql port 80))
-	       then (setq host (format nil "~a:~a" host port)))
-	    (dolist (ent (gethash host (pcache-uri-info-table pcache)))
-	      (let ((pregexp (uri-info-path-regexp ent)))
-		(if* (null pregexp)
-		   then ; matches everything
-			(return ent)
-		 elseif (match-regexp pregexp path :return nil)
-		   then (return ent)))))))
+       then (dolist (ent (gethash host (pcache-uri-info-table pcache)))
+	      (if* (eql port (uri-info-port ent))
+		 then 
+		      (let ((pregexp (uri-info-path-regexp ent)))
+			(if* (null pregexp)
+			   then ; matches everything
+				(return ent)
+			 elseif (match-regexp pregexp path :return nil)
+			   then (return ent))))))))
+
 
 
 	      

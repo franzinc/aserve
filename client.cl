@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.33 2000/12/27 19:47:08 jkf Exp $
+;; $Id: client.cl,v 1.34 2001/02/06 20:46:14 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -372,17 +372,11 @@
        then ; sent request through a proxy server
 	    (assert (stringp proxy) (proxy) 
 	      "proxy value ~s should be a string" proxy)
-	    (let ((parts (net.aserve::split-on-character proxy #\:))
-		  (pport 80)
-		  phost)
-	      (if* (cdr parts)
-		 then ; port given
-		      (setq pport (read-from-string (cadr parts)))
-		      (assert (integerp pport)
-			  (pport)
-			"proxy port ~s should be an integer"
-			pport))
-	      (setq phost (car parts))
+	    (multiple-value-bind (phost pport)
+		(net.aserve::get-host-port proxy)
+	      (if* (null phost)
+		 then (error "proxy arg should have form \"foo.com\" ~
+or \"foo.com:8000\", not ~s" proxy))
 	      
 	      (setq sock (socket:make-socket :remote-host phost
 					     :remote-port pport

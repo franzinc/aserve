@@ -1,3 +1,7 @@
+2001-02-06  John Foderaro  <jkf@tiger.franz.com>
+1.1.39
+	* proxy and scanning fixes
+
 2001-01-22  John Foderaro  <jkf@tiger.franz.com>
 1.1.38
 	* main.cl: incf version.  Also hooks added for links scanning.
