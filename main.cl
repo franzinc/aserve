@@ -371,7 +371,7 @@
 				    
 			      
 (defun start (&key (port 80) 
-		   listeners
+		   (listeners 5)
 		   (chunking t)
 		   (keep-alive t)
 		   (server *wserver*)
@@ -422,11 +422,11 @@
     
     
     (let ((*wserver* server)) ; bind it too for privacy
-      (if* (null listeners)
+      (if* (or (null listeners) (eq 0 listeners))
 	 then (start-simple-server)
        elseif (and (fixnump listeners) (> listeners 0))
 	 then (start-lisp-thread-server listeners)
-	 else (error "listeners should be nil or a positive fixnum, not ~s"
+	 else (error "listeners should be nil or a non-negative fixnum, not ~s"
 		     listeners)))
     
     server

@@ -31,17 +31,17 @@ other files are present to support the examples in examples.cl.
    (or start Allegro cl 5.0.1 and use the toplevel ":cd" command to cd 
    to the directory containing the neo distribution).
 
-2. load  neodist.fasl
+2. load  neo.fasl
     
-        user(1): :ld neodist.fasl
+        user(1): :ld neo.fasl
 
-3. load the examples
+3. load the examples (either the compiled or source version)
 
         user(2): :ld examples
 
 4. start the webserver
 
-        user(3):  (neo:start :port 8010 :listeners 4)
+        user(3):  (neo:start :port 8010)
 
 
 5. go to a web browser and select this machine and the port you chose:

@@ -63,11 +63,10 @@ running.</p>
 <p><strong><font face="Courier New">(start &amp;key port listeners chunking keep-alive
 server debug)</font></strong></p>
 
-<p>If no arguments are given then this just starts a simple single threaded web server on
-port 80, which is the standard web server port.&nbsp;&nbsp; The <strong>start</strong>
-function doesn't return in this case as it has to handle the web client requests.
-&nbsp;&nbsp; If you are running this on Unix then you can only allocate port 80 if you are
-logged in as root or have made Lisp a set-user-id root program.</p>
+<p>If no arguments are given then this just starts a multi-threaded web server on port 80,
+which is the standard web server port.&nbsp;&nbsp;&nbsp; If you are running this on Unix
+then you can only allocate port 80 if you are logged in as root or have made Lisp a
+set-user-id root program.</p>
 
 <p>The&nbsp; are quite a few keyword arguments to <strong>start</strong>, but in practice
 you only need be concerned with <strong>:port</strong> and <strong>:listeners.
@@ -76,15 +75,16 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
 <ul>
   <li>port -- the port on which to open the web server.&nbsp; 80 is the default.</li>
   <li>listeners -- the number of threads to process http requests.&nbsp;&nbsp;&nbsp;&nbsp; If
-    a value isn't given for the <strong>:listeners</strong> argument or if that value is <strong>nil
-    </strong>then the server runs in <em>simple server mode<strong> </strong></em>in which the
-    <strong>start</strong> function doesn't return - instead it processes the request itself,
-    one at a time.&nbsp; If a positive number is given as the value of <strong>:listeners</strong>
-    then the server runs in <em>threaded server mode<strong>.</em> </strong>&nbsp; In this
-    mode separate lisp lightweight processes are started to handle requests from clients, the
-    number of request handing threads equal to the value of the <strong>:listeners</strong>
-    keyword argument.&nbsp; In this mode the <strong>start </strong>function returns after
-    starting the other threads.</li>
+    a value isn't given for the <strong>:listeners</strong> argument then 5 is assumed.
+    &nbsp; If&nbsp; the value is <strong>nil </strong>or <strong>0 </strong>then the server
+    runs in <em>simple server mode<strong> </strong></em>in which the <strong>start</strong>
+    function doesn't return - instead it processes the request itself, one at a time.&nbsp; If
+    a positive number is given as the value of <strong>:listeners</strong> then the server
+    runs in <em>threaded server mode<strong>.</em> </strong>&nbsp; In this mode separate lisp
+    lightweight processes are started to handle requests from clients, the number of request
+    handing threads equal to the value of the <strong>:listeners</strong> keyword
+    argument.&nbsp; In this mode the <strong>start </strong>function returns after starting
+    the other threads.</li>
   <li>chunking -- if true then the server will using the chunked transfer encoding when it's
     possible to do so.&nbsp; This is an optimization and should be left enabled unless you
     suspect that it is the cause of some sort of error.&nbsp;&nbsp; The default is true.</li>

@@ -58,7 +58,7 @@
   (copy-files-to *neo-files* "neo.fasl")
   (copy-files-to '("../htmlgen/htmlgen.html")
 		 "neo-dist/htmlgen.fasl")
-  (dolist (file '("neodist.fasl"
+  (dolist (file '("neo.fasl"
 		  "neo.html"
 		  "readme.txt"
 		   "examples.cl"
