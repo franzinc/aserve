@@ -1282,7 +1282,7 @@ page.</p>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 content content-type query format cookies <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-redirect basic-authorization<br>
+redirect redirect-methods basic-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 keep-alive headers proxy user-agent external-format ssl)</font></strong></p>
 
@@ -1376,12 +1376,19 @@ keep-alive headers proxy user-agent external-format ssl)</font></strong></p>
   <tr>
     <td width="22%">redirect</td>
     <td width="16%">5</td>
-    <td width="62%">If the response is a redirect (code 301, 302, 303), and the method is <strong>:get</strong>
-    or <strong>:head,</strong> then if this argument is true (and, if an integer, positive), <strong>do-http-request</strong>
-    will call itself to access the page to which the redirection is pointed.&nbsp; If <strong>redirect</strong>
-    is an integer then in the recursiive call the valued passed for <strong>redirect</strong>
+    <td width="62%">If the response is a redirect (code 301, 302, 303), and the method is one
+    given by the value of <strong>redirect-methods </strong> then if this argument is true
+    (and, if an integer, positive), <strong>do-http-request</strong> will call itself to
+    access the page to which the redirection is pointed.&nbsp; If <strong>redirect</strong> is
+    an integer then in the recursiive call the valued passed for <strong>redirect</strong>
     will be one less than the current value.&nbsp; This prevents infinite recursion due to
     redirection loops.</td>
+  </tr>
+  <tr>
+    <td width="22%">redirect-methods</td>
+    <td width="16%">(:get :head)</td>
+    <td width="62%">List of http methods which will be redirected if <strong>redirect</strong>
+    is true.</td>
   </tr>
   <tr>
     <td width="22%">basic-authorization</td>
