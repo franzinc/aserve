@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.15 2000/10/19 16:37:47 jkf Exp $
+;; $Id: examples.cl,v 1.16 2001/01/22 16:17:30 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -94,7 +94,6 @@
 			 " should get an error when clicked"
 			 
 			 
-			 ;; published in puzzle.cl
 			 ;; run only in an international lisp.
 			 ;; test at runtime since we may switch back
 			 ;; and forth between international and 8 bit
@@ -109,11 +108,16 @@
 				  ((:a :href "icharcount")
 				   "(International) Character Counter")
 				  :br
+				  ;; published in puzzle.cl
 				  ((:a :href "wordpuzzle")
-				   "Word Puzzle")))
-			 )
+				   "Word Puzzle")
+				  :br
+				  ;; published in urian.cl
+				  ((:a :href "urian")
+				   "International Web Page Character Finder")))
+			 
 		  
-		  )))))
+			 ))))))
 			     
 
 

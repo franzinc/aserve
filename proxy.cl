@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.36 2001/01/17 16:30:35 jkf Exp $
+;; $Id: proxy.cl,v 1.37 2001/01/22 16:17:29 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -2489,6 +2489,12 @@ cached connection = ~s~%" cond cached-connection))
 			(scan-depth nil sd-p)
 			(exclude nil ex-p)
 			(scan-function nil sf-p))
+  
+  ;; store info about how to handle this uri during the scan
+  
+  ;* should convert host of foo:80 to foo since in find-uri-info
+  ;  we treat 80 specially.
+  
   (let ((pcache (wserver-pcache server))
 	(table)
 	(uri-info))
@@ -2537,10 +2543,13 @@ cached connection = ~s~%" cond cached-connection))
   ;; locate the uri-info corresponding to this uri, if
   ;; there is one
   (let ((pcache (wserver-pcache *wserver*))
-	(path (net.uri:uri-path uri)))
+	(path (net.uri:uri-path uri))
+	(host (net.uri:uri-host uri))
+	(port (net.uri:uri-port uri)))
     (if* pcache
-       then (dolist (ent (gethash (net.uri:uri-host uri) 
-				  (pcache-uri-info-table pcache)))
+       then (if* (not (eql port 80))
+	       then (setq host (format nil "~a:~a" host port)))
+	    (dolist (ent (gethash host (pcache-uri-info-table pcache)))
 	      (let ((pregexp (uri-info-path-regexp ent)))
 		(if* (null pregexp)
 		   then ; matches everything
