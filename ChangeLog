@@ -1,5 +1,5 @@
 2001-12-03  John Foderaro  <jkf@tiger.franz.com>
-
+1.2.19
 	* main.cl: add ensure-stream-lock function to put a lock object
 	  on a stream that the logging functions then can use.
 
