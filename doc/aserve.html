@@ -30,6 +30,7 @@
 &nbsp; <a href="#f-header-slot-value">header-slot-value</a><br>
 &nbsp; <a href="#f-reply-header-slot-value">reply-header-slot-value</a><br>
 &nbsp; <a href="#f-request-query">request-query</a></font><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-request-query-value">request-query-value</a></font><br>
 <a href="#request-object-readers">Request Object Readers and Accessors</a><br>
 <font face="Courier New">&nbsp; <a href="#f-request-method">request-method</a><br>
 &nbsp; <a href="#f-request-uri">request-uri</a><br>
@@ -523,6 +524,15 @@ form will be decoded for query values.</p>
 
 <p>.&nbsp;&nbsp; </p>
 
+<p><a name="f-request-query-value"></a><font face="Courier New"><strong>(request-query-value
+key request &amp;key uri post test)</strong></font></p>
+
+<p>This combines a call to <strong>request-query</strong> to retrieve the alist of query
+keys and values, with a call to <strong>assoc</strong> to search for the specific key, and
+finally with a call to <strong>cdr</strong> to return just the value from the assoc list
+entry.&nbsp; The <strong>test</strong> argument is the function to be used to test the
+given key against the keys in the assoc list. It defaults to <strong>#'equal</strong>. </p>
+
 <hr>
 
 <p>&nbsp;</p>
@@ -641,8 +651,8 @@ defines the form
     method has a few disadvantages - the amount of data that can be sent is limited since the
     size of urls is limited.&nbsp; Also the data is visible to everyone seeing the url and
     that may not be desirable.&nbsp; </li>
-  <li><strong>&lt;form method=&quot;post&quot;&gt; - </strong>The data is send in the body of
-    the request.&nbsp;&nbsp;&nbsp; The&nbsp; AllegroServe url handler should call <strong>(rqeuest-query</strong>
+  <li><strong>&lt;form method=&quot;post&quot;&gt; - </strong>The data is sent in the body of
+    the request.&nbsp;&nbsp;&nbsp; The&nbsp; AllegroServe url handler should call <strong>(request-query</strong>
     <strong>req)</strong> to retrieve and decode the data posted.&nbsp;&nbsp;&nbsp; In this
     case&nbsp; <strong>request-query</strong> calls <strong>(get-request-body req)</strong> to
     retrieve the body from the web browser and then <strong>(form-urlencoded-to-query body) </strong>to
