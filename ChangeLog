@@ -1,3 +1,7 @@
+2001-09-20  Kevin Layer  <layer@crikey>
+
+	* makefile (clean): add `r' to `rm'
+
 2001-09-18  Kevin Layer  <layer@crikey>
 1.2.9
 
