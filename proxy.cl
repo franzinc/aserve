@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.23 2000/10/25 01:31:29 jkf Exp $
+;; $Id: proxy.cl,v 1.24 2000/10/26 05:28:37 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -36,6 +36,13 @@
 
 
 (defparameter *extra-lifetime-factor* 1.1)
+
+; number of seconds to add to expiration time of any entry in cache
+(defparameter *extra-lifetime* 0) 
+
+; set to variable to be called when a new entry is cached
+; (so that it can be scanned for links)
+(defparameter *entry-cached-hook* nil)
 
 (defstruct pcache 
   ;; proxy cache
@@ -131,7 +138,7 @@
   data		; data blocks (first is the response header block)
   data-length	; number of octets of data
   blocks	; number of cache blocks (length of the value in data slot)
-  code		; response code
+  code		; response code.   200 or 302
   comment	; response comment 
   
   cookie	; the cookie if any with this request
@@ -240,7 +247,7 @@
 			(net.uri:copy-uri uri :scheme nil :host nil))
 		      (handle-request req)
 		 else ; must really proxy
-		      (proxy-cache-request req ent))))))
+		      (proxy-cache-request req ent t 0))))))
 
 
   
@@ -250,7 +257,7 @@
 
 		     
 
-(defun proxy-request (req ent &key pcache-ent (respond t))
+(defun proxy-request (req ent &key pcache-ent (respond t) (level 0))
   ;; a request has come in with an http scheme given in uri
   ;; and a machine name which isn't ours.
   ;; 
@@ -354,18 +361,19 @@
 					       :type *socket-stream-type*))
 	      (error (cond)
 		(declare (ignore cond))
-		(with-http-response (req ent :response
-					 *response-not-found*)
-		  (with-http-body (req ent)
-		    (html
-		     (:html
-		      (:head (:title "404 - Not Found"))
-		      (:body
-		       (:h1 "404 - Not Found")
-		       "The proxy failed to connect to machine "
-		       (:b (:princ-safe host))
-		       " on port "
-		       (:b (:princ-safe (or port 80))))))))
+		(if* respond
+		   then (with-http-response (req ent :response
+						 *response-not-found*)
+			  (with-http-body (req ent)
+			    (html
+			     (:html
+			      (:head (:title "404 - Not Found"))
+			      (:body
+			       (:h1 "404 - Not Found")
+			       "The proxy failed to connect to machine "
+			       (:b (:princ-safe host))
+			       " on port "
+			       (:b (:princ-safe (or port 80)))))))))
 		(return-from proxy-request)))
 
 	    (if* *watch-for-open-sockets*
@@ -510,7 +518,7 @@
 		 then ; we are caching
 		      (cache-response req pcache-ent
 				      response comment clibuf 
-				      body-buffers body-length)
+				      body-buffers body-length level)
 		      ; these buffers have been saved in the cache
 		      ; so nil them out so they aren't freed
 		      (setf clibuf nil
@@ -977,6 +985,8 @@
 		   (:princ (pcache-ent-data-length ent))
 		   (:b ", State: ")
 		   (:princ-safe (pcache-ent-state ent))
+		   (:b ", Code: ")
+		   (:princ-safe (pcache-ent-code ent))
 		   (if* (pcache-ent-disk-location ent)
 		      then (html :br
 				 (:b "Disk Location: "
@@ -1038,13 +1048,17 @@
   
 
 
-(defun proxy-cache-request (req ent)
+(defun proxy-cache-request (req ent respond level)
   ;; if we've got a proxy cache then retrieve it from there
   ;; else just proxy the request
   
+  ;; respond is true if we really want to respond, it will be 
+  ;; nil if we just want to ensure that what we need is in the cache
+  ;;
   
   (let ((pcache (wserver-pcache *wserver*))
-	(rendered-uri (net.uri:render-uri (request-raw-uri req) nil)))
+	(rendered-uri 
+	 (transform-uri (net.uri:render-uri (request-raw-uri req) nil))))
     
     (if* (or (null pcache)
 	     ; should handle :head requests too
@@ -1058,9 +1072,12 @@
        then (if* pcache then (incf (pcache-r-direct pcache)))
 	    (logmess (format nil "direct for ~a~%" rendered-uri))
 	    (return-from proxy-cache-request
-	      (proxy-request req ent)))
+	      (proxy-request req ent :respond respond)))
 
-    (logmess (format nil "cache: look in cache for ~a~%" rendered-uri))
+    (logmess (format nil "cache: look in cache for ~a, number of ents ~d~%" 
+		     rendered-uri
+		     (length (gethash rendered-uri (pcache-table pcache)))
+		     ))
 
     (dolist (pcache-ent (gethash rendered-uri (pcache-table pcache))
 	      ; not found, must proxy and then cache if the
@@ -1068,13 +1085,16 @@
 	      (progn
 		(logmess "not in cache, proxy it")
 		(incf (pcache-r-miss pcache))
-		(proxy-and-cache-request req ent (get-universal-time) nil t)))
+		(proxy-and-cache-request req ent (get-universal-time) 
+					 nil respond level)))
       (if* (lock-pcache-ent pcache-ent)
 	 then (unwind-protect
 		  (if* (equal (pcache-ent-cookie pcache-ent)
 			      (header-slot-value req :cookie))
 		     then ; can use this one
-			  (use-value-from-cache req ent pcache-ent)
+			  (if* respond 
+			     then (use-value-from-cache req ent pcache-ent
+							level))
 			  (return)
 		     else (logmess 
 			   (format nil "can't use cached ~s due to cookie difference~%"
@@ -1084,11 +1104,12 @@
 					   (pcache-ent-cookie pcache-ent)
 					   (header-slot-value req :cookie))))
 				 
-		(unlock-pcache-ent pcache-ent))))))
+		(unlock-pcache-ent pcache-ent))
+	 else (logmess "entry could not be locked~%")))))
 
 
 
-(defun proxy-and-cache-request (req ent now pcache-ent respond)
+(defun proxy-and-cache-request (req ent now pcache-ent respond level)
   ;; must send the request to the net via the proxy.
   ;; if pcache-ent is non-nil then this is the existing
   ;; cache entry which may get updated or killed.
@@ -1096,10 +1117,13 @@
   ;; return the reponse code from the proxy call
   ;;
   (let ((new-ent (make-pcache-ent))
-	(rendered-uri (net.uri:render-uri (request-raw-uri req) nil))
+	(rendered-uri 
+	 (transform-uri (net.uri:render-uri (request-raw-uri req) nil)))
 	(pcache (wserver-pcache *wserver*)))
-    (proxy-request req ent :pcache-ent new-ent :respond respond)
-    (if* (eq (pcache-ent-code new-ent) 200)
+    (proxy-request req ent :pcache-ent new-ent :respond respond :level level)
+    (if* (member (pcache-ent-code new-ent) '(200 
+					     302 ; redirect
+					     ))
        then ; turns out it was modified, must
 	    ; make this the new entry
 
@@ -1140,7 +1164,7 @@
   
 
 
-(defun use-value-from-cache (req ent pcache-ent)
+(defun use-value-from-cache (req ent pcache-ent level)
   ;; we've determined that pcache-ent matches the request.
   ;; now deal with the issue of it possibily being out of date
   (let* ((ims (header-slot-value req :if-modified-since))
@@ -1154,6 +1178,10 @@
 
     ; compute if the entry is fresh or stale
     (setq fresh (<= now (pcache-ent-expires pcache-ent)))
+    
+    
+    (logmess (format nil "ims is ~s, fresh by ~s seconds" ims 
+		     (-  (pcache-ent-expires pcache-ent) now)))
     
     
     (if* (and ims (not (equal "" ims)))
@@ -1176,7 +1204,8 @@
 	       else ; stale, must revalidate
 		    (let ((code
 			   (proxy-and-cache-request req ent 
-						    now pcache-ent t)))
+						    now pcache-ent t
+						    level)))
 		      (if* (eql code 304)
 			 then (logmess "slow validation")
 			      (incf (pcache-r-slow-validation pcache))
@@ -1200,7 +1229,8 @@
 			    (pcache-ent-last-modified pcache-ent)))))
 
 		    (let ((code 
-			   (proxy-and-cache-request req ent now pcache-ent nil)))
+			   (proxy-and-cache-request req ent now pcache-ent nil
+						    level)))
 		      ; we didn't respond just sent out a probe
 		      (if* (eql code 304)
 			 then ; hasn't been modified since our 
@@ -1400,7 +1430,7 @@
 
 (defun cache-response (req pcache-ent 
 		       response-code comment client-response-header
-		       body-buffers body-length)
+		       body-buffers body-length level)
   
   ;; we are caching, save the information about this response 
   ;; in the pcache-ent we are passed, which should be blank
@@ -1413,7 +1443,9 @@
 		   ))
   
   (let (now)
-    (if* (eql response-code 200)
+    (if* (or (eql response-code 200)
+	     (eql response-code 302) ; redirect
+	     )
        then ; full response
 	    
 	    (setf (pcache-ent-code pcache-ent) response-code)
@@ -1467,7 +1499,15 @@
 		      (setf (pcache-ent-expires pcache-ent)
 			(compute-approx-expiration
 			 (pcache-ent-last-modified pcache-ent)
-			 (or now (get-universal-time))))))
+			 (or now (get-universal-time)))))
+	      
+	      ;; add something while testing caching
+	      (incf (pcache-ent-expires pcache-ent)
+		    *extra-lifetime*)
+	      
+	      (if* *entry-cached-hook*
+		 then (funcall *entry-cached-hook* pcache-ent level))
+	      )
 		       
      elseif (eql response-code 304)
        then ; just set that so the reader of the response will know
@@ -1869,8 +1909,38 @@
 		
 ;--- end disk cache  
   
-    
-  
+;--- uri transforms 
+
+(defparameter *uri-transforms* 
+    ;; list of functions that take a string and if they make a change
+    ;; return a string (else they return nil)
+    nil)
+
+
+(defun transform-uri (string)
+  ;; transform the string
+  (let (ans)
+    (dolist (tr *uri-transforms* string)
+      (if* (setq ans (funcall tr string))
+	 then (return ans)))))
+
+
+; define sample transform
+(defun add-transform (function)
+  (pushnew function *uri-transforms*))
+
+(add-transform 
+ #'(lambda (string)
+     (multiple-value-bind (matched whole 
+			   prefix  postfix)
+	 (match-regexp "\\(http://ads\\..*/\\)[0-9]+\\(.*\\)"
+		       string
+		       )
+       (declare (ignore whole))
+       (if* matched
+	  then (concatenate 'simple-string
+		 prefix "--" postfix)))))
+
 
 
   

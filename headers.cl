@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.16 2000/10/25 01:31:29 jkf Exp $
+;; $Id: headers.cl,v 1.17 2000/10/26 05:28:37 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -331,7 +331,7 @@
 ;;
 ;;  min-db is a 2 byte value telling where the lowest data-block entry starts
 ;;
-;;  The header-index-block is 2 bytes per entry and specifies in index
+;;  The header-index-block is 2 bytes per entry and specifies an index
 ;;  into the data-block where a descriptor for the value associated with
 ;;  this header are located.  This file lists the headers we know about
 ;;  and each is given an index.  The header-index-block is stored
@@ -704,7 +704,27 @@
 	    (error "Incomplete headers sent by server"))))
 
 							   
-							   
+
+(defun initialize-header-block (buf)
+  ;; set the parsed header block buf to the empty state
+  
+  ; clear out the indicies pointing to the values
+  (let ((index (header-block-header-index 0)))
+    (dotimes (i *header-count*)
+      (setf (unsigned-16-value buf index) 0)
+      (decf index 2)))
+  
+  ; no headers yet
+  (setf (unsigned-16-value buf *header-block-used-size-index*) 0)
+  
+  ; start of where to put data
+  (setf (unsigned-16-value buf *header-block-data-start-index*)
+    (header-block-data-start))
+  
+  buf)
+  
+  
+  
 (defun copy-headers (frombuf tobuf header-array)
   ;; copy the headers denoted as :p (pass) in header array 
   ;; in frombuf to the tobuf

@@ -1,3 +1,7 @@
+2000-10-25  jkf  <jkf@main.verada.com>
+1.1.33
+	* hooks for link checking and experimenting with caching
+
 2000-10-19  John Foderaro  <jkf@tiger.franz.com>
 1.1.32
 	* add ssl arguments to net.aserve.start and

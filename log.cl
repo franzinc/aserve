@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: log.cl,v 1.15 2000/10/25 01:31:29 jkf Exp $
+;; $Id: log.cl,v 1.16 2000/10/26 05:28:37 jkf Exp $
 
 ;; Description:
 ;;   iserve's logging
@@ -39,13 +39,14 @@
 (defun logmess (message)
   (multiple-value-bind (csec cmin chour cday cmonth cyear)
       (decode-universal-time (get-universal-time))
-    (mp:without-scheduling
-      (format (or *aserve-debug-stream* *initial-terminal-io*)
-	      "~a: ~2,'0d/~2,'0d/~2,'0d - ~2,'0d:~2,'0d:~2,'0d - ~a~%"
-	      (mp:process-name sys:*current-process*)
-	      cmonth cday (mod cyear 100)
-	      chour cmin csec
-	      message))))
+    (let ((str (format nil
+		       "~a: ~2,'0d/~2,'0d/~2,'0d - ~2,'0d:~2,'0d:~2,'0d - ~a~%"
+		       (mp:process-name sys:*current-process*)
+		       cmonth cday (mod cyear 100)
+		       chour cmin csec
+		       message)))
+      (write-sequence str (or *aserve-debug-stream* *initial-terminal-io*)))))
+
 
 
 
