@@ -149,8 +149,8 @@ and after you start the server.</p>
 <p>The function <font face="Courier New">net.aserve:start</font> is used to start the
 server running.</p>
 
-<p><strong><font face="Courier New"><a name="f-start"></a>(start &amp;key port listeners
-chunking keep-alive server setuid setgid <br>
+<p><strong><font face="Courier New"><a name="f-start"></a>(start &amp;key port host
+listeners chunking keep-alive server setuid setgid <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; debug proxy proxy-proxy
 cache restore-cache accept-hook ssl os-processes external-format)</font></strong></p>
 
@@ -165,6 +165,12 @@ only need be concerned with <strong>:port</strong> and <strong>:listeners.
 
 <ul>
   <li>port -- the port on which to open the web server.&nbsp; 80 is the default.</li>
+  <li>host -- the host on which to run the server.&nbsp; If you don't specify this then the
+    server will listen on all TCP/IP network interfaces on the machine.&nbsp;&nbsp; If you
+    specify &quot;localhost&quot; then the server willl only accept connections from the same
+    machine.&nbsp;&nbsp; Other values for host can be used to run AllegroServe only a
+    particular network interface.&nbsp; Host can be a name (like &quot;foo.franz.com&quot;), a
+    dotted ip address &quot;192.168.0.1&quot; or an integer IP address.</li>
   <li>listeners -- the number of threads to process http requests.&nbsp;&nbsp;&nbsp;&nbsp; If
     a value isn't given for the <strong>:listeners</strong> argument then 5 is assumed. &nbsp;
     If&nbsp; the value is <strong>nil </strong>or <strong>0 </strong>then the server runs in <em>simple
