@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.46 2003/02/26 01:16:47 jkf Exp $
+;; $Id: t-aserve.cl,v 1.47 2003/05/09 17:34:01 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -218,7 +218,9 @@
 	(prefix-local (format nil "http://localhost:~a" port))
 	(prefix-dns   (format nil "http://~a:~a" 
 			      (long-site-name)
-			      port)))
+			      port))
+	(reps 0)
+	(got-reps nil))
     
     (setq dummy-1-contents (build-dummy-file 8055 70 dummy-1-name))
 
@@ -232,6 +234,10 @@
     (let ((ent (publish-file :path "/frob" :file dummy-1-name
 			     :content-type "text/plain"
 			     :cache-p t
+			     :hook #'(lambda (req ent extra)
+				       (declare (ignore req ent extra))
+				       (setq got-reps (or got-reps 0))
+				       (incf got-reps))
 			     )))
       (test nil (net.aserve::contents ent)) ; nothing cached yet
 
@@ -244,6 +250,7 @@
 		(x-do-http-request (format nil "~a/frob" cur-prefix)
 				   :protocol protocol
 				   :keep-alive keep-alive)
+	      (incf reps)
 	      (test 200 code)
 	      (test (format nil "text/plain")
 		    (cdr (assoc :content-type headers :test #'eq))
@@ -259,6 +266,7 @@
       (test t (not (null (net.aserve::contents ent))))
       )
 
+    (test reps got-reps)  ; verify hook function worked
 
     (setq dummy-2-contents (build-dummy-file 8055 65 dummy-2-name))
 
@@ -1207,7 +1215,8 @@
 			      (long-site-name)
 			      port))
 	(test-dir)
-	(step 0))
+	(step 0)
+	(got-reps nil))
     
     (multiple-value-bind (ok whole dir)
 	(match-regexp "\\(.*[/\\]\\).*" (namestring *aserve-load-truename*))
@@ -1220,6 +1229,10 @@
 	
     (publish-directory :prefix "/test-pd/"
 		       :destination test-dir
+		       :hook #'(lambda (req ent extra)
+				       (declare (ignore req ent extra))
+				       (setq got-reps (or got-reps 0))
+				       (incf got-reps))
 		       :filter #'(lambda (req ent filename info)
 				   (declare (ignore ent info))
 				   (test t
@@ -1236,13 +1249,16 @@
     (test 404 (values2 
 	       (x-do-http-request (format nil "~a/test-pd/server.pem" 
 					  prefix-local))))
-      
+
+    (test nil got-reps) ; hook didn't fire
+    
     ; in step 1 we have it return the actual file
     (setq step 1)
     (test 200 (values2
 	       (x-do-http-request (format nil "~a/test-pd/server.pem"
 					  prefix-local))))
-      
+    (test 1 got-reps)   ; hook fired
+    
     ; remove entry so subsequent tests won't see it
     (publish-file :path "/test-pd/server.pem" :remove t)
       

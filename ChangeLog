@@ -1,3 +1,12 @@
+2003-05-09    <jkf@main.verada.com>
+1.2.27
+	* added a hook argument to most publish functions. documented
+	  as 'entity hook function'
+	* chat.cl - use cookies to get around security problem
+	* add compute-request-headers (an internal fucntion at the
+	  moment, I may export it in the future)
+	  
+
 2003-05-08  John Foderaro  <jkf@tiger.franz.com>
 
 	* doc/aserve.html - clarify that you can have a list of

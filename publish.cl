@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.73 2003/05/09 13:49:24 jkf Exp $
+;; $Id: publish.cl,v 1.74 2003/05/09 17:34:01 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -87,6 +87,13 @@
    (plist    :initarg :plist
 	     :initform nil
 	     :accessor entity-plist)
+   
+   ; function of 3 args (req ent extra) called between
+   ; with-http-request and with-http-body for entity types
+   ; where the user has no control (i.e. non function types)
+   (hook     :initarg :hook
+	     :initform nil
+	     :accessor entity-hook)
    
    ; extra holds random info we need for a particular entity
    (extra    :initarg :extra  :reader entity-extra)
@@ -500,6 +507,7 @@
 		     authorizer
 		     timeout
 		     plist
+		     hook
 		     )
   ;; publish the given url
   ;; if file is given then it specifies a file to return
@@ -527,7 +535,9 @@
 			 :content-type content-type
 			 :authorizer authorizer
 			 :plist plist
-			 :timeout timeout)))
+			 :timeout timeout
+			 :hook hook
+			 )))
 	      (publish-entity ent locator path hval)))))
 
 (defun publish-prefix (&key (host nil host-p) port prefix
@@ -583,7 +593,9 @@
 			  authorizer
 			  plist
 			  (timeout #+io-timeout #.(* 100 24 60 60)
-				   #-io-timeout nil))
+				   #-io-timeout nil)
+			  hook
+			  )
 			  
   ;; return the given file as the value of the url
   ;; for the given host.
@@ -635,6 +647,7 @@
 			    :authorizer authorizer
 			    :timeout  timeout
 			    :plist plist
+			    :hook hook
 			    ))))
        else (setq ent (make-instance (or class 'file-entity)
 			:host hval 
@@ -646,6 +659,7 @@
 			:authorizer authorizer
 			:timeout timeout
 			:plist plist
+			:hook hook
 			)))
 
     (publish-entity ent locator path hval)))
@@ -671,6 +685,7 @@
 			       publisher
 			       access-file
 			       plist
+			       hook
 			       )
   
   ;; make a whole directory available
@@ -700,6 +715,7 @@
 	       :publisher publisher
 	       :access-file access-file
 	       :plist plist
+	       :hook hook
 	       )))
     
     (publish-prefix-entity ent prefix locator host host-p nil)
@@ -789,7 +805,8 @@
 			   remove
 			   authorizer
 			   timeout
-			   plist)
+			   plist
+			   hook)
   
   (if* (null locator)
      then (setq locator (find-locator :exact server)))
@@ -843,7 +860,9 @@
 			       items)
 		:content-type (or content-type "application/octet-stream")
 		:authorizer authorizer
-		:timeout timeout)))
+		:timeout timeout
+		:hook hook
+		)))
     (publish-entity ent locator path hval)))
 
 
@@ -1209,7 +1228,8 @@
 		(setf (request-reply-content-length req) (length contents))
 		(setf (reply-header-slot-value req :last-modified)
 		  (last-modified-string ent))
-	      
+
+		(run-entity-hook req ent nil)
 	      
 		(with-http-body (req ent)
 		  ;; at this point the header are out and we have a stream
@@ -1289,7 +1309,7 @@
 			  (setf (reply-header-slot-value req :last-modified)
 			    (last-modified-string ent))
 			
-			
+			  (run-entity-hook req ent nil)
 			
 			  (with-http-body (req ent)
 			    (loop
@@ -1308,6 +1328,12 @@
     
   t	; we've handled it
   )
+
+
+(defun run-entity-hook (req ent extra)
+  ;; if there is a hook function, call it.
+  (let ((hook (entity-hook ent)))
+    (if* hook then (funcall hook req ent extra))))
 
 
 (defun return-file-range-response (req ent range buffer p size)
@@ -1331,6 +1357,8 @@
 	    (with-http-response (req ent 
 				     :response 
 				     *response-requested-range-not-satisfiable*)
+	      
+	      (run-entity-hook req ent :illegal-range)
 	      (with-http-body (req ent)
 		(html "416 - Illegal Range Specified")))
        else ; valid range
@@ -1341,6 +1369,8 @@
 		(format nil "bytes ~d-~d/~d" start end size))
 	      (setf (request-reply-content-length req) 
 		(max 0 (1+ (- end start))))
+	      
+	      (run-entity-hook req ent :in-range)
 	      (with-http-body (req ent)
 		(file-position p start)
 		(let ((left (max 0 (1+ (- end start)))))
@@ -1478,6 +1508,7 @@
 		  :content-type content-type
 		  :timeout (entity-timeout ent)
 		  :plist (list :parent ent) ; who spawned us
+		  :hook (entity-hook ent)
 		  )))
       
 
@@ -1829,6 +1860,7 @@
 	 then (setf (reply-header-slot-value req :last-modified)
 		(last-modified-string ent)))
       
+      (run-entity-hook req ent nil)
       (with-http-body (req ent)
 	(dolist (item (items ent))
 	  (let ((cache (multi-item-cache item)))
@@ -1872,6 +1904,7 @@
 		      (compute-strategy req nm-ent nil)
 		      
 		      (setf (request-reply-code req) *response-not-modified*)
+		      (run-entity-hook req ent :not-modified)
 		      (with-http-body (req nm-ent)
 			;; force out the header
 			)
