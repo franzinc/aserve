@@ -18,10 +18,10 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: log.cl,v 1.3 2000/01/07 22:40:35 jkf Exp $
+;; $Id: log.cl,v 1.4 2000/01/25 22:54:37 jkf Exp $
 
 ;; Description:
-;;   neo's loggint
+;;   neo's logging
 
 ;;- This code in this file obeys the Lisp Coding Standard found in
 ;;- http://www.franz.com/~jkf/coding_standards.html
@@ -48,3 +48,38 @@
 (defun log-timed-out-request-read (socket)
   (logmess (format nil "No request read from address ~a" 
 		   (socket::ipaddr-to-dotted (socket::remote-host socket)))))
+
+
+
+(defmethod log-request ((req http-request))
+  ;; after the request has been processed, write out log line
+  (let ((ipaddr (socket:remote-host (socket req)))
+	(time   (resp-date req))
+	(code   (let ((obj (resp-code req)))
+		  (if* obj
+		     then (response-number obj)
+		     else 999)))
+	(method (request-method req))
+	(protocol (protocol-string req))
+	(length  (resp-content-length req))
+	
+	(stream (wserver-log-stream
+		 (request-wserver req))))
+    
+    (format stream
+	    "~a - - [~a] ~s ~s ~s~%"
+	    (socket:ipaddr-to-dotted ipaddr)
+	    (universal-time-to-date time)
+	    ; method
+	    ; (render-uri (request-uri req) nil)
+	    ; protocol
+	    (request-raw-request req)
+	    code
+	    (or length -1))))
+
+	    	
+    
+    
+    
+    
+  

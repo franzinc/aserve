@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: main.cl,v 1.16 2000/01/25 16:26:39 jkf Exp $
+;; $Id: main.cl,v 1.17 2000/01/25 22:54:37 jkf Exp $
 
 ;; Description:
 ;;   neo's main loop
@@ -42,6 +42,10 @@
    #:publish
    #:publish-file
    #:publish-directory
+
+   #:request-method
+   #:request-uri
+   #:request-wserver
    
    #:resp-code
    #:resp-date
@@ -62,7 +66,11 @@
    #:url-argument-alist
    #:with-http-response
    #:with-http-body
+   
    #:wserver
+   #:wserver-log-function
+   #:wserver-log-stream
+   
    #:*neo-version*
    #:*response-ok*
    #:*response-created*
@@ -159,6 +167,21 @@
       ;; satisfied
       :initform nil  ; will build on demand if not present
       :accessor wserver-invalid-request)
+     
+     (log-function
+      ;; function to call after the request is done to 
+      ;; do the logging
+      :initarg :log-function
+      :initform nil	; no logging initially
+      :accessor wserver-log-function)
+     
+     (log-stream
+      ;; place for log-function to store stream to log to if
+      ;; it makes sense to do so
+      :initarg :log-stream
+      :initform  t 	; initially to *standard-output*
+      :accessor wserver-log-stream)
+     
      ))
 
 
@@ -332,25 +355,14 @@
 
 (defclass http-request (http-header-mixin)
   ;; incoming
-  ((command  ;; keyword giving the command in this request
-    :initarg :command
-    :reader command)
+  ((method  ;; keyword giving the command in this request :get .. etc.
+    :initarg :method
+    :reader request-method)
    
    (uri  ;; uri object holding the current request
     :initarg :uri
     :reader request-uri)
    
-   (path 
-    ;; the path value from the uri object encoded as a string
-    ;; we need this slot to cache the transformation of path to string
-    ;* we may eliminate the need for this in the future if the uri
-    ;  module caches the path as a string for us.
-    :initarg :path
-    :reader request-path)
-   
-   #+replaced (url ;; string - the argument to the command
-    :initarg :url
-    :reader url)
    (url-argument  ;; alist of arguments if there were any after a ? on the url
     :initarg :url-argument
     :reader url-argument)
@@ -369,8 +381,14 @@
    (socket ;; the socket we're communicating through
     :initarg :socket
     :reader socket)
-   (client-ipaddr  ;; who is connecting to us
-    :initarg :client-ipaddr)
+   
+   (wserver ;; wserver object for web server this request came to
+    :initarg :wserver
+    :reader request-wserver)
+   
+   (raw-request  ;; the actual command line from the browser
+    :initarg :raw-request
+    :reader request-raw-request)
 
    ;; response
    (resp-code   ;; one of the *response-xx* objects
@@ -554,7 +572,7 @@
 
 
 (defun http-worker-thread ()
-  ;; made runnable when there is an socket on whcih work is to be done
+  ;; made runnable when there is an socket on which work is to be done
   (loop
     
     (let ((sock (car (mp:process-run-reasons sys:*current-process*))))
@@ -667,8 +685,8 @@
 		  ; end this connection by closing socket
 		  (return-from process-connection nil)
 	     else ;; got a request
-		  (logmess "got valid request")
 		  (handle-request req)
+		  (log-request req)
 		  (let ((sock (socket req)))
 		    (if* (member :keep-alive
 				 (resp-strategy req)
@@ -686,7 +704,8 @@
   
   (let ((buffer (get-request-buffer))
 	(req)
-	(end))
+	(end)
+	(raw-cmd))
     
     (unwind-protect
 	(progn
@@ -715,6 +734,8 @@
 	       then (return) ; out of loop
 		    ))
 	  
+	  (setq raw-cmd (buffer-substr buffer 0 end))
+	  
 	  (multiple-value-bind (cmd uri protocol)
 	      (parse-http-command buffer end)
 	    (if* (or (null cmd) (null protocol))
@@ -722,16 +743,17 @@
 		    (return-from read-http-request nil))
 	      
 	    (setq req (make-instance 'http-request
-			:command cmd
+			:method cmd
 			:uri uri
-			:path (uri-path-to-string uri)
 			:protocol protocol
 			:protocol-string (case protocol
 					   (:http/1.0 "HTTP/1.0")
 					   (:http/1.1 "HTTP/1.1")
 					   (:http/0.9 "HTTP/0.9"))
 			:socket sock
-			:client-ipaddr (socket:remote-host sock)))
+			:wserver *wserver*
+			:raw-request raw-cmd
+			))
 	    
 	    
 	    (if* (and (not (eq protocol :http/0.9))
@@ -739,10 +761,24 @@
 	       then (debug-format 5 "no headers, ignore~%")
 		    (return-from read-http-request nil))
 	    
-	    ;; let the handler do this
-	    #+ignore
-	    (if* (null (read-entity-body req sock))
-	       then (return-from read-http-request nil)))
+	    ; insert the host name and port into the uri
+	    (let ((host (header-slot-value req "host")))
+	      (if* host
+		 then (let ((colonpos (find-it #\: host 0 (length host)))
+			    (uri (request-uri req))
+			    (port))
+			(if* colonpos
+			   then ; host:port
+				(setq 
+				    port (string-to-number
+					  host (1+ colonpos)
+					  (length host))
+				    host (buffer-substr host
+							0 colonpos)))
+			(if* (null (uri-host uri))
+			   then (setf (uri-host uri) host)
+				(if* port
+				   then (setf (uri-port uri) port)))))))
 	  
 	    
 	  req  ; return req object
@@ -1446,3 +1482,23 @@
 
 	    
 ;;-----------------
+
+
+(defun string-to-number (string start end)
+  ;; convert the string into a number.
+  ;; the number is decimal
+  ;; this is faster than creating a string input stream and
+  ;; doing a lisp read
+  ;; string must be a simple string
+  (let ((ans 0))
+    (do ((i start (1+ i)))
+	((>= i end)
+	 ans)
+      (let ((digit (- (char-code (schar string i)) #.(char-code #\0))))
+	(if* (<= 0 digit 9)
+	   then (setq ans (+ (* ans 10) digit))
+	   else (return ans))))))
+
+		
+	
+

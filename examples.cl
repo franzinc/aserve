@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: examples.cl,v 1.20 2000/01/18 22:59:41 jkf Exp $
+;; $Id: examples.cl,v 1.21 2000/01/25 22:54:37 jkf Exp $
 
 ;; Description:
 ;;   neo examples
@@ -48,7 +48,9 @@
 		 (html
 		  (:head (:title "Welcome to Neo"))
 		  (:body 
-		   (:i "This server's name is "
+		   (:h1 "Welcome to Neo")
+		   (:p "These links show off some of Neo's capabilities. ")
+		   (:i "This server's host name is "
 		    (:princ-safe (header-slot-value req "host")))
 		   :p
 		   (:b "Sample pages") :br
@@ -59,7 +61,11 @@
 			 ((:a :href "/secret") "Test authorization")
  			 " (name: " (:b "foo") ", password: " (:b "bar") ")"
 			 :br
-			 ((:a :href "/timeout") "Test timeout"))
+			 ((:a :href "/timeout") "Test timeout")
+			 :br
+			 ((:a :href "/getfile") "Client to server file transfer")
+			 )
+		  
 			 )))))
 			     
 
@@ -167,6 +173,7 @@
  :content-type "text/html"
  :function
  #'(lambda (req ent)
+     (format t "request uri is ~s~%" (neo::request-uri req))
      (let ((lookup (assoc "symbol" (url-argument-alist req) :test #'equal)))
        (with-http-response (req ent)
 	 (with-http-body (req ent)

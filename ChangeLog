@@ -1,3 +1,7 @@
+2000-01-25  John Foderaro  <jkf@tiger.franz.com>
+
+	* partially added logging
+
 2000-01-25  jkf  <jkf@main.verada.com>
 
 	* use uri package 

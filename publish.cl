@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: publish.cl,v 1.21 2000/01/25 16:26:39 jkf Exp $
+;; $Id: publish.cl,v 1.22 2000/01/25 22:54:37 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -497,7 +497,9 @@
 					 (html "The request for "
 					       (:princ-safe 
 						(render-uri 
-						 (request-uri req)))
+						 (request-uri req)
+						 nil
+						 ))
 					       " was not found on this server."))))
 			   :content-type "text/html"))
 	    (setf (wserver-invalid-request *wserver*) entity))
@@ -510,7 +512,7 @@
 			     (locator locator-exact))
   ;; standard function for finding an entity in an exact locator
   ;; return the entity if one is found, else return nil
-  (let ((entity (gethash (request-path req)
+  (let ((entity (gethash (uri-path (request-uri req))
 			 (locator-info locator))))
     (if* entity
        then (let ((entity-host (host entity)))
@@ -529,10 +531,10 @@
 			     (locator locator-prefix))
   ;; standard function for finding an entity in an exact locator
   ;; return the entity if one is found, else return nil
-  (let* ((url (request-path req))
+  (let* ((url (uri-path (request-uri req)))
 	 (len-url (length url)))
 	     
-    (dolist (entpair (wserver-prefix-url *wserver*))
+    (dolist (entpair (locator-info locator))
       (if* (and (>= len-url (length (car entpair)))
 		(buffer-match url 0 (car entpair)))
 	 then ; we may already be a wiener
@@ -653,7 +655,8 @@
   
   (let ((realname (concatenate 'string
 		    (entity-directory ent)
-		    (subseq (request-path req) (length (prefix ent)))))
+		    (subseq (uri-path (request-uri req))
+			    (length (prefix ent)))))
 	(newname))
     (debug-format 10 "directory request for ~s~%" realname)
     
@@ -690,7 +693,8 @@
 	 then  (let ((ext (subseq realname (1+ chpos))))
 		 (setq mtype (or (gethash ext *mime-types*) mtype))))
       
-      (process-entity req (publish-file :url (request-path req) 
+      (process-entity req (publish-file :url (uri-path 
+					      (request-uri req))
 					:file realname
 					:content-type mtype)))
       
@@ -746,7 +750,7 @@
   ;; determine how we'll respond to this request
   
   (let ((strategy nil))
-    (if* (eq (command req) :head)
+    (if* (eq (request-method req) :head)
        then ; head commands are particularly easy to reply to
 	    (setq strategy '(:use-socket-stream
 			     :omit-body))
@@ -806,7 +810,7 @@
 				 (header-slot-value req "connection"))))
 	(strategy))
     
-    (if*  (eq (command req) :get)
+    (if*  (eq (request-method req) :get)
        then (setq strategy (if* keep-alive
 			      then '(:use-socket-stream :keep-alive)
 			      else '(:use-socket-stream)))
@@ -898,22 +902,22 @@
 		 then (dformat sock "Content-Length: ~d~a"
 			       (resp-content-length req)      
 			       *crlf*)
-		      (logmess (format nil 
+		      (debug-format 10 
 				       "~d ~s - ~d bytes" 
 				       (response-number code)
 				       (response-desc   code)
-				       (resp-content-length req)))
+				       (resp-content-length req))
 	       elseif chunked-p
-		 then (logmess (format nil 
+		 then (debug-format 10 nil 
 				       "~d ~s - chunked" 
 				       (response-number code)
 				       (response-desc   code)
-				       ))
-		 else (logmess (format nil 
+				       )
+		 else (debug-format 10 
 				       "~d ~s - unknown length" 
 				       (response-number code)
 				       (response-desc   code)
-				       )))
+				       ))
 	      
 	      (dolist (head (resp-headers req))
 		(dformat sock "~a: ~a~a"
@@ -1049,7 +1053,6 @@
   
   
   
-
 
 ;;;;;;;;;;;;;;; setup things
 
