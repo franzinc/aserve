@@ -1,3 +1,8 @@
+2001-12-03  John Foderaro  <jkf@tiger.franz.com>
+
+	* main.cl: add ensure-stream-lock function to put a lock object
+	  on a stream that the logging functions then can use.
+
 2001-11-30    <jkf@CROW>
 
 	* doc/aserve.html - add documentation on using AllegroServe as 

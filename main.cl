@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.130 2001/12/01 00:20:35 jkf Exp $
+;; $Id: main.cl,v 1.131 2001/12/03 18:23:18 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -47,6 +47,7 @@
    ; #:debug-on			
    #:denied-request
    #:enable-proxy
+   #:ensure-stream-lock
    #:entity-plist
    #:failed-request
    #:form-urlencoded-to-query
@@ -151,7 +152,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 18))
+(defparameter *aserve-version* '(1 2 19))
 
 (eval-when (eval load)
     (require :sock)
@@ -500,10 +501,10 @@
 (defclass vhost ()
   ((log-stream :accessor vhost-log-stream
 	       :initarg :log-stream
-	       :initform *standard-output*)
+	       :initform (ensure-stream-lock *standard-output*))
    (error-stream :accessor vhost-error-stream
 		 :initarg :error-stream
-		 :initform *standard-output*)
+		 :initform (ensure-stream-lock *standard-output*))
    (names :accessor vhost-names
 	  :initarg :names
 	  :initform nil)
@@ -2663,7 +2664,20 @@ in get-multipart-sequence"))
 		    (if* port
 		       then (values (car parts) port))))))
 
-	    
+;-------
+
+(defun ensure-stream-lock (stream)
+  ;; ensure that the stream has a lock object on it so that
+  ;; it can be used as log stream.
+  ;;
+  ;; return the stream object passed in.
+  ;;
+  (if* (and (streamp stream)
+	    (null (getf (excl::stream-property-list stream) :lock)))
+     then (setf (getf (excl::stream-property-list stream) :lock)
+	    (mp:make-process-lock)))
+  stream)
+	  
 	
 		
 	
