@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.15 2000/10/15 15:18:45 jkf Exp $
+;; $Id: headers.cl,v 1.16 2000/10/25 01:31:29 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -266,6 +266,18 @@
 		 (make-array *header-block-size*
 			     :element-type '(unsigned-byte 8)))))
 
+(defparameter *header-block-plus-sresource*
+    ;; (+ 4096 100) element usb8 arrays
+    ;; used to hold things slight larger than a header block will hold
+    (create-sresource
+     :create #'(lambda (sresource &optional size)
+		 (declare (ignore sresource))
+		 (if* size
+		    then (error "size can't be specifed for header blocks"))
+		 
+		 (make-array (+ *header-block-size* 100)
+			     :element-type '(unsigned-byte 8)))))
+
 (defparameter *header-index-sresource*
     ;; used in parsing to hold location of header info in header-block
     (create-sresource
@@ -295,6 +307,12 @@
    elseif block
      then (error "bad value passed to free-header-block ~s" block)))
 
+
+(defun get-header-plus-block ()
+  (get-sresource *header-block-plus-sresource*))
+
+(defun free-header-plus-block (block)
+  (if* block then (free-sresource *header-block-plus-sresource* block)))
 
 	      
 ;; parsed header array

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.22 2000/10/15 15:18:45 jkf Exp $
+;; $Id: proxy.cl,v 1.23 2000/10/25 01:31:29 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -1075,7 +1075,14 @@
 			      (header-slot-value req :cookie))
 		     then ; can use this one
 			  (use-value-from-cache req ent pcache-ent)
-			  (return))
+			  (return)
+		     else (logmess 
+			   (format nil "can't use cached ~s due to cookie difference~%"
+				   rendered-uri))
+			  (logmess (format nil
+					   "cached cookie ~s~%, current cookie: ~s~%" 
+					   (pcache-ent-cookie pcache-ent)
+					   (header-slot-value req :cookie))))
 				 
 		(unlock-pcache-ent pcache-ent))))))
 
