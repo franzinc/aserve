@@ -1,0 +1,134 @@
+<html>
+
+<head>
+<title>Allegro iServe Tutorial</title>
+<meta name="GENERATOR" content="Microsoft FrontPage 3.0">
+</head>
+
+<body>
+
+<h1 align="center">Allegro iServe Tutorial</h1>
+
+<p>This document is a companion to the iServe reference manual.&nbsp;&nbsp; Here we will
+take you through various examples and demonstrate how to use the facilities of the iServe
+web server.&nbsp;&nbsp; Refer to the reference manual for more details on the functions we
+mention here.</p>
+
+<h1>Loading iServe</h1>
+
+<p>iServe is distributed as a single fasl file: iserve.fasl.&nbsp;&nbsp;&nbsp; If the file
+is installed where <strong>require</strong> can find it then you need only type</p>
+
+<pre>(require :iserve)</pre>
+
+<p>to ensure that it's loaded.&nbsp; Otherwise you'll have to call the <strong>load</strong>
+function.&nbsp;&nbsp; In the subsequent steps we've assumed that you've loaded iServe into
+Lisp.</p>
+
+<h1>Package setup</h1>
+
+<p>iServe consists of two components: a web server and an html generator.&nbsp; These are
+located in two Lisp packages: <strong>net.iserve</strong> and <strong>net.html.generator</strong>.
+&nbsp;&nbsp; These are long package names to type so the first thing to do is to create a
+package that <em>uses</em> these packages as well as the normal Lisp packages.&nbsp; Let's
+create a package called <strong>tutorial</strong> and make that the current package:</p>
+
+<pre>(defpackage :tutorial 
+    (:use :common-lisp :excl :net.iserve :net.html.generator))
+
+(in-package :tutorial)
+</pre>
+
+<h1>Starting iServe</h1>
+
+<p>Normally you would publish all the pages for your site and then start the web server.
+&nbsp; That way everyone would see a consistent view of your site.&nbsp; However, for this
+tutorial we'll start the server first so that we can immediately see the pages we're
+publishing.</p>
+
+<p>Web servers normally listen on port <strong>80</strong>.&nbsp; On Unix port <strong>80 </strong>
+can only be allocated by the the superuser (called<strong> root</strong>).
+&nbsp;&nbsp;&nbsp; On Windows any user can open port <strong>80</strong> as long as it's
+not yet allocated.&nbsp;&nbsp;&nbsp; In order to make this tutorial work on both Unix and
+Windows (and not require that you run as <strong>root</strong> on Unix), we'll put our web
+server on port <strong>8000</strong>. </p>
+
+<pre>tutorial(4): (start :port 8000)
+#&lt;wserver @ #x206929aa&gt;
+tutorial(5): </pre>
+
+<p>Now the web server is up and running.&nbsp;&nbsp; Let's assume that we're running
+iServe on a machine named <strong>test.franz.com</strong>.&nbsp; If you now go to a web
+browser and ask for <a href="http://test.franz.com">http://test.franz.com</a>&nbsp; you
+will contact this iServe server and it will respond that whatever you asked for wasn't
+found on the server (since we haven't published any pages).&nbsp; You can also try <a
+href="http://test">http://test</a> and get the same result (although the response message
+will be slightly different).&nbsp; If you are running the web browser on test.franz.com as
+well you can ask for <a href="http://localhost">http://localhost</a> and get a similar
+&quot;not found&quot; response.&nbsp;&nbsp;&nbsp; This demonstrates that web servers are
+known by many names.&nbsp; If you choose to take advantage of that (creating what are
+known as <strong>Virtual Hosts</strong>) then iServe will support you .&nbsp; However if
+you want to create web pages that are served by whatever name can be used to reach the
+server, then iServe will allow you to do that well.</p>
+
+<p>Type <strong>:proc</strong> to Lisp and look at which Lisp lightweight processes are
+running:</p>
+
+<pre>tutorial(6): :proc
+P Dis Sec dSec Priority State Process Name, Whostate, Arrest
+* 8 3 3.2 0 runnable Initial Lisp Listener
+* 2 0 0.0 0 waiting Connect to Emacs daemon, waiting for input
+* 1 0 0.0 0 inactive Run Bar Process
+* 1 0 0.0 0 waiting Editor Server, waiting for input
+<strong>* 1 0 0.0 0 waiting iserve-accept-6, waiting for input</strong>
+<strong>* 0 0 0.0 0 inactive 1-iserve-worker
+* 0 0 0.0 0 inactive 2-iserve-worker
+* 0 0 0.0 0 inactive 3-iserve-worker
+* 0 0 0.0 0 inactive 4-iserve-worker
+* 0 0 0.0 0 inactive 5-iserve-worker</strong>
+tutorial(7): </pre>
+
+<p>We've emboldened the threads that are part of iServe.&nbsp;&nbsp;&nbsp; The thread
+named <strong>iserve-accept-6</strong> is waiting for an http request.&nbsp; When one
+arrives it passes it off to one of the <strong>iserve-worker</strong> threads and then
+loops back to wait for the next request.&nbsp; The number of of worker threads is
+determined by the <strong>:listeners</strong> argument to the <strong>start</strong>
+function.</p>
+
+<h1>Publishing a file</h1>
+
+<p>The simplest way to publish something is to publish files stored on the disk.
+&nbsp;&nbsp; Create&nbsp; a file (here we called it /tmp/foo.txt) and put some words in
+it, and then</p>
+
+<pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/foo.txt&quot;)
+#&lt;net.iserve::file-entity @ #x2076e0c2&gt;
+tutorial(31):</pre>
+
+<p>Now if we ask for <a href="http://test.franz.com/foo">http://test.franz.com/foo</a>
+we'll see the contents of the file in the web browser.&nbsp; Since we didn't specify a
+content-type in the call to <strong>publish-file</strong> the content-type will be
+determined by the &quot;txt&quot; file type, which is associated with the
+&quot;text/plain&quot; content-type.</p>
+
+<h1>Publishing a computed page</h1>
+
+<h1>Publishing a form</h1>
+
+<h1>Authenticating a request</h1>
+
+<h2>password</h2>
+
+<h2>source address</h2>
+
+<h1>Multiple servers</h1>
+
+<h1>The entity lookup algorithm</h1>
+
+<h1>Debugging a computed response handler</h1>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+</body>
+</html>
