@@ -1,6 +1,7 @@
-(sys:defpatch "webactions" 2
+(sys:defpatch "webactions" 3
   "v1: add extended maps and authorizers;
-v2: webactions 1.4: add flags to map entries."
+v2: webactions 1.4: add flags to map entries;
+v3: Add hook to allow processing of session objects before they are reaped."
   :type :system
   :post-loadable t)
 
@@ -30,7 +31,7 @@ v2: webactions 1.4: add flags to map entries."
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: clpage.cl,v 1.1.2.3 2003/12/22 21:52:11 layer Exp $
+;; $Id: clpage.cl,v 1.1.2.4 2003/12/22 22:01:54 layer Exp $
 
 
 (eval-when (compile load eval) (require :aserve))
