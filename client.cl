@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.35 2001/02/12 16:53:40 jkf Exp $
+;; $Id: client.cl,v 1.36 2001/08/28 16:33:48 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -194,7 +194,7 @@
 			headers	    ; extra header lines, alist
 			proxy	    ; naming proxy server to access through
 			user-agent
-			(external-format :latin1-base)
+			(external-format *default-aserve-external-format*)
 			ssl	; do an ssl connection
 			)
   
@@ -338,8 +338,8 @@
 				     headers
 				     proxy
 				     user-agent
-				     ;; :utf8-base might be better
-				     (external-format :latin1-base)
+				     (external-format 
+				      *default-aserve-external-format*)
 				     ssl
 				     )
   

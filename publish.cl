@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.51 2001/08/16 17:38:54 jkf Exp $
+;; $Id: publish.cl,v 1.52 2001/08/28 16:33:49 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -1373,7 +1373,8 @@
 			      &key name value expires domain 
 				   (path "/")
 				   secure
-				   (external-format :latin1-base))
+				   (external-format 
+				    *default-aserve-external-format*))
   ;; put a set cookie header in the list of header to be sent as
   ;; a response to this request.
   ;; name and value are required, they should be strings
@@ -1424,7 +1425,8 @@
     res))
 
 
-(defun get-cookie-values (req &key (external-format :latin1-base))
+(defun get-cookie-values (req &key (external-format 
+				    *default-aserve-external-format*))
   ;; return the set of cookie name value pairs from the current
   ;; request as conses  (name . value) 
   ;;

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.108 2001/08/24 22:31:17 jkf Exp $
+;; $Id: main.cl,v 1.109 2001/08/28 16:33:49 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -74,6 +74,7 @@
 
    #:request-method
    #:request-protocol
+
    #:request-protocol-string
    #:request-query
    #:request-query-value
@@ -107,6 +108,7 @@
    #:wserver
    #:wserver-enable-chunking
    #:wserver-enable-keep-alive
+   #:wserver-external-format
    #:wserver-filters
    #:wserver-locators
    #:wserver-log-function
@@ -114,6 +116,7 @@
    #:wserver-socket
 
    #:*aserve-version*
+   #:*default-aserve-external-format*
    #:*http-response-timeout*
    #:*mime-types*
    #:*response-accepted*
@@ -133,7 +136,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 6))
+(defparameter *aserve-version* '(1 2 7))
 
 (eval-when (eval load)
     (require :sock)
@@ -276,7 +279,7 @@
 ;; more specials
 (defvar *max-socket-fd* 0) ; the maximum fd returned by accept-connection
 (defvar *aserve-debug-stream* nil) ; stream to which to seen debug messages
-
+(defvar *default-aserve-external-format* :latin1-base) 
 (defvar *worker-request*)  ; set to current request object
 
 ; type of socket stream built.
@@ -358,6 +361,12 @@
     :initarg :accept-hook
     :initform nil
     :accessor wserver-accept-hook)
+
+   (external-format
+    ;; used to bind *default-aserve-external-format* in each thread
+    :initarg :external-format
+    :initform :latin1-base
+    :accessor wserver-external-format)
    
    ;;
    ;; -- internal slots --
@@ -479,7 +488,9 @@ External-format `~s' passed to make-http-client-request filters line endings.
 Problems with protocol may occur." (ef-name ef)))))
 
 (defmacro with-http-body ((req ent
-			   &key format headers (external-format :latin1-base))
+			   &key format headers 
+				(external-format 
+				 *default-aserve-external-format*))
 			  &rest body)
   (declare (ignorable external-format))
   (let ((g-req (gensym))
@@ -884,6 +895,7 @@ by keyword symbols and not by strings"
 		   accept-hook
 		   ssl		 ; enable ssl
 		   os-processes  ; to fork and run multiple instances
+		   (external-format nil efp); to set external format
 		   )
   ;; -exported-
   ;;
@@ -903,6 +915,8 @@ by keyword symbols and not by strings"
   (if* (eq server :new)
      then (setq server (make-instance 'wserver)))
 
+  (if* efp then (setf (wserver-external-format server) external-format))
+	  
   (if* ssl
      then (if* (pathnamep ssl)
 	     then (setq ssl (namestring ssl)))
@@ -1074,7 +1088,8 @@ by keyword symbols and not by strings"
   ;; do all the serving on the main thread so it's easier to
   ;; debug problems
   (let ((main-socket (wserver-socket *wserver*))
-	(ipaddrs (wserver-ipaddrs *wserver*)))
+	(ipaddrs (wserver-ipaddrs *wserver*))
+	(*default-aserve-external-format* (wserver-external-format *wserver*)))
     (unwind-protect
 	(loop
 	  (restart-case
@@ -1136,7 +1151,10 @@ by keyword symbols and not by strings"
 (defun http-worker-thread ()
   ;; made runnable when there is an socket on which work is to be done
   (let ((*print-level* 5)
-	(*worker-request* nil))
+	(*worker-request* nil)
+	(*default-aserve-external-format* 
+	 (wserver-external-format *wserver*))
+	)
     ;; lots of circular data structures in the caching code.. we 
     ;; need to restrict the print level
     (loop
@@ -1911,7 +1929,9 @@ by keyword symbols and not by strings"
 				   buffer
 				   &key (start 0)
 					(end (length buffer))
-					(external-format :latin1-base ef-spec))
+					(external-format 
+					 *default-aserve-external-format* 
+					 ef-spec))
   ;; fill the buffer with the chunk of data.
   ;; start at 'start' and go no farther than (1- end) in the buffer
   ;; return the index of the first character not placed in the buffer.
@@ -2096,8 +2116,8 @@ in get-multipart-sequence"))
 		      
 				  
 (defmethod request-query ((req http-request) &key (post t) (uri t)
-						  (external-format
-						   :latin1-base))
+						  (external-format 
+						   *default-aserve-external-format*))
   ;; decode if necessary and return the alist holding the
   ;; args to this url.  In the alist items the value is the 
   ;; cdr of the alist item.

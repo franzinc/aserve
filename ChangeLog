@@ -1,3 +1,13 @@
+2001-08-28  John Foderaro  <jkf@tiger.franz.com>
+1.2.7
+	* take the default value for the external-format
+	  argument from *default-aserve-external-format*.  
+	  net.aserve:start sets the value of *default-aserve-external-foramt*
+	  in worker threads.
+
+	* parse.cl (split-string): don't get confused by commas inside
+		a double quoted header parameter value.
+
 2001-08-24  John Foderaro  <jkf@tiger.franz.com>
 
 	*  when an error occurs in the worker thread  print the command line

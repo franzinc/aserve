@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.32 2001/08/16 17:38:54 jkf Exp $
+;; $Id: parse.cl,v 1.33 2001/08/28 16:33:49 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -673,6 +673,24 @@
 			(if* (>= start end)
 			   then (add-to-parseobj po st start)
 				(return))
+		 elseif (eq ch #\")
+		   then ; double quoted value.. skip over this
+			(loop
+			  (incf start)
+			  (if* (>= start end)
+			     then (return)
+			     else (setq ch (schar str start))
+				  (if* (eq ch #\")
+				     then (return)
+				   elseif (eq ch #\\)
+				     then ; single char quote
+					  (incf start)
+					  (if* (>= start end)
+					     then (return)))))
+			(if* (>= start end)
+			   then (add-to-parseobj po st start)
+				(return)
+			   else (incf start))
 		   else (incf start)))))
     po))
 
