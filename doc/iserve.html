@@ -30,10 +30,10 @@ generation to be parts of the same product.</p>
     knowledge of simple html.</li>
   <li>usable in commercial applications .</li>
   <li>support the latest http protocol (currently HTTP/1.1)</li>
-  <li>runnable in multiple configuration.&nbsp;&nbsp;&nbsp; We want to support a program that
+  <li>runnable in multiple configurations.&nbsp;&nbsp;&nbsp; We want to support a program that
     just wants to make some part of it visible or configurable by one user through a web
     server.&nbsp; We also want to support&nbsp; a web site running on a multiprocessor taking
-    many hits per second.&nbsp;&nbsp; And we want so support levels in between those
+    many hits per second.&nbsp;&nbsp; Finally, we want so support levels in between those
     scenarios.</li>
 </ul>
 
@@ -185,15 +185,15 @@ given, the rest of the arguments are optional..&nbsp; The arguments have these m
     host part specified, then it will not match.</li>
   <li><strong>port</strong> -- this argument is currently unused and will likely be removed in
     future versions.</li>
-  <li><strong>file </strong>-- the name of the file to return when a request this entity is
+  <li><strong>file </strong>-- the name of the file to return when a request to this entity is
     made.&nbsp;&nbsp; The file doesn't have to exist until the request is made unless <strong>preload</strong>
     is specified as true.</li>
   <li><strong>content-type</strong> -- A string describing the content of the file.&nbsp; This
-    often referred to as the MIME type of the file.&nbsp; An example is &quot;text/html&quot;
-    to describe an html file.&nbsp; If a content-type value is not provided, then iServe
-    checks the pathname-type in the&nbsp; *mime-types* hash table to see if there is a
-    content-type associated with this pathname-type.&nbsp; If it fails to find a content-type
-    then it uses the type &quot;application/octet-stream&quot;.&nbsp; </li>
+    is often referred to as the MIME type of the file.&nbsp; An example is
+    &quot;text/html&quot; to describe an html file.&nbsp; If a content-type value is not
+    provided, then iServe checks the pathname-type in the&nbsp; *mime-types* hash table to see
+    if there is a content-type associated with this pathname-type.&nbsp; If it fails to find a
+    content-type then it uses the type &quot;application/octet-stream&quot;.&nbsp; </li>
   <li><strong>class</strong> -- a Clos class name or class object to be used to hold this
     entity.&nbsp; The class must be a subclass of&nbsp; <strong>file-entity</strong>.
     &nbsp;&nbsp; </li>
@@ -202,7 +202,7 @@ given, the rest of the arguments are optional..&nbsp; The arguments have these m
     up the response to this request.&nbsp; However note that if the file changes on the disk
     after it has been preloaded, this change will <strong>not </strong>be seen until<strong>
     &nbsp; publish-file </strong>is called again<strong>.</strong></li>
-  <li><strong>remove </strong>-- instead of adding an entity, remove the entities that matches
+  <li><strong>remove </strong>-- instead of adding an entity, remove the entities that match
     the given <strong>path</strong> and <strong>host. </strong>This removes all entities, not
     just file entities.&nbsp; If a <strong>host</strong> value is not passed in an argument,
     then this will remove all entities for this <strong>path</strong>, regardless of their <strong>host</strong>
@@ -271,7 +271,7 @@ the response is only that the request wasn't found.</p>
 
 <h2>Generating a computed response </h2>
 
-<p>There are a variety of ways that a response can been sent back to the http client
+<p>There are a variety of ways that a response can be sent back to the http client
 depending on whether keep-alive is being done, chunking is possible, whether the response
 is text or binary, whether the client already has the most recent data, and whether the
 size of the body of the response is known before the headers are sent.&nbsp; iServe
@@ -372,7 +372,7 @@ responsibility of the code supplied as the <strong>body </strong>form of the mac
 &nbsp;&nbsp;&nbsp; In cases where there is no body to the response being sent it is still
 necessary to call <strong>with-http-body </strong>so that the other parts of the response
 are sent out, e.g.<font face="Courier New"> </font>at a minimum you should put<font
-face="Courier New"> (with-http-body (req ent)) </font>in the body of an with-http-response</p>
+face="Courier New"> (with-http-body (req ent)) </font>in the body of a with-http-response</p>
 
 <p align="left">The <strong>format</strong> argument specifies whether the code in the <strong>body</strong>
 will want to write <strong>:text</strong> (e.g. <strong>write-char</strong>) or <strong>:binary</strong>
@@ -397,7 +397,7 @@ req)</strong> to obtain a stream to which it can write to supply the body of the
 will be an empty string or nil.&nbsp;&nbsp; If a request has a body you should call this
 function even if you don't plan on using what is in the body.&nbsp; <em>We will fix this
 in future version so that you don't always have to call this function if you don't need
-the value.&nbsp; </em>The typical reason for their to be a body to a request is when a web
+the value.&nbsp; </em>The typical reason for there to be a body to a request is when a web
 browser sends the result of a form with&nbsp; a POST method.</p>
 
 <hr>
@@ -429,7 +429,7 @@ name of the argument and the cdr is a string giving the value of the argument.</
 contains information about the response that is being computed and returned to the
 requestor.&nbsp;&nbsp; The following functions access slots of the request object. &nbsp;
 Those with names beginning with <strong>request-reply-</strong> are accessing the slots
-which hold information about the response the to request.&nbsp;&nbsp; When a function is
+which hold information about the response to the request.&nbsp;&nbsp; When a function is
 listed as an<em> accessor<strong> </strong></em>that means that it can be <strong>setf</strong>'ed
 as well as used to read the slot value.</p>
 
@@ -465,8 +465,8 @@ the wserver object describing the web server taking this request</p>
 <p>&nbsp;</p>
 
 <p><strong><font face="Courier New">(request-reply-code request)</font></strong>
-&nbsp;&nbsp;&nbsp;&nbsp; - accessor - the value is describes the response code and string
-we will return for this request.&nbsp;&nbsp; See the value of the argument <strong>response</strong>
+&nbsp;&nbsp;&nbsp;&nbsp; - accessor - the value describes the response code and string we
+will return for this request.&nbsp;&nbsp; See the value of the argument <strong>response</strong>
 in <strong>with-http-response</strong> for more information.</p>
 
 <p><strong><font face="Courier New">(request-reply-date request)</font></strong>
@@ -538,7 +538,7 @@ defines the form
     separate MIME entity.&nbsp;&nbsp;&nbsp; This method is only necessary when one of the
     fields in the form is a <strong>&lt;input type=&quot;file&quot;&gt;</strong> since that
     causes the whole contents of a file to be sent from the browser to the web server. &nbsp;
-    When sending a file you would like to include information such as the file name and
+    When sending a file you would like to include information such as the filename and
     content-type of the file, and by sending it in MIME format there is room for this
     information in the MIME header.&nbsp;&nbsp; We describe how to retrieve data from such a
     form next.</li>
@@ -554,8 +554,8 @@ following to retrieve the value of each field in the form:
   <li>Call <strong>(get-multipart-header req)</strong> to return the MIME headers of the next
     field.&nbsp; If this returns nil then there are no more fields to retrieve.</li>
   <li>Create a buffer and call <strong>(get-multipart-sequence req buffer)</strong> repeatedly
-    to return the next chunk of data.&nbsp; When there is no more data to read for this field
-    &nbsp; <strong>get-multipart-sequence</strong> will return nil.&nbsp; </li>
+    to return the next chunk of data.&nbsp; When there is no more data to read for this field,
+    <strong>get-multipart-sequence</strong> will return nil.&nbsp; </li>
   <li>go back to step 1</li>
 </ol>
 
@@ -642,7 +642,7 @@ automatically by storing an <strong>authorizer</strong> object in the entity.</p
 
 <p><strong><font face="Courier New">(get-basic-authorization request)</font></strong></p>
 
-<p>This function retrieve the Basic authorization information associated with this
+<p>This function retrieves the Basic authorization information associated with this
 request, if any.&nbsp;&nbsp;&nbsp; The two returned values are the name and password, both
 strings.&nbsp; If there is no Basic authorization information with this request, <strong>nil</strong>
 is returned.</p>
@@ -651,9 +651,9 @@ is returned.</p>
 
 <p><strong><font face="Courier New">(set-basic-authorization request realm)</font></strong></p>
 
-<p>This add a header line that requests Basic authorization in the given realm (a string).
-&nbsp;&nbsp; This should be called between <strong>with-http-response</strong> and <strong>with-http-body</strong>
-and only for response of type 401 (i.e. <strong>*response-unauthorized*</strong>).
+<p>This adds a header line that requests Basic authorization in the given realm (a
+string). &nbsp;&nbsp; This should be called between <strong>with-http-response</strong>
+and <strong>with-http-body</strong> and only for response of type 401 (i.e. <strong>*response-unauthorized*</strong>).
 &nbsp;&nbsp; The realm is an identifier, unique on this site, for the set of pages for
 which access should be authorized by a certain name and password.</p>
 
@@ -679,7 +679,7 @@ their own authorization needs.&nbsp;&nbsp; </p>
     <strong>t </strong>- meaning this request is authorized to access this entity<br>
     <strong>nil - </strong>meaning that this request isn't authorized.&nbsp; The response from
     iServe will be the standard &quot;failed request&quot; response so the user won't be able
-    to distinguish this response from one that would be received in the entity didn't exist at
+    to distinguish this response from one that would be received if the entity didn't exist at
     all.<br>
     <strong>:deny</strong> - a denied request response will be returned.&nbsp;&nbsp; It will <strong>not</strong>
     use the 401 return code so this will not cause a password box to be displayed by the
@@ -720,7 +720,7 @@ two slots:</p>
   </tr>
 </table>
 
-<p>An example of it's use is the following where we allow access only the user enters a
+<p>An example of it's use is the following where we allow access only if the user enters a
 name of <strong>joe</strong> and a password of <strong>eoj</strong> or a name of <strong>fred</strong>
 and a password of<strong> derf</strong>.</p>
 
@@ -767,9 +767,9 @@ matches, then the request is accepted.&nbsp; </p>
 <p>A pattern can be 
 
 <ul>
-  <li><strong>:accept</strong> -- this is a pattern that matches all IP address and causes the
-    access to be authorized</li>
-  <li><strong>:deny</strong> -- this is a pattern that matches all IP address and causes the
+  <li><strong>:accept</strong> -- this is a pattern that matches all IP addresses and causes
+    the access to be authorized</li>
+  <li><strong>:deny</strong> -- this is a pattern that matches all IP addresses and causes the
     access to be rejected</li>
   <li><strong>(:accept ipaddress [bits])</strong> --&nbsp; if the request's IP address matches
     the most significant <strong>bits</strong> of <strong>ipaddress</strong> then this access
@@ -853,7 +853,7 @@ automatically decode the uriencoding.<br>
 If the <strong>path </strong>argument isn't given, it will default to &quot;/&quot; which
 will allow this cookie to match all requests.<br>
 If the <strong>domain</strong> argument isn't given then it will default to the host to
-which this request was sent.&nbsp; If you wish you to specify this you are only allowed to
+which this request was sent.&nbsp; If you wish to specify this you are only allowed to
 specify a subsequence of the host to which this request was sent (i.e the name of the
 machine running the webserver).&nbsp;&nbsp; The <strong>domain</strong> should have at
 least two periods in it (i.e.&nbsp; &quot;.foo.com&quot;).<br>
@@ -915,7 +915,7 @@ must send a response back to the client itself.&nbsp; <strong>handle-request</st
 locators to find the entity (more on this below), and then if an entity is found and that
 entity has an authorizer, it calls <strong>authorize</strong> to see if this request is
 allowed to access the selected entity.&nbsp; If the entity passes the authorization then <strong>process-entity</strong>
-is called to cause the entity to be respond to the request.&nbsp; If there is no entity to
+is called to cause the entity to respond to the request.&nbsp; If there is no entity to
 respond then <strong>failed-request</strong> is called to send back a failure message.</p>
 
 <p>A <strong>locator</strong> is an object used to map requests into entities.
@@ -925,7 +925,7 @@ locator objects.&nbsp;&nbsp; <strong>handle-request</strong> calls </p>
 <p><strong><font face="Courier New">(standard-locator (req http-request) (loc locator)) </font></strong>[generic
 function]</p>
 
-<p>on each successive locator in that list until one return an entity object.
+<p>on each successive locator in that list until one returns an entity object.
 &nbsp;&nbsp;&nbsp; iServe has two built-in locator classes, <strong>locator-exact</strong>
 and <strong>locator-prefix</strong>, that are subclasses of <strong>locator.&nbsp;&nbsp; </strong>When
 you call <strong>publish</strong> or <strong>publish-file</strong> you are adding the
@@ -1006,13 +1006,13 @@ server to handle the bulk of pages on your site and only use Iserve for dynamic 
 &nbsp;&nbsp; The newest versions of the Apache web server have the proxy capability.
 &nbsp;&nbsp; In this section we'll describe what you have to do to configure Apache and to
 generate proxy-friendly html.&nbsp;&nbsp; The Apache notes apply to version 1.3.9 of
-&nbsp; Apache and are likely apply to other versions as well (but it would be useful to
+&nbsp; Apache and are likely to apply to other versions as well (but it would be useful to
 read the document on the proxy module just in case).</p>
 
 <p>The proxy support for Apache is found in the Proxy Module rather than being built into
 the server.&nbsp;&nbsp; First you must make sure that the proxy module is loaded into
 Apache by looking for references to it in the main Apache configuration file (httpd.conf),
-and ensuring that those references are no commented out.</p>
+and ensuring that those references are not commented out.</p>
 
 <p>Then you should ensure that proxying is turned on with this line in httpd.conf:</p>
 
