@@ -3,6 +3,11 @@ todo list:
 done -- 1. get complete set of mime types by one-time 
 	   parsing of /etc/mime.types
 
+1a - add shutdown command  (spr21190)
+
+1b - deal with parameter values that have special characters in them
+    (i.e. always do a print-safe)
+
 2. support cookies
 
 3. make authorization easier to use

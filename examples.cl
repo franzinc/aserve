@@ -251,9 +251,15 @@
 			 :br
 			 ((:input :type "file" 
 				  :name "thefile"
-				  :value "foo.txt"))
+				  :value "*.txt"))
 			 :br
 			 ((:input :type "text" :name "textthing"))
+			 :br
+			 ((:input :type "checkbox" :name "checkone"))
+			 "check box one"
+			 :br
+			 ((:input :type "checkbox" :name "checktwo"))
+			 "check box two"
 			 :br
 			 ((:input :type "submit")))))))))
 
@@ -273,7 +279,7 @@
 		   (if* (null (setq h (neo:get-multipart-header req)))
 		      then ; no more items
 			   (return))
-		   
+		   (format t "parsed headers: ~s~%" h)
 		   ; we can get the filename from the header if 
 		   ; it was an <input type="file"> item.  If there is
 		   ; no filename, we just create one.
@@ -345,8 +351,6 @@
 (publish-directory :prefix "/int"
 		   :destination "/net/tanya/www/internal/htdocs/")
 
-#+ignore (publish-directory :prefix "/"
-		   :destination "/home/alphapro/public_html/alphapro/")
 
 
 

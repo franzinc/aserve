@@ -1,3 +1,8 @@
+;; neo 
+;; 
+;;
+
+
 (defpackage :neo
   (:use :common-lisp :excl :htmlgen)
   (:export
@@ -32,7 +37,7 @@
 (in-package :neo)
 
 
-(defparameter *neo-version* '(1 0 3))
+(defparameter *neo-version* '(1 0 4))
 
 ;;;;;;;  debug support 
 
@@ -845,7 +850,9 @@
     (setf (getf (resp-plist req) 'mp-info)
       (make-mp-info :buffer (get-request-buffer)
 		    :ebuf 0		    :left len
-		    :boundary (concatenate 'string "--" boundary)
+		    ;; keep boundary case insensitive
+		    :boundary (concatenate 'string "--" 
+					   (string-downcase boundary))
 		    :socket   (socket req)
 		    ))))
 
@@ -982,7 +989,8 @@
       (if* (>= i (length boundary))
 	 then ; could match the boundary
 	      (if* (dotimes (i (length boundary) t)
-		     (if* (not (eq (schar buffer i) (schar boundary i)))
+		     (if* (not (eq (char-downcase (schar buffer i))
+				   (schar boundary i)))
 			then (return nil)))
 		 then ; matches the boundary at least, check for
 		      ; end of boundary which is two extra hypens
