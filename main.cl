@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.97 2001/02/12 16:53:41 jkf Exp $
+;; $Id: main.cl,v 1.98 2001/03/22 17:30:52 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -132,8 +132,13 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 1 40))
+(defparameter *aserve-version* '(1 1 41))
 
+(eval-when (eval load)
+    (require :sock)
+    (require :process)
+    #+(version>= 6) (require :acldns) ; not strictly required but this is preferred
+)
 
 (provide :aserve)
 
@@ -248,9 +253,15 @@
 
 ;; foreign function imports
 #+unix
-(ff:def-foreign-call (setuid "setuid") ((x :int)) :returning :int)
-#+unix
-(ff:def-foreign-call (setgid "setgid") ((x :int)) :returning :int)
+(progn 
+    (ff:def-foreign-call (setuid "setuid") ((x :int)) :returning :int)
+    (ff:def-foreign-call (setgid "setgid") ((x :int)) :returning :int)
+    (ff:def-foreign-call (getpid "getpid") () :returning :int)
+    (ff:def-foreign-call (unix-fork "fork") () :returning :int)
+    (ff:def-foreign-call (unix-kill "kill") ((pid :int) (sig :int))
+      :returning :int)
+    
+)
 
 
 ;; more specials
@@ -849,6 +860,7 @@ by keyword symbols and not by strings"
 		   debug-stream  ; stream to which to send debug messages
 		   accept-hook
 		   ssl		 ; enable ssl
+		   os-processes  ; to fork and run multiple instances
 		   )
   ;; -exported-
   ;;
@@ -894,9 +906,20 @@ by keyword symbols and not by strings"
   (if* proxy 
      then (enable-proxy :server server :proxy-proxy proxy-proxy))
 
+  (if* (and (or restore-cache cache)
+	    os-processes)
+     then ; coordinating the cache between processes is something we're
+	  ; not ready to do ... *yet*.
+	  (error "Can't have caching and os-processes in the same server"))
+  
+  #-unix
+  (if* os-processes
+     then (error "os-processes supported on Unix only at this time"))
+  
+  
   (if* restore-cache
      then (restore-proxy-cache restore-cache :server server)
-  elseif cache
+   elseif cache
      then ; cache argument can have many forms
 	  (let ((memory-size #.(* 10 1024 1024)) ; default 10mb
 		(disk-caches nil))
@@ -935,7 +958,8 @@ by keyword symbols and not by strings"
 					  
 					  :type 
 					  *socket-stream-type*
-					  )))
+					  ))
+	 (is-a-child))
 
     #+unix
     (progn
@@ -946,7 +970,37 @@ by keyword symbols and not by strings"
     (setf (wserver-terminal-io server) *terminal-io*)
     (setf (wserver-enable-chunking server) chunking)
     (setf (wserver-enable-keep-alive server) keep-alive)
-    
+
+    (if* os-processes
+       then ; create a number of processes, letting only the main
+	    ; one keep access to the tty
+	    (if* (not (and (integerp os-processes) 
+			   (>= os-processes 1)))
+	       then (error "os-processes should be an integer greater than zero"))
+	    (let (children child)
+	      (dotimes (i (1- os-processes))
+		(if* (zerop (setq child (unix-fork)))
+		   then ; we're a child, let the *lisp-listener* go 
+			; catatonic
+			(excl::unix-signal 15 0) ; let term kill it
+			(setq is-a-child t 
+			      children nil)
+			(return) ; exit dotimes 
+		   else (push child children)))
+	      (if* children
+		 then ; setup to kill children when main server 
+		      ; shutdown
+		      (push #'(lambda (wserver)
+				(declare (ignore wserver))
+				(dolist (proc children)
+				  (unix-kill proc 15) ; 15 is sigterm
+				  )
+				; allow zombies to die
+				(sleep 2)
+				(loop (if* (null
+					    (sys:reap-os-subprocess :wait nil))
+					 then (return))))
+			    (wserver-shutdown-hooks server)))))
     
     (let ((*wserver* server)) ; bind it too for privacy
       (if* (or (null listeners) (eq 0 listeners))
@@ -955,6 +1009,9 @@ by keyword symbols and not by strings"
 	 then (start-lisp-thread-server listeners)
 	 else (error "listeners should be nil or a non-negative fixnum, not ~s"
 		     listeners)))
+    
+
+    (if* is-a-child then (loop (sleep 10000)))
     
     server
     ))
@@ -985,6 +1042,8 @@ by keyword symbols and not by strings"
   (if* save-cache
      then (save-proxy-cache save-cache :server server)
      else (kill-proxy-cache :server server)))
+
+
 
 
 (defun start-simple-server ()
@@ -2420,3 +2479,4 @@ in get-multipart-sequence"))
        then (push (setq obj (make-resp code "unknown code")) *responses*))
     obj))
   
+

@@ -1,3 +1,11 @@
+2001-03-22  John Foderaro  <jkf@tiger.franz.com>
+1.1.41
+	* add os-processes argument to net.aserve:start 
+	 which causes aserve to fork (on unix only) and create
+	 multiple operating system processes listening on the
+	 same port.
+	
+
 2001-02-08  John Foderaro  <jkf@tiger.franz.com>
 1.1.40
 	* added the proxy-proxy argument to net.aserve:start that

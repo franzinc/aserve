@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.16 2001/01/22 16:17:30 jkf Exp $
+;; $Id: examples.cl,v 1.17 2001/03/22 17:30:53 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -48,6 +48,7 @@
     ;; create an absolute address for this file we'll load
     `(merge-pathnames ,name *example-pathname*))
 
+(defvar *hit-counter* 0)
 
 
 (publish :path "/" 
@@ -63,6 +64,11 @@
 			 (:p "These links show off some of AllegroServe's capabilities. ")
 			 (:i "This server's host name is "
 			     (:princ-safe (header-slot-value req :host)))
+			 #+unix
+			 (:i ", the running on process "
+			     (:princ (net.aserve::getpid)))
+			 :br
+			 (:princ (incf *hit-counter*)) " hits"
 			 :p
 			 (:b "Sample pages") :br
 			 ((:a :href "gc") "Garbage Collector Stats") :br
@@ -93,7 +99,11 @@
 			 ((:a :href "missing-link") "Missing Link")
 			 " should get an error when clicked"
 			 
-			 
+			 :br
+			 #+unix
+			 ((:a :href "long-slow") "long, slow cpu bound")
+			  " action to demo multiple process actions"
+			 :br
 			 ;; run only in an international lisp.
 			 ;; test at runtime since we may switch back
 			 ;; and forth between international and 8 bit
@@ -630,6 +640,35 @@
 	     ;; occur
 	     (with-http-response (req ent :timeout 15)
 	       (loop (sleep 5)))))
+
+
+
+(publish :path "/long-slow"
+	 :content-type "text/plain"
+	 :function
+	 #'(lambda (req ent)
+	     ;; chew up cpu time in a look that blocks 
+	     ;; the scheduler from running so this aserve
+	     ;; won't accept any more connections and we can
+	     ;; demo the multiple process version
+	     ; takes 50 secs on a 1.2ghz Athlon
+	     (locally (declare (optimize (speed 3) (safety 0)))
+	       (dotimes (aa 500)
+		 (declare (fixnum aa))
+		 (dotimes (j 300)
+		   (declare (fixnum j))
+		   (dotimes (i 10000) 
+		     (declare (fixnum i))
+		     (let ((k (+ i j)))
+		       (declare (fixnum k))
+		       (setf k (- i j))
+		       (setf k (+ i j k))
+		       (setf k (- i j k)))))))
+						
+					     
+	     (with-http-response (req ent)
+	       (with-http-body (req ent)
+		 (html "done")))))
 
 
 ;;;;;;  directory publishing.  These will only work on a particular
