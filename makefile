@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.7 2001/09/20 15:28:30 layer Exp $
+# $Id: makefile,v 1.8 2002/01/21 22:33:42 jkf Exp $
 #
 # On Windows, this makefile requires the use of GNU make from Redhat
 # (http://sources.redhat.com/cygwin/).
@@ -33,9 +33,9 @@ srcdist: FORCE
 	$(mlisp) -batch -L build.tmp -kill
 
 clean:	FORCE
-	rm -fr *.fasl */*.fasl
+	rm -fr *.fasl */*.fasl build.tmp
 
-cleanall: clean
+distclean: clean
 	rm -fr aserve-src
 
 FORCE:
