@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.49 2001/08/08 17:13:44 jkf Exp $
+;; $Id: publish.cl,v 1.50 2001/08/09 17:31:19 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -120,9 +120,16 @@
     :initform nil
     :accessor cache-p)   
    
+   ; list of name of files that can be used to index this directory
    (indexes   :initarg :indexes
-	      :initform '("index.html" "index.htm")
-	      :reader indexes)
+	      :initform nil
+	      :accessor directory-entity-indexes)
+   
+   ; filter is nil or a function of   req ent filename
+   ; which can process the request or return nil
+   (filter    :initarg :filter
+	      :initform nil
+	      :accessor directory-entity-filter)
     
    
    )
@@ -510,7 +517,8 @@
 			       locator
 			       remove
 			       authorizer
-			       indexes
+			       (indexes '("index.html" "index.htm"))
+			       filter
 			       )
   
   ;; make a whole directory available
@@ -528,6 +536,7 @@
 		       :port port
 		       :authorizer authorizer
 		       :indexes indexes
+		       :filter filter
 		       )))
     
   (dolist (entpair (locator-info locator))
@@ -1009,7 +1018,7 @@
 		 then (setq realname (concatenate 'string realname "/")))
 
 	      (setf redir-to 
-		(dolist (index (indexes ent) 
+		(dolist (index (directory-entity-indexes ent) 
 			  ; no match to index file, give up
 			  (return-from process-entity nil))
 		  (if* (eq :file (excl::filesys-type
@@ -1036,6 +1045,9 @@
 			       redir-to))
 			     
 		(with-http-body (req ent))))
+     elseif (and (directory-entity-filter ent)
+		 (funcall (directory-entity-filter ent) req ent realname))
+       thenret ; processed by the filter
        else ;; ok realname is a file.
 	    ;; create an entity object for it, publish it, and dispatch on it
       
