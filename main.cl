@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.92 2001/01/12 16:27:53 jkf Exp $
+;; $Id: main.cl,v 1.93 2001/01/16 15:10:44 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -388,8 +388,11 @@
 
 (defmethod print-object ((wserver wserver) stream)
   (print-unreadable-object (wserver stream :type t :identity t)
-    (format stream "port ~d" (socket:local-port
-			      (wserver-socket wserver)))))
+    (format stream "port ~a" 
+	    (let ((sock (wserver-socket wserver)))
+	      (if* sock 
+		 then (socket:local-port sock)
+		 else "-no socket-")))))
      
      
      
