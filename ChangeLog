@@ -1,3 +1,10 @@
+2001-09-12  John Foderaro  <jkf@tiger.franz.com>
+1.2.8
+	* client.cl: add :skip-body to do-http-request. add test for this.
+	* decode.cl: fix form-urlencoded-to-query so that it can
+		handle a non simple string (which can be returned under
+	        certain circumstances from get-request-body)
+
 2001-08-28  John Foderaro  <jkf@tiger.franz.com>
 1.2.7
 	* take the default value for the external-format
