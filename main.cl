@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.94 2001/01/22 16:17:29 jkf Exp $
+;; $Id: main.cl,v 1.95 2001/01/31 21:59:02 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -283,6 +283,7 @@
    ;; (accessors exported)
    
    (socket 		;; listening socket 
+    :initform nil
     :initarg :socket
     :accessor wserver-socket)
      
