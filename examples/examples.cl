@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.10.6.5.2.2 2001/09/17 04:49:23 layer Exp $
+;; $Id: examples.cl,v 1.10.6.5.2.3 2001/09/21 16:48:31 layer Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -72,7 +72,8 @@
 			 :p
 			 (:b "Sample pages") :br
 			 ((:a :href "gc") "Garbage Collector Stats") :br
-			 ((:a :href "apropos") "Apropos") :br
+			 ((:a :href "apropos") "Apropos")
+			 :br
 			 ((:a :href "pic") "Sample jpeg") :br
 			 ((:a :href "pic-redirect") "Redirect to previous picture") :br
 			 ((:a :href "pic-gen") "generated jpeg") "- hit reload to switch images" :br
@@ -93,6 +94,7 @@
 			  "Like the preceding but uses authorizer objects")
 			 :br
 			 ((:a :href "timeout") "Test timeout")
+			 "  this will take a while to time out."
 			 :br
 			 ((:a :href "getfile") "Client to server file transfer")
 			 :br
@@ -101,9 +103,18 @@
 			 
 			 :br
 			 #+unix
-			 ((:a :href "long-slow") "long, slow cpu bound")
-			 #+unix
-			  " action to demo multiple process actions"
+			 (html
+			  ((:a :href "long-slow") "long, slow, cpu-bound")
+			  " action to demonstrate how AllegroServe "
+			  "in multiple Unix process mode can be responsive"
+			  " even if one AllegroServe process is wedged."
+			  " You probably do "
+			  (:b "not")
+			  " want to click on this link if you are running"
+			  " AllegroServe is its normal single Unix process"
+			  " mode.")
+			  
+			 
 			 :br
 			 ;; run only in an international lisp.
 			 ;; test at runtime since we may switch back
@@ -308,6 +319,8 @@
 			    :maxlength 40
 			    :size 20
 			    :name "symbol")))
+		  #+allegro
+		  " The apropos function in ACL is case sensitive."
 		  :p
 			
 		  (if* lookup
