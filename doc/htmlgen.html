@@ -100,11 +100,19 @@ html output is generated.&nbsp; The output is sent to the stream htmlgen:*html-s
     the <strong>html</strong> macro rather than markup commands.&nbsp; They are described
     below.</li>
   <li>list beginning with a list beginning with a keyword symbol - This is used to specify
-    markup commands that have arguments.&nbsp; For example <br>
+    markup commands that have parameters.&nbsp; For example <br>
     <strong>((:a href &quot;/foo/bar.html&quot;) &quot;the link&quot;)</strong> turns into <strong>&lt;a
     href=&quot;/foo/bar.html&quot;&gt;the link&lt;/a&gt;</strong>.&nbsp;&nbsp;&nbsp; The
-    arguments are in plist form.&nbsp; The keyword names are not evaluated, they should be
-    symbols or strings.&nbsp; The values are evaluated and printed with <strong>prin1</strong>.</li>
+    arguments are in plist form: a sequence of names and values.&nbsp; The names are <strong>not</strong>
+    evaluated, they should be symbols or strings.&nbsp;&nbsp; We often use keyword symbols for
+    the names since that looks more lisp-like and reduces the number of symbols we create.
+    &nbsp; The values <strong>are</strong> evaluated and printed with a function that escapes
+    characters with special meaning in html : &lt;, &gt;, &amp;, &quot;.&nbsp;&nbsp; If the
+    value is a symbol with a zero length print name, then something special is done:&nbsp; The
+    name alone is printed without a following equal sign.&nbsp; For example: <strong>((:option
+    :size 4 :selected '||) &quot;foo&quot;)</strong> generates <strong>&lt;option
+    size=&quot;4&quot; selected&gt;foo&lt;/option&gt;</strong>.&nbsp;&nbsp;&nbsp; This form of
+    valueless argument is illegal html but in some older browsers it's the required syntax.</li>
   <li>anything else&nbsp; - everything else is simply evaluated in the normal lisp way and the
     value thrown away.</li>
 </ul>
@@ -497,7 +505,7 @@ face="Courier New">(simple-table-e 6)</font></p>
 <p>It's possible to express HTML using Lisp data structures.&nbsp;&nbsp; The form is based
 on how HTML is written using the <strong>html</strong> macro above.&nbsp; </p>
 
-<p>Lisp HTML (<strong>lhtml) </strong> is defined as one of the following
+<p>Lisp HTML (<strong>lhtml) </strong>is defined as one of the following 
 
 <ul>
   <li>a string, which is rendered as HTML by simply printing it.&nbsp; Thus the string can
@@ -508,12 +516,12 @@ on how HTML is written using the <strong>html</strong> macro above.&nbsp; </p>
     and <strong>:comment</strong>.&nbsp;&nbsp; These act just as they do in the <strong>html</strong>
     macro.&nbsp;&nbsp; This form is rendered as an opening tag, then the rendering of the
     body, and a closing HTML tag if one exists.</li>
-  <li>a list beginning with a list beginning with an <strong>lhtml</strong> keyword.
-    &nbsp; This is the form used when arguments are to be supplied with the opening entity
-    tag.&nbsp; </li>
+  <li>a list beginning with a list beginning with an <strong>lhtml</strong> keyword. &nbsp;
+    This is the form used when arguments are to be supplied with the opening entity tag.&nbsp;
+  </li>
 </ul>
 
-<p>Examples of valid <strong>lhtml</strong>:
+<p>Examples of valid <strong>lhtml</strong>: 
 
 <ul>
   <li>&quot;foo&lt;i&gt;bar&lt;/i&gt;baz&quot;</li>
@@ -527,12 +535,12 @@ on how HTML is written using the <strong>html</strong> macro above.&nbsp; </p>
 
 <p>Print the Lisp HTML expression <strong>lhtml</strong> to the <strong>stream.</strong></p>
 
-<p><strong>&nbsp;</strong></p>
+<p>&nbsp;</p>
 
 <p><font face="Courier New"><strong>(html-print-list lhtml-list stream)</strong></font></p>
 
-<p>Print the list of <strong>lhtml</strong> forms to the <strong>stream.&nbsp;&nbsp; </strong>
-This is equivalent to calling <strong>html-print</strong> on every element of <strong>lhtml-list</strong>.
+<p>Print the list of <strong>lhtml</strong> forms to the <strong>stream.&nbsp;&nbsp; </strong>This
+is equivalent to calling <strong>html-print</strong> on every element of <strong>lhtml-list</strong>.
 </p>
 
 <p>&nbsp;</p>

@@ -1,3 +1,11 @@
+2001-05-14  John Foderaro  <jkf@tiger.franz.com>
+
+	* add a method for specifying that an entity argument name should
+	  listed alone without being followed by an equal sign and value.
+	  This is an incompatible change in the unlikely event that you
+	  have code that gives the symbol || as an argument value and
+	  you expect this to be printed as ="" by the html printer
+
 2001-04-13  John Foderaro  <jkf@tiger.franz.com>
 
 	*  add more support for templates

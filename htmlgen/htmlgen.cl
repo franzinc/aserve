@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.13 2001/05/11 21:42:21 jkf Exp $
+;; $Id: htmlgen.cl,v 1.14 2001/05/14 18:10:24 jkf Exp $
 
 ;; Description:
 ;;   html generator
@@ -211,7 +211,7 @@
 			 then ; insert following conditionally
 			      (push `(if* ,(cadr xx)
 					then (write-string 
-					      ,(format nil " ~a=" (caddr xx))
+					      ,(format nil " ~a" (caddr xx))
 					      *html-stream*)
 					     (prin1-safe-http-string ,(cadddr xx)))
 				    res)
@@ -219,7 +219,7 @@
 			 else 
 					     
 			      (push `(write-string 
-				      ,(format nil " ~a=" (car xx))
+				      ,(format nil " ~a" (car xx))
 				      *html-stream*)
 				    res)
 			      (push `(prin1-safe-http-string ,(cadr xx)) res)))
@@ -256,16 +256,26 @@
 
 
 (defun prin1-safe-http-string (val)
+  ;; used only in a parameter value situation
+  ;;
+  ;; if the parameter value is the symbol with the empty print name
+  ;; then turn this into a singleton object.  Thus || is differnent
+  ;; than "".
+  ;;
   ;; print the contents inside a string double quotes (which should
   ;; not be turned into &quot;'s
   ;; symbols are turned into their name
-  (if* (or (stringp val)
-	   (and (symbolp val) 
-		(setq val (symbol-name val))))
-     then (write-char #\" *html-stream*)
-	  (emit-safe *html-stream* val)
-	  (write-char #\" *html-stream*)
-     else (prin1-safe-http val)))
+  (if* (and (symbolp val)
+	    (equal "" (symbol-name val)))
+     thenret ; do nothing
+     else (write-char #\= *html-stream*)
+	  (if* (or (stringp val)
+		   (and (symbolp val) 
+			(setq val (symbol-name val))))
+	     then (write-char #\" *html-stream*)
+		  (emit-safe *html-stream* val)
+		  (write-char #\" *html-stream*)
+	     else (prin1-safe-http val))))
 
 
 
