@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: macs.cl,v 1.10 2000/05/30 21:34:15 jkf Exp $
+;; $Id: macs.cl,v 1.10.8.1 2000/10/12 05:10:59 layer Exp $
 
 ;; Description:
 ;;   useful internal macros
@@ -116,7 +116,15 @@
 	    then (return nil))))))
 
 
-
+(defmacro rational-read-sequence (&rest args)
+  ;; acl's read-sequence was changed to conform to the
+  ;; bogus ansi definition where the whole buffer was filled up.
+  ;; even for socket stream. 
+  ;; rational-read-sequence does read-sequence the right way.
+  #-(version>= 6 0 pre-final 9) 
+  `(read-sequence ,@args)
+  #+(version>= 6 0 pre-final 9) 
+  `(read-sequence ,@args :partial-fill t))
 
 
 

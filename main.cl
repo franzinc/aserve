@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.48.2.1 2000/09/05 19:03:41 layer Exp $
+;; $Id: main.cl,v 1.48.2.2 2000/10/12 05:11:00 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -131,7 +131,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 1 28))
+(defparameter *aserve-version* '(1 1 29))
 
 
 (provide :aserve)
@@ -256,10 +256,19 @@
 (defvar *max-socket-fd* 0) ; the maximum fd returned by accept-connection
 (defvar *aserve-debug-stream* nil) ; stream to which to seen debug messages
 
+; type of socket stream built.
+; :hiper is possible in acl6
+(defvar *socket-stream-type* 
+    #+(and allegro (version>= 6)) :hiper
+    #-(and allegro (version>= 6)) :stream
+)
+
 ;; specials from other files
 (defvar *header-block-sresource*)
 (defvar *header-index-sresource*)
-(defvar *header-keyword-array*)
+(defvar *header-keyword-array*
+    ;; indexed by header-number, holds the keyword naming this header
+    )
     
 
 	
@@ -308,6 +317,14 @@
     :initarg :log-stream
     :initform  t 	; initially to *standard-output*
     :accessor wserver-log-stream)
+
+   (accept-hook
+    ;; if non-nil the function to call passing the socket about to be
+    ;; processed by aserve, and charged with returning the socket to
+    ;; process
+    :initarg :accept-hook
+    :initform nil
+    :accessor wserver-accept-hook)
    
    ;;
    ;; -- internal slots --
@@ -345,7 +362,14 @@
     ;; list of the ip addresses by which this wserver has been contacted
     :initform nil
     :accessor wserver-ipaddrs
-   )))
+    )
+   
+   (pcache
+    ;; proxy cache
+    :initform nil
+    :accessor wserver-pcache)
+    
+   ))
 
 
      
@@ -393,19 +417,32 @@
 	   )))))
 
 
-(defmacro with-http-body ((req ent &key format headers)
+#+(and allegro (version>= 6 0 pre-final 1))
+(defun warn-if-crlf (external-format)
+  (let ((ef (find-external-format external-format)))
+    (if* (not (eq (crlf-base-ef ef) ef))
+       then (warn "~
+External-format `~s' passed to make-http-client-request filters line endings.
+Problems with protocol may occur." (ef-name ef)))))
+
+(defmacro with-http-body ((req ent
+			   &key format headers (external-format :latin1-base))
 			  &rest body)
+  (declare (ignorable external-format))
   (let ((g-req (gensym))
 	(g-ent (gensym))
 	(g-format (gensym))
 	(g-headers (gensym))
+	(g-external-format (gensym))
 	)
     `(let ((,g-req ,req)
 	   (,g-ent ,ent)
 	   (,g-format ,format)
 	   (,g-headers ,headers)
+	   #+(and allegro (version>= 6 0 pre-final 1))
+	   (,g-external-format (find-external-format ,external-format))
 	   )
-       (declare (ignore-if-unused ,g-req ,g-ent ,g-format))
+       (declare (ignore-if-unused ,g-req ,g-ent ,g-format ,g-external-format))
        ,(if* body 
 	   then `(compute-response-stream ,g-req ,g-ent))
        (if* ,g-headers
@@ -413,6 +450,13 @@
        (send-response-headers ,g-req ,g-ent :pre)
        (if* (not (member :omit-body (request-reply-strategy ,g-req)))
 	  then (let ((*html-stream* (request-reply-stream ,g-req)))
+		 #+(and allegro (version>= 6 0 pre-final 1))
+		 (if* (and (streamp *html-stream*)
+			   (not (eq ,g-external-format
+				    (stream-external-format *html-stream*))))
+		    then (warn-if-crlf ,g-external-format)
+			 (setf (stream-external-format *html-stream*)
+			   ,g-external-format))
 		 (progn ,@body)))
        
        (if* (member :keep-alive (request-reply-strategy ,g-req))
@@ -493,9 +537,8 @@
        then ; has a fast accesor
 	    `(or (,(third ent) ,req)
 		 (setf (,(third ent) ,req)
-		   (or (header-buffer-req-header-value ,req ,name)
-		       "" ; to speed up the next search
-		       )))
+		    (header-buffer-req-header-value ,req ,name)
+		       ))
        else ; must get it from the alist
 	    `(header-slot-value-other ,req ,name))))
 
@@ -504,7 +547,7 @@
   (let ((ent (assoc name (request-headers req) :test #'eq)))
     (if* ent
        then (cdr ent)
-       else (let ((ans (or (header-buffer-req-header-value req name) "")))
+       else (let ((ans (header-buffer-req-header-value req name)))
 	      (push (cons name ans) (request-headers req))
 	      ans))))
       
@@ -778,7 +821,9 @@ by keyword symbols and not by strings"
 		   setuid
 		   setgid
 		   proxy
+		   cache       ; enable proxy cache
 		   debug-stream  ; stream to which to send debug messages
+		   (accept-hook nil ah-p) ; fcn of one arg, socket
 		   )
   ;; -exported-
   ;;
@@ -798,18 +843,29 @@ by keyword symbols and not by strings"
   (if* (eq server :new)
      then (setq server (make-instance 'wserver)))
   
+  (if* ah-p
+     then (setf (wserver-accept-hook server) accept-hook))
+  
   
   ; shut down existing server
   (shutdown server) 
 
   (if* proxy 
      then (enable-proxy :server server))
+  
+  (if* cache
+     then (create-proxy-cache :server server))
+  
 
   
   (let* ((main-socket (socket:make-socket :connect :passive
 					  :local-port port
 					  :reuse-address t
-					  :format :bivalent)))
+					  :format :bivalent
+					  
+					  :type 
+					  *socket-stream-type*
+					  )))
 
     #+unix
     (progn
@@ -918,24 +974,27 @@ by keyword symbols and not by strings"
 
 (defun http-worker-thread ()
   ;; made runnable when there is an socket on which work is to be done
-  (loop
+  (let ((*print-level* 5))
+    ;; lots of circular data structures in the caching code.. we 
+    ;; need to restrict the print level
+    (loop
 
-    (let ((sock (car (mp:process-run-reasons sys:*current-process*))))
-      (restart-case
-	  (if* (not (member :notrap *debug-current* :test #'eq))
-	     then (handler-case (process-connection sock)
-		    (error (cond)
-		      (logmess (format nil "~s: got error ~a~%" 
-				       (mp:process-name sys:*current-process*)
-				       cond))))
-	     else (process-connection sock))
-	(abandon ()
-	    :report "Abandon this request and wait for the next one"
-	  nil))
-      (atomic-incf (wserver-free-workers *wserver*))
-      (mp:process-revoke-run-reason sys:*current-process* sock))
+      (let ((sock (car (mp:process-run-reasons sys:*current-process*))))
+	(restart-case
+	    (if* (not (member :notrap *debug-current* :test #'eq))
+	       then (handler-case (process-connection sock)
+		      (error (cond)
+			(logmess (format nil "~s: got error ~a~%" 
+					 (mp:process-name sys:*current-process*)
+					 cond))))
+	       else (process-connection sock))
+	  (abandon ()
+	      :report "Abandon this request and wait for the next one"
+	    nil))
+	(atomic-incf (wserver-free-workers *wserver*))
+	(mp:process-revoke-run-reason sys:*current-process* sock))
     
-    ))
+      )))
 
 (defun http-accept-thread ()
   ;; loop doing accepts and processing them
@@ -1049,6 +1108,12 @@ by keyword symbols and not by strings"
   ;; another request.
   ;; When this function returns the given socket has been closed.
   ;;
+  
+  ; run the accept hook on the socket if there is one
+  (let ((ahook (wserver-accept-hook *wserver*)))
+    (if* ahook then (setq sock (funcall ahook sock))))
+  
+	
   (unwind-protect
       (let ((req))
 	;; get first command
@@ -1068,6 +1133,8 @@ by keyword symbols and not by strings"
 		  (return-from process-connection nil)
 	     else ;; got a request
 		  (handle-request req)
+		  (force-output (request-socket req))
+		  
 		  (log-request req)
 		  
 		  (free-req-header-block req)
@@ -1156,7 +1223,7 @@ by keyword symbols and not by strings"
 		    (return-from read-http-request nil))
 	    
 	    ; insert the host name and port into the uri
-	    (let ((host (request-header-host req)))
+	    (let ((host (header-slot-value req :host)))
 	      (if* host
 		 then (let ((colonpos (find-it #\: host 0 (length host)))
 			    (uri (request-uri req))
@@ -1248,6 +1315,7 @@ by keyword symbols and not by strings"
 				      
 				      
 		     else ; no content length given
+			  
 			  (if* (equalp "keep-alive" 
 				       (header-slot-value req :connection))
 			     then ; must be no body
@@ -1266,7 +1334,7 @@ by keyword symbols and not by strings"
 						     (setq ch (read-char 
 							       sock nil :eof)))
 					       then (return  ans)
-					       else (vector-push-extend ans ch))))))))
+					       else (vector-push-extend ch ans))))))))
 	   else "" ; no body
 		))))
 
@@ -1462,7 +1530,7 @@ by keyword symbols and not by strings"
 		    nil
 	       else ; read as much as we acn
 		    (let* ((end (mp-info-end mp-info))
-			   (pos (read-sequence mpbuffer 
+			   (pos (rational-read-sequence mpbuffer 
 					       (mp-info-socket mp-info)
 					       :start end
 					       :end (min
@@ -1625,12 +1693,22 @@ by keyword symbols and not by strings"
 (defmethod get-multipart-sequence ((req http-request)
 				   buffer
 				   &key (start 0)
-					(end (length buffer)))
+					(end (length buffer))
+					(external-format :latin1-base ef-spec))
   ;; fill the buffer with the chunk of data.
   ;; start at 'start' and go no farther than (1- end) in the buffer
   ;; return the index of the first character not placed in the buffer.
   
   
+  ;; Since external-format not used in all versions
+  (declare (ignorable external-format ef-spec))
+
+  #-(and allegro (version>= 6 0 pre-final 1))
+  (if* ef-spec
+     then (warn "~
+For this version of Lisp, external-format is ignored ~
+in get-multipart-sequence"))
+
   (let* ((mp-info (getf (request-reply-plist req) 'mp-info))
 	 mpbuffer 
 	 cur
@@ -1670,10 +1748,24 @@ by keyword symbols and not by strings"
 		 )
 	 (if* (> pos cur)
 	    then ; got something to return
-		 (let ((tocopy (min (- end start) (- pos cur))))
+		 (let* ((tocopy (min (- end start) (- pos cur)))
+			(items tocopy))
 		   (if* text-mode
-		      then ; here is where we should do
+		      then 
+			   ; here is where we should do
 			   ; external format processing
+			   #+(and allegro (version>= 6 0 pre-final 1))
+			   (multiple-value-setq (buffer items tocopy)
+			     (octets-to-string
+			      mpbuffer
+			      :string buffer
+			      :start cur
+			      :end (+ cur tocopy)
+			      :string-start start
+			      :string-end (length buffer)
+			      :external-format external-format
+			      :truncate t))
+			   #-(and allegro (version>= 6 0 pre-final 1))
 			   (dotimes (i tocopy)
 			     (setf (aref buffer (+ start i))
 			       (code-char (aref mpbuffer (+ cur i)))))
@@ -1682,7 +1774,7 @@ by keyword symbols and not by strings"
 			     (setf (aref buffer (+ start i))
 			       (aref mpbuffer (+ cur i)))))
 		   (setf (mp-info-cur mp-info) (+ cur tocopy))
-		   (return-from get-multipart-sequence (+ start tocopy)))
+		   (return-from get-multipart-sequence (+ start items)))
 	  elseif (eq kind :partial)
 	    then  ; may be a boundary, can't tell
 		 (if* (null (shift-buffer-up-and-read mp-info))
@@ -1720,7 +1812,7 @@ by keyword symbols and not by strings"
   (mp:with-timeout (timeout nil)
     (let ((got 0))
       (loop
-	(let ((this (read-sequence string sock :start got)))
+	(let ((this (rational-read-sequence string sock :start got)))
 	  (if* (<= this 0)
 	     then (return nil) ; eof too early
 	     else (setq  got    this)
@@ -1784,7 +1876,9 @@ by keyword symbols and not by strings"
       
 		      
 				  
-(defmethod request-query ((req http-request) &key (post t) (uri t))
+(defmethod request-query ((req http-request) &key (post t) (uri t)
+						  (external-format
+						   :latin1-base))
   ;; decode if necessary and return the alist holding the
   ;; args to this url.  In the alist items the value is the 
   ;; cdr of the alist item.
@@ -1810,14 +1904,17 @@ by keyword symbols and not by strings"
       (if* uri
 	 then (let ((arg (uri-query (request-uri req))))
 		(if* arg
-		   then (setq res (form-urlencoded-to-query arg)))))
+		   then (setq res (form-urlencoded-to-query
+				   arg
+				   :external-format external-format)))))
 	      
       (if* post
 	 then (if* (eq (request-method req) :post)
 		 then (setf res
 			(append res
 				(form-urlencoded-to-query
-				 (get-request-body req))))))
+				 (get-request-body req)
+				 :external-format external-format)))))
       (setf (getf (request-reply-plist req) 'request-query-sig)
 	signature)
       (setf (request-query-alist req) res))))
@@ -1838,7 +1935,7 @@ by keyword symbols and not by strings"
   ;; else nil
   (if* val 
      then (let (ans)
-	    (ignore-errors (setq ans (read-from-string val)))
+	    (setq ans (string-to-number val 0 (length val)))
 	    (if* (integerp ans)
 	       then (values ans t)))))
 
@@ -1982,28 +2079,38 @@ by keyword symbols and not by strings"
      then ut-or-string
      else (universal-time-to-date ut-or-string)))
 
+(defvar *saved-ut-to-date* nil)
+    
 (defun universal-time-to-date (ut)
   ;; convert a lisp universal time to rfc 1123 date
   ;;
-  (let ((*print-pretty* nil))
-    (multiple-value-bind
-	(sec min hour date month year day-of-week dsp time-zone)
-	(decode-universal-time ut 0)
-      (declare (ignore time-zone dsp))
-      (format nil "~a, ~2,'0d ~a ~d ~2,'0d:~2,'0d:~2,'0d GMT"
-	      (svref
-	       '#("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun")
-	       day-of-week)
-	      date
-	      (svref
-	       '#(nil "Jan" "Feb" "Mar" "Apr" "May" "Jun"
-		  "Jul" "Aug" "Sep" "Oct" "Nov" "Dec")
-	       month
-	       )
-	      year
-	      hour
-	      min
-	      sec))))
+  (let ((cval *saved-ut-to-date*))
+    (if* (eql ut (car cval))
+       then ; turns out we often repeatedly ask for the same conversion
+	    (cdr cval)
+       else
+	    (let ((*print-pretty* nil))
+	      (multiple-value-bind
+		  (sec min hour date month year day-of-week dsp time-zone)
+		  (decode-universal-time ut 0)
+		(declare (ignore time-zone dsp))
+		(let ((ans (format nil "~a, ~2,'0d ~a ~d ~2,'0d:~2,'0d:~2,'0d GMT"
+				   (svref
+				    '#("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun")
+				    day-of-week)
+				   date
+				   (svref
+				    '#(nil "Jan" "Feb" "Mar" "Apr" "May" "Jun"
+				       "Jul" "Aug" "Sep" "Oct" "Nov" "Dec")
+				    month
+				    )
+				   year
+				   hour
+				   min
+				   sec)))
+		  (setf *saved-ut-to-date* (cons ut ans))
+		  ans
+		  ))))))
 
 
 
@@ -2022,6 +2129,7 @@ by keyword symbols and not by strings"
   ;; get a new resource. If size is given then ask for at least that
   ;; size
   (let (to-return)
+    ;; force new ones to be allocated
     (mp:without-scheduling 
       (let ((buffers (sresource-data sresource)))
 	(if* size
@@ -2057,6 +2165,12 @@ by keyword symbols and not by strings"
   ;; we silently ignore nil being passed in as a buffer
   (if* buffer 
      then (mp:without-scheduling
+	    ;; if debugging
+	    (if* (member buffer (sresource-data sresource)
+			 :test #'eq)
+	       then (error "freeing freed buffer"))
+	    ;;
+	    
 	    (push buffer (sresource-data sresource)))))
 
 

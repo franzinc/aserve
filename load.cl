@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.31.10.1 2000/09/05 19:03:40 layer Exp $
+;; $Id: load.cl,v 1.31.10.2 2000/10/12 05:10:58 layer Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -47,6 +47,12 @@
     '("examples/examples"
       ))
 
+
+
+;; end experimental
+
+(require :sock)  ; so we can tell if we have hiper sockets
+;(setq *features* (delete :hiper-socket *features*))
 
 (with-compilation-unit  nil
   (dolist (file (append *aserve-files* *aserve-examples*))
@@ -236,7 +242,8 @@
    (format nil "cp ~adoc/htmlgen.html ~adoc/aserve.html ~adoc/tutorial.html /net/cobweb/www/opensource/devel/www/aserve"
 	   *aserve-root*
 	   *aserve-root*
-	   *aserve-root*)))
+	   *aserve-root*))
+  (run-shell-command "~/bin/sync-a-opensource"))
 	   
 	    
   

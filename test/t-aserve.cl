@@ -1,6 +1,6 @@
 ;; -*- mode: common-lisp; package: net.aserve.test -*-
 ;;
-;; t-iserve.cl
+;; t-aserve.cl
 ;;
 ;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA 
 ;;
@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.6.6.1 2000/09/05 19:03:44 layer Exp $
+;; $Id: t-aserve.cl,v 1.6.6.2 2000/10/12 05:11:05 layer Exp $
 
 ;; Description:
 ;;   test iserve
@@ -43,7 +43,7 @@
 (in-package :net.aserve.test)
 
 ; set to nil before loading the test to prevent the test from auto-running
-(defvar user::*do-aserve-test* t)
+(defvar user::*do-aserve-test* nil)
 (defvar *x-proxy* nil) ; when true x-do-http-request will go through a proxy
 (defvar *proxy-wserver* nil)
 
@@ -603,11 +603,35 @@
 		   (,str1 . "a b c d")
 		   ("efffg" . ,str2))))
       (test (form-urlencoded-to-query
-	     (query-to-form-urlencoded query))
+	     (query-to-form-urlencoded query :external-format :latin1-base)
+	     :external-format :latin1-base)
 	    query
-	    :test #'equal))))
-		       
-
+	    :test #'equal)))
+  #+(and allegro ics (version>= 6 0))
+  (let* ((str1 (coerce '(#\hiragana_letter_a #\hiragana_letter_i
+			 #\hiragana_letter_u)
+		       'string))
+	 (str2 (coerce '(#\katakana_letter_a #\katakana_letter_i
+			 #\katakana_letter_u)
+		       'string))
+	 (query `(("bazzer" . ,str1)
+		  (,str2 . "berry"))))
+    (dolist (ef (list (find-external-format :utf8)
+		      (find-external-format :shiftjis)
+		      ;; 6.0 beta didn't have an ef for unicode.
+		      (if* (find-external-format :unicode :errorp nil)
+			 thenret
+			 else (find-external-format :utf8))
+		      (find-external-format :euc)))
+      (test (form-urlencoded-to-query
+	     (query-to-form-urlencoded query :external-format ef)
+	     :external-format ef)
+	    query
+	    :test #'equal)
+      (test str1
+	    (uridecode-string (uriencode-string str1 :external-format ef)
+			      :external-format ef)
+	    :test #'string=))))
     
     
 (defun test-forms (port)
@@ -883,20 +907,117 @@
     ))
   
   
+
+
+;; proxy cache tests
+;; (net.aserve.test::test-proxy-cache)
+;;
+(defun test-proxy-cache ()
+  (let* ((*wserver* (start :port nil :server :new))
+	 (proxy-wserver (start :port nil :server :new :proxy t :cache t))
+	 (proxy-host)
+	 (origin-server)
+	 (pcache (net.aserve::wserver-pcache proxy-wserver))
+	 (*print-level* 4) ; in case we see some errors
+	 )
     
+    (macrolet ((test-2 (res1 res2 form &key (test #'eql))
+		 `(multiple-value-bind (v1 v2) ,form
+		    (test ,res1 (and '(:first ,form) v1) :test ,test)
+		    (test ,res2 (and '(:second ,form) v2) :test ,test))))
+		 
+		      
+		 
     
+      (setq proxy-host (format nil "localhost:~d"
+			       (socket:local-port
+				(net.aserve::wserver-socket proxy-wserver))))
+    
+      (setq origin-server
+	(format nil "http://localhost:~d" (socket:local-port
+					   (net.aserve::wserver-socket *wserver*))))
 
+      (format t "server on port ~d, proxy server on port ~d~%"
+	      (socket:local-port
+	       (net.aserve::wserver-socket *wserver*))
+	      (socket:local-port
+	       (net.aserve::wserver-socket proxy-wserver)))
 
-
-
-
+      (with-open-file (p "aservetest.xx" :direction :output
+		       :if-exists :supersede)
+	(format p "foo"))
       
-    
-    
-    
-    
-			  
-		   
+      (with-tests (:name "aserve-proxy-cache")
+	(unwind-protect
+	    (progn
+	      (publish-file  :path "/foo" :file "aservetest.xx" :cache-p t)
+
+	      ; a miss
+	      (test-2 "foo" 200
+		      (do-http-request 
+			  (format nil "~a/foo" origin-server)
+			:proxy proxy-host)
+		      :test #'equal)
+	      
+	      (test 1 (net.aserve::pcache-r-miss pcache))
+	      
+	      ; a fast hit
+	      (test-2 "foo" 200
+		      (do-http-request 
+			  (format nil "~a/foo" origin-server)
+			:proxy proxy-host)
+		      :test #'equal)
+	      (test 1 (net.aserve::pcache-r-fast-hit pcache))
+	      
+	      ; another fast hit
+	      (test-2 "foo" 200
+		      (do-http-request 
+			  (format nil "~a/foo" origin-server)
+			:proxy proxy-host)
+		      :test #'equal)
+	      (test 2 (net.aserve::pcache-r-fast-hit pcache))
+	  
+
+	      (format t "sleeping for 10 secs.....~%")(force-output)
+	      (sleep 10)
+	      
+	      ; entry no longer fresh so get a slow hit
+	      (test-2 "foo" 200
+		      (do-http-request 
+			  (format nil "~a/foo" origin-server)
+			:proxy proxy-host)
+		      :test #'equal)
+	      (test 1 (net.aserve::pcache-r-slow-hit pcache))
+
+	      ; entry now updated so we get a fast hit 
+	      (test-2 "foo"  200
+		      (do-http-request 
+			  (format nil "~a/foo" origin-server)
+			:proxy proxy-host)
+		      :test #'equal)
+	      
+	      (test 3 (net.aserve::pcache-r-fast-hit pcache))
+	      
+	      ; try flushing all to disk
+	      (net.aserve::clean-memory-cache pcache)
+	      
+	      ; and retrieve from the disk
+	      (test-2 "foo"  200
+		      (do-http-request 
+			  (format nil "~a/foo" origin-server)
+			:proxy proxy-host)
+		      :test #'equal)
+	      (test 4 (net.aserve::pcache-r-fast-hit pcache))
+		
+	      )
+	    
+	  
+      
+
+	  (ignore-errors (delete-file "aservetest.xx"))
+	  (shutdown  proxy-wserver)
+	  (shutdown  *wserver*))))))
+
     
     
     
@@ -904,7 +1025,12 @@
 
 
     
-(if* user::*do-aserve-test* then (test-aserve))
+(if* user::*do-aserve-test* 
+   then (test-aserve)
+   else (format t 
+		" (net.aserve.test::test-aserve) will run the aserve test~%"))
+
+
 
 	
     

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.21.2.1 2000/09/05 19:03:40 layer Exp $
+;; $Id: client.cl,v 1.21.2.2 2000/10/12 05:10:56 layer Exp $
 
 ;; Description:
 ;;   http client code.
@@ -193,6 +193,7 @@
 			headers	    ; extra header lines, alist
 			proxy	    ; naming proxy server to access through
 			user-agent
+			(external-format :latin1-base)
 			)
   
   ;; send an http request and return the result as four values:
@@ -211,6 +212,7 @@
 	       :headers headers
 	       :proxy proxy
 	       :user-agent user-agent
+	       :external-format external-format
 	       )))
 
     (unwind-protect
@@ -333,6 +335,8 @@
 				     headers
 				     proxy
 				     user-agent
+				     ;; :utf8-base might be better
+				     (external-format :latin1-base)
 				     )
   
 
@@ -373,11 +377,22 @@
 	      
 	      (setq sock (socket:make-socket :remote-host phost
 					     :remote-port pport
-					     :format :bivalent)))
+					     :format :bivalent
+					     :type net.aserve::*socket-stream-type*
+					     )))
        else (setq sock 
 	      (socket:make-socket :remote-host host
 				  :remote-port port
-				  :format :bivalent)))
+				  :format :bivalent
+				  :type 
+				  net.aserve::*socket-stream-type*
+					     
+				  )))
+
+    #+(and allegro (version>= 6 0))
+    (let ((ef (find-external-format external-format)))
+      #+(version>= 6 0 pre-final 1) (net.aserve::warn-if-crlf ef)
+      (setf (stream-external-format sock) ef))
     
     (if* net.aserve::*watch-for-open-sockets*
        then (schedule-finalization 
@@ -391,12 +406,15 @@
 	       (if* (not fresh-uri)
 		  then (setq uri (net.uri:copy-uri uri)))
 	       (setf (net.uri:uri-query uri) (query-to-form-urlencoded
-					      query)))
+					      query
+					      :external-format
+					      external-format)))
 	      (:post 	; make the content
 	       (if* content
 		  then (error "Can't specify both query ~s and content ~s"
 			      query content))
-	       (setq content (query-to-form-urlencoded query)
+	       (setq content (query-to-form-urlencoded
+			      query :external-format external-format)
 		     content-type "application/x-www-form-urlencoded"))))
 		 
     
@@ -613,7 +631,8 @@
        then ; just a normal read-sequence
 	    (if* (zerop bytes-left)
 	       then 0  ; eof
-	       else (let ((ans (read-sequence buffer socket :start start
+	       else (let ((ans (net.aserve::rational-read-sequence buffer 
+						       socket :start start
 					      :end (+ start 
 						      (min (- end start) 
 							   bytes-left)))))
@@ -742,7 +761,7 @@
 (defun get-header-line-buffer ()
   ;; return the next header line buffer
   (let (buff)
-    (mp:without-scheduling 
+    (excl::atomically
       (setq buff (pop *response-header-buffers*)))
     (if* buff
        thenret

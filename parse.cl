@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.22.10.1 2000/09/05 19:03:41 layer Exp $
+;; $Id: parse.cl,v 1.22.10.2 2000/10/12 05:11:01 layer Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -314,7 +314,6 @@
 	(end))
 	       
     (setf (request-header-block req) buff)
-    
     ;; read in all the headers, stop at the last crlf
     (if* (setq end (read-headers-into-buffer sock buff))
        then (parse-header-block buff 0 end)
@@ -329,7 +328,7 @@
   ;;
   (let ((len (- (length buff) 500)) ; leave space for index at end
 	(i 0)
-	(state 0)
+	(state 2)
 	(echo (member :xmit *debug-current*)))
 	
     (loop
@@ -345,7 +344,7 @@
 	(setf (aref buff i) ch)
 	(incf i)
 	(case state
-	  (0 ; seen nothing intersting
+	  (0 ; seen nothing interesting
 	   (if* (eq ch #.(char-code #\newline))
 	      then (setq state 2)
 	    elseif (eq ch #.(char-code #\return))

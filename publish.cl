@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.33.6.1 2000/09/05 19:03:42 layer Exp $
+;; $Id: publish.cl,v 1.33.6.2 2000/10/12 05:11:02 layer Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -58,6 +58,12 @@
 		  :accessor last-modified
 		  :initform nil ; means always considered new
 		  )
+   
+   ; ut string format for last-modified cached here.
+   (last-modified-string :initarg :last-modified-string
+			 :accessor last-modified-string
+			 :initform nil)
+   
    (format :initarg :format  ;; :text or :binary
 	   :initform :text
 	   :reader  entity-format)
@@ -481,6 +487,8 @@
 			    
 			    :contents  guts
 			    :last-modified lastmod
+			    :last-modified-string (universal-time-to-date lastmod)
+			    
 			    :cache-p cache-p
 			    :ssi     ssi
 			    :authorizer authorizer
@@ -874,10 +882,7 @@
 	    (with-http-response (req ent
 				     :content-type (content-type ent))
 	      (setf (request-reply-content-length req) (length contents))
-	      (push (cons "Last-Modified"
-			  (universal-time-to-date 
-			   (min (request-reply-date req) 
-				(last-modified ent))))
+	      (push (cons "Last-Modified" (last-modified-string ent))
 		    (request-reply-headers req))
 	      
 	      (with-http-body (req ent :format :binary)
@@ -907,7 +912,10 @@
 					      :element-type '(unsigned-byte 8))))
 		      (declare (dynamic-extent buffer))
 		      
-		      (setf (last-modified ent) lastmod)
+		      (setf (last-modified ent) lastmod
+			    (last-modified-string ent)
+			    (universal-time-to-date lastmod))
+		      
 		      
 		      (with-http-response (req ent)
 
@@ -919,8 +927,7 @@
 			
 			(setf (request-reply-content-length req) size)
 			(push (cons "Last-Modified"
-				    (universal-time-to-date 
-				     (min (request-reply-date req) lastmod)))
+				    (last-modified-string ent))
 			      (request-reply-headers req))
 			
 			
@@ -1238,7 +1245,14 @@
 			    (car head)
 			    (cdr head)
 			    *crlf*))
-	      (format-dif :xmit sock "~a" *crlf*))
+	      (format-dif :xmit sock "~a" *crlf*)
+	      
+	      (force-output sock)
+	      ; clear bytes written count so we can count data bytes
+	      ; transferred
+	      #+(and allegro (version>= 6))
+	      (excl::socket-bytes-written sock 0) 
+	      )
       
       (if* (and send-headers chunked-p (eq time :pre))
 	 then (force-output sock)
@@ -1253,7 +1267,11 @@
       ;; if we're chunking then shut that off
       (if* (and chunked-p (eq time :post))
 	 then (socket:socket-control sock :output-chunking-eof t)
-	      (write-sequence *crlf* sock))
+	      ; in acl5.0.1 the output chunking eof didn't send 
+	      ; the final crlf, so we do it here
+	      #+(and allegro (not (version>= 6)))
+	      (write-sequence *crlf* sock)
+	      )
       )))
 
       	
@@ -1277,7 +1295,8 @@
 (defmethod set-cookie-header ((req http-request)
 			      &key name value expires domain 
 				   (path "/")
-				   secure)
+				   secure
+				   (external-format :latin1-base))
   ;; put a set cookie header in the list of header to be sent as
   ;; a response to this request.
   ;; name and value are required, they should be strings
@@ -1292,9 +1311,11 @@
   ;; secure is either true or false
   ;;
   (let ((res (concatenate 'string 
-	       (uriencode-string (string name))
+	       (uriencode-string (string name)
+				 :external-format external-format)
 	       "="
-	       (uriencode-string (string value)))))
+	       (uriencode-string (string value)
+				 :external-format external-format))))
     (if* expires
        then (if* (eq expires :never)
 	       then (setq expires *far-in-the-future*))
@@ -1326,7 +1347,7 @@
     res))
 
 
-(defun get-cookie-values (req)
+(defun get-cookie-values (req &key (external-format :latin1-base))
   ;; return the set of cookie name value pairs from the current
   ;; request as conses  (name . value) 
   ;;
@@ -1348,8 +1369,11 @@
 		 then ; the correct format, must decode pieces
 		      (mapcar #'(lambda (ent)
 				  (cons 
-				   (uridecode-string (car ent))
-				   (uridecode-string (cdr ent))))
+				   (uridecode-string
+				    (car ent) :external-format external-format)
+				   (uridecode-string
+				    (cdr ent)
+				    :external-format external-format)))
 			      (cddr (car res))))))))
 			
 
