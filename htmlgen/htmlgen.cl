@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.20 2002/09/13 02:01:13 jkf Exp $
+;; $Id: htmlgen.cl,v 1.21 2003/01/07 16:20:51 jkf Exp $
 
 ;; Description:
 ;;   html generator
@@ -506,94 +506,95 @@
 
 
 (def-special-html :newline 
-    #'(lambda (ent args argsp body)
+    (excl:named-function html-newline-function
+      (lambda (ent args argsp body)
 	(declare (ignore ent args argsp))
 	(if* body
 	   then (error "can't have a body with :newline -- body is ~s" body))
 			       
-	`(terpri *html-stream*))
+	`(terpri *html-stream*)))
   
-  #'(lambda (ent cmd args form subst unknown stream)
+  (excl:named-function html-newline-print-function
+    (lambda (ent cmd args form subst unknown stream)
       (declare (ignore args ent unknown subst))
       (if* (eq cmd :set)
 	 then (terpri stream)
-	 else (error ":newline in an illegal place: ~s" form)))
-  )
-			       
+	 else (error ":newline in an illegal place: ~s" form)))))
 
-(def-special-html :princ 
-    #'(lambda (ent args argsp body)
+(def-special-html :princ
+    (excl:named-function html-princ-function
+      (lambda (ent args argsp body)
 	(declare (ignore ent args argsp))
 	`(progn ,@(mapcar #'(lambda (bod)
 			      `(princ-http ,bod))
-			  body)))
+			  body))))
   
-  #'(lambda (ent cmd args form subst unknown stream)
+  (excl:named-function html-princ-print-function
+    (lambda (ent cmd args form subst unknown stream)
       (declare (ignore args ent unknown subst))
       (assert (eql 2 (length form)))
       (if* (eq cmd :full)
 	 then (format stream "~a" (cadr form))
-	 else (error ":princ must be given an argument")))
-  )
+	 else (error ":princ must be given an argument")))))
 
 (def-special-html :princ-safe 
-    #'(lambda (ent args argsp body)
+    (excl:named-function html-princ-safe-function
+      (lambda (ent args argsp body)
 	(declare (ignore ent args argsp))
 	`(progn ,@(mapcar #'(lambda (bod)
 			      `(princ-safe-http ,bod))
-			  body)))
-  #'(lambda (ent cmd args form subst unknown stream)
+			  body))))
+  (excl:named-function html-princ-safe-print-function
+    (lambda (ent cmd args form subst unknown stream)
       (declare (ignore args ent unknown subst))
       (assert (eql 2 (length form)))
       (if* (eq cmd :full)
 	 then (emit-safe stream (format nil "~a" (cadr form)))
-	 else (error ":princ-safe must be given an argument"))))
+	 else (error ":princ-safe must be given an argument")))))
 
-(def-special-html :prin1 
-    #'(lambda (ent args argsp body)
+(def-special-html :prin1
+    (excl:named-function html-prin1-function
+      (lambda (ent args argsp body)
 	(declare (ignore ent args argsp))
 	`(progn ,@(mapcar #'(lambda (bod)
 			      `(prin1-http ,bod))
-			  body)))
-  #'(lambda (ent cmd args form subst unknown stream)
+			  body))))
+  (excl:named-function html-prin1-print-function
+    (lambda (ent cmd args form subst unknown stream)
       (declare (ignore ent args unknown subst))
       (assert (eql 2 (length form)))
       (if* (eq cmd :full)
 	 then (format stream "~s" (cadr form))
-	 else (error ":prin1 must be given an argument")))
-  
-  )
+	 else (error ":prin1 must be given an argument")))))
 
-
-(def-special-html :prin1-safe 
-    #'(lambda (ent args argsp body)
+(def-special-html :prin1-safe
+    (excl:named-function html-prin1-safe-function
+      (lambda (ent args argsp body)
 	(declare (ignore ent args argsp))
 	`(progn ,@(mapcar #'(lambda (bod)
 			      `(prin1-safe-http ,bod))
-			  body)))
-  #'(lambda (ent cmd args form unknown stream)
-      (declare (ignore args ent unknown))
+			  body))))
+  (excl:named-function html-prin1-safe-print-function
+    (lambda (ent cmd args form subst unknown stream)
+      (declare (ignore args ent subst unknown))
       (assert (eql 2 (length form)))
       (if* (eq cmd :full)
 	 then (emit-safe stream (format nil "~s" (cadr form)))
-	 else (error ":prin1-safe must be given an argument"))
-      )
-  )
-
+	 else (error ":prin1-safe must be given an argument")))))
 
 (def-special-html :comment
-  #'(lambda (ent args argsp body)
-      ;; must use <!--   --> syntax
-      (declare (ignore ent args argsp))
-      `(progn (write-string "<!--" *html-stream*)
-	      (html ,@body)
-	      (write-string "-->" *html-stream*)))
-  
-  #'(lambda (ent cmd args form unknown stream)
-      (declare (ignore ent cmd args unknown))
-      (format stream "<!--~a-->" (cadr form))))
+    (excl:named-function html-comment-function
+      (lambda (ent args argsp body)
+	;; must use <!--   --> syntax
+	(declare (ignore ent args argsp))
+	`(progn (write-string "<!--" *html-stream*)
+		(html ,@body)
+		(write-string "-->" *html-stream*))))
+  (excl:named-function html-comment-print-function
+    (lambda (ent cmd args form subst unknown stream)
+      (declare (ignore ent cmd args subst unknown))
+      (format stream "<!--~a-->" (cadr form)))))
 
-      
 
 
 (defmacro def-std-html (kwd has-inverse name-attrs)
@@ -692,7 +693,7 @@
 (def-std-html :noframes t nil)
 (def-std-html :noscript t nil)
 
-(def-std-html :object  	nil nil)
+(def-std-html :object  	t nil)
 (def-std-html :ol  	t nil)
 (def-std-html :optgroup t nil)
 (def-std-html :option  	t nil)

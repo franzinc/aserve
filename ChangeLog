@@ -1,3 +1,11 @@
+2003-01-07  John Foderaro  <jkf@tiger.franz.com>
+
+	* client.cl - when sending character data obey external formats
+	* main.cl - initialize log stream to *initial-terminal-io* since
+	  *standard-output* could be bound to something during the loading
+	  process.
+	* [htmlgen changes, see it's ChangeLog]
+
 2002-09-06  John Foderaro  <jkf@tiger.franz.com>
 
 	* detect connection reset by peer on the AIX operating system

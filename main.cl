@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.140 2002/09/06 17:12:15 jkf Exp $
+;; $Id: main.cl,v 1.141 2003/01/07 16:20:50 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -386,10 +386,10 @@
 (defclass vhost ()
   ((log-stream :accessor vhost-log-stream
 	       :initarg :log-stream
-	       :initform (ensure-stream-lock *standard-output*))
+	       :initform (ensure-stream-lock *initial-terminal-io*))
    (error-stream :accessor vhost-error-stream
 		 :initarg :error-stream
-		 :initform (ensure-stream-lock *standard-output*))
+		 :initform (ensure-stream-lock *initial-terminal-io*))
    (names :accessor vhost-names
 	  :initarg :names
 	  :initform nil)

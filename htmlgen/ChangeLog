@@ -1,3 +1,8 @@
+2003-01-07  John Foderaro  <jkf@tiger.franz.com>
+
+	* fix :comment and :prin1-safe when html-print'ing
+	* make sure to close off use of <object>
+
 2002-09-06  John Foderaro  <jkf@tiger.franz.com>
 
 	* add hook to catch when unknonwn html tags are emitted
