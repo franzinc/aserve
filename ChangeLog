@@ -1,3 +1,9 @@
+2001-10-08  John Foderaro  <jkf@tiger.franz.com>
+
+	* publish.cl - publish-directory must pass on host info
+		to the publish-files that it does.
+	            - unpublish takes a :server argument
+
 2001-09-29  John Foderaro  <jkf@tiger.franz.com>
 
 	* cgi.cl - fix bug where content-length was specified wrong
