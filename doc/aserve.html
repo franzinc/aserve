@@ -8,7 +8,7 @@
 <body>
 
 <h1 align="center">AllegroServe - A Web Application Server<br>
-<small><small><small>version <font face="Courier New">1.2.25</font></small></small></small></h1>
+<small><small><small>version <font face="Courier New">1.2.26</font></small></small></small></h1>
 
 <p align="left"><strong><small>copyright(c) 2000-2001. Franz Inc</small></strong></p>
 
@@ -854,11 +854,11 @@ necessary to call <strong>with-http-body </strong>so that the other parts of the
 are sent out, e.g.<font face="Courier New"> </font>at a minimum you should put<font
 face="Courier New"> (with-http-body (req ent)) </font>in the body of a with-http-response.</p>
 
-<p align="left"><em>The <strong>body </strong>forms may not be executed! </em> If the
+<p align="left"><em>The <strong>body </strong>forms may not be executed! </em>If the
 request is an http <strong>head</strong> request then the browser wants only the headers
 returned.&nbsp;&nbsp; The <strong>with-http-body </strong>macro will not evaulate the <strong>body</strong>
 forms.&nbsp;&nbsp; You must be aware of this and should never put code in the <strong>body
-</strong> form that absolutely must be executed when a request is given.</p>
+</strong>form that absolutely must be executed when a request is given.</p>
 
 <p align="left">The <strong>headers</strong> argument is a list of conses, where the car
 is the header name (a keyword symbol) and the cdr is the header value.&nbsp; These headers
@@ -881,13 +881,20 @@ have an effect on the stream created.</em></p>
 <hr>
 
 <p><a name="f-get-request-body"></a><strong><font face="Courier New">(get-request-body
-request)</font></strong></p>
+request &amp;key external-format)</font></strong></p>
 
 <p>Return the body of the request as a string.&nbsp; If there is no body the return value
 will be an empty string.&nbsp;&nbsp; The result is cached inside the request object, so
 this function can be called more than once while processing a request.&nbsp;&nbsp; The
 typical reason for there to be a body to a request is when a web browser sends the result
-of a form with&nbsp; a POST method.</p>
+of a form with&nbsp; a POST method.&nbsp;&nbsp; The octets that make up the body of the
+request are converted to a string (and then cached) using the <strong>:octets</strong>
+external format as this is the appropriate external format if the request body contains a
+list of form values.</p>
+
+<p>If an <strong>external-format</strong> is specified the body is reconverted to a string
+using the given external-format and then returned from this function.&nbsp;&nbsp; This
+reconversion does not affect the cached value.</p>
 
 <hr>
 
