@@ -1,3 +1,8 @@
+(sys:defpatch "htmlgen" 1
+  "fix :comment and :prin1-safe when html-print'ing"
+  :type :system
+  :post-loadable t)
+
 ;; -*- mode: common-lisp; package: net.html.generator -*-
 ;;
 ;; htmlgen.cl
@@ -24,7 +29,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.8.6.5.2.2 2003/01/10 16:21:37 layer Exp $
+;; $Id: htmlgen.cl,v 1.8.6.5.2.3 2003/01/29 22:06:33 layer Exp $
 
 ;; Description:
 ;;   html generator
