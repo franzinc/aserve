@@ -1,24 +1,28 @@
-;; -*- mode: common-lisp; package: neoe -*-
+;; -*- mode: common-lisp; package: net.iserve.examples -*-
 ;;
 ;; examples.cl
 ;;
-;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA  - All rights reserved.
+;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA 
 ;;
-;; The software, data and information contained herein are proprietary
-;; to, and comprise valuable trade secrets of, Franz, Inc.  They are
-;; given in confidence by Franz, Inc. pursuant to a written license
-;; agreement, and may be stored and used only in accordance with the terms
-;; of such license.
+;; This code is free software; you can redistribute it and/or
+;; modify it under the terms of the version 2.1 of
+;; the GNU Lesser General Public License as published by 
+;; the Free Software Foundation; 
 ;;
-;; Restricted Rights Legend
-;; ------------------------
-;; Use, duplication, and disclosure of the software, data and information
-;; contained herein by any agency, department or entity of the U.S.
-;; Government are subject to restrictions of Restricted Rights for
-;; Commercial Software developed at private expense as specified in
-;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
+;; This code is distributed in the hope that it will be useful,
+;; but without any warranty; without even the implied warranty of
+;; merchantability or fitness for a particular purpose.  See the GNU
+;; Lesser General Public License for more details.
 ;;
-;; $Id: examples.cl,v 1.23 2000/02/08 17:09:15 jkf Exp $
+;; Version 2.1 of the GNU Lesser General Public License is in the file 
+;; license-lgpl.txt that was distributed with this file.
+;; If it is not present, you can access it from
+;; http://www.gnu.org/copyleft/lesser.txt (until superseded by a newer
+;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
+;; Suite 330, Boston, MA  02111-1307  USA
+;;
+;;
+;; $Id: examples.cl,v 1.2 2000/03/16 17:53:30 layer Exp $
 
 ;; Description:
 ;;   neo examples
@@ -30,13 +34,20 @@
 
 
 ;; examples of web pages
-(defpackage :neoe ;; neo example
-  (:use :common-lisp :excl :htmlgen :neo))
+(defpackage :net.iserve.examples ;; neo example
+  (:use :common-lisp :excl :net.html.generator :net.iserve))
 
-(in-package :neoe)
+(in-package :net.iserve.examples)
 
 ;; flush all publishing done so far:
 (unpublish :all t)
+
+(defparameter *example-pathname* *load-truename*) ; where this file is
+(eval-when (compile)
+  (defmacro example-file (name)
+    ;; create an absolute address for this file we'll load
+    `(merge-pathnames ,name *example-pathname*)))
+
 
 
 (publish :path "/" 
@@ -48,26 +59,39 @@
 		 (html
 		  (:head (:title "Welcome to Neo"))
 		  (:body 
-		   (:h1 "Welcome to Neo")
+		   (:center ((:img :src "iservelogo.gif")))
+		   (:h1 "Welcome to Allegro iServe")
 		   (:p "These links show off some of Neo's capabilities. ")
 		   (:i "This server's host name is "
 		    (:princ-safe (header-slot-value req "host")))
 		   :p
 		   (:b "Sample pages") :br
-			 ((:a :href "/gc") "Garbage Collector Stats") :br
-			 ((:a :href "/apropos") "Apropos") :br
-			 ((:a :href "/pic") "Sample jpeg") :br
-			 ((:a :href "/pic-gen") "generated jpeg") "- hit reload to switch images" :br
-			 ((:a :href "/cookietest") "test cookies") :br
-			 ((:a :href "/secret") "Test authorization")
+			 ((:a :href "gc") "Garbage Collector Stats") :br
+			 ((:a :href "apropos") "Apropos") :br
+			 ((:a :href "pic") "Sample jpeg") :br
+			 ((:a :href "pic-gen") "generated jpeg") "- hit reload to switch images" :br
+			 ((:a :href "cookietest") "test cookies") :br
+			 ((:a :href "secret") "Test manual authorization")
  			 " (name: " (:b "foo") ", password: " (:b "bar") ")"
 			 :br
-			 ((:a :href "/timeout") "Test timeout")
+			 ((:a :href "secret-auth") "Test automatic authorization")
+			 " (name: "
+			 (:b "foo2")
+			 " password: "
+			 (:b "bar2") ")"
 			 :br
-			 ((:a :href "/getfile") "Client to server file transfer")
+			 ((:a :href "local-secret") "Test source based authorization") " This will only work if you can use "
+			 "http:://localhost ... to reach this page" :
 			 :br
-			 ((:a :href "/missing-link") "Missing Link")
-			 "should get error"
+			 ((:a :href "local-secret-auth") 
+			  "Like the preceeding but uses authorizer objects")
+			  :br
+			 ((:a :href "timeout") "Test timeout")
+			 :br
+			 ((:a :href "getfile") "Client to server file transfer")
+			 :br
+			 ((:a :href "missing-link") "Missing Link")
+			 " should get an error when clicked"
 			 )
 		  
 			 )))))
@@ -132,10 +156,13 @@
 
 
 ;; display a picture from a file.
-(publish-file :path "/pic" :file "prfile9.jpg"
+(publish-file :path "/pic" :file (example-file "prfile9.jpg")
 	      :content-type "image/jpeg")
 
 
+
+(publish-file :path "/iservelogo.gif" :file (example-file "iservelogo.gif")
+	      :content-type "image/gif")
 
 ;; this is a demonstration of how you can return a jpeg 
 ;; image that was created on the fly (rather thsn read from
@@ -156,7 +183,8 @@
 		   ; we're just reading it from a file in this example
 		   (let ((stream (request-reply-stream req)))
 		     (with-open-file (p (nth selector
-					     '("prfile9.jpg" "fresh.jpg"))
+					     `(,(example-file "prfile9.jpg")
+					       ,(example-file "fresh.jpg")))
 				      :element-type '(unsigned-byte 8))
 
 		       (setq selector (mod (1+ selector) 2))
@@ -211,14 +239,14 @@
  :content-type "text/html"
  :function
  #'(lambda (req ent)
-     (format t "request uri is ~s~%" (neo::request-uri req))
+     
      (let ((lookup (assoc "symbol" (request-query req) :test #'equal)))
        (with-http-response (req ent)
 	 (with-http-body (req ent)
 	   (html (:head (:title "Allegro Apropos"))
-		 ((:body :background "/neoweb/fresh.jpg")
+		 ((:body :background "neoweb/fresh.jpg")
 		  "New Apropos of "
-		  ((:form :action "/apropos"
+		  ((:form :action "apropos"
 			  :method "get")
 		   ((:input :type "text"
 			    :maxlength 40
@@ -266,18 +294,18 @@
 
 ;; a preloaded picture file
 (publish-file :path "/neoweb/fresh.jpg"
-	      :file "fresh.jpg"
+	      :file (example-file "fresh.jpg")
 	      :content-type "image/jpeg"
 	      :preload t)
 
 ;; a preloaded text file
 (publish-file :path "/foo"
-	      :file "foo.txt"
+	      :file (example-file "foo.txt")
 	      :content-type "text/plain"
 	      :preload t)
 
 (publish-file :path "/foo.txt"
-	      :file "foo.txt"
+	      :file (example-file "foo.txt")
 	      :content-type "text/plain"
 	      :preload nil)
 
@@ -288,24 +316,56 @@
 	 :content-type "text/html"
 	 :function
 	 #'(lambda (req ent)
-	     (let ((auth-val (header-slot-value req "authorization")))
-	       (if* (and (stringp auth-val)
-			 (equal (base64-decode 
-				 (cadr (split-into-words auth-val)))
-				"foo:bar"))
+	     (multiple-value-bind (name password) (get-basic-authorization req)
+	       (if* (and (equal name "foo") (equal password "bar"))
 		  then (with-http-response (req ent)
 			 (with-http-body (req ent)
 			   (html (:head (:title "Secret page"))
 				 (:body "You made it to the secret page"))))
 		  else
-		       (with-http-response (req ent :response *response-unauthorized*)
-			 (with-http-body (req ent
-					      :headers 
-					      '(("WWW-Authenticate" 
-						 . "Basic realm=\"secretserver\"")))))))))
+		       (with-http-response (req ent :response 
+						*response-unauthorized*)
+			 (set-basic-authorization req
+						   "secretserver")
+			 (with-http-body (req ent)))))))
 
 
+(publish :path "/local-secret"
+	 :content-type "text/html"
+	 :function
+	 #'(lambda (req ent)
+	     (let ((net-address (ash (socket:remote-host
+				      (request-socket req))
+				     -24)))
+	       (if* (equal net-address 127)
+		  then (with-http-response (req ent)
+			 (with-http-body (req ent)
+			   (html (:head (:title "Secret page"))
+				 (:body (:b "Congratulations. ")
+					"You are on the local network"))))
+		  else
+		       (with-http-response (req ent)
+			 (with-http-body (req ent)
+			   (html
+			    (:html (:head (:title "Unauthorized"))
+				   (:body 
+				    "You cannot access this page "
+				    "from your location")))))))))
 
+
+(publish :path "/local-secret-auth"
+	 :content-type "text/html"
+	 :authorizer (make-instance 'location-authorizer
+		       :patterns '((:accept "127.0" 8)
+				   (:accept "tiger.franz.com")
+				   :deny))
+	 :function
+	 #'(lambda (req ent)
+	     (with-http-response (req ent)
+	       (with-http-body (req ent)
+		 (html (:head (:title "Secret page"))
+		       (:body (:b "Congratulations. ")
+			      "You made it to the secret page"))))))
 
 ;; these two urls show how to transfer a user-selected file from
 ;; the client browser to the server.
@@ -325,7 +385,7 @@
 		       (:body
 			((:form :enctype "multipart/form-data"
 				:method "post"
-				:action "/getfile-got")
+				:action "getfile-got")
 			 "Let me know what file to grab"
 			 :br
 			 ((:input :type "file" 
@@ -342,6 +402,24 @@
 			 :br
 			 ((:input :type "submit")))))))))
 
+
+(publish :path "/secret-auth"
+	 :content-type "text/html"
+	 :authorizer (make-instance 'password-authorizer
+		       :allowed '(("foo2" . "bar2")
+				  ("foo3" . "bar3")
+				  )
+		       :realm  "SecretAuth")
+	 :function
+	 #'(lambda (req ent)
+	     (with-http-response (req ent)
+	       (with-http-body (req ent)
+		 (html (:head (:title "Secret page"))
+		       (:body "You made it to the secret page"))))))
+
+
+
+
 ;; this called with the file from 
 (publish :path "/getfile-got"
 	 :content-type "text/html"
@@ -355,10 +433,9 @@
 		     )
 		 (loop
 		   ; get headers for the next item
-		   (if* (null (setq h (neo:get-multipart-header req)))
+		   (if* (null (setq h (get-multipart-header req)))
 		      then ; no more items
 			   (return))
-		   (format t "parsed headers: ~s~%" h)
 		   ; we can get the filename from the header if 
 		   ; it was an <input type="file"> item.  If there is
 		   ; no filename, we just create one.
@@ -396,7 +473,7 @@
 		       (let ((buffer (make-array 1024
 						 :element-type '(unsigned-byte 8))))
 			 
-			 (loop (let ((count (neo:get-multipart-sequence 
+			 (loop (let ((count (get-multipart-sequence 
 					     req 
 					     buffer
 					     :raw t)))
@@ -429,7 +506,7 @@
 				  :expires :never)
 	       (set-cookie-header req
 				  :name "the time"
-				  :value (neo::universal-time-to-date
+				  :value (net.iserve::universal-time-to-date
 					  (get-universal-time))
 				  :path "/cookieverify"
 				  :expires (+ (get-universal-time)
@@ -441,7 +518,7 @@
 		 (html (:head (:title "Cookie Test"))
 		       (:body "you should have a cookie now."
 			      " Go "
-			      ((:a :href "/cookieverify") "here")
+			      ((:a :href "cookieverify") "here")
 			      " to see if they were saved"))))))
 
 (publish :path "/cookieverify"

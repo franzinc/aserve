@@ -1,8 +1,50 @@
-(in-package :user)
+;; -*- mode: common-lisp; package: net.html.generator -*-
+;;
+;; htmlgen.cl
+;;
+;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA 
+;;
+;; This code is free software; you can redistribute it and/or
+;; modify it under the terms of the version 2.1 of
+;; the GNU Lesser General Public License as published by 
+;; the Free Software Foundation; 
+;;
+;; This code is distributed in the hope that it will be useful,
+;; but without any warranty; without even the implied warranty of
+;; merchantability or fitness for a particular purpose.  See the GNU
+;; Lesser General Public License for more details.
+;;
+;; Version 2.1 of the GNU Lesser General Public License is in the file 
+;; license-lgpl.txt that was distributed with this file.
+;; If it is not present, you can access it from
+;; http://www.gnu.org/copyleft/lesser.txt (until superseded by a newer
+;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
+;; Suite 330, Boston, MA  02111-1307  USA
+;;
+
+;;
+;; $Id: htmlgen.cl,v 1.2 2000/03/16 17:53:32 layer Exp $
+
+;; Description:
+;;   html generator
+
+;;- This code in this file obeys the Lisp Coding Standard found in
+;;- http://www.franz.com/~jkf/coding_standards.html
+;;-
+
+
+
+(defpackage :net.html.generator
+  (:use :common-lisp :excl)
+  (:export #:html #:html-stream #:*html-stream*
+	   ;; should export with with-html-xxx things too I suppose
+	   ))
+
+(in-package :net.html.generator)
 
 ;; html generation
 
-;;;;;;; html generation
+(defvar *html-stream*)	; all output sent here
 
 (defstruct (html-process (:type list) (:constructor
 				       make-html-process (key has-inverse
@@ -15,10 +57,15 @@
 
 
 (defparameter *html-process-table* nil)
+(defvar *html-stream* nil) ; where the output goes
 
 (defmacro html (&rest forms)
-  ;; 
+  ;; just emit html to the curfent stream
   (process-html-forms forms))
+
+(defmacro html-stream (stream &rest forms)
+  ;; set output stream and emit html
+  `(let ((*html-stream* ,stream)) (html ,@forms)))
 
 (defun process-html-forms (forms)
   (let (res)
@@ -56,7 +103,7 @@
 			     else (do-ent ent nil nil nil)))
 		 elseif (stringp form)
 		   then ; turn into a print of it
-			(push `(write-string ,form *response-stream*) res)
+			(push `(write-string ,form *html-stream*) res)
 		   else (push form res))
 	   else (let ((first (car form)))
 		  (if* (keywordp first)
@@ -82,8 +129,8 @@
 (defun html-atom-check (args open close body)
   (if* (and args (atom args))
      then (let ((ans (case args
-		       (:set `(write-string  ,open *response-stream*))
-		       (:unset `(write-string  ,close *response-stream*))
+		       (:set `(write-string  ,open *html-stream*))
+		       (:unset `(write-string  ,close *html-stream*))
 		       (t (error "illegal arg ~s to ~s" args open)))))
 	    (if* (and ans body)
 	       then (error "can't have a body form with this arg: ~s"
@@ -92,9 +139,9 @@
 
 (defun html-body-form (open close body)
   ;; used when args don't matter
-  `(progn (write-string  ,open *response-stream*)
+  `(progn (write-string  ,open *html-stream*)
 	  ,@body
-	  (write-string  ,close *response-stream*)))
+	  (write-string  ,close *html-stream*)))
 
 
 (defun html-body-key-form (string-code has-inv args body)
@@ -105,10 +152,10 @@
 	  (return-from html-body-key-form
 	    (case args
 	      (:set `(write-string  ,(format nil "<~a>" string-code)
-				    *response-stream*))
+				    *html-stream*))
 	      (:unset (if* has-inv
 			 then `(write-string  ,(format nil "</~a>" string-code)
-					      *response-stream*)))
+					      *html-stream*)))
 	      (t (error "illegal arg ~s to ~s" args string-code)))))
   
   (if* (not (evenp (length args)))
@@ -117,46 +164,68 @@
   
   (if* args
      then `(progn (write-string ,(format nil "<~a" string-code)
-				*response-stream*)
+				*html-stream*)
 		  ,@(do ((xx args (cddr xx))
 			 (res))
 			((null xx)
 			 (nreverse res))
-		      
-		      (push `(write-string ,(format nil " ~a=" (car xx))
-					   *response-stream*)
-			    res)
-		      (push `(prin1 ,(cadr xx) *response-stream*) res))
+		      (if* (eq :if* (car xx))
+			 then ; insert following conditionally
+			      (push `(if* ,(cadr xx)
+					then (write-string 
+					      ,(format nil " ~a=" (caddr xx))
+					      *html-stream*)
+					     (prin1-safe-http-string ,(cadddr xx)))
+				    res)
+			      (pop xx) (pop xx)
+			 else 
+					     
+			      (push `(write-string 
+				      ,(format nil " ~a=" (car xx))
+				      *html-stream*)
+				    res)
+			      (push `(prin1-safe-http-string ,(cadr xx)) res)))
 						    
 		      
-		  (write-string ">" *response-stream*)
+		  (write-string ">" *html-stream*)
 		  ,@body
 		  ,(if* (and body has-inv)
 		      then `(write-string ,(format nil "</~a>" string-code)
-					  *response-stream*)))
+					  *html-stream*)))
      else `(progn (write-string ,(format nil "<~a>" string-code)
-				*response-stream*)
+				*html-stream*)
 		  ,@body
 		  ,(if* (and body has-inv)
 		      then `(write-string ,(format nil "</~a>" string-code)
-					  *response-stream*)))))
+					  *html-stream*)))))
 			     
 		 
 
 (defun princ-http (val)
   ;; print the given value to the http stream using ~a
-  (format *response-stream* "~a" val))
+  (format *html-stream* "~a" val))
 
 (defun prin1-http (val)
   ;; print the given value to the http stream using ~s
-  (format *response-stream* "~s" val))
+  (format *html-stream* "~s" val))
 
 
 (defun princ-safe-http (val)
-  (emit-safe *response-stream* (format nil "~a" val)))
+  (emit-safe *html-stream* (format nil "~a" val)))
 
 (defun prin1-safe-http (val)
-  (emit-safe *response-stream* (format nil "~s" val)))
+  (emit-safe *html-stream* (format nil "~s" val)))
+
+
+(defun prin1-safe-http-string (val)
+  ;; print the contents inside a string double quotes (which should
+  ;; not be turned into &quot;'s
+  (if* (stringp val)
+     then (write-char #\" *html-stream*)
+	  (emit-safe *html-stream* val)
+	  (write-char #\" *html-stream*)
+     else (prin1-safe-http val)))
+
 
 
 (defun emit-safe (stream string)
@@ -180,7 +249,9 @@
        elseif (eq ch #\>)
 	 then (setq cvt "&gt;")
        elseif (eq ch #\&)
-	 then (setq cvt "&amp;"))
+	 then (setq cvt "&amp;")
+       elseif (eq ch #\")
+	 then (setq cvt "&quot;"))
       (if* cvt
 	 then ; must do a conversion, emit previous chars first
 		
@@ -205,6 +276,13 @@
   `(push (make-html-process ,kwd nil nil ,fcn) *html-process-table*))
 
 
+(def-special-html :newline #'(lambda (ent args argsp body)
+			       (declare (ignore ent args argsp))
+			       (if* body
+				  then (error "can't have a body with :newline -- body is ~s" body))
+			       
+			       `(terpri *html-stream*)))
+			       
 
 (def-special-html :princ #'(lambda (ent args argsp body)
 			     (declare (ignore ent args argsp))

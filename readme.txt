@@ -1,18 +1,28 @@
-The Neo Webserver
-copyright (c) 1999 Franz Inc.
+The Allegro iServe Webserver
+copyright (c) 1999,2000 Franz Inc.
 
 
-This is a distribution of the current state of the neo web server.
+
+!! Note: this readme is for people receiving the binary only
+         distribution of iserve.
+
+         If you received a source distribution, then follow
+         the instructions in source-readme.txt instead.
+
+
+
+
+This is a distribution of the current state of the iServe web server.
 This is not a finished product.   We are distributing this so that
 people can see what directions we are taking in our design.
 
 
 == The files in this distribution:
 
-neo.fasl -- This includes the neo web server and htmlgen html generation
+iserve.fasl -- This includes the neo web server and htmlgen html generation
     code.
 
-neo.html -- documentation on the web server
+doc/iserve.html -- documentation on the web server
 htmlgen.html -- documentation on the html generation system
 
 examples.cl -- load this into lisp to publish sample urls.  Read  this file
@@ -21,7 +31,7 @@ examples.cl -- load this into lisp to publish sample urls.  Read  this file
 examples.fasl -- just a compiled version of examples.cl 
 
 
-other files are present to support the examples in examples.cl.
+other files are present to support the examples in examples/examples.cl.
 
 
 
@@ -31,17 +41,17 @@ other files are present to support the examples in examples.cl.
    (or start Allegro cl 5.0.1 and use the toplevel ":cd" command to cd 
    to the directory containing the neo distribution).
 
-2. load  neo.fasl
+2. load iserve.fasl
     
-        user(1): :ld neo.fasl
+        user(1): :ld iserve.fasl
 
 3. load the examples (either the compiled or source version)
 
-        user(2): :ld examples
+        user(2): :ld examples/examples
 
 4. start the webserver
 
-        user(3):  (neo:start :port 8010)
+        user(3):  (net.iserve:start :port 8010)
 
 
 5. go to a web browser and select this machine and the port you chose:

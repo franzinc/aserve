@@ -1,24 +1,30 @@
-;; -*- mode: common-lisp; package: neo -*-
+;; -*- mode: common-lisp; package: net.iserve -*-
 ;;
 ;; parse.cl
 ;;
-;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA  - All rights reserved.
 ;;
-;; The software, data and information contained herein are proprietary
-;; to, and comprise valuable trade secrets of, Franz, Inc.  They are
-;; given in confidence by Franz, Inc. pursuant to a written license
-;; agreement, and may be stored and used only in accordance with the terms
-;; of such license.
+;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA 
 ;;
-;; Restricted Rights Legend
-;; ------------------------
-;; Use, duplication, and disclosure of the software, data and information
-;; contained herein by any agency, department or entity of the U.S.
-;; Government are subject to restrictions of Restricted Rights for
-;; Commercial Software developed at private expense as specified in
-;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
+;; This code is free software; you can redistribute it and/or
+;; modify it under the terms of the version 2.1 of
+;; the GNU Lesser General Public License as published by 
+;; the Free Software Foundation; 
 ;;
-;; $Id: parse.cl,v 1.14 2000/01/28 19:44:29 jkf Exp $
+;; This code is distributed in the hope that it will be useful,
+;; but without any warranty; without even the implied warranty of
+;; merchantability or fitness for a particular purpose.  See the GNU
+;; Lesser General Public License for more details.
+;;
+;; Version 2.1 of the GNU Lesser General Public License is in the file 
+;; license-lgpl.txt that was distributed with this file.
+;; If it is not present, you can access it from
+;; http://www.gnu.org/copyleft/lesser.txt (until superseded by a newer
+;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
+;; Suite 330, Boston, MA  02111-1307  USA
+;;
+
+;;
+;; $Id: parse.cl,v 1.15 2000/03/16 17:53:28 layer Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -28,7 +34,7 @@
 ;;-
 
 
-(in-package :neo)
+(in-package :net.iserve)
 
 
 ;; parseobj -- used for cons-free parsing of strings
@@ -198,7 +204,7 @@
 	(dolist (head *fast-headers*)
 	  (push (cons
 		 (dual-caseify (concatenate 'string (car head) ":"))
-		 (cdr head))
+		 (third head))
 		res))
 	res))
       
@@ -550,7 +556,33 @@
 				(return))
 		   else (incf start)))))
     po))
-  
+
+
+(defun split-on-character (str char)
+  ;; given a string return a list of the strings between occurances
+  ;; of the given character.
+  ;; If the character isn't present then the list will contain just
+  ;; the given string.
+  (let ((loc (position char str))
+	(start 0)
+	(res))
+    (if* (null loc)
+       then ; doesn't appear anywhere, just the original string
+	    (list str)
+       else ; must do some work
+	    (loop
+	      (push (subseq str start loc) res)
+	      (setq start (1+ loc))
+	      (setq loc (position char str :start start))
+	      (if* (null loc)
+		 then (if* (< start (length str))
+			 then (push (subseq str start) res)
+			 else (push "" res))
+		      (return (nreverse res)))))))
+
+    
+
+
 (defun split-into-words (str)
   ;; split the given string into words (items separated by white space)
   ;;

@@ -1,47 +1,67 @@
-;; -*- mode: common-lisp; package: neo -*-
+;; -*- mode: common-lisp; package: net.iserve -*-
 ;;
 ;; main.cl
 ;;
-;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA  - All rights reserved.
+;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA 
 ;;
-;; The software, data and information contained herein are proprietary
-;; to, and comprise valuable trade secrets of, Franz, Inc.  They are
-;; given in confidence by Franz, Inc. pursuant to a written license
-;; agreement, and may be stored and used only in accordance with the terms
-;; of such license.
+;; This code is free software; you can redistribute it and/or
+;; modify it under the terms of the version 2.1 of
+;; the GNU Lesser General Public License as published by 
+;; the Free Software Foundation; 
 ;;
-;; Restricted Rights Legend
-;; ------------------------
-;; Use, duplication, and disclosure of the software, data and information
-;; contained herein by any agency, department or entity of the U.S.
-;; Government are subject to restrictions of Restricted Rights for
-;; Commercial Software developed at private expense as specified in
-;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
+;; This code is distributed in the hope that it will be useful,
+;; but without any warranty; without even the implied warranty of
+;; merchantability or fitness for a particular purpose.  See the GNU
+;; Lesser General Public License for more details.
 ;;
-;; $Id: main.cl,v 1.19 2000/02/08 17:09:15 jkf Exp $
+;; Version 2.1 of the GNU Lesser General Public License is in the file 
+;; license-lgpl.txt that was distributed with this file.
+;; If it is not present, you can access it from
+;; http://www.gnu.org/copyleft/lesser.txt (until superseded by a newer
+;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
+;; Suite 330, Boston, MA  02111-1307  USA
+;;
+;;
+;; $Id: main.cl,v 1.20 2000/03/16 17:53:28 layer Exp $
 
 ;; Description:
-;;   neo's main loop
+;;   iserve's main loop
 
 ;;- This code in this file obeys the Lisp Coding Standard found in
 ;;- http://www.franz.com/~jkf/coding_standards.html
 ;;-
 
 
-(defpackage :neo
-  (:use :common-lisp :excl :htmlgen)
+(defpackage :net.iserve
+  (:use :common-lisp :excl :net.html.generator)
   (:export
+   #:authorize
+   #:authorizer
    #:base64-decode
    #:base64-encode
+   #:compute-strategy
+   #:computed-entity
    #:decode-form-urlencoded
+   #:denied-request
+   #:failed-request
+   #:get-basic-authorization
    #:get-cookie-values
    #:get-multipart-header
    #:get-multipart-sequence
    #:get-request-body
+   #:handle-request
    #:header-slot-value
+   #:http-request  	; class
+   #:locator		; class
+   #:location-authorizer  ; class
+   #:password-authorizer  ; class
+   #:process-entity
    #:publish
    #:publish-file
    #:publish-directory
+   #:set-basic-authorization
+   #:standard-locator
+   #:unpublish-locator
 
    #:request-method
    #:request-protocol
@@ -79,8 +99,9 @@
    #:wserver-log-function
    #:wserver-log-stream
    #:wserver-socket
-   
-   #:*neo-version*
+
+   #:*iserve-version*
+   #:*mime-types*
    #:*response-ok*
    #:*response-created*
    #:*response-accepted*
@@ -91,10 +112,10 @@
    #:*response-internal-server-error*
    #:*wserver*))
 
-(in-package :neo)
+(in-package :net.iserve)
 
 
-(defparameter *neo-version* '(1 0 9))
+(defparameter *iserve-version* '(1 1 3))
 
 ;;;;;;;  debug support 
 
@@ -124,9 +145,15 @@
 ;;;;;;;;;;; end debug support ;;;;;;;;;;;;
 
 
+;; foreign function imports
+#+unix
+(ff:def-foreign-call (setuid "setuid") ((x :int)) :returning :int)
+#+unix
+(ff:def-foreign-call (setgid "setgid") ((x :int)) :returning :int)
 
 
 
+	
 ;;;;;;;;;;;;;  end special vars
 
 
@@ -198,7 +225,13 @@
     ;; entity to invoke given a request that can't be
     ;; satisfied
     :initform nil  ; will build on demand if not present
-    :accessor wserver-invalid-request)))
+    :accessor wserver-invalid-request)
+   
+   (denied-request
+    ;; entity to invoke given a request that was denied
+    :initform nil  ; will build on demand if not present
+    :accessor wserver-denied-request)
+   ))
 
 
      
@@ -266,7 +299,7 @@
 		 (append ,g-headers (request-reply-headers ,g-req))))
        (send-response-headers ,g-req ,g-ent :pre)
        (if* (not (member :omit-body (request-reply-strategy ,g-req)))
-	  then (let ((htmlgen:*html-stream* (request-reply-stream ,g-req)))
+	  then (let ((*html-stream* (request-reply-stream ,g-req)))
 		 (progn ,@body)))
        (send-response-headers ,g-req ,g-ent :post))))
 			  
@@ -301,7 +334,11 @@
 			"host"
 			"user-agent"
 			"content-length"))
-	  (push (cons name (read-from-string name)) res))
+	  (push (list name   ;; string name
+		      (read-from-string name) ;; symbol name
+		      ;; accessor name
+		      (read-from-string 
+			    (format nil "request-header-~a" name))) res))
 	res)))
 
     
@@ -314,7 +351,7 @@
   (let (ent)
     (if* (setq ent (assoc name *fast-headers* :test #'equal))
        then ; has a fast accesor
-	    `(,(cdr ent) ,obj)
+	    `(,(third ent) ,obj)
        else ; must get it from the alist
 	    `(cdr (assoc ,name (request-headers ,obj) :test #'equal)))))
 
@@ -322,7 +359,7 @@
   ;; set the header value regardless of where it is stored
   (let (ent)
     (if* (setq ent (assoc name *fast-headers* :test #'equal))
-       then `(setf (,(cdr ent) ,obj) ,newval)
+       then `(setf (,(third ent) ,obj) ,newval)
        else (let ((genvar (gensym))
 		  (nobj (gensym)))
 	      `(let* ((,nobj ,obj)
@@ -352,10 +389,10 @@
       ;; generate a list of slot descriptors for all of the 
       ;; fast header slots
       (dolist (head *fast-headers*)
-	(push `(,(cdr head) :accessor ,(cdr head) 
+	(push `(,(third head) :accessor ,(third head) 
 			    :initform nil
 			    :initarg
-			    ,(intern (symbol-name (cdr head)) :keyword))
+			    ,(intern (symbol-name (second head)) :keyword))
 	      res))
       res))
    
@@ -503,11 +540,15 @@
 		   (keep-alive t)
 		   (server *wserver*)
 		   debug      ; set debug level
+		   setuid
+		   setgid
 		   )
   ;; -exported-
   ;;
   ;; start the web server
   ;; return the server object
+  #+mswindows
+  (declare (ignore setuid setgid))
   
 
   (if* (eq server :new)
@@ -517,8 +558,6 @@
   (if* (and debug (numberp debug))
      then (setq *ndebug* debug))
 
-  (build-mime-types-table) 
-
   ; shut down existing server
   (shutdown server) 
   
@@ -527,6 +566,11 @@
 					  :local-port port
 					  :reuse-address t
 					  :format :bivalent)))
+
+    #+unix
+    (progn
+      (if* (fixnump setgid) then (setgid setgid))
+      (if* (fixnump setuid) then (setuid setuid)))
     
     (setf (wserver-socket server) main-socket)
     (setf (wserver-terminal-io server) *terminal-io*)
@@ -593,7 +637,7 @@
   ; create accept thread
   (setf (wserver-accept-thread *wserver*)
     (mp:process-run-function 
-     (list :name (format nil "neo-accept-~d" (incf *thread-index*))
+     (list :name (format nil "iserve-accept-~d" (incf *thread-index*))
 	   :initial-bindings
 	   `((*wserver*  . ',*wserver*)
 	     (*debug-io* . ',(wserver-terminal-io *wserver*))
@@ -601,7 +645,7 @@
      #'http-accept-thread)))
 
 (defun make-worker-thread ()
-  (let* ((name (format nil "ht~d" (incf *thread-index*)))
+  (let* ((name (format nil "~d-iserve-worker" (incf *thread-index*)))
 	 (proc (mp:make-process :name name
 				:initial-bindings
 				`((*wserver*  . ',*wserver*)
@@ -720,7 +764,10 @@
 	(loop
 	  (mp:with-timeout (*read-request-timeout* 
 			    (debug-format 5 "request timed out on read~%")
-			    (log-timed-out-request-read sock)
+			    ; this is too common to log, it happens with
+			    ; every keep alive socket when the user stops
+			    ; clicking
+			    ;;(log-timed-out-request-read sock)
 			    (return-from process-connection nil))
 	    (setq req (read-http-request sock)))
 	  (if* (null req)
@@ -806,7 +853,7 @@
 		    (return-from read-http-request nil))
 	    
 	    ; insert the host name and port into the uri
-	    (let ((host (header-slot-value req "host")))
+	    (let ((host (request-header-host req)))
 	      (if* host
 		 then (let ((colonpos (find-it #\: host 0 (length host)))
 			    (uri (request-uri req))
@@ -864,7 +911,7 @@
   ;; http/1.1 offers up the chunked transfer encoding
   ;; we can't handle that at present...
   (declare (ignore sock)) ; but they are passed to the next method
-  (if* (equalp "chunked" (transfer-encoding req))
+  (if* (equalp "chunked" (request-header-transfer-encoding req))
      then (with-http-response (*response-not-implemented*
 			       req "text/html" :close t)
 	    (format (response req) "chunked transfer is not supported yet"))
@@ -890,7 +937,7 @@
   ;;      then we read what follows and assumes that the body
   ;;	  (this is the http/0.9 behavior).
   ;;
-  (let ((cl (content-length req)))
+  (let ((cl (request-header-content-length req)))
     (if* cl
        then (let ((len (content-length-value req))
 		  (ret))
@@ -902,7 +949,7 @@
 		   else (setf (body req) ret)
 			t)))
        else ; no content length
-	    (if* (not (equalp (connection req) "keep-alive"))
+	    (if* (not (equalp (request-header-connection req) "keep-alive"))
 	       then (call-next-method) ; do the 0.9 thing
 	       else ; there is no body
 		    t))))
@@ -924,28 +971,55 @@
 (defmethod get-request-body ((req http-request))
   ;; return a string that holds the body of the http-request
   ;; 
-  (multiple-value-bind (length believe-it)
-      (header-slot-value-integer req "content-length")
-      (if* believe-it
-	 then ; we know the length
-	      (let ((ret (make-string length)))
-		(read-sequence-with-timeout ret length (request-socket req)
-					    *read-request-body-timeout*))
-	 else ; no content length given
-	      (if* (equalp "keep-alive" 
-			   (header-slot-value req "connection"))
-		 then ; must be no body
-		      ""
-		 else ; read until the end of file
-		      (mp:with-timeout (*read-request-body-timeout* nil)
-			(let ((ans (make-array 2048 :element-type 'character
-					       :fill-pointer 0))
-			      (sock (request-socket req))
-			      (ch))
-			  (loop (if* (eq :eof 
-					 (setq ch (read-char sock nil :eof)))
-				   then (return  ans)
-				   else (vector-push-extend ans ch)))))))))
+  (if* (member (request-method req) '(:put :post))
+     then (multiple-value-bind (length believe-it)
+	      (header-slot-value-integer req "content-length")
+	    (if* believe-it
+	       then ; we know the length
+		    (prog1 (let ((ret (make-string length)))
+			     (read-sequence-with-timeout 
+			      ret length 
+			      (request-socket req)
+			      *read-request-body-timeout*))
+	    
+		      ; netscape (at least) is buggy in that 
+		      ; it sends a crlf after
+		      ; the body.  We have to eat that crlf.  We could check
+		      ; which browser is calling us but it's not clear what
+		      ; is the set of buggy browsers 
+		      (let ((ch (read-char-no-hang (request-socket req)
+						   nil nil)))
+			(if* (eq ch #\return)
+			   then ; now look for linefeed
+				(setq ch (read-char-no-hang 
+					  (request-socket req) nil nil))
+				(if* (eq ch #\linefeed)
+				   thenret 
+				   else (unread-char ch 
+						     (request-socket req)))
+			 elseif ch
+			   then (unread-char ch (request-socket req)))))
+				      
+				      
+	       else ; no content length given
+		    (if* (equalp "keep-alive" 
+				 (header-slot-value req "connection"))
+		       then ; must be no body
+			    ""
+		       else ; read until the end of file
+			    (mp:with-timeout (*read-request-body-timeout* nil)
+			      (let ((ans (make-array 2048 
+						     :element-type 'character
+						     :fill-pointer 0))
+				    (sock (request-socket req))
+				    (ch))
+				(loop (if* (eq :eof 
+					       (setq ch (read-char 
+							 sock nil :eof)))
+					 then (return  ans)
+					 else (vector-push-extend ans ch))))))))
+     else "" ; no body
+	  ))
 
 
 
@@ -1546,4 +1620,34 @@
 
 		
 	
+;;-------------------
+;; authorization
+
+(defmethod get-basic-authorization ((req http-request))
+  ;; return the basic authorization information for this request, if any
+  ;; 
+  ;; basic authorization is used when a name/password dialog is
+  ;; put up by the browser
+  ;;
+  ;; if authorization info in found this request, return two values
+  ;;  name
+  ;;  password
+  ;;
+  (let ((auth-value (header-slot-value req "authorization")))
+    (if* auth-value
+       then (let ((words (split-into-words auth-value)))
+	      (if* (equalp (car words) "basic")
+		 then (setq auth-value 
+			(split-on-character (base64-decode (cadr words)) #\:))
+		      (values-list auth-value))))))
+		      
+	      
+(defmethod set-basic-authorization ((req http-request) realm)
+  ;; declare that you want to get authentication information
+  ;; for the given realm.
+  ;; This must be called after with-http-response and before
+  ;; with-http-body
+  (setq realm (string realm))
+  (push `("WWW-Authenticate" . ,(format nil "Basic realm=~s" realm))
+	(request-reply-headers req)))
 

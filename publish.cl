@@ -1,24 +1,28 @@
-;; -*- mode: common-lisp; package: neo -*-
+;; -*- mode: common-lisp; package: net.iserve -*-
 ;;
 ;; publish.cl
 ;;
-;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA  - All rights reserved.
+;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA 
 ;;
-;; The software, data and information contained herein are proprietary
-;; to, and comprise valuable trade secrets of, Franz, Inc.  They are
-;; given in confidence by Franz, Inc. pursuant to a written license
-;; agreement, and may be stored and used only in accordance with the terms
-;; of such license.
+;; This code is free software; you can redistribute it and/or
+;; modify it under the terms of the version 2.1 of
+;; the GNU Lesser General Public License as published by 
+;; the Free Software Foundation; 
 ;;
-;; Restricted Rights Legend
-;; ------------------------
-;; Use, duplication, and disclosure of the software, data and information
-;; contained herein by any agency, department or entity of the U.S.
-;; Government are subject to restrictions of Restricted Rights for
-;; Commercial Software developed at private expense as specified in
-;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
+;; This code is distributed in the hope that it will be useful,
+;; but without any warranty; without even the implied warranty of
+;; merchantability or fitness for a particular purpose.  See the GNU
+;; Lesser General Public License for more details.
 ;;
-;; $Id: publish.cl,v 1.23 2000/01/28 19:44:29 jkf Exp $
+;; Version 2.1 of the GNU Lesser General Public License is in the file 
+;; license-lgpl.txt that was distributed with this file.
+;; If it is not present, you can access it from
+;; http://www.gnu.org/copyleft/lesser.txt (until superseded by a newer
+;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
+;; Suite 330, Boston, MA  02111-1307  USA
+;;
+;;
+;; $Id: publish.cl,v 1.24 2000/03/16 17:53:28 layer Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -28,7 +32,7 @@
 ;;-
 
 
-(in-package :neo)
+(in-package :net.iserve)
 
 
 (defclass entity ()
@@ -61,6 +65,9 @@
 		 :reader content-type
 		 :initform nil)
    
+   (authorizer  :initarg :authorizer  ; authorizer object, if any
+		:accessor entity-authorizer
+		:initform nil)
    )
   )
 
@@ -138,10 +145,6 @@
 	 :initarg :name
 	 :reader  locator-name)
 
-   (method :initform #'standard-locator
-	   :initarg :method
-	   :accessor locator-method)
-   
    ; info is where the locator will likely store data related
    ; to mapping
    (info :initform nil
@@ -161,6 +164,21 @@
   ;; use to map prefixes to entities
   ()
   )
+
+
+;; the info slot of a locator-prefix class is a list of
+;; prefix-handler objects, sorted by the length of the path
+;; (from longest to smallest).
+(defstruct (prefix-handler (:type list))
+  path           ;; string which must be the prefix of the url part to match
+  host-handlers  ;; list of host-handlers
+  )
+
+(defstruct (host-handler  (:type list))
+  host	  ;; list of host names to match.  nil means match anything
+  entity  ;; entity object to handle this request
+  )
+
 
 
 
@@ -320,7 +338,8 @@
 	    (dolist (type (cdr ent))
 	      (setf (gethash type *mime-types*) (car ent))))))
   
-  
+
+(build-mime-types-table)  ;; build the table now
 
 
 (defun unpublish (&key all)
@@ -368,41 +387,74 @@
 
 ;; url exporting
 
-(defun publish (&key host port path function class format
+
+
+
+
+
+
+
+(defun publish (&key (host nil host-p) port path function class format
 		     content-type
 		     (server *wserver*)
 		     locator
+		     remove
+		     authorizer
 		     )
   ;; publish the given url
   ;; if file is given then it specifies a file to return
   ;; 
-  (if* (null locator) 
-     then (setq locator (find-locator :exact server)))
-  
-  (let ((ent (make-instance (or class 'computed-entity)
-	       :host host
-	       :port port
-	       :path path
-	       :function function
-	       :format format
-	       :content-type content-type)))
-    (setf (gethash path (locator-info locator)) ent))
-  )
+  (let (hval)
+    (if* (null locator) 
+       then (setq locator (find-locator :exact server)))
+
+    (if* remove
+       then ; eliminate the entity if it exists
+	    (unpublish-entity locator path host host-p)
+       else
+	     
+	    (let ((ent (make-instance (or class 'computed-entity)
+			 :host (setq hval (if* host
+					     then (if* (atom host)
+						     then (list host)
+						     else host)))
+			 :port port
+			 :path path
+			 :function function
+			 :format format
+			 :content-type content-type
+			 :authorizer authorizer)))
+	      (publish-entity ent locator path hval)))))
+
 	     
 
 (defun publish-file (&key (server *wserver*)
 			  locator
-			  host port path
+			  (host nil host-p) 
+			  port path
 			  file content-type class preload
-			  cache-p ssi)
+			  cache-p ssi 
+			  remove
+			  authorizer)
   ;; return the given file as the value of the url
   ;; for the given host.
   ;; If host is nil then return for any host
   
   (if* (null locator) 
      then (setq locator (find-locator :exact server)))
+
+  (if* remove
+     then (unpublish-entity locator path
+			    host
+			    host-p)
+	  (return-from publish-file nil))
   
-  (let (ent got)
+  
+  (let (ent got hval
+	(c-type (or content-type
+		    (gethash (pathname-type (pathname file))
+			     *mime-types*)
+		    "application/octet-stream")))
     (if* preload
        then ; keep the content in core for fast display
 	    (with-open-file (p file :element-type '(unsigned-byte 8))
@@ -417,67 +469,246 @@
 			       size
 			       got))
 		(setq ent (make-instance (or class 'file-entity)
-			    :host host
+			    :host (setq hval (if* host 
+						then (if* (atom host)
+							then (list host)
+							else host)))
 			    :port port
 			    :path path
 			    :file file
-			    :content-type content-type
+			    :content-type c-type
+			    
 			    :contents  guts
 			    :last-modified lastmod
 			    :cache-p cache-p
 			    :ssi     ssi
+			    :authorizer authorizer
 			    ))))
        else (setq ent (make-instance (or class 'file-entity)
-			:host host
+			:host (setq hval (if* host 
+					    then (if* (atom host)
+						    then (list host)
+						    else host)))
 			:port port
 			:path path
 			:file file
-			:content-type content-type
+			:content-type c-type
 			:cache-p cache-p
 			:ssi ssi
+			:authorizer authorizer
 			)))
-  
-    (setf (gethash path (locator-info locator)) ent)))
+
+    (publish-entity ent locator path hval)))
+
+
 
 
 
 
 
 (defun publish-directory (&key prefix 
-			       host
+			       (host nil host-p)
 			       port
 			       destination
 			       (server *wserver*)
 			       locator
+			       remove
+			       authorizer
 			       )
   
   ;; make a whole directory available
   
   (if* (null locator) 
      then (setq locator (find-locator :prefix server)))
+
+  (if* (and host (atom host))
+     then (setq host (list host)))
   
-  (push (cons prefix (make-instance 'directory-entity 
+  (let ((ent (make-instance 'directory-entity 
 		       :directory destination
 		       :prefix prefix
 		       :host host
 		       :port port
-		       ))
-	(locator-info locator)))
+		       :authorizer authorizer
+		       )))
+    
+  (dolist (entpair (locator-info locator))
+    (if* (equal (prefix-handler-path entpair) prefix)
+       then ; match, prefix
+	    (if* (and remove (not host-p))
+	       then ; remove all entries for all hosts
+		    (setf (locator-info locator)
+		      (remove entpair (locator-info locator)))
+		    (return-from publish-directory nil))
+	    
+	    ; scan for particular host
+	    (dolist (hostpair (prefix-handler-host-handlers entpair))
+	      (if* (null (set-exclusive-or (host-handler-host hostpair) 
+					   host
+					   :test #'equalp))
+		 then ; match existing one
+		      (if* remove
+			 then ; make it go away
+			      (setf (prefix-handler-host-handlers entpair)
+				(remove hostpair 
+					(prefix-handler-host-handlers 
+					 entpair)))
+			 else (setf (host-handler-entity hostpair) ent))
+		      (return-from publish-directory ent)))
+	    
+	    ; no match, must add it
+	    (if* remove 
+	       then ; no work to do
+		    (return-from publish-directory nil))
+		    
+	    (if* (null host)
+	       then ; add at end
+		    (setf (prefix-handler-host-handlers entpair)
+		      (append (prefix-handler-host-handlers entpair) 
+			      (list (make-host-handler :host host 
+						       :entity ent))))
+	       else ; add at beginning
+		    (setf (prefix-handler-host-handlers entpair)
+		      (cons (make-host-handler :host host :entity ent) 
+			    (prefix-handler-host-handlers entpair))))
+	    (return-from publish-directory ent)))
+
+  ; prefix not present, must add.
+  ; keep prefixes in order, with max length first, so we match
+  ; more specific before less specific
+  
+  (if* remove 
+     then ; no work to do
+	  (return-from publish-directory nil))
+  
+  (let ((len (length prefix))
+	(list (locator-info locator))
+	(new-ent (make-prefix-handler
+		     :path prefix
+		     :host-handlers (list (make-host-handler :host host 
+					      :entity ent)))))
+    (if* (null list)
+       then ; this is the first
+	    (setf (locator-info locator) (list new-ent))
+     elseif (>= len
+		(length (caar list)))
+       then ; this one should preceed all other ones
+	    (setf (locator-info locator) (cons new-ent list))
+       else ; must fit somewhere in the list
+	    (do* ((back list (cdr back))
+		  (cur  (cdr back) (cdr cur)))
+		((null cur)
+		 ; put at end
+		 (setf (cdr back) `((,prefix (,host ,ent)))))
+	      (if* (>= len (length (caar cur)))
+		 then (setf (cdr back)
+			`(,new-ent ,@cur))))))
+  
+  ent
+  ))
+		 
 
 
-			   
+(defmethod publish-entity ((ent entity) 
+			   (locator locator-exact)
+			   path
+			   host)
+  ;; handle the tricky case of putting an entity in hash
+  ;; table of a locator-exact.
+  ;; We have to store a list of entities for each path due
+  ;; to virtual hosts.  We always store the no host specified
+  ;; case last (if there is one).
+  ;;
+  (let ((ents (gethash path (locator-info locator))))
+    ;; must replace entry with matching host parameter
+    (if* (null ents)
+       then ; nothing for this path yet, just store
+	    ; this one
+	    (setq ents (list ent))
+       else (if* (null host)
+	       then ; no host specified, if there's a matching
+		    ; entity, it will be the last
+		    (let ((lents (last ents)))
+		      (if* (null (host (car lents)))
+			 then ; is a null one, just blast it
+			      (setf (car lents) ent)
+			 else ; not null, so add to end
+			      (nconc ents (list ent))))
+	       else ; entity specifies a host, must look for
+		    ; a match
+		    (do ((xents ents (cdr xents)))
+			((null xents)
+			 ; no match, add to the front
+			 (setq ents (cons ent ents)))
+		      (if* (null (set-exclusive-or 
+				  host
+				  (host (car xents))
+				  :test #'equalp))
+			 then ; match
+			      (setf (car xents) ent)
+			      (return)))))
+		      
+    (setf (gethash path (locator-info locator)) ents))
+  
+  ent)
 
 
+(defmethod unpublish-entity ((locator locator-exact)
+			     path
+			     host
+			     host-p)
+  ;; remove any entities matching the host and path.
+  ;; if host-p is nil then remove all entities, don't match the host
+  (let ((ents (gethash path (locator-info locator))))
+    (if* ents
+       then (if* host-p
+	       then ; must patch the hosts
+		    
+		    ; ensure that host is a list
+		    (if* (and host (atom host))
+		       then (setq host (list host)))
+		    
+		    (let (res)
+		      (dolist (ent ents)
+			(if* (set-exclusive-or host
+					       (host ent)
+					       :test #'equalp)
+			   then ; no match
+				(push ent res)))
+		      (setf (gethash path (locator-info locator))
+			(nreverse res)))
+	       else ; throw away everything
+		    (remhash path (locator-info locator))))))
 
+				
 
 (defmethod handle-request ((req http-request))
   (dolist (locator (wserver-locators *wserver*))
-    (let ((ent (funcall (locator-method locator)
-			req
-			locator)))
+    (let ((ent (standard-locator req locator)))
       (if* ent
-	 then (return-from handle-request
-		(process-entity req ent)))))
+	 then ; check if it is authorized
+	      (let ((authorizer (entity-authorizer ent)))
+		(if* authorizer
+		   then (let ((result (authorize authorizer
+						 req
+						 ent)))
+			  (if* (eq result t)
+			     then (return-from handle-request
+				    (process-entity req ent))
+			   elseif (eq result :done)
+			     then ; already responsed
+				  (return-from handle-request nil)
+			   elseif (eq result :deny)
+			     then ; indicate denied request
+				  (denied-request req)
+				  (return-from handle-request nil))
+			  ; the nil case falls through and will return
+			  ; failed request
+			  )
+		   else ; no authorizer, let anyone access
+			(return-from handle-request
+			  (process-entity req ent))
+			)))))
   
   ; no handler
   (failed-request req)
@@ -490,55 +721,108 @@
     (if* (null entity)
        then (setq entity (make-instance 'computed-entity
 			   :function #'(lambda (req ent)
-				     (with-http-response 
-					 (req ent
-					      :response *response-not-found*)
-				       (with-http-body (req ent)
-					 (html "The request for "
-					       (:princ-safe 
-						(render-uri 
-						 (request-uri req)
-						 nil
-						 ))
-					       " was not found on this server."))))
+					 (with-http-response 
+					     (req ent
+						  :response *response-not-found*)
+					   (with-http-body (req ent)
+					     (html 
+					      (:head (:title "404 - NotFound")
+						     (:body
+						      (:h1 "Not Found")
+						      "The request for "
+						      (:princ-safe 
+						       (render-uri 
+							(request-uri req)
+							nil
+							))
+						      " was not found on this server."))))))
 			   :content-type "text/html"))
 	    (setf (wserver-invalid-request *wserver*) entity))
     (process-entity req entity)))
 
-  
+(defmethod denied-request ((req http-request))
+  ;; generate a response to a request that we can't handle
+  (let ((entity (wserver-denied-request *wserver*)))
+    (if* (null entity)
+       then (setq entity (make-instance 'computed-entity
+			   :function #'(lambda (req ent)
+					 (with-http-response 
+					     (req ent
+						  :response *response-not-found*)
+					   (with-http-body (req ent)
+					     (html 
+					      (:head (:title "404 - NotFound")
+						     (:body
+						      (:h1 "Not Found")
+						      "The request for "
+						      (:princ-safe 
+						       (render-uri 
+							(request-uri req)
+							nil
+							))
+						      " was denied."))))))
+			   :content-type "text/html"))
+	    (setf (wserver-denied-request *wserver*) entity))
+    (process-entity req entity)))
 
 
 (defmethod standard-locator ((req http-request)
 			     (locator locator-exact))
   ;; standard function for finding an entity in an exact locator
   ;; return the entity if one is found, else return nil
-  (let ((entity (gethash (uri-path (request-uri req))
-			 (locator-info locator))))
-    (if* entity
-       then (let ((entity-host (host entity)))
-	      (if* entity-host
-		 then ; must do a host match
-		      (let ((req-host (host req)))
-			(if* req-host 
-			   then (if* (equal req-host entity-host)
-				   then entity)
-			   else ; no host given, don't do it
-				nil))
-		 else ; no host specified in entity, so do it
-		      entity)))))
+  (let ((entities (gethash (uri-path (request-uri req))
+			   (locator-info locator))))
+    (dolist (entity entities)
+      (let ((entity-host (host entity)))
+	(if* entity-host
+	   then ; must do a host match
+		(let ((req-host (header-slot-value req "host")))
+		  (if* req-host 
+		     then ; name may be foo.com:8000
+			  ; need to just use the foo.com part:
+			  (setq req-host (car (split-on-character 
+					       req-host
+					       #\:)))
+				
+			  (if* (member req-host entity-host
+				       :test #'equalp)
+			     then (return entity))
+		     else ; no host given, don't do it
+			  nil))
+	   else ; no host specified in entity, so do it
+		(return entity))))))
 
 (defmethod standard-locator ((req http-request)
 			     (locator locator-prefix))
   ;; standard function for finding an entity in an exact locator
   ;; return the entity if one is found, else return nil
   (let* ((url (uri-path (request-uri req)))
-	 (len-url (length url)))
+	 (len-url (length url))
+	 (req-host (header-slot-value req "host")))
+    
+    (setq req-host (car (split-on-character req-host #\:)))
 	     
     (dolist (entpair (locator-info locator))
-      (if* (and (>= len-url (length (car entpair)))
-		(buffer-match url 0 (car entpair)))
+      (if* (and (>= len-url (length (prefix-handler-path entpair)))
+		(buffer-match url 0 (prefix-handler-path entpair)))
 	 then ; we may already be a wiener
-	      (return (cdr entpair))))))
+	      (dolist (host-h (prefix-handler-host-handlers entpair))
+		(let ((host (host-handler-host host-h)))
+		  (if* host
+		     then ; host specified, must match it
+			  (if* req-host
+			     then ; host passed in 
+				  (if* (member req-host host
+					       :test #'equalp)
+				     then (return-from standard-locator
+					    (host-handler-entity
+					     host-h)))
+			     else ; no host passed in, can't work
+				  nil)
+		     else ; no host specified, it always wins
+			  (return-from standard-locator
+			    (host-handler-entity host-h)))))))))
+					  
   
 
 (defun find-locator (name wserver)
@@ -623,8 +907,15 @@
 		      (declare (dynamic-extent buffer))
 		      
 		      (setf (last-modified ent) lastmod)
+		      
 		      (with-http-response (req ent)
 
+			;; control will not reach here if the request
+			;; included an if-modified-since line and if
+			;; the lastmod value we just calculated shows
+			;; that the file hasn't changed since the browser
+			;; last grabbed it.
+			
 			(setf (request-reply-content-length req) size)
 			(push (cons "Last-Modified"
 				    (universal-time-to-date 
@@ -644,6 +935,7 @@
 			      (decf size got)))))))
 		      
 		      
+		
 		(close p))))))
 	      
 		
@@ -686,17 +978,12 @@
     ;; ok realname is a file.
     ;; create an entity object for it, publish it, and dispatch on it
     
-    ; must compute the mime type
-    (let ((chpos (find-it-rev #\. realname 0 (length realname)))
-	  (mtype "application/octet-stream"))
-      (if* chpos
-	 then  (let ((ext (subseq realname (1+ chpos))))
-		 (setq mtype (or (gethash ext *mime-types*) mtype))))
       
-      (process-entity req (publish-file :url (uri-path 
-					      (request-uri req))
-					:file realname
-					:content-type mtype)))
+    (process-entity req (publish-file :path (uri-path 
+					     (request-uri req))
+				      :file realname
+				      :authorizer (entity-authorizer ent)
+				      ))
       
     t))
     
@@ -749,28 +1036,30 @@
 (defmethod compute-strategy ((req http-request) (ent entity))
   ;; determine how we'll respond to this request
   
-  (let ((strategy nil))
+  (let ((strategy nil)
+	(keep-alive-possible
+	 (and (wserver-enable-keep-alive *wserver*)
+		      (>= (wserver-free-workers *wserver*) 2)
+		      (equalp "keep-alive" 
+			      (header-slot-value req "connection" )))))
     (if* (eq (request-method req) :head)
        then ; head commands are particularly easy to reply to
 	    (setq strategy '(:use-socket-stream
 			     :omit-body))
 	    
-	    (if* (and (wserver-enable-keep-alive *wserver*)
-		      (>= (wserver-free-workers *wserver*) 2)
-		      (equalp "keep-alive" 
-			      (header-slot-value req "connection" )))
+	    (if* keep-alive-possible
 	       then (push :keep-alive strategy))
 	    
      elseif (and  ;; assert: get command
 	     (wserver-enable-chunking *wserver*)
 	     (eq (request-protocol req) :http/1.1)
 	     (null (content-length ent)))
-       then (setq strategy '(:chunked :use-socket-stream))
+       then ;; http/1.1 so we can chunk
+	    (if* keep-alive-possible
+	       then (setq strategy '(:keep-alive :chunked :use-socket-stream))
+	       else (setq strategy '(:chunked :use-socket-stream)))
        else ; can't chunk, let's see if keep alive is requested
-	    (if* (and (wserver-enable-keep-alive *wserver*)
-		      (>= (wserver-free-workers *wserver*) 2)
-		      (equalp "keep-alive" 
-			      (header-slot-value req "connection")))
+	    (if* keep-alive-possible
 	       then ; a keep alive is requested..
 		    ; we may want reject this if we are running
 		    ; short of processes to handle requests.
@@ -908,8 +1197,7 @@
 				       (response-desc   code)
 				       (request-reply-content-length req))
 	       elseif chunked-p
-		 then (debug-format 10 nil 
-				       "~d ~s - chunked" 
+		 then (debug-format 10 "~d ~s - chunked" 
 				       (response-number code)
 				       (response-desc   code)
 				       )
