@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.61 2003/09/10 16:54:14 layer Exp $
+;; $Id: load.cl,v 1.62 2003/09/12 16:23:24 layer Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -83,7 +83,9 @@
 
 ;; end experimental
 
-(require :sock)  ; so we can tell if we have hiper sockets
+(eval-when (compile eval load)
+  (require :sock) ;; so we can tell if we have hiper sockets
+  )
 ;(setq *features* (delete :hiper-socket *features*))
 
 (with-compilation-unit  nil
@@ -157,27 +159,9 @@
 
 (defun make-distribution ()
   ;; make a distributable version of aserve
-  (run-shell-command 
-   (format nil "rm -fr ~aaserve-dist" *aserve-root*)
-   :show-window :hide
-   )
-   
-  (run-shell-command 
-   (format nil "mkdir ~aaserve-dist ~aaserve-dist/doc ~aaserve-dist/examples ~aaserve-dist/test"
-	   *aserve-root*
-	   *aserve-root*
-	   *aserve-root*
-	   *aserve-root*
-	   )
-   :show-window :hide)
-  
-  (run-shell-command 
-   (format nil "mkdir ~aaserve-dist/test/testdir ~aaserve-dist/test/testdir/suba ~aaserve-dist/test/testdir/subb"
-	   *aserve-root*
-	   *aserve-root*
-	   *aserve-root*
-	   )
-   :show-window :hide)
+
+  (run-shell-command (format nil "rm -fr ~aaserve-dist" *aserve-root*)
+		     :show-window :hide)
    
   (copy-files-to *aserve-files* "aserve.fasl" :root *aserve-root*)
   
@@ -233,78 +217,16 @@
 
 (defun make-src-distribution (&optional (dist-name aserve-version-name))
   ;; make a source distribution of aserve
-  ;;
-    
-  (run-shell-command 
-   (format nil "rm -fr ~aaserve-src" *aserve-root*)
-   :show-window :hide)
-    
-  (run-shell-command 
-   (format nil "mkdir ~aaserve-src ~aaserve-src/~a ~aaserve-src/~a/htmlgen "
-	   *aserve-root*
-	   
-	   *aserve-root*
-	   dist-name
-	   
-	   *aserve-root*
-	   dist-name
-	   )
-   :show-window :hide)
+
+  (run-shell-command (format nil "rm -fr ~aaserve-src" *aserve-root*)
+		     :show-window :hide)
   
-  (run-shell-command 
-   (format nil "mkdir ~aaserve-src/~a/doc ~aaserve-src/~a/examples ~aaserve-src/~a/test"
-	   *aserve-root*
-	   dist-name
-	   
-	   *aserve-root*
-	   dist-name
-	   
-	   *aserve-root*
-	   dist-name
-	   
-	   )
-   :show-window :hide)
-  (run-shell-command 
-   (format nil "mkdir ~aaserve-src/~a/test/testdir ~aaserve-src/~a/test/testdir/suba ~aaserve-src/~a/test/testdir/subb"
-	   *aserve-root*
-	   dist-name
-	   
-	   *aserve-root*
-	   dist-name
-	   
-	   *aserve-root*
-	   dist-name
-	   
-	   )
-   :show-window :hide)
-  
-  (run-shell-command 
-   (format nil "mkdir  ~aaserve-src/~a/test/testdir/subc ~aaserve-src/~a/test/testdir/subd"
-	   *aserve-root*
-	   dist-name
-	   
-	   *aserve-root*
-	   dist-name
-	   
-	   )
-   :show-window :hide)
-  (run-shell-command 
-   (format nil "mkdir ~aaserve-src/~a/test/testdir/suba/subsuba ~aaserve-src/~a/test/testdir/suba/subd "
-	   *aserve-root*
-	   dist-name
-	   
-	   *aserve-root*
-	   dist-name
-	   )
-   :show-window :hide)
-	   
-  (dolist (file (append (mapcar #'(lambda (file) (format nil "~a.cl" file))
+  (dolist (file (append (mapcar (lambda (file) (format nil "~a.cl" file))
 				*aserve-files*)
 			*aserve-other-files*))
-    (copy-files-to
-     (list file)
-     (format nil "aserve-src/~a/~a" dist-name file)
-     :root *aserve-root*)))
+    (copy-files-to (list file)
+		   (format nil "aserve-src/~a/~a" dist-name file)
+		   :root *aserve-root*)))
 
 
 (defun ftp-publish-src ()
@@ -339,11 +261,12 @@
 (defun copy-files-to (files dest &key (root ""))
   ;; copy the contents of all files to the file named dest.
   ;; append .fasl to the filenames (if no type is present)
+
+  (setq dest (concatenate 'string root dest))
+  (ensure-directories-exist dest)
   
   (let ((buffer (make-array 4096 :element-type '(unsigned-byte 8))))
-    (with-open-file (p (concatenate 'string root dest)
-		     :direction :output
-		     :if-exists :supersede
+    (with-open-file (p dest :direction :output :if-exists :supersede
 		     :element-type '(unsigned-byte 8))
       (dolist (file files)
 	(setq file (concatenate 'string root file))
