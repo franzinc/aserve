@@ -349,11 +349,18 @@ AllegroServe's strategy computation</p>
 the browser window:</p>
 
 <pre>(publish :path &quot;/hello&quot;
+
          :content-type &quot;text/html&quot;
+
          :function #'(lambda (req ent)
+
                        (with-http-response (req ent)
+
                           (with-http-body (req ent)
+
                              (html &quot;Hello World!&quot;)))))
+
+
 
 </pre>
 
@@ -370,12 +377,19 @@ html:</p>
 <div align="left">
 
 <pre>(publish :path &quot;/hello2&quot;
+
          :content-type &quot;text/html&quot;
+
          :function #'(lambda (req ent)
+
                        (with-http-response (req ent)
+
                          (with-http-body (req ent)
+
                            (html 
+
                              (:html
+
                                (:body &quot;Hello World!&quot;)))))))</pre>
 </div>
 
@@ -655,6 +669,7 @@ name=&quot;textthing&quot;&gt; </strong>the value returned by <strong>get-multip
 would be</p>
 
 <pre>((&quot;Content-Disposition&quot;
+
       (:param &quot;form-data&quot; (&quot;name&quot; . &quot;textthing&quot;))))</pre>
 
 <p>For an input field such as <strong>&lt;input type=&quot;file&quot;
@@ -662,8 +677,11 @@ name=&quot;thefile&quot;&gt; </strong>the value returned by <strong>get-multipar
 would be something like</p>
 
 <pre>((&quot;Content-Disposition&quot;
+
       (:param &quot;form-data&quot; (&quot;name&quot; . &quot;thefile&quot;)
+
                           (&quot;filename&quot; . &quot;C://down//550mhz.gif&quot;)))
+
  (&quot;Content-Type&quot; &quot;image/gif&quot;))</pre>
 
 <p>Note that the filename is expressed in the syntax of the operating system on which the
@@ -740,19 +758,33 @@ which access should be authorized by a certain name and password.</p>
 and the password is <strong>bar</strong>.</p>
 
 <pre>(publish :path &quot;/secret&quot;
+
     :content-type &quot;text/html&quot;
+
     :function
+
     #'(lambda (req ent)
+
         (multiple-value-bind (name password) (<strong>get-basic-authorization</strong> req)
+
            (if* (and (equal name &quot;foo&quot;) (equal password &quot;bar&quot;))
+
              then (with-http-response (req ent)
+
                     (with-http-body (req ent)
+
                       (html (:head (:title &quot;Secret page&quot;))
+
                             (:body &quot;You made it to the secret page&quot;))))
+
              else ; this will cause browser to put up a name/password dialog
+
                   (with-http-response (req ent :response *response-unauthorized*)
+
                      (<strong>set-basic-authorization</strong> req &quot;secretserver&quot;)
+
                      (with-http-body (req ent)))))))
+
 </pre>
 
 <h3>authorizer classes</h3>
@@ -821,16 +853,27 @@ name of <strong>joe</strong> and a password of <strong>eoj</strong> or a name of
 and a password of<strong> derf</strong>.</p>
 
 <pre>  (publish :path &quot;/foo&quot;
+
     :content-type &quot;text/html&quot;
+
     :authorizer (make-instance 'password-authorizer
+
                        :allowed '((&quot;joe&quot; . &quot;eoj&quot;)
+
                                   (&quot;fred&quot; . &quot;derf&quot;))
+
                        :realm &quot;SecretAuth&quot;)
+
     :function
+
     #'(lambda (req ent)
+
         (with-http-response (req ent)
+
            (with-http-body (req ent)
+
               (html (:head (:title &quot;Secret page&quot;))
+
                     (:body &quot;You made it to the secret page&quot;))))))</pre>
 
 <p>&nbsp;</p>
@@ -892,18 +935,31 @@ particular machine (tiger.franz.com).&nbsp; Note that we end the pattern list wi
 so that anything not matching the preceding patterns will be denied.</p>
 
 <pre>(publish :path &quot;/local-secret-auth&quot;
+
     :content-type &quot;text/html&quot;
+
     :authorizer (make-instance 'location-authorizer
+
                          :patterns '((:accept &quot;127.0&quot; 8)
+
                                      (:accept &quot;tiger.franz.com&quot;)
+
                                      :deny))
+
     :function
+
     #'(lambda (req ent)
+
         (with-http-response (req ent)
+
            (with-http-body (req ent)
+
                (html (:head (:title &quot;Secret page&quot;))
+
                      (:body (:b &quot;Congratulations. &quot;)
+
                        &quot;You made it to the secret page&quot;))))))
+
 </pre>
 
 <h2><a name="cookies"></a>Cookies</h2>
@@ -1121,7 +1177,7 @@ content format cookies <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 redirect basic-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-keep-alive headers)</font></strong></p>
+keep-alive headers proxy)</font></strong></p>
 
 <p>Sends a request to <strong>uri</strong> and returns three values: 
 
@@ -1212,6 +1268,17 @@ keep-alive headers)</font></strong></p>
     <td width="16%">nil</td>
     <td width="62%">an alist of conses <font face="Courier New">(&quot;header-name&quot; .
     &quot;header-value&quot;)</font> for additional headers to send with the request.</td>
+  </tr>
+  <tr>
+    <td width="22%">proxy</td>
+    <td width="16%">nil</td>
+    <td width="62%">the name and optionally the port number of a proxying web server through
+    which this request should be made.&nbsp;&nbsp; The form is of the argument is <a
+    href="http://www.machine.com">&quot;www.machine.com&quot;</a> or <a
+    href="http://www.machine.com:8000">&quot;www.machine.com:8000&quot;</a> if the web server
+    is listening on port 8000 rather than 80.&nbsp;&nbsp; Proxying web servers are often used
+    when clients are behind firewalls that prevent direct access to the internet.
+    &nbsp; Another use is to centralize the page cache for a group of clients.</td>
   </tr>
 </table>
 
@@ -1355,7 +1422,7 @@ and has these fields</p>
 <p><a name="f-make-http-client-request"></a><strong><font face="Courier New">(make-http-client-request
 uri &amp;key method protocol keep-alive<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-accept cookies headers<br>
+accept cookies headers proxy<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 basic-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
