@@ -94,6 +94,7 @@
 &nbsp; <a href="#f-wserver-response-timeout">wserver-response-timeout</a></font><br>
 <a href="#miscellaneous">Miscellaneous</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-map-entities"><font face="Courier New">map-entities</font></a><br>
+<a href="#asaservice">Running AllegroServe as a Service on Windows NT</a><br>
 <a href="#debugging">Debugging</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-debug-on">net.aserve::debug-on</a><br>
 &nbsp; <a href="#f-debug-off">net.aserve::debug-off</a></font><br>
@@ -507,9 +508,9 @@ if it's permitted to descend another directory level:</p>
 directory containing the file to be accessed it stops at each directory level accumlates
 the access information and then tests to see if it can descend further based on the <strong>:subdirectories
 </strong>information.&nbsp;&nbsp; If it cannot descend into the next subdirectory it gives
-up immediately and a <strong>404 - Not Found</strong> response is returned.
-&nbsp;&nbsp; See the section Allow Deny processing below for a description of how it uses
-the <strong>:allow</strong> and <strong>:deny</strong> values.</p>
+up immediately and a <strong>404 - Not Found</strong> response is returned. &nbsp;&nbsp;
+See the section Allow Deny processing below for a description of how it uses the <strong>:allow</strong>
+and <strong>:deny</strong> values.</p>
 
 <p>These other information forms are used by the standard publisher function. &nbsp;&nbsp;
 Each takes an <strong>:inherit</strong> argument which defaults to false. &nbsp;
@@ -570,9 +571,9 @@ subdirectory and for all directories above it up to the directory given as the <
 argument to <strong>publish-directory.&nbsp; </strong>Information from superdirectories
 will only be used <strong>:inherit t</strong> is given for that information.&nbsp; </p>
 
-<p>The rules is it that a given name is accessible if it is allowed and not denied.
-&nbsp; That is the filename or directory name must match one of the allow clauses and none
-of the deny clauses.&nbsp; There may be multiple allow and deny clauses since there may be
+<p>The rules is it that a given name is accessible if it is allowed and not denied. &nbsp;
+That is the filename or directory name must match one of the allow clauses and none of the
+deny clauses.&nbsp; There may be multiple allow and deny clauses since there may be
 multiple information forms of the type <strong>:files </strong>or <strong>:subdirectories</strong>.
 &nbsp;&nbsp; Each allow or deny argument can be a string or a list of strings or nil
 (which is the same as that argument not being given).<strong> </strong>&nbsp; The strings
@@ -580,7 +581,7 @@ are regular expressions (which are not exactly like unix shell wildcard filename
 expressions).&nbsp;&nbsp; In particular <font face="Courier New">&quot;.*&quot;</font> is
 the regular expression that matches anything.</p>
 
-<p>The special cases are the following
+<p>The special cases are the following 
 
 <ul>
   <li>if <strong>:allow</strong> is given as nil or is not given at all then that is the same
@@ -692,6 +693,8 @@ and is a list of zero or more of the following objects
     or an unsigned-byte 8 array.</li>
   <li><strong>(:string</strong> string<strong>) - </strong>this item supplies the given string
     to the web page.</li>
+  <li>(<strong>:binary</strong> vector) - vector should be a one dimensional simple-array of
+    (unsigned-byte 8).&nbsp; This vector of bytes is added to the web page.</li>
 </ul>
 
 <p>Here's an example where we create a page from a fixed header and trailer page with a
@@ -2620,6 +2623,69 @@ given<strong> locator</strong>.&nbsp;&nbsp; One common use of <strong>map-entiti
 is to find entities that you no longer wish to be published.&nbsp; For that reason <strong>map-entities</strong>
 will remove the entity the passed to the <strong>function</strong> if the <strong>function</strong>
 returns the keyword symbol <strong>:remove</strong> as its value.</p>
+
+<p>&nbsp;</p>
+
+<hr>
+
+<h2><a name="asaservice"></a>Running AllegroServe as a Service on Windows NT</h2>
+
+<p>On Windows NT (and Windows 2000 and Windows XP) when you log off all the programs you
+are running are terminated.&nbsp;&nbsp; If you want to run AllegroServe on your machine
+after you log out you have to start it as a <strong>Windows Service.&nbsp; </strong>This
+is easy to do thanks to code contributed by Ahmon Dancy.&nbsp;&nbsp; </p>
+
+<p>The first step is to download the <a href="http://opensource.franz.com/ntservice">ntservice
+code and documentation</a> from the Franz <a href="http://opensource.franz.com">opensource
+site</a>.&nbsp; Read the documentation carefully especially as regards the different
+capabilities of the accounts under which you may choose to run AllegroServe.&nbsp;&nbsp; </p>
+
+<p>You'll probably want to build an AllegroServe application that can run either normally
+or as a service,.&nbsp; You can run it normally to debug it and then start it as a service
+when you're satisifed that it works.</p>
+
+<p>Following is an example of how this can be done.&nbsp;&nbsp; I've decided that if the <font
+face="Courier New">/service</font> argument is given on the command line when I start my
+application then I'll start my application as a service, otherwise I start it normally.
+&nbsp;&nbsp;&nbsp;&nbsp; Here is the <strong>restart-init-function</strong> (to <strong>generate-application</strong>)
+that I define:</p>
+
+<pre>(defun start-aserve-application ()
+  (flet ((start-application ()
+	   (net.aserve:start :port 8020)
+	   (loop (sleep 100000))))
+    (if* (member &quot;/service&quot; (sys:command-line-arguments) :test #'equalp)
+     then ; start as  a service
+	  (ntservice:start-service #'start-application)
+     else ; start as a normal app
+	  (start-application)))))</pre>
+
+<p>&nbsp;</p>
+
+<p>I use <font face="Courier New">(loop (sleep 100000))</font> to ensure that the <strong>restart-init-function</strong>
+never returns.</p>
+
+<p>&nbsp;</p>
+
+<p>In order to register my application as a service to the operating system I call <strong>ntservice:create-service</strong>
+like this:</p>
+
+<pre>(ntservice:create-service &quot;aservetest&quot; &quot;Aserve Test Service&quot;
+     &quot;c:\\acl61\\testservice\\testapp\\testapp.exe -- /service&quot;)</pre>
+
+<p>Note that I use &quot;<font face="Courier New">--</font>&quot; before the &quot;<font
+face="Courier New">/service</font>&quot;.&nbsp; This is <em>very </em>important.
+&nbsp;&nbsp; The &quot;<font face="Courier New">--</font>&quot; separates the arguments
+used to start up the program from the arguments passed to the program itself.
+&nbsp;&nbsp; The call to <strong>ntservice:create-service</strong> is done only once and
+need not be done from within your application.&nbsp; </p>
+
+<p>Once an application is registered as a service you can start it by going to the Control
+Panel, selecting Administrative Tools and then Services.&nbsp;&nbsp; Locate the service
+you just added, right click on it and select <strong>start</strong>.&nbsp;&nbsp; You can
+stop the service with a a right click as well. </p>
+
+<p>&nbsp;</p>
 
 <hr>
 
