@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.78 2004/01/16 19:31:14 layer Exp $
+;; $Id: publish.cl,v 1.78.26.1 2004/07/23 06:04:45 duane Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -639,7 +639,11 @@
     
     (if* preload
        then ; keep the content in core for fast display
-	    (with-open-file (p file :element-type '(unsigned-byte 8))
+	    (with-open-file (p file
+			     #-(and allegro (version>= 6))
+			     :element-type
+			     #-(and allegro (version>= 6))
+			     '(unsigned-byte 8))
 	      (let ((size (excl::filesys-size (stream-input-fn p)))
 		    (lastmod (excl::filesys-write-date (stream-input-fn p)))
 		    (guts))
@@ -1276,7 +1280,10 @@
 		(if* (null (errorset 
 			    (setq p (open (file ent) 
 					  :direction :input
-					  :element-type '(unsigned-byte 8)))))
+					  #-(and allegro (version>= 6))
+					  :element-type
+					  #-(and allegro (version>= 6))
+					  '(unsigned-byte 8)))))
 		   then ; file not readable
 		      
 			(return-from process-entity nil))

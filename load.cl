@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.63 2003/10/24 15:11:24 jkf Exp $
+;; $Id: load.cl,v 1.63.44.1 2004/07/23 06:04:45 duane Exp $
 ;;
 
 ;
@@ -311,7 +311,10 @@
   
   (let ((buffer (make-array 4096 :element-type '(unsigned-byte 8))))
     (with-open-file (p dest :direction :output :if-exists :supersede
-		     :element-type '(unsigned-byte 8))
+		     #-(and allegro (version>= 6))
+		     :element-type
+		     #-(and allegro (version>= 6))
+		     '(unsigned-byte 8))
       (if* verbose
 	 then (format t "Creating ~s~%" dest))
       (dolist (file files)
@@ -319,7 +322,11 @@
 	(if* (and (null (pathname-type file))
 		  (not (probe-file file)))
 	   then (setq file (concatenate 'string file  ".fasl")))
-	(with-open-file (in file :element-type '(unsigned-byte 8))
+	(with-open-file (in file
+			 #-(and allegro (version>= 6))
+			 :element-type
+			 #-(and allegro (version>= 6))
+			 '(unsigned-byte 8))
 	  (loop
 	    (let ((count (read-sequence buffer in)))
 	      (if* (<= count 0) then (return))

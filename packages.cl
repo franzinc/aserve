@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: packages.cl,v 1.5.10.1 2004/06/10 17:35:24 layer Exp $
+;; $Id: packages.cl,v 1.5.10.2 2004/07/23 06:04:45 duane Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe
@@ -41,7 +41,7 @@
 
 (eval-when (compile load eval)
   (require :uri)
-  (require :streamc))
+  #+ignore (require :streamc))
 
 
 (defpackage :net.aserve
