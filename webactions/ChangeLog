@@ -1,3 +1,8 @@
+2004-06-09    <jkf@main.verada.com>
+1.10
+	* clpage.cl - do uri-rewriting to add session is for the src
+	        attribute of a frame element
+
 2004-03-08  John Foderaro  <jkf@tiger.franz.com>
 1.9
 	* webact.cl - when redefining a webaction project remove all

@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.160 2004/04/29 22:33:42 jkf Exp $
+;; $Id: main.cl,v 1.160.2.1 2004/06/10 17:35:24 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -38,7 +38,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 36))
+(defparameter *aserve-version* '(1 2 37))
 
 (eval-when (eval load)
     (require :sock)
@@ -1361,9 +1361,10 @@ by keyword symbols and not by strings"
   
 	
   (unwind-protect
-      (let ((req))
+      (let (req error-obj)
 	;; get first command
 	(loop
+	  
 	  (with-timeout-local (*read-request-timeout* 
 			       (debug-format :info "request timed out on read~%")
 			       ; this is too common to log, it happens with
@@ -1371,11 +1372,24 @@ by keyword symbols and not by strings"
 			       ; clicking
 			       ;;(log-timed-out-request-read sock)
 			       (return-from process-connection nil))
-	    (setq req (read-http-request sock)))
+	    (multiple-value-setq (req error-obj)
+	      (ignore-errors (read-http-request sock))))
 	  (if* (null req)
 	     then ; end of file, means do nothing
 		  ; (logmess "eof when reading request")
 		  ; end this connection by closing socket
+		  (if* error-obj
+		     then (brief-logmess 
+			   (format nil "While reading http request~:_ from ~a:~:_ ~a" 
+				   (socket:ipaddr-to-dotted 
+				    (socket::remote-host sock))
+				   error-obj)))
+
+		  ; notify the client if it's still listening
+		  (ignore-errors
+		   (format sock "HTTP/1.0 400 Bad Request~a~a" *crlf* *crlf*)
+		   (force-output sock))
+		   
 		  (return-from process-connection nil)
 	     else ;; got a request
 		  (setq *worker-request* req) 
@@ -2604,6 +2618,7 @@ in get-multipart-sequence"))
   data	 ; list of buffers
   create ; create new object for the buffer
   init	 ; optional - used to init buffers taken off the free list
+  (lock  (mp:make-process-lock))
   )
 
 (defun create-sresource (&key create init)
@@ -2614,7 +2629,7 @@ in get-multipart-sequence"))
   ;; size
   (let (to-return)
     ;; force new ones to be allocated
-    (mp:without-scheduling 
+    (mp:with-process-lock ((sresource-lock sresource))
       (let ((buffers (sresource-data sresource)))
 	(if* size
 	   then ; must get one of at least a certain size
@@ -2650,7 +2665,7 @@ in get-multipart-sequence"))
   ;; return a resource to the pool
   ;; we silently ignore nil being passed in as a buffer
   (if* buffer 
-     then (mp:without-scheduling
+     then (mp:with-process-lock ((sresource-lock sresource))
 	    ;; if debugging
 	    (if* (member buffer (sresource-data sresource) :test #'eq)
 	       then (error "freeing freed buffer"))
