@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.33 2000/06/26 04:51:34 jkf Exp $
+;; $Id: publish.cl,v 1.34 2000/08/10 00:57:32 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -1204,7 +1204,7 @@
 
 	      (if* chunked-p
 		 then (format-dif :xmit
-				  sock "Transfer-Encoding: Chunked~a"
+				  sock "Transfer-Encoding: chunked~a"
 				  *crlf*))
 	      
 	      (if* (and (not chunked-p)

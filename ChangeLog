@@ -1,3 +1,9 @@
+2000-08-09  jkf  <jkf@main.verada.com>
+
+	*  publish.cl: write the transfer encoding as all lowercase 'chunked'
+	   since a bug in Mozilla M17 means it will only understand this form.
+	*  htmlgen/htmlgen.cl - add the <caption> tag
+
 2000-08-04  jkf  <jkf@main.verada.com>
 1.1.24
 	*  examples/chat.cl - add user logins and private messages 
