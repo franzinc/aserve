@@ -2,7 +2,8 @@
 ;;
 ;; authorize.cl
 ;;
-;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA 
+;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA  - All rights reserved.
+;; copyright (c) 2000-2004 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
@@ -23,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: authorize.cl,v 1.7 2003/09/22 17:30:49 jkf Exp $
+;; $Id: authorize.cl,v 1.8 2004/01/16 19:31:14 layer Exp $
 
 ;; Description:
 ;;   classes and functions for authorizing access to entities
