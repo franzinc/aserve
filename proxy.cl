@@ -534,6 +534,10 @@
 
 (defun send-cached-response (req pcache-ent)
   ;; send back this response
+  (logmess (format nil "cache: sending back cached response: ~a~%" 
+		   (net.uri:render-uri (request-raw-uri req) nil)))
+  (incf (pcache-ent-returned pcache-ent))
+  
   (let ((rsock (request-socket req)))
     (format rsock "HTTP/1.1 ~d ~a~a" 
 	    (pcache-ent-code pcache-ent)
@@ -541,7 +545,8 @@
 
     (let ((data (pcache-ent-data pcache-ent))
 	  (data-length (pcache-ent-data-length pcache-ent)))
-      (write-sequence (car data) rsock :end (pcache-ent-data-length pcache-ent))
+      (write-sequence (car data) rsock 
+		      :end (pcache-ent-response-header-size pcache-ent))
       (if* data-length 
 	 then (write-body-buffers rsock (cdr data) data-length))
 		
@@ -637,6 +642,8 @@
 			   (format t " code: ~s~%data-length: ~s~%"
 				   (pcache-ent-code  pcache-ent)
 				   (pcache-ent-data-length pcache-ent))
+			   (format t " returned: ~s~%"
+				   (pcache-ent-returned pcache-ent))
 			   (format t " use: ~d~%last-modified: ~d~%"
 				   (pcache-ent-use  pcache-ent)
 				   (pcache-ent-last-modified  pcache-ent))
