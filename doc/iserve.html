@@ -483,15 +483,16 @@ sent are passed as the <strong>:header</strong> argument to <strong>with-http-bo
 
 <p><strong><font face="Courier New">(request-reply-content-length request) </font></strong>&nbsp;&nbsp;&nbsp;
 - accessor -&nbsp; the value to send as the Content-Length of this response.&nbsp;&nbsp;
-This is computed automatically by neo and thus a user program shouldn't have to set this
-slot under normal circumstances.</p>
+This is computed automatically by iServe and thus a user program shouldn't have to set
+this slot under normal circumstances.</p>
 
 <p><strong><font face="Courier New">(request-reply-plist request)</font></strong>
-&nbsp;&nbsp;&nbsp;&nbsp; - accessor -&nbsp; this slot holds a property list on which neo
-uses to stores some lesser used information.&nbsp; The user program can use it as well.</p>
+&nbsp;&nbsp;&nbsp;&nbsp; - accessor -&nbsp; this slot holds a property list on which
+iServe uses to stores some lesser used information.&nbsp; The user program can use it as
+well.</p>
 
 <p><font face="Courier New"><strong>(request-reply-strategy request)</strong></font>&nbsp;&nbsp;
-- accessor - the strategy is a list of symbols which describe how neo will build a
+- accessor - the strategy is a list of symbols which describe how iServe will build a
 response stream and will send back a response.&nbsp; More details will be given about the
 possible strategies at a future time.</p>
 
@@ -523,13 +524,13 @@ defines the form
 <ul>
   <li><strong>&lt;form method=&quot;get&quot;&gt; -&nbsp; </strong>The data is made part of
     the <strong>url</strong> that is sent to the web server and is separated from the url
-    itself by a question mark.&nbsp; The neo url handler code uses <strong>(request-query</strong>
+    itself by a question mark.&nbsp; The iServe url handler code uses <strong>(request-query</strong>
     <strong>req)</strong> to retrieve the alist of form names and values.&nbsp;&nbsp; This
     method has a few disadvantages - the amount of data that can be sent is limited since the
     size of urls is limited.&nbsp; Also the data is visible to everyone seeing the url and
     that may not be desirable.&nbsp; </li>
   <li><strong>&lt;form method=&quot;post&quot;&gt; - </strong>The data is send in the body of
-    the request.&nbsp;&nbsp;&nbsp; The neo url handler code calls <strong>(get-request-body
+    the request.&nbsp;&nbsp;&nbsp; The iServe url handler code calls <strong>(get-request-body
     req)</strong> to retrieve the body from the web browser and then <strong>(decode-form-urlencoded
     body) </strong>to turn it into an alist that associates form field names with values.</li>
   <li><strong>&lt;form method=&quot;post&quot; enctype=&quot;multipart/form-data&quot;&gt; - </strong>The
@@ -783,7 +784,7 @@ matches, then the request is accepted.&nbsp; </p>
     result of the conversion to an IP address).</li>
   <li><strong>(:deny ipaddress [bits])</strong> -- just like the case above except the request
     is rejected if it matches the <strong>ipaddress</strong>.&nbsp;&nbsp; One difference is
-    this: if the <strong>ipaddress </strong> is a hostname and that host name cannot be
+    this: if the <strong>ipaddress </strong>is a hostname and that host name cannot be
     translated to an IP address, then it is assumed to match, and thus the request will be
     denied.&nbsp; </li>
 </ul>
@@ -903,7 +904,7 @@ to log the action of the request.&nbsp; Finally if the response to the request i
 that the connection was to be kept open rather than being closed after the response, then <strong>process-connection</strong>
 loops back to the top to read the next request.</p>
 
-<p><strong><font face="Courier New">&nbsp;</font></strong></p>
+<p>&nbsp;</p>
 
 <p><strong><font face="Courier New">(handle-request (req http-request))</font></strong>
 &nbsp;&nbsp; [generic function]</p>
@@ -921,8 +922,8 @@ respond then <strong>failed-request</strong> is called to send back a failure me
 &nbsp;&nbsp; The value of <strong>(wserver-locators *wserver*)</strong> is a list of
 locator objects.&nbsp;&nbsp; <strong>handle-request</strong> calls </p>
 
-<p><strong><font face="Courier New">(standard-locator (req http-request) (loc locator)) </font>
-</strong>[generic function]</p>
+<p><strong><font face="Courier New">(standard-locator (req http-request) (loc locator)) </font></strong>[generic
+function]</p>
 
 <p>on each successive locator in that list until one return an entity object.
 &nbsp;&nbsp;&nbsp; iServe has two built-in locator classes, <strong>locator-exact</strong>

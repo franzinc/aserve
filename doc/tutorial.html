@@ -105,7 +105,7 @@ some words in it, and then</p>
 #&lt;net.iserve::file-entity @ #x2076e0c2&gt;
 tutorial(31):</pre>
 
-<p>Now if we ask a web browser for <a href="http://test.franz.com/foo">http://test.franz.com/foo</a>
+<p>Now if we ask a web browser for <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>
 we'll see the contents of the file in the web browser.&nbsp; Since we didn't specify a
 content-type in the call to <strong>publish-file</strong> the content-type will be
 determined by the &quot;<strong>txt</strong>&quot; file type, which is associated with the
@@ -113,8 +113,8 @@ determined by the &quot;<strong>txt</strong>&quot; file type, which is associate
 
 <p>Because we didn't specify a <strong>:host</strong> argument to <strong>publish-file </strong>iServe
 will return this page to any brower regardless of the host name used to name the machine.
-&nbsp; So iServe will respond to requests for <a href="http://test.franz.com/foo">http://test.franz.com/foo</a>
-and <a href="http://test/foo">http://test/foo</a> and <a href="http://localhost/foo">http://localhost/foo</a>.
+&nbsp; So iServe will respond to requests for <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>
+and <a href="http://test/foo">http://test:8000/foo</a> and <a href="http://localhost/foo">http://localhost:8000/foo</a>.
 &nbsp;&nbsp; </p>
 
 <p>If we do </p>
@@ -123,15 +123,15 @@ and <a href="http://test/foo">http://test/foo</a> and <a href="http://localhost/
 #&lt;net.iserve::file-entity @ #x2076e0c2&gt;
 tutorial(31):</pre>
 
-<p>Then iServe will only respond to requests for <a href="http://test.franz.com/foo">http://test.franz.com/foo</a>.
+<p>Then iServe will only respond to requests for <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>.
 &nbsp; If we do</p>
 
 <pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/foo.txt&quot; :host (&quot;test&quot; &quot;test.franz.com&quot;))
 #&lt;net.iserve::file-entity @ #x2076e0c2&gt;
 tutorial(31):</pre>
 
-<p>Then iServe will only respond to <a href="http://test.franz.com/foo">http://test.franz.com/foo</a>
-and <a href="http://test/foo">http://test/foo</a>.&nbsp;&nbsp;&nbsp; This type of
+<p>Then iServe will only respond to <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>
+and <a href="http://test/foo">http://test:8000/foo</a>.&nbsp;&nbsp;&nbsp; This type of
 restriction is useful if you want to create the illusion that a single machine is really a
 set of machines, each with its own set of web pages.&nbsp;&nbsp; Suppose that the machine <strong>test.franz.com</strong>
 also had the name <strong>sales.franz.com</strong>.&nbsp; You could publish two different
@@ -144,8 +144,8 @@ tutorial(31): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/<strong>sale
 #&lt;net.iserve::file-entity @ #x2076e324&gt;</pre>
 
 <p>Now you will get different results if you ask for&nbsp; <a
-href="http://test.franz.com/foo">http://test.franz.com/foo</a> and <a
-href="http://sales.franz.com/foo">http://sales.franz.com/foo</a>. </p>
+href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a> and <a
+href="http://sales.franz.com/foo">http://sales.franz.com:8000/foo</a>. </p>
 
 <h1>Publishing a computed page</h1>
 
