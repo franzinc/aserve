@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.4 2000/08/20 19:13:23 jkf Exp $
+;; $Id: headers.cl,v 1.5 2000/08/24 14:53:39 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -94,6 +94,7 @@
 	("Authorization" :p :nf)
 	("Cache-control" :p :p)
 	("Connection" :np :np)
+	("Content-Disposition" :nf :nf) ; in multipart/form-data bodies
 	("Content-Encoding" :p :p)
 	("Content-Language" :p :p)
 	("Content-Length" :np :np)

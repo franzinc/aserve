@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.60 2000/08/22 05:32:26 jkf Exp $
+;; $Id: main.cl,v 1.61 2000/08/24 14:53:39 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -238,6 +238,11 @@
 (ff:def-foreign-call (setgid "setgid") ((x :int)) :returning :int)
 
 
+;; specials from other files
+(defvar *header-block-sresource*)
+(defvar *header-index-sresource*)
+(defvar *header-keyword-array*)
+    
 
 	
 ;;;;;;;;;;;;;  end special vars
@@ -1156,70 +1161,6 @@ by keyword symbols and not by strings"
       ("CONNECT " . :connect)))
   
 
-
-    
-    
-    
-#+ignore
-(defmethod read-entity-body ((req http-request-1.1) sock)
-  ;; http/1.1 offers up the chunked transfer encoding
-  ;; we can't handle that at present...
-  (declare (ignore sock)) ; but they are passed to the next method
-  (if* (equalp "chunked" (request-header-transfer-encoding req))
-     then (with-http-response (*response-not-implemented*
-			       req "text/html" :close t)
-	    (format (response req) "chunked transfer is not supported yet"))
-	  t
-     else ; do the http/1.0 thing
-	  (call-next-method)))
-
-
-  
-	  
-	  
-	  
-			     
-#+ignore
-(defmethod read-entity-body ((req http-request-1.0) sock)
-  ;; Read the message following the request header, if any.
-  ;; Here's my heuristic
-  ;;   if Content-Length is given then it specifies the length.
-  ;;   if there is no Content-Length but there is a Connection: Keep-Alive
-  ;;      then we assume there is no entity body
-  ;;  
-  ;;   if there is no Content-Length and no Connection: Keep-Alive
-  ;;      then we read what follows and assumes that the body
-  ;;	  (this is the http/0.9 behavior).
-  ;;
-  (let ((cl (request-header-content-length req)))
-    (if* cl
-       then (let ((len (content-length-value req))
-		  (ret))
-	      (setq ret (make-string len))
-	      (let ((got-len (read-sequence ret sock)))
-		(if* (not (eql got-len len))
-		   then ; failed to get all the data
-			nil
-		   else (setf (body req) ret)
-			t)))
-       else ; no content length
-	    (if* (not (equalp (request-header-connection req) "keep-alive"))
-	       then (call-next-method) ; do the 0.9 thing
-	       else ; there is no body
-		    t))))
-
-
-#+ignore
-(defmethod read-entity-body ((req http-request-0.9) sock)
-  ;; read up to end of file, that will be the body
-  (let ((ans (make-array 2048 :element-type 'character
-			 :fill-pointer 0))
-	(ch))
-    (loop (if* (eq :eof (setq ch (read-char sock nil :eof)))
-	     then (setf (body req) ans)
-		  (return t)
-	     else (vector-push-extend ans ch)))))
-
 	    
 
 (defmethod get-request-body ((req http-request))
@@ -1287,7 +1228,394 @@ by keyword symbols and not by strings"
 ;; multipart code
 ;; used when enctype=multipart/form-data is used
 
-(defstruct mp-info 
+; new version that uses binary mode to transfer data
+
+(defstruct mp-info
+  buffer	; usb8 buffer if we're active
+  left		; bytes of content-length left to read
+  state		; state where the buffer pointer is pointed
+  cur		; current buffer pointer
+  end		; index after last byte in the buffer
+  boundary	; boundary vector
+  socket	; socket we're reading from
+  )
+
+(defmethod start-multipart-capture ((req http-request))
+  ;; begin the grab of the body.
+  ;; user doesn't have to call this, it's called automatically
+  (let* ((ctype (header-slot-value req :content-type))
+	 (parsed (and ctype (parse-header-value ctype)))
+	 (boundary (and (equalp "multipart/form-data" (cadar parsed))
+			(cdr (assoc "boundary" (cddar parsed) :test #'equal))))
+	 (len (header-slot-value-integer req :content-length)))
+    
+    (if* (null boundary)
+       then ; not in the right form, give up
+	    (return-from start-multipart-capture nil))
+    
+    
+    (setf (getf (request-reply-plist req) 'mp-info)
+      (make-mp-info :buffer (get-sresource *header-block-sresource*)
+		    :left  len
+		    :state :header
+		    :cur   0
+		    :end   0
+		    :socket (request-socket req)
+		    
+		    ;;  boundary is a case insensitive usb8 array
+		    ;; <cr><lf>--boundary-downcased
+		    ;;
+		    :boundary 
+		    (let ((array (make-array (+ 2 ; crlf
+						2 ; --
+						(length boundary))
+					     :element-type '(unsigned-byte 8))))
+		      (setf (aref array 0) #.(char-code #\return))
+		      (setf (aref array 1) #.(char-code #\linefeed))
+		      (setf (aref array 2) #.(char-code #\-))
+		      (setf (aref array 3) #.(char-code #\-))
+		      
+		      (dotimes (i (length boundary))
+			(setf (aref array (+ i 4))
+			  (char-code (char-downcase (schar boundary i)))))
+		      array)
+		    ))))
+
+
+(defparameter *crlf-crlf-usb8*
+    (make-array 4 :element-type '(unsigned-byte 8)
+		:initial-contents
+		(list #.(char-code #\return)
+		      #.(char-code #\linefeed)
+		      #.(char-code #\return)
+		      #.(char-code #\linefeed))))
+
+(defmethod get-multipart-header ((req http-request))
+  ;; return an alist holding the header info for the next request.
+  ;; or nil if this is the end of the line
+  
+  (let ((mp-info (getf (request-reply-plist req) 'mp-info)))
+    
+    (if* (null mp-info)
+       then (start-multipart-capture req)
+	    ; satisify normal requests for the body with an empty string
+	    (setf (request-request-body req) "") 
+	    (setq mp-info (getf (request-reply-plist req) 'mp-info)))
+    
+    (if* (null mp-info)
+       then ; no headers left
+	    (return-from get-multipart-header nil))
+    
+    (loop
+      (case (mp-info-state mp-info)
+	(:header (return)) ; ok
+	((:body :boundary) (scan-forward mp-info))
+	(:last-boundary ; no more space
+	 (return-from get-multipart-header nil))))
+    
+    ; in the header state, must find the end of the
+    ; header block <cr><lf><cr><lf>
+    (let* ((buffer (mp-info-buffer mp-info))
+	   cur  
+	   headers
+	   endhead)
+      
+      (loop
+	(setq cur (mp-info-cur mp-info))
+	(setq endhead (search-usb8 buffer 
+				   cur 
+				   (mp-info-end mp-info)
+				   *crlf-crlf-usb8*))
+	(if* (integerp endhead) 
+	   then (incf endhead 4) ; cr lf cr lf
+		(return))
+	
+	(if* (not (shift-buffer-up-and-read mp-info))
+	   then ; failed to find the end of the headers
+		(error "end of headers not found, badly formed request")))
+      
+      ; found the end of the headers.
+      (let ((ans (get-sresource *header-index-sresource*)))
+	(parse-header-block-internal buffer cur endhead ans)
+	(dotimes (i (length ans))
+	  (dolist (ent (svref ans i))
+	    (push (cons (svref *header-keyword-array* i)
+			(buffer-subseq-to-string buffer (car ent) (cdr ent)))
+		  headers)))
+	(free-sresource *header-index-sresource* ans))
+      
+      (setf (mp-info-cur mp-info) endhead)
+      (setf (mp-info-state mp-info) :body) ; pointing at the body
+      
+      headers)))
+
+(defun search-usb8 (buffer start end pattern)
+  ;; look for the pattern in the buffer
+  (do* ((i start (1+ i))
+	(patlen (length pattern))
+	(realend (- end patlen -1)))
+      ((>= i realend))
+    (dotimes (j patlen (return-from search-usb8 i))
+      (print (list (aref buffer (+ i j)) (aref pattern j)))
+      (if* (not (eq (aref buffer (+ i j))  (aref pattern j)))
+	 then ; no match
+	      (return nil)))))
+	      
+       
+  
+
+(defun shift-buffer-up-and-read (mp-info)
+  ;; bring bytes from cur to end to the top of the buffer.
+  ;;
+  ;; read in more bytes.
+  ;;
+  ;;
+  ;; return true if more any bytes.  nil means that there is
+  ;; no more data to read or no more space for data.
+  ;;
+  (let ((cur (mp-info-cur mp-info))
+	(mpbuffer (mp-info-buffer mp-info))
+	(left))
+    
+    (if* (zerop (setq left (mp-info-left mp-info)))
+       then nil ; nothing to do, since no more data left
+       else ; shift up buffer if needed
+	    (if* (> cur 0)
+	       then (do ((end (mp-info-end mp-info))
+			 (i cur (1+ i)))
+			((>= i end))
+		      (setf (aref mpbuffer (- i cur)) (aref mpbuffer i)))
+		    (setf (mp-info-cur mp-info) 0)
+		    (decf (mp-info-end mp-info) cur))
+    
+	    (if* (eql (mp-info-end mp-info) (length mpbuffer))
+	       then ; no room to store anything else
+		    nil
+	       else ; read as much as we acn
+		    (let* ((end (mp-info-end mp-info))
+			   (pos (read-sequence mpbuffer 
+					       (mp-info-socket mp-info)
+					       :start end
+					       :end (min
+						     left
+						     (- (length mpbuffer) end)))))
+		      (if* (<= pos end)
+			 then ; no bytes read, eof
+			      nil
+			 else (decf (mp-info-left mp-info) 
+				    (- pos end))
+			      (setf (mp-info-end mp-info) pos)
+			      t ; read something in
+			      ))))))
+
+	    
+(defun scan-forward (mp-info)
+  ;; scan forward to the next interesting thing
+  (case (mp-info-state mp-info)
+    (:boundary
+     ;; skip past boundary if it's in the buffer
+     ;; this is called only in get-multipart-header
+     (loop
+       (let ((past (+ (mp-info-cur mp-info)
+		      (length (mp-info-boundary mp-info))
+		      2 ; for the crlf
+		      )))
+	 (if* (< past (mp-info-end mp-info))
+	    then ; inside the buffer
+		 (setf (mp-info-cur mp-info) past)
+		 (setf (mp-info-state mp-info) :header)
+		 (return)
+	    else (if* (not (shift-buffer-up-and-read mp-info))
+		    then ; no more data
+			 (setf (mp-info-state mp-info) :last-boundary)
+			 (return))))))
+    (:last-boundary nil)
+    
+    (:body 
+     ;; looking for a boundary or partial boundary
+     (let* ((cur (mp-info-cur mp-info))
+	    (end (mp-info-end mp-info))
+	    (boundary (mp-info-boundary mp-info))
+	    (len-boundary (length boundary))
+	    )
+       (if* (eql cur end)
+	  then (if* (not (shift-buffer-up-and-read mp-info))
+		  then ; no more data available
+		       (setf (mp-info-state mp-info) :last-boundary)
+		       (return-from scan-forward (values 0 :last-boundary))))
+       (setq cur (mp-info-cur mp-info)
+	     end (mp-info-end mp-info))
+       
+       (do* ((i cur (1+ i))
+	     (mpbuffer (mp-info-buffer mp-info)))
+	   ((>= i end)
+	    (values end :body))
+	 
+	 (let* ((ch (aref mpbuffer i)))
+	   (if* (eq ch #.(char-code #\return))
+	      then ; this could match
+		   (do ((j i (1+ j))
+			(ind 0 (1+ ind)))
+		       
+		       (nil)
+		     (if* (>= ind len-boundary)
+			then ; matched the whole boundary
+			     ; minus the tail... a tail of crlf 
+			     ; is a boundary and a --crlf is a last
+			     ; boundary
+				
+			     (if* (< (- end j) 2)
+				then ; can't tell yet
+				     (return-from scan-forward
+				       (values i :partial))
+			      elseif (and (eql (aref mpbuffer j) 
+					       #.(char-code #\return))
+					  (eql (aref mpbuffer (1+ j))
+					       #.(char-code #\linefeed)))
+				then ; it's a boundary match
+				     (return-from scan-forward
+				       (values i :boundary))
+			      elseif (and (eql (aref mpbuffer j) 
+					       #.(char-code #\-))
+					  (eql (aref mpbuffer (1+ j))
+					       #.(char-code #\-)))
+				then ; could be last-boundary
+				     (if* (< (- end j) 4)
+					then ; not enough to tell
+					     (return-from scan-forward
+					       (values i :partial))
+				      elseif (and (eql (aref mpbuffer (+ 2 j))
+						       #.(char-code #\return))
+						  (eql (aref mpbuffer (+ 3 j))
+						       #.(char-code #\linefeed)))
+					then ; hit the end
+					     (return-from scan-forward
+					       (values i :last-boundary))))
+			     ; if here then doesn't match boundary
+			     (return)
+		      elseif (>= j end)
+			then ; end of buffer before end of boundary
+			     (return-from scan-forward
+			       (values i :partial)))
+		     
+		     (if* (not (eq (aref mpbuffer j)
+				   (aref boundary ind)))
+			then (return))))))))))
+       
+		     
+		     
+						
+						
+					 
+					 
+	   
+	   
+	       
+		       
+	       
+  
+  
+    
+
+
+
+(defmethod get-multipart-sequence ((req http-request)
+				   buffer
+				   &key (start 0)
+					(end (length buffer))
+					(raw nil raw-p))
+  ;; fill the buffer with the chunk of data.
+  ;; start at 'start' and go no farther than (1- end) in the buffer
+  ;; return the index of the first character not placed in the buffer.
+  
+  ; for now require that buffer is (unsigned-byte 8)
+  (declare (ignore raw raw-p)) ; for now
+  
+  (typecase buffer
+    ((array (unsigned-byte 8) (*))
+     )
+    
+    (t 
+     (error 
+      "This function only accepts (array (unsigned-byte 8)) at this time")))
+  
+  (let* ((mp-info (getf (request-reply-plist req) 'mp-info))
+	 mpbuffer 
+	 cur
+	 pos
+	 kind)
+
+    (if* (null mp-info)
+       then (error "get-multipart-sequence called before get-mulipart-header"))
+    
+    (setq mpbuffer (mp-info-buffer mp-info)
+	  cur      (mp-info-cur mp-info))
+
+    (loop
+      (case (mp-info-state mp-info)
+	((:header :boundary :last-boundary)
+	 ; no data left
+	 (return-from get-multipart-sequence nil))
+	((:body :partial)
+	 (if* (eq (mp-info-state mp-info) :partial)
+	    then ; this was set below. we will return the partial
+		 ; at then end of the buffer
+		 (setf (mp-info-state mp-info) :body)
+		 (setq pos (mp-info-end mp-info))
+	    else (multiple-value-setq (pos kind) (scan-forward mp-info)))
+	 (if* (> pos cur)
+	    then ; got something to return
+		 (let ((tocopy (min (- end start) (- pos cur))))
+		   (dotimes (i tocopy)
+		     (setf (aref buffer (+ start i))
+		       (aref mpbuffer (+ cur i))))
+		   (setf (mp-info-cur mp-info) (+ cur tocopy))
+		   (return-from get-multipart-sequence (+ start tocopy)))
+	  elseif (eq kind :partial)
+	    then  ; may be a boundary, can't tell
+		 (if* (null (shift-buffer-up-and-read mp-info))
+		    then ; no more data, partial will never match
+			 ; so return the partial, this special
+			 ; state is recognized in this routine
+			 (setf (mp-info-state mp-info) :partial))
+		 ; loop around
+			   
+	  elseif (or (eq kind :boundary)
+		     (eq kind :last-boundary))
+	    then ; hit a boundary, nothing more to return
+		 (setf (mp-info-state mp-info) kind
+		       (mp-info-cur   mp-info) pos)
+		 (return-from get-multipart-sequence nil)))))))
+
+
+  
+		 
+	       
+		 
+	       
+    
+
+
+      
+	
+	
+	
+	
+    
+    
+    
+
+
+  
+
+
+
+
+
+
+
+
+#+ignore (defstruct mp-info 
   ;; multipart information
   buffer 	; string buffer
   ebuf		; index after last valid char in buffer
@@ -1302,7 +1630,7 @@ by keyword symbols and not by strings"
 
 
 
-(defmethod start-multipart-capture ((req http-request))
+#+ignore (defmethod start-multipart-capture ((req http-request))
   ;; begin the grab of the body.
   ;; user doesn't have to call this, it's called automatically
   (let* ((ctype (header-slot-value req :content-type))
@@ -1328,7 +1656,7 @@ by keyword symbols and not by strings"
 
     
 
-(defmethod get-multipart-header ((req http-request))
+#+ignore (defmethod get-multipart-header ((req http-request))
   ;; return an alist holding the header info for the next request.
   ;; or nil if this is the end of the line
   
@@ -1400,7 +1728,7 @@ by keyword symbols and not by strings"
       
       
 
-(defun get-multipart-line (mp-info)
+#+ignore (defun get-multipart-line (mp-info)
   ;; read the next line into the give buffer
   ;; return a code describing the line
   (let* ((buffer (mp-info-buffer mp-info))
@@ -1426,7 +1754,7 @@ by keyword symbols and not by strings"
 	      (return))
     
       (setq ch (read-char fd nil :eof))
-      ;(if* (not (eq ch :eof)) then (write-char ch))
+      (if* (not (eq ch :eof)) then (write-char ch))
       (if* len then (decf len))
       (if* (eq :eof ch)
 	 then (return) ; out of the loop
@@ -1486,7 +1814,7 @@ by keyword symbols and not by strings"
       
 		
     
-(defmethod get-multipart-sequence ((req http-request)
+#+ignore (defmethod get-multipart-sequence ((req http-request)
 				   buffer
 				   &key (start 0) 
 					(end (length buffer))
