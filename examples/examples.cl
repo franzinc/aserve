@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.10.6.8.2.2 2003/01/10 16:21:37 layer Exp $
+;; $Id: examples.cl,v 1.10.6.8.2.3 2003/04/29 17:00:25 layer Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -139,7 +139,13 @@
 				  :br
 				  ;; published in urian.cl
 				  ((:a :href "urian")
-				   "International Web Page Character Finder")))
+				   "International Web Page Character Finder")
+				  :br
+				  ;; published in locale.cl
+				  ((:a :href "locale")
+				   "Locale Demo")
+				  :br
+				  ))
 			 
 			 #+(and unix (version>= 6 1))
 			 (html

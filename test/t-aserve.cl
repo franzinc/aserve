@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.6.6.8.2.1 2002/06/17 18:29:03 layer Exp $
+;; $Id: t-aserve.cl,v 1.6.6.8.2.2 2003/04/29 17:00:26 layer Exp $
 
 ;; Description:
 ;;   test iserve
@@ -86,7 +86,8 @@
 		   (test-client port)
 		   (test-cgi port)
 		   (if* (member :ics *features*)
-		      then (test-international port))
+		      then (test-international port)
+			   (test-spr27296))
 		   (if* test-timeouts 
 		      then (test-timeouts port))
 		   ))
@@ -833,6 +834,14 @@
 			       (header-slot-value req :content-type)
 			       :test #'equal))
 		 (setq req-query-res (request-query req))
+		 
+		 ;; also test here the setf'ing of query values
+		 (test nil (request-query-value "flurber" req))
+		 (setf (request-query-value "flurber" req) "ziftp")
+		 (test "ziftp" (request-query-value "flurber" req)
+		       :test #'equal)
+		 
+		 
 		 (with-http-response (req ent)
 		   (with-http-body (req ent)
 		     (html "hi")))))
@@ -1638,9 +1647,40 @@
       (test t (not (null begin)))  ; verify we found begin 
       (test t (not (null end)))    ; and end markers
       (test Privyet! test-string :test #'string=))))
-  
-  
-  
+
+
+
+(defun test-spr27296 ()
+  #+(and allegro ics)
+  (let ((server (start :port nil :server :new
+		       :external-format (crlf-base-ef :utf8)))
+	(string (concatenate 'string
+		  "<Name>B"
+		  '(#\latin_small_letter_o_with_diaeresis
+		    #\r
+		    #\latin_small_letter_o_with_diaeresis)
+		  "cz P"
+		  '(#\latin_small_letter_e_with_acute)
+		  "ter</Name>")))
+    (publish :path "/spr27296"
+	     :content-type "text/xml"
+	     :server server
+	     :function #'(lambda (req ent)
+			   (test string
+				 (get-request-body
+				  req
+				  :external-format (crlf-base-ef :utf8))
+				 :test #'string=)
+			   (with-http-response (req ent)
+			     (with-http-body (req ent)))))
+    (do-http-request (format nil "http://localhost:~d/spr27296"
+			     (socket:local-port
+			      (net.aserve::wserver-socket server)))
+      :method :post
+      :content string
+      :external-format (crlf-base-ef :utf8))
+    (shutdown :server server)))
+			   
 
 
     

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.48.2.10.2.2 2003/01/10 16:21:36 layer Exp $
+;; $Id: main.cl,v 1.48.2.10.2.3 2003/04/29 17:00:25 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -37,7 +37,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 25))
+(defparameter *aserve-version* '(1 2 26))
 
 (eval-when (eval load)
     (require :sock)
@@ -1529,66 +1529,80 @@ by keyword symbols and not by strings"
 
 	    
 
-(defmethod get-request-body ((req http-request))
-  ;; return a string that holds the body of the http-request
-  ;;  cache it for later too
-  (or (request-request-body req)
-      (setf (request-request-body req)
-	(if* (member (request-method req) '(:put :post))
-	   then (multiple-value-bind (length believe-it)
-		    (header-slot-value-integer req :content-length)
-		  (if* believe-it
-		     then ; we know the length
-			  (prog1 (let ((ret (make-string length)))
-				   (read-sequence-with-timeout 
-				    ret length 
-				    (request-socket req)
-				    *read-request-body-timeout*))
+(defmethod get-request-body ((req http-request)
+			     &key (external-format :octets ef-supplied))
+  (let ((result
+	 ;; return a string that holds the body of the http-request
+	 ;;  cache it for later too
+	 (or (request-request-body req)
+	     (setf (request-request-body req)
+	       (if* (member (request-method req) '(:put :post))
+		  then (multiple-value-bind (length believe-it)
+			   (header-slot-value-integer req :content-length)
+			 (if* believe-it
+			    then	; we know the length
+				 (prog1 (let ((ret (make-string length)))
+					  (read-sequence-with-timeout 
+					   ret length 
+					   (request-socket req)
+					   *read-request-body-timeout*))
 	    
-			    ; netscape (at least) is buggy in that 
-			    ; it sends a crlf after
-			    ; the body.  We have to eat that crlf.  
-			    ; We could check
-			    ; which browser is calling us but it's 
-			    ; not clear what
-			    ; is the set of buggy browsers 
-			    (let ((ch (read-char-no-hang (request-socket req)
-							 nil nil)))
-			      (if* (eq ch #\return)
-				 then ; now look for linefeed
-				      (setq ch (read-char-no-hang 
-						(request-socket req) nil nil))
-				      (if* (eq ch #\linefeed)
-					 thenret 
-					 else (unread-char 
-					       ch (request-socket req)))
-			       elseif ch
-				 then (unread-char ch (request-socket req)))))
+					; netscape (at least) is buggy in that 
+					; it sends a crlf after
+					; the body.  We have to eat that crlf.
+					; We could check
+					; which browser is calling us but it's 
+					; not clear what
+					; is the set of buggy browsers 
+				   (let ((ch (read-char-no-hang
+					      (request-socket req)
+					      nil nil)))
+				     (if* (eq ch #\return)
+					then ; now look for linefeed
+					     (setq ch (read-char-no-hang 
+						       (request-socket req)
+						       nil nil))
+					     (if* (eq ch #\linefeed)
+						thenret 
+						else (unread-char 
+						      ch (request-socket req)))
+				      elseif ch
+					then (unread-char ch (request-socket
+							      req)))))
 				      
 				      
-		     else ; no content length given
+			    else	; no content length given
 			  
-			  (if* (equalp "keep-alive" 
-				       (header-slot-value req :connection))
-			     then ; must be no body
-				  ""
-			     else ; read until the end of file
-				  (with-timeout-local
-				      (*read-request-body-timeout* 
-				       nil)
-				    (let ((ans (make-array 
-						2048 
-						:element-type 'character
-						:fill-pointer 0))
-					  (sock (request-socket req))
-					  (ch))
-				      (loop (if* (eq :eof 
-						     (setq ch (read-char 
+				 (if* (equalp "keep-alive" 
+					      (header-slot-value req
+								 :connection))
+				    then ; must be no body
+					 ""
+				    else ; read until the end of file
+					 (with-timeout-local
+					     (*read-request-body-timeout* 
+					      nil)
+					   (let ((ans (make-array 
+						       2048 
+						       :element-type 'character
+						       :fill-pointer 0))
+						 (sock (request-socket req))
+						 (ch))
+					     (loop (if* (eq :eof 
+							    (setq ch
+							      (read-char 
 							       sock nil :eof)))
-					       then (return  ans)
-					       else (vector-push-extend ch ans))))))))
-	   else "" ; no body
-		))))
+						      then (return  ans)
+						      else (vector-push-extend
+							    ch ans))))))))
+		  else ""		; no body
+		       )))))
+    (if* ef-supplied			; spr27296
+       then (values
+	     (octets-to-string
+	      (string-to-octets result :external-format :octets)
+	      :external-format external-format))
+       else result)))
 
 
 
@@ -2345,7 +2359,21 @@ in get-multipart-sequence"))
 	      :test test)))
 
 
-	
+(defsetf request-query-value 
+    (key req &key (post t) (uri t) 
+		  (test #'equal) (external-format 
+				  *default-aserve-external-format*))
+    (newvalue)
+  ;; make it appear that the query alist contains this extra key/value
+  `(let ((ent (assoc ,key (request-query ,req :post ,post :uri ,uri
+					 :external-format ,external-format)
+		    :test ,test)))
+    (if* ent 
+       then (setf (cdr ent) ,newvalue)
+       else (push (cons ,key ,newvalue) (request-query-alist ,req)))
+    
+    ,newvalue))
+
 
 (defun header-decode-integer (val)
   ;; if val is a string holding an integer return its value

@@ -1,4 +1,11 @@
 *******************************************************************************
+Tue Apr 29 10:00:00 PDT 2003
+merge from trunk to acl62 branch
+command:
+join.sh trunk trunk_to_acl62_merge2 trunk_to_acl62_merge3 aserve
+*******************************************************************************
+
+*******************************************************************************
 Fri Jan 10 08:19:16 PST 2003
 merge from trunk to acl62 branch
 command:
@@ -10,6 +17,26 @@ Mon Jun 17 11:27:39 PDT 2002
 merge from trunk to acl62 branch
 cmd: join.sh trunk acl62 trunk_to_acl62_merge1 aserve
 *******************************************************************************
+
+2003-02-26  John Foderaro  <jkf@tiger.franz.com>
+1.2.26
+	* doc/aserve.html - new get-request-body argument
+
+2003-02-24  Charles A. Cox  <cox@ultra>
+	New file: examples/locale.cl.
+	
+	* load.cl: add locale example.
+	* main.cl: add external-format argument to
+	get-request-body for spr27296.
+	* examples/examples.cl: Minor home page cleanup for ics
+	examples.
+	* examples/urian.cl: Add extra smarts for determining a
+	page's charset.
+	* test/t-aserve.cl: Add spr27296 test.
+
+2003-02-06  John Foderaro  <jkf@tiger.franz.com>
+
+	* main.cl  - added (setf request-query-value)
 
 2003-01-10  John Foderaro  <jkf@tiger.franz.com>
 1.2.25

@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.31.10.6.14.2 2003/01/10 16:21:36 layer Exp $
+;; $Id: load.cl,v 1.31.10.6.14.3 2003/04/29 17:00:25 layer Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -41,6 +41,7 @@
       "examples/file2000.txt"
       "examples/puzzle.cl"
       "examples/urian.cl"
+      "examples/locale.cl"
       "load.cl"
       "test/t-aserve.cl"
       "test/server.pem"
@@ -68,12 +69,14 @@
     '("examples/examples"
       "examples/puzzle"
       "examples/urian"
+      "examples/locale"
       ))
 
 (defparameter *aserve-international-only*
     ;; files that should only be loaded into a international lisp
     '("examples/puzzle"
       "examples/urian"
+      "examples/locale"
       ))
 
 
