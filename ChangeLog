@@ -1,3 +1,15 @@
+2000-04-24    <jkf@CROW>
+
+	* load.cl: make aServe load in acl5.0.1 Lite (Windows) but
+	   be advised that it doesn't work very well due to socket
+	   problems that can be patched in the Lite version.
+
+	* main.cl: the default timeout for a with-http-response
+		now comes from *http-response-timeout* and it
+		now defaults to 120 seconds rather than 60.
+	
+	* some documention updates
+
 2000-04-23  jkf  <jkf@main.verada.com>
 
 	* client.cl - added proxy argument so that client requests

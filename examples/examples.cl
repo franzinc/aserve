@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.5 2000/04/17 21:34:28 jkf Exp $
+;; $Id: examples.cl,v 1.6 2000/04/24 19:28:44 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -43,10 +43,9 @@
 (unpublish :all t)
 
 (defparameter *example-pathname* *load-truename*) ; where this file is
-(eval-when (compile)
-  (defmacro example-file (name)
+(defmacro example-file (name)
     ;; create an absolute address for this file we'll load
-    `(merge-pathnames ,name *example-pathname*)))
+    `(merge-pathnames ,name *example-pathname*))
 
 
 
@@ -58,21 +57,20 @@
 	       (with-http-body (req ent)
 		 (html
 		  (:head (:title "Welcome to AllegroServe"))
-		  (:body 
-		   (:center ((:img :src "aservelogo.gif")))
-		   (:h1 "Welcome to AllegroServe")
-		   (:p "These links show off some of AllegroServe's capabilities. ")
-		   (:i "This server's host name is "
-		    (:princ-safe (header-slot-value req "host")))
-		   :p
-		   (:b "Sample pages") :br
+		  (:body (:center ((:img :src "aservelogo.gif")))
+			 (:h1 "Welcome to AllegroServe") 
+			 (:p "These links show off some of AllegroServe's capabilities. ")
+			 (:i "This server's host name is "
+			     (:princ-safe (header-slot-value req "host")))
+			 :p
+			 (:b "Sample pages") :br
 			 ((:a :href "gc") "Garbage Collector Stats") :br
 			 ((:a :href "apropos") "Apropos") :br
 			 ((:a :href "pic") "Sample jpeg") :br
 			 ((:a :href "pic-gen") "generated jpeg") "- hit reload to switch images" :br
 			 ((:a :href "cookietest") "test cookies") :br
 			 ((:a :href "secret") "Test manual authorization")
- 			 " (name: " (:b "foo") ", password: " (:b "bar") ")"
+			 " (name: " (:b "foo") ", password: " (:b "bar") ")"
 			 :br
 			 ((:a :href "secret-auth") "Test automatic authorization")
 			 " (name: "
@@ -85,7 +83,7 @@
 			 :br
 			 ((:a :href "local-secret-auth") 
 			  "Like the preceding but uses authorizer objects")
-			  :br
+			 :br
 			 ((:a :href "timeout") "Test timeout")
 			 :br
 			 ((:a :href "getfile") "Client to server file transfer")
@@ -94,7 +92,7 @@
 			 " should get an error when clicked"
 			 )
 		  
-			 )))))
+		  )))))
 			     
 
 

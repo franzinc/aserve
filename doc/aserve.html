@@ -28,6 +28,7 @@
 &nbsp; <a href="#f-with-http-body">with-http-body</a><br>
 &nbsp; <a href="#f-get-request-body">get-request-body</a><br>
 &nbsp; <a href="#f-header-slot-value">header-slot-value</a><br>
+&nbsp; <a href="#f-reply-header-slot-value">reply-header-slot-value</a><br>
 &nbsp; <a href="#f-request-query">request-query</a></font><br>
 <a href="#request-object-readers">Request Object Readers and Accessors</a><br>
 <font face="Courier New">&nbsp; <a href="#f-request-method">request-method</a><br>
@@ -65,11 +66,13 @@
 <a href="#cliient-request">Client Functions</a><br>
 <font face="Courier New">&nbsp; <a href="#f-do-http-request">do-http-request</a><br>
 &nbsp; <a href="#c-client-request">client-request</a><br>
-<a href="#c-cookie-jar">cookie-jar</a><br>
+&nbsp; <a href="#c-cookie-jar">cookie-jar</a><br>
 &nbsp; <a href="#f-make-http-client-request">make-http-client-request</a><br>
 &nbsp; <a href="#f-read-client-response">read-client-response-headers</a><br>
 &nbsp; <a href="#f-client-request-read-sequence">client-request-read-sequence</a></font><br>
-<br>
+<a href="#debugging">Debugging</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-debug-on">net.aserve::debug-on</a><br>
+&nbsp; <a href="#f-debug-off">net.aserve::debug-off</a></font><br>
 <br>
 <br>
 </p>
@@ -349,15 +352,10 @@ AllegroServe's strategy computation</p>
 the browser window:</p>
 
 <pre>(publish :path &quot;/hello&quot;
-
          :content-type &quot;text/html&quot;
-
          :function #'(lambda (req ent)
-
                        (with-http-response (req ent)
-
                           (with-http-body (req ent)
-
                              (html &quot;Hello World!&quot;)))))
 
 
@@ -377,19 +375,12 @@ html:</p>
 <div align="left">
 
 <pre>(publish :path &quot;/hello2&quot;
-
          :content-type &quot;text/html&quot;
-
          :function #'(lambda (req ent)
-
                        (with-http-response (req ent)
-
                          (with-http-body (req ent)
-
-                           (html 
-
+                          (html 
                              (:html
-
                                (:body &quot;Hello World!&quot;)))))))</pre>
 </div>
 
@@ -414,18 +405,19 @@ and then&nbsp; runs the code in the <strong>body</strong> which will actually se
 response.&nbsp; <strong>req</strong> and <strong>ent</strong> are the request and entity
 objects passed into the function designated to compute the response for the request.
 &nbsp;&nbsp;&nbsp; <strong>timeout </strong>sets a time limit for the computation of the
-response.&nbsp;&nbsp; The default is 60 (meaning 60 seconds).&nbsp;&nbsp; If <strong>check-modified
-</strong>is true (the default) then the <strong>last-modified </strong>time stored in the
-entity object will be compared against the <strong>if-modified-since </strong>time of the
-request and if that indicates that the client already has the latest copy of this entity
-then a <strong>not-modified</strong> response will be automatically returned to the client
-and the <strong>body </strong>of this macro will not be run.&nbsp;&nbsp; <strong>response </strong>is
-an object containing the code and description of the http response we wish to return.
-&nbsp;&nbsp; The default value is the value of <strong>*response-ok*</strong> (which has a
-code of 200 and a string descriptor &quot;OK&quot;).&nbsp;&nbsp; <strong>content-type </strong>is
-a string describing the MIME type of the body (if any) sent after the headers.&nbsp; It
-has a form like &quot;text/html&quot;.&nbsp;&nbsp; If <strong>content-type</strong> isn't
-given here then the content-type value in the entity (which is set in the call to <strong>publish)</strong>
+response.&nbsp;&nbsp; The default is the value of the variable <strong>*http-response-timeout*</strong>
+(which is initially 120 meaning 120 seconds).&nbsp;&nbsp; If <strong>check-modified </strong>is
+true (the default) then the <strong>last-modified </strong>time stored in the entity
+object will be compared against the <strong>if-modified-since </strong>time of the request
+and if that indicates that the client already has the latest copy of this entity then a <strong>not-modified</strong>
+response will be automatically returned to the client and the <strong>body </strong>of
+this macro will not be run.&nbsp;&nbsp; <strong>response </strong>is an object containing
+the code and description of the http response we wish to return. &nbsp;&nbsp; The default
+value is the value of <strong>*response-ok*</strong> (which has a code of 200 and a string
+descriptor &quot;OK&quot;).&nbsp;&nbsp; <strong>content-type </strong>is a string
+describing the MIME type of the body (if any) sent after the headers.&nbsp; It has a form
+like &quot;text/html&quot;.&nbsp;&nbsp; If <strong>content-type</strong> isn't given here
+then the content-type value in the entity (which is set in the call to <strong>publish)</strong>
 will be used.</p>
 
 <p align="left">&nbsp;</p>
@@ -491,6 +483,17 @@ request header-name)</font></strong></p>
 the header wasn't present in this request then nil will be returned.&nbsp;&nbsp; <strong>header-slot-value</strong>
 is a macro that will expand into a fast accessor if the <strong>header-name</strong> is a
 constant string.</p>
+
+<p>&nbsp;</p>
+
+<hr>
+
+<p><a name="f-reply-header-slot-value"></a><font face="Courier New"><strong>(reply-header-slot-value
+request header-name)</strong></font></p>
+
+<p>Return the value associated with the header <strong>header-name</strong> in the reply
+sent back to the client.&nbsp; This function is setf'able and this is the preferred way to
+specify headers and values to be sent with a reply.</p>
 
 <hr>
 
@@ -561,12 +564,14 @@ be made (in Lisp's universal time format).&nbsp; This defaults to the time when 
 request arrived.</p>
 
 <p><a name="f-request-reply-headers"></a><strong><font face="Courier New">(request-reply-headers
-request)</font></strong> - accessor - an alist of headers to send out with the
-reply.&nbsp; Each entry in the alist is a cons where the <strong>car</strong> is a string
-holding the header name and the <strong>cdr</strong> is the value (it is printed using the
-<strong>~a</strong> format directive). &nbsp;&nbsp; Typically <strong>request-reply-headers</strong>
-isn't used, instead the headers to be sent are passed as the <strong>:header</strong>
-argument to <strong>with-http-body</strong>. </p>
+request)</font></strong> - accessor - an alist of some of the headers to send out with the
+reply (other headers values are stored in specific slots of the request object).&nbsp;
+Each entry in the alist is a cons where the <strong>car</strong> is a string holding the
+header name and the <strong>cdr</strong> is the value (it is printed using the <strong>~a</strong>
+format directive). &nbsp;&nbsp; Typically <strong>request-reply-headers</strong> isn't
+used, instead the headers to be sent are passed as the <strong>:header</strong> argument
+to <strong>with-http-body</strong>, or <strong>(setf reply-header-slot-value)</strong> is
+called.</p>
 
 <p><a name="f-request-reply-content-length"></a><strong><font face="Courier New">(request-reply-content-length
 request) </font></strong>&nbsp;&nbsp;&nbsp; - accessor -&nbsp; the value to send as the
@@ -677,11 +682,8 @@ name=&quot;thefile&quot;&gt; </strong>the value returned by <strong>get-multipar
 would be something like</p>
 
 <pre>((&quot;Content-Disposition&quot;
-
       (:param &quot;form-data&quot; (&quot;name&quot; . &quot;thefile&quot;)
-
                           (&quot;filename&quot; . &quot;C://down//550mhz.gif&quot;)))
-
  (&quot;Content-Type&quot; &quot;image/gif&quot;))</pre>
 
 <p>Note that the filename is expressed in the syntax of the operating system on which the
@@ -758,31 +760,18 @@ which access should be authorized by a certain name and password.</p>
 and the password is <strong>bar</strong>.</p>
 
 <pre>(publish :path &quot;/secret&quot;
-
     :content-type &quot;text/html&quot;
-
     :function
-
     #'(lambda (req ent)
-
         (multiple-value-bind (name password) (<strong>get-basic-authorization</strong> req)
-
            (if* (and (equal name &quot;foo&quot;) (equal password &quot;bar&quot;))
-
              then (with-http-response (req ent)
-
                     (with-http-body (req ent)
-
                       (html (:head (:title &quot;Secret page&quot;))
-
                             (:body &quot;You made it to the secret page&quot;))))
-
              else ; this will cause browser to put up a name/password dialog
-
                   (with-http-response (req ent :response *response-unauthorized*)
-
                      (<strong>set-basic-authorization</strong> req &quot;secretserver&quot;)
-
                      (with-http-body (req ent)))))))
 
 </pre>
@@ -853,27 +842,17 @@ name of <strong>joe</strong> and a password of <strong>eoj</strong> or a name of
 and a password of<strong> derf</strong>.</p>
 
 <pre>  (publish :path &quot;/foo&quot;
-
     :content-type &quot;text/html&quot;
-
     :authorizer (make-instance 'password-authorizer
-
                        :allowed '((&quot;joe&quot; . &quot;eoj&quot;)
-
                                   (&quot;fred&quot; . &quot;derf&quot;))
-
                        :realm &quot;SecretAuth&quot;)
 
     :function
-
     #'(lambda (req ent)
-
         (with-http-response (req ent)
-
            (with-http-body (req ent)
-
               (html (:head (:title &quot;Secret page&quot;))
-
                     (:body &quot;You made it to the secret page&quot;))))))</pre>
 
 <p>&nbsp;</p>
@@ -935,29 +914,18 @@ particular machine (tiger.franz.com).&nbsp; Note that we end the pattern list wi
 so that anything not matching the preceding patterns will be denied.</p>
 
 <pre>(publish :path &quot;/local-secret-auth&quot;
-
     :content-type &quot;text/html&quot;
-
     :authorizer (make-instance 'location-authorizer
-
                          :patterns '((:accept &quot;127.0&quot; 8)
-
                                      (:accept &quot;tiger.franz.com&quot;)
-
                                      :deny))
 
     :function
-
     #'(lambda (req ent)
-
         (with-http-response (req ent)
-
            (with-http-body (req ent)
-
                (html (:head (:title &quot;Secret page&quot;))
-
                      (:body (:b &quot;Congratulations. &quot;)
-
                        &quot;You made it to the secret page&quot;))))))
 
 </pre>
@@ -1277,14 +1245,30 @@ keep-alive headers proxy)</font></strong></p>
     href="http://www.machine.com">&quot;www.machine.com&quot;</a> or <a
     href="http://www.machine.com:8000">&quot;www.machine.com:8000&quot;</a> if the web server
     is listening on port 8000 rather than 80.&nbsp;&nbsp; Proxying web servers are often used
-    when clients are behind firewalls that prevent direct access to the internet.
-    &nbsp; Another use is to centralize the page cache for a group of clients.</td>
+    when clients are behind firewalls that prevent direct access to the internet. &nbsp;
+    Another use is to centralize the page cache for a group of clients.</td>
   </tr>
 </table>
 
 <p>&nbsp;</p>
 
-<p>&nbsp;</p>
+<p>For example:</p>
+
+<pre>user(5): <strong>(do-http-request &quot;http://www.franz.com&quot;)</strong>
+200
+((&quot;content-type&quot; . &quot;text/html&quot;) (&quot;transfer-encoding&quot; . &quot;chunked&quot;)
+(&quot;server&quot; . &quot;Apache/1.3.9 (Unix) PHP/3.0.14&quot;)
+(&quot;date&quot; . &quot;Mon, 24 Apr 2000 11:00:51 GMT&quot;))
+&quot;&lt;HTML&gt;
+    &lt;HEAD&gt;
+        &lt;TITLE&gt;Franz Inc: Allegro Common Lisp and Common Lisp Products&lt;/TITLE&gt;
+        &lt;BASE FONTFACE=\&quot;helvetica, arial\&quot; FONTSIZE=\&quot;1\&quot;&gt;
+.....</pre>
+
+<pre>&quot;</pre>
+
+<pre>
+        </pre>
 
 <p>&nbsp;</p>
 
@@ -1484,7 +1468,71 @@ caller of the function must be prepared for having the buffer only partially fil
 
 <p>&nbsp;</p>
 
+<hr>
+
 <p>&nbsp;</p>
+
+<h2><a name="debugging"></a>Debugging</h2>
+
+<p>Debugging entity handler functions is difficult since these are usually run on a
+separate lisp thread.&nbsp; Also AllegroServe catches errors in entity handler functions,
+thus preventing you from interactively diagnosing the problem.</p>
+
+<p>You can put aServe in a mode that makes debugging easier with the <font
+face="Courier New">net.aserve::debug-on</font> function.&nbsp;&nbsp; Note that this is not
+an exported function to emphasize the fact that you are working with the internals of
+aServe.</p>
+
+<p>&nbsp;</p>
+
+<p><a name="f-debug-on"></a><strong><font face="Courier New">(net.aserve::debug-on
+&amp;rest debugging-features-to-enable)</font></strong></p>
+
+<p>We've classified the debugging features and given each a keyword symbol name.
+&nbsp;&nbsp; This function turns on those named features.&nbsp; If no arguments are given,
+then <strong>debug-on</strong> prints the list of debugging features and whether each is
+enabled.</p>
+
+<p>&nbsp;</p>
+
+<p><a name="f-debug-off"></a><strong><font face="Courier New">(net.aserve::debug-off
+&amp;rest debugging-features-to-disable)</font></strong></p>
+
+<p>This function turns off the given list of features.</p>
+
+<p>&nbsp;</p>
+
+<p>The list of debug features are:</p>
+
+<table border="1" width="100%">
+  <tr>
+    <td width="18%"><strong>:info</strong></td>
+    <td width="82%">aServe prints information at certain places while doing its processing.
+    &nbsp; </td>
+  </tr>
+  <tr>
+    <td width="18%"><strong>:xmit</strong></td>
+    <td width="82%">aServe prints what it receives from and sends to the client.&nbsp; In some
+    cases the body of a request or response will not be printed.</td>
+  </tr>
+  <tr>
+    <td width="18%"><strong>:notrap</strong></td>
+    <td width="82%">When enabled, this prevents aServe from catching errors in entity handler
+    functions.&nbsp; If an error occurs and you're running in an evironment where background
+    processes automatically create new windows (such as the emacs-lisp interface) then you'll
+    be given a chance to :zoom the stack and diagnose the problem.&nbsp; Note that if a
+    timeout has been established to limit the amount of time that a certain step is allowed
+    (and this is done by default) then the interactive debugging session will be aborted when
+    the timeout is reached.</td>
+  </tr>
+</table>
+
+<p>&nbsp;</p>
+
+<p>Two pseudo debug features are <strong>:all</strong> and <strong>:log.</strong>. &nbsp;
+Specifying <strong>:all </strong>to <strong>debug-on</strong> or <strong>debug-off</strong>
+&nbsp; is the same as listing all of the debug features.&nbsp;&nbsp; Specifying <strong>:log</strong>
+is the same as specifying all features except <strong>:notrap.</strong></p>
 
 <p>&nbsp;</p>
 </body>

@@ -1,3 +1,8 @@
+2000-04-24    <jkf@CROW>
+
+	* add html-print and html-print-list to print the lisp
+	  form of html (lhtml)
+
 2000-04-16    <jkf@DEEDEE>
 
 	* htmlgen/htmlgen.cl - when printing option values inside

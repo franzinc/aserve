@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.34 2000/04/17 21:34:25 jkf Exp $
+;; $Id: main.cl,v 1.35 2000/04/24 19:28:44 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -42,8 +42,8 @@
    #:compute-strategy
    #:computed-entity
    ;; don't export, these should be private
-   ; #:debug-off			;; to be documented
-   ; #:debug-on			;; to be documented
+   ; #:debug-off		
+   ; #:debug-on			
    #:decode-form-urlencoded
    #:denied-request
    #:failed-request
@@ -63,7 +63,7 @@
    #:publish
    #:publish-file
    #:publish-directory
-   #:reply-header-slot-value  ;; to be documented
+   #:reply-header-slot-value 
    #:set-basic-authorization
    #:standard-locator
    #:unpublish-locator
@@ -107,6 +107,7 @@
    #:wserver-socket
 
    #:*aserve-version*
+   #:*http-response-timeout*
    #:*mime-types*
    #:*response-ok*
    #:*response-created*
@@ -154,7 +155,7 @@
   "If set than errors in handlers cause a break loop to be entered")
 
 (define-debug-kind :xmit   :log
-  "If set then most of the traffic between clients and servers are also sent to the debug stream")
+  "If set then most of the traffic between clients and servers is also sent to the debug stream")
 
 (define-debug-kind :info   :log
   "General information")
@@ -320,7 +321,7 @@
 ;;;;;; macros 
 
 (defmacro with-http-response ((req ent
-				&key (timeout 60)
+				&key (timeout '*http-response-timeout*)
 				     (check-modified t)
 				     (response '*response-ok*)
 				     content-type
@@ -655,6 +656,7 @@
 
 (defvar *read-request-timeout* 20)
 (defvar *read-request-body-timeout* 60)
+(defvar *http-response-timeout* 120) ; amount of time for an http response
 
 (defvar *thread-index*  0)      ; globalcounter to gen process names
 

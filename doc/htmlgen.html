@@ -61,11 +61,12 @@ discussion below of the syntax of the <strong>html</strong> macro.</p>
 example, the generated page is surrounded by <strong>&lt;html&gt;</strong> and <strong>&lt;/html&gt;</strong>
 due to the <strong>:html</strong> form.&nbsp;&nbsp;&nbsp; The page contains a header and a
 body surrounded by their respective html markers.&nbsp; The body of the document contains
-a level 1 header followed by the text beginning &quot;Hello, AllegroServe&quot;. &nbsp;&nbsp;
-Following that is printed the universal time at the time that the page is generated (i.e
-now rather than when the macro was first processed by lisp). &nbsp;&nbsp; The following <strong>incf</strong>
-expression is evaluated but the result is not printed.&nbsp;&nbsp; In this case we're
-keeping a private count of the number of times this page has been accessed.</p>
+a level 1 header followed by the text beginning &quot;Hello, AllegroServe&quot;.
+&nbsp;&nbsp; Following that is printed the universal time at the time that the page is
+generated (i.e now rather than when the macro was first processed by lisp). &nbsp;&nbsp;
+The following <strong>incf</strong> expression is evaluated but the result is not
+printed.&nbsp;&nbsp; In this case we're keeping a private count of the number of times
+this page has been accessed.</p>
 
 <h2>html macro</h2>
 
@@ -74,8 +75,7 @@ describe the syntax in detail.</p>
 
 <p>&nbsp;</p>
 
-<p><strong>(html <em>form1 form2 ... formn)
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<p><strong><font face="Courier New">(html <em>form1 form2 ... formn) </font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 </em>[Macro]</strong></p>
 
 <p>The forms are processed from left to right.&nbsp; The most&nbsp; likely effect is that
@@ -112,12 +112,6 @@ html output is generated.&nbsp; The output is sent to the stream htmlgen:*html-s
 <p>Special cases: 
 
 <ul>
-  <li>Normally a list beginning with a keyword specifies that the <strong>cdr</strong> of the
-    list is to be enclosed with a start and end html markup command.&nbsp; For example <strong>(:i
-    &quot;foo&quot;)</strong> generates <strong>&lt;i&gt;foo&lt;/i&gt;</strong>.
-    &nbsp;&nbsp;&nbsp; If the <strong>cdr</strong> of the list is <strong>nil</strong> then
-    the end markup command isn't done.&nbsp; Thus <strong>(:i)</strong> generates <strong>&lt;i&gt;</strong>.
-  </li>
   <li><strong>(:princ </strong>arg1 arg2 .. argn<strong>) </strong>causes the result of
     evaluating each of the args to be printed to the html stream using the <strong>princ</strong>
     function (which prints without inserting escape characters needed by the lisp reader to
@@ -150,7 +144,8 @@ html output is generated.&nbsp; The output is sent to the stream htmlgen:*html-s
 
 <p>&nbsp;</p>
 
-<p><strong>(html-stream <em>stream</em>&nbsp; <em>form1 form2 ... formn)
+<p><strong><font face="Courier New">(html-stream <em>stream</em>&nbsp; <em>form1 form2 ...
+formn)</font>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 </em>[Macro]</strong></p>
 
@@ -426,15 +421,15 @@ evaluated but the values are.&nbsp;&nbsp; If we evaluate this expression:</p>
 
      (html-stream p 
         (:html
-        (:head (:title &quot;Test Table&quot;))
-        (:body 
-        ((:table border 2)
-        (dotimes (i count)
-        (html (:tr 
-            (dotimes (j count)
-            (html ((:td <strong>:if* (evenp j) :bgcolor &quot;red&quot;
-                        :if* (not (evenp j)):bgcolor &quot;green&quot;</strong>)
-                (:princ (* i j))))))))))))))
+          (:head (:title &quot;Test Table&quot;))
+          (:body 
+            ((:table border 2)
+             (dotimes (i count)
+              (html (:tr 
+               (dotimes (j count)
+                 (html ((:td <strong>:if* (evenp j) :bgcolor &quot;red&quot;
+                             :if* (not (evenp j)):bgcolor &quot;green&quot;</strong>)
+                        (:princ (* i j))))))))))))))
 </pre>
 
 <p>This sets the color of the columns to alternately red and green:&nbsp; Here is <font
@@ -490,6 +485,57 @@ face="Courier New">(simple-table-e 6)</font></p>
     <td bgcolor="green">25</td>
   </tr>
 </table>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<h2>HTML generation functions</h2>
+
+<p>It's possible to express HTML using Lisp data structures.&nbsp;&nbsp; The form is based
+on how HTML is written using the <strong>html</strong> macro above.&nbsp; </p>
+
+<p>Lisp HTML (<strong>lhtml) </strong> is defined as one of the following
+
+<ul>
+  <li>a string, which is rendered as HTML by simply printing it.&nbsp; Thus the string can
+    contain embedded HTML commands.</li>
+  <li>a list beginning with a valid <strong>lhtml</strong> keyword and containing <strong>lhtml</strong>
+    forms.&nbsp;&nbsp; The valid keywords are those corresponding to the HTML entity tags,
+    plus the special tags <strong>:princ, :princ-safe, :prin1, :prin1-safe</strong>, <strong>:newline</strong>
+    and <strong>:comment</strong>.&nbsp;&nbsp; These act just as they do in the <strong>html</strong>
+    macro.&nbsp;&nbsp; This form is rendered as an opening tag, then the rendering of the
+    body, and a closing HTML tag if one exists.</li>
+  <li>a list beginning with a list beginning with an <strong>lhtml</strong> keyword.
+    &nbsp; This is the form used when arguments are to be supplied with the opening entity
+    tag.&nbsp; </li>
+</ul>
+
+<p>Examples of valid <strong>lhtml</strong>:
+
+<ul>
+  <li>&quot;foo&lt;i&gt;bar&lt;/i&gt;baz&quot;</li>
+  <li>(:i &quot;foo&quot;)</li>
+  <li>((:body :bgcolor &quot;#xffffff&quot;) &quot;the body&quot;)</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<p><strong><font face="Courier New">(html-print lhtml stream)</font></strong></p>
+
+<p>Print the Lisp HTML expression <strong>lhtml</strong> to the <strong>stream.</strong></p>
+
+<p><strong>&nbsp;</strong></p>
+
+<p><font face="Courier New"><strong>(html-print-list lhtml-list stream)</strong></font></p>
+
+<p>Print the list of <strong>lhtml</strong> forms to the <strong>stream.&nbsp;&nbsp; </strong>
+This is equivalent to calling <strong>html-print</strong> on every element of <strong>lhtml-list</strong>.
+</p>
+
+<p>&nbsp;</p>
 
 <p>&nbsp;</p>
 

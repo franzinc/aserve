@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.28 2000/04/17 21:34:24 jkf Exp $
+;; $Id: load.cl,v 1.29 2000/04/24 19:28:44 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -45,17 +45,30 @@
 
 (with-compilation-unit  nil
   (dolist (file (append *aserve-files* *aserve-examples*))
-    (case *loadswitch*
-      (:compile-if-needed (compile-file-if-needed 
-			   (merge-pathnames (format nil "~a.cl" file)
-					    *load-truename*)))
-      (:compile (compile-file 
-		 (merge-pathnames (format nil "~a.cl" file)
-				  *load-truename*)))
-      (:load nil))
-    (load (merge-pathnames 
-	   (format nil "~a.fasl" file)
-	   *load-truename*))))
+    #+allegro-cl-lite
+    (progn
+      ;; aServe doesn't work very well under 5.0.1 Lite due to
+      ;; socket problem which are patched in the normal 5.0.1 but
+      ;; not the lite version
+      (if* (equal file "examples/examples")
+	 then (load (merge-pathnames (format nil "~a.cl" file)
+				     *load-truename*))
+	 else (excl:load-compiled (merge-pathnames (format nil "~a.cl" file)
+						   *load-truename*)))
+      (gc t) ; must compact to keep under the heap limit
+      )
+    #-allegro-cl-lite
+    (progn (case *loadswitch*
+	     (:compile-if-needed (compile-file-if-needed 
+				  (merge-pathnames (format nil "~a.cl" file)
+						   *load-truename*)))
+	     (:compile (compile-file 
+			(merge-pathnames (format nil "~a.cl" file)
+					 *load-truename*)))
+	     (:load nil))
+	   (load (merge-pathnames 
+		  (format nil "~a.fasl" file)
+		  *load-truename*)))))
 
 
 
