@@ -1,5 +1,8 @@
 *******************************************************************************
 merge from trunk to acl61 branch
+cmd: ../../join.sh trunk trunk_to_acl61_merge9 trunk_to_acl61_merge10 aserve
+*******************************************************************************
+merge from trunk to acl61 branch
 command: ../../join.sh trunk trunk_to_acl61_merge8 trunk_to_acl61_merge9 aserve
 *******************************************************************************
 merge from trunk to acl61 branch
@@ -26,6 +29,12 @@ command: ../../join.sh trunk trunk_to_acl61_merge1 trunk_to_acl61_merge2 aserve
 merge from trunk to acl61 branch
 command: ../../join.sh trunk acl61 trunk_to_acl61_merge1 aserve
 *******************************************************************************
+
+2001-10-08  John Foderaro  <jkf@tiger.franz.com>
+
+	* publish.cl - publish-directory must pass on host info
+		to the publish-files that it does.
+	            - unpublish takes a :server argument
 
 2001-09-29  John Foderaro  <jkf@tiger.franz.com>
 

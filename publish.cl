@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.33.6.4.2.1 2001/09/10 17:55:44 layer Exp $
+;; $Id: publish.cl,v 1.33.6.4.2.2 2001/10/08 23:56:31 layer Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -354,12 +354,12 @@
 (build-mime-types-table)  ;; build the table now
 
 
-(defun unpublish (&key all)
+
+(defun unpublish (&key all (server *wserver*))
   (if* all
-     then (dolist (locator (wserver-locators *wserver*))
+     then (dolist (locator (wserver-locators server))
 	    (unpublish-locator locator))
      else (error "not done yet")))
-
   
 ;; methods on entity objects
 
@@ -1069,6 +1069,7 @@
 	    (process-entity req 
 			    (publish-file :path (uri-path 
 						 (request-uri req))
+					  :host (host ent)
 					  :file realname
 					  :authorizer (entity-authorizer ent))))
     t))
