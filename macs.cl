@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: macs.cl,v 1.15 2001/10/16 17:55:41 jkf Exp $
+;; $Id: macs.cl,v 1.16 2002/08/09 22:21:45 jkf Exp $
 
 ;; Description:
 ;;   useful internal macros
@@ -38,8 +38,6 @@
 
 ;; macros used by iserve
 
-(defpackage :net.aserve
-  (:use :common-lisp :excl :net.html.generator :net.uri))
 
 (in-package :net.aserve)
 

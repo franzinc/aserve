@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.40 2002/04/10 16:06:50 jkf Exp $
+;; $Id: client.cl,v 1.41 2002/08/09 22:21:45 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -39,39 +39,11 @@
 
 
 
-(defpackage :net.aserve.client 
-  (:use :net.aserve :excl :common-lisp)
-  (:export 
-   #:client-request  ; class
-   #:client-request-close
-   #:client-request-cookies
-   #:client-request-headers
-   #:client-request-protocol
-   #:client-request-read-sequence
-   #:client-request-response-code
-   #:client-request-response-comment
-   #:client-request-socket
-   #:client-request-uri
-   #:client-response-header-value
-   #:cookie-item
-   #:cookie-item-expires
-   #:cookie-item-name
-   #:cookie-item-path
-   #:cookie-item-secure
-   #:cookie-item-value
-   #:cookie-jar     ; class
-   #:do-http-request
-   #:make-http-client-request
-   #:read-client-response-headers
-   ))
+
 
 
 
 (in-package :net.aserve.client)
-
-
-
-
 
 
 
@@ -119,7 +91,7 @@
 
 
 (defvar crlf (make-array 2 :element-type 'character
-			 :initial-contents '(#\return #\newline)))
+			 :initial-contents '(#\return #\linefeed)))
 
 (defmacro with-better-scan-macros (&rest body)
   ;; define the macros for scanning characters in a string
@@ -142,9 +114,9 @@
 		     (let ((thisch (schar ,buffer ,i)))
 		       (if* (eq thisch #\return)
 			  then (let ((ans (buf-substr start ,i ,buffer)))
-				 (incf ,i)  ; skip to newline
+				 (incf ,i)  ; skip to linefeed
 				 (return ans))
-			elseif (eq thisch #\newline)
+			elseif (eq thisch #\linefeed)
 			  then (return (buf-substr start ,i ,buffer))))
 		     (incf ,i)
 		     )))
@@ -769,7 +741,7 @@ or \"foo.com:8000\", not ~s" proxy))
 
 (defun read-socket-line (socket buffer max)
   ;; read the next line from the socket.
-  ;; the line may end with a newline or a return, newline, or eof
+  ;; the line may end with a linefeed or a return, linefeed, or eof
   ;; in any case don't put that the end of line characters in the buffer
   ;; return the number of characters in the buffer which will be zero
   ;; for an empty line.
@@ -787,7 +759,7 @@ or \"foo.com:8000\", not ~s" proxy))
 			)
 	 elseif (eq ch #\return)
 	   thenret ; ignore
-	 elseif (eq ch #\newline)
+	 elseif (eq ch #\linefeed)
 	   then ; end of the line,
 		(return i)
 	 elseif (< i max)

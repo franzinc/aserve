@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.35 2002/01/15 20:06:46 jkf Exp $
+;; $Id: parse.cl,v 1.36 2002/08/09 22:21:46 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -209,24 +209,24 @@
 	(incf i)
 	(case state
 	  (0 ; seen nothing interesting
-	   (if* (eq ch #.(char-code #\newline))
+	   (if* (eq ch #.(char-code #\linefeed))
 	      then (setq state 2)
 	    elseif (eq ch #.(char-code #\return))
 	      then (setq state 1)))
 	  (1 ; seen cr
-	   (if* (eq ch #.(char-code #\newline))
+	   (if* (eq ch #.(char-code #\linefeed))
 	      then (setq state 2)
 	    elseif (eq ch #.(char-code #\return))
 	      then nil ; stay in 1
 	      else (setq state 0)))
 	  (2 ; seen [cr] lf
-	   (if* (eq ch #.(char-code #\newline))
+	   (if* (eq ch #.(char-code #\linefeed))
 	      then (setq state 4)
 	    elseif (eq ch #.(char-code #\return))
 	      then (setq state 3)
 	      else (setq state 0)))
 	  (3 ; seen [cr] lf cr
-	   (if* (eq ch #.(char-code #\newline))
+	   (if* (eq ch #.(char-code #\linefeed))
 	      then (setq state 4)
 	    elseif (eq ch #.(char-code #\return))
 	      then (setq state 1)
@@ -297,7 +297,7 @@
       (setf (svref arr (char-code #\ff)) ch-space)
       (setf (svref arr (char-code #\tab)) ch-space)
       (setf (svref arr (char-code #\return)) ch-space)
-      (setf (svref arr (char-code #\newline)) ch-space)
+      (setf (svref arr (char-code #\linefeed)) ch-space)
       
       (setf (svref arr (char-code #\,)) ch-sep)
       (setf (svref arr (char-code #\;)) ch-sep)

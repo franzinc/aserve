@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.15 2002/01/25 15:43:01 jkf Exp $
+;; $Id: htmlgen.cl,v 1.16 2002/08/09 22:21:46 jkf Exp $
 
 ;; Description:
 ;;   html generator
@@ -548,7 +548,7 @@
       ;; must use <!--   --> syntax
       (declare (ignore ent args argsp))
       `(progn (write-string "<!--" *html-stream*)
-	      ,@body
+	      (html ,@body)
 	      (write-string "-->" *html-stream*)))
   
   #'(lambda (ent cmd args form stream)
