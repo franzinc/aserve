@@ -1,5 +1,16 @@
-*******************************************************************************
-<version for this commit> (incf *aserve-version* in main.cl each commit)
+2000-06-08  John Foderaro  <jkf@tiger.franz.com>
+1.1.21
+	* client.cl - do-http-request: 
+	        1. give the redirect arg a numeric
+		   value to prevent infinite redirect loops.
+	        2. handle two other redirect codes
+		3. autoredirect only for get and head
+		4. return the uri accessed as the fourth value
+	* main.cl - add more response codes
+		- handle calls to request-query specifying different
+		 uri and post values.
+	* examples.cl - add redirect test
+	* t-aserve.cl - test redirection
 
 2000-05-30  John Foderaro  <jkf@tiger.franz.com>
 1.1.20

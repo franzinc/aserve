@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.7 2000/04/26 18:11:48 jkf Exp $
+;; $Id: examples.cl,v 1.8 2000/06/08 16:43:58 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -67,6 +67,7 @@
 			 ((:a :href "gc") "Garbage Collector Stats") :br
 			 ((:a :href "apropos") "Apropos") :br
 			 ((:a :href "pic") "Sample jpeg") :br
+			 ((:a :href "pic-redirect") "Redirect to previous picture") :br
 			 ((:a :href "pic-gen") "generated jpeg") "- hit reload to switch images" :br
 			 ((:a :href "cookietest") "test cookies") :br
 			 ((:a :href "secret") "Test manual authorization")
@@ -197,6 +198,28 @@
 	 
 
 
+;; do a redirect to the picture
+
+(publish :path "/pic-redirect"
+	 :content-type "text/html"
+	 :function
+	 #'(lambda (req ent)
+	     (with-http-response (req ent
+				      :response *response-moved-permanently*)
+	       (setf (reply-header-slot-value req "location") "pic")
+	       (with-http-body (req ent)
+		 ;; this is optional and most likely unnecessary since most 
+		 ;; browsers understand the redirect response
+		 (html 
+		  (:html
+		   (:head (:title "Object Moved"))
+		   (:body 
+		    (:h1 "Object Moved")
+		    "The picture you're looking for is now at "
+		    ((:a :href "pic") "This location"))))))))
+		    
+		    
+	 
 
 
 ;;

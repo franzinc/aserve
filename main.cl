@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.42 2000/05/30 21:34:15 jkf Exp $
+;; $Id: main.cl,v 1.43 2000/06/08 16:43:58 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -111,21 +111,23 @@
    #:*aserve-version*
    #:*http-response-timeout*
    #:*mime-types*
-   #:*response-ok*
-   #:*response-created*
    #:*response-accepted*
-   #:*response-not-modified*
    #:*response-bad-request*
+   #:*response-created*
+   #:*response-found*
+   #:*response-internal-server-error*
+   #:*response-not-found*
+   #:*response-not-modified*
+   #:*response-ok*
    #:*response-moved-permanently*
+   #:*response-see-other*
    #:*response-temporary-redirect*
    #:*response-unauthorized*
-   #:*response-not-found*
-   #:*response-internal-server-error*
    #:*wserver*))
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 1 20))
+(defparameter *aserve-version* '(1 1 21))
 
 
 (provide :aserve)
@@ -652,6 +654,8 @@
 (defparameter *response-accepted* (make-resp 202 "Accepted"))
 
 (defparameter *response-moved-permanently* (make-resp 301 "Moved Permanently"))
+(defparameter *response-found* (make-resp 302 "Found"))
+(defparameter *response-see-other* (make-resp 303 "See Other"))
 (defparameter *response-not-modified* (make-resp 304 "Not Modified"))
 (defparameter *response-temporary-redirect* 
     (make-resp 307 "Temporary Redirect"))
@@ -1551,22 +1555,31 @@
   ;; If both are true (and this is a post) then we look both places.
   ;;
   ;;
-  (let ((alist (request-query-alist req)))
+  (let ((alist (request-query-alist req))
+	(signature (cons post uri)))
+    
     (if* (not (eq alist :empty))
-       then alist
-       else (let (res)
-	      (if* uri
-		 then (let ((arg (uri-query (request-uri req))))
-			(if* arg
-			   then (setq res (form-urlencoded-to-query arg)))))
+       then (let ((given-sig (getf (request-reply-plist req) 
+				   'request-query-sig)))
+	      (if* (equal given-sig signature)
+		 then ; same args as before, cached value is legit
+		      (return-from request-query alist))))
+    
+    (let (res)
+      (if* uri
+	 then (let ((arg (uri-query (request-uri req))))
+		(if* arg
+		   then (setq res (form-urlencoded-to-query arg)))))
 	      
-	      (if* post
-		 then (if* (eq (request-method req) :post)
-			 then (setf res
-				(append res
-					(form-urlencoded-to-query
-					 (get-request-body req))))))
-	      (setf (request-query-alist req) res)))))
+      (if* post
+	 then (if* (eq (request-method req) :post)
+		 then (setf res
+			(append res
+				(form-urlencoded-to-query
+				 (get-request-body req))))))
+      (setf (getf (request-reply-plist req) 'request-query-sig)
+	signature)
+      (setf (request-query-alist req) res))))
 			
 
 

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.17 2000/05/17 14:54:53 jkf Exp $
+;; $Id: client.cl,v 1.18 2000/06/08 16:43:58 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -187,16 +187,16 @@
 			query
 			(format :text) ; or :binary
 			cookies ; nil or a cookie-jar
-			(redirect t) ; auto redirect if needed
+			(redirect 5) ; auto redirect if needed
 			basic-authorization  ; (name . password)
 			keep-alive   ; if true, set con to keep alive
 			headers	    ; extra header lines, alist
 			proxy	    ; naming proxy server to access through
 			user-agent
-			      )
+			)
   
-  ;; send an http request and return the result as three values:
-  ;; the response code, the headers and the body
+  ;; send an http request and return the result as four values:
+  ;; the body, the response code, the headers and the uri 
   (let ((creq (make-http-client-request 
 	       uri  
 	       :method method
@@ -265,22 +265,39 @@
 			    (setq body "")
 		       else (setq body (subseq ans 0 start))))
 
-	    (if* (and redirect
-		      (eql 302 (client-request-response-code creq)))
-	       then ; must do a redirect to get to the read site
+	    (let (new-location)
+	      
+	      (if* (and (member (client-request-response-code creq)
+				'( #.(net.aserve::response-number *response-found*)
+				  #.(net.aserve::response-number 
+				     *response-moved-permanently*)
+				  #.(net.aserve::response-number 
+				     *response-see-other*))
+				:test #'eq)
+			(member method '(:get :head) :test #'eq)
+			redirect
+			(if* (integerp redirect)
+			   then (> redirect 0))
+			(setq new-location
+			  (cdr (assoc "location" (client-request-headers creq)
+				      :test #'equal)))
+			)
+		 then ; must do a redirect to get to the real site
 		    
-		    (apply #'do-http-request
-			   (net.uri:merge-uris
-			    (cdr (assoc "location" (client-request-headers creq)
-					:test #'equal))
-			    uri)
-			   args)
-	       else ; return the values
-		    (values 
-		     body
-		     (client-request-response-code creq)
-		     (client-request-headers  creq)
-		     ))))
+		      (apply #'do-http-request
+			     (net.uri:merge-uris new-location uri)
+			     :redirect
+			     (if* (integerp redirect)
+				then (1- redirect)
+				else redirect)
+			     args)
+		 else ; return the values
+		      (values 
+		       body
+		       (client-request-response-code creq)
+		       (client-request-headers  creq)
+		       uri
+		       )))))
       
       ; protected form:
       (client-request-close creq))))

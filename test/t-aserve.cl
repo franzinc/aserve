@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.5 2000/05/30 21:34:16 jkf Exp $
+;; $Id: t-aserve.cl,v 1.6 2000/06/08 16:43:58 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -61,14 +61,15 @@
 	    (test-authorization port)
 	    (test-encoding)
 	    (test-forms port)
+	    (test-client port)
 	    )
 	(stop-aserve-running))))
   (if* (or (> util.test::*test-errors* 0)
 	   (> util.test::*test-successes* 0)
 	   (> util.test::*test-unexpected-failures* 0))
      then (format t "~%Test information from other threads:~%")
-	  (format t "Successes: ~d~%" util.test::*test-successes*)
 	  (format t "Errors:    ~d~%" util.test::*test-errors*)
+	  (format t "Successes: ~d~%~%" util.test::*test-successes*)
 	  (format t "Unexpected failures: ~d~%" 
 		  util.test::*test-unexpected-failures*)))
     
@@ -781,7 +782,67 @@
     
 
   
+(defun test-client (port)
+  (let ((prefix-local (format nil "http://localhost:~a" port)))
+  
+    ;; test redirection
+    (publish :path "/redir-target"
+	     :content-type "text/plain"
+	     :function #'(lambda (req ent)
+			   (with-http-response (req ent)
+			     (with-http-body (req ent)
+			       (html "foo")))))
+  
+    (publish :path "/redir-to"
+	     :function #'(lambda (req ent)
+			   (with-http-response (req ent
+						    :response *response-found*)
+			     (setf (reply-header-slot-value req "location") 
+			       "redir-target")
+			     (with-http-body (req ent)))))
+    
+    ; redirect to itself... danger danger!
+    (publish :path "/redir-inf"
+	     :function #'(lambda (req ent)
+			   (with-http-response (req ent
+						    :response *response-found*)
+			     (setf (reply-header-slot-value req "location") 
+			       "redir-inf")
+			     (with-http-body (req ent)))))
+    
+  
+    ; first test target
+    (multiple-value-bind (body code headers)
+	(do-http-request (format nil "~a/redir-target" prefix-local))
+      (declare (ignore body headers))
+      (test 200 code))
+  
+    ; now test through redirect
+    (multiple-value-bind (body code headers)
+	(do-http-request (format nil "~a/redir-to" prefix-local))
+      (declare (ignore body headers))
+      (test 200 (and :second code)))
+  
+    ; now turn off redirect and test
+    (multiple-value-bind (body code headers)
+	(do-http-request (format nil "~a/redir-to" prefix-local) :redirect nil)
+      (declare (ignore body headers))
+      (test 302 (and :third code)))
 
+    ; turn off with a zero repeat count
+    (multiple-value-bind (body code headers)
+	(do-http-request (format nil "~a/redir-to" prefix-local) :redirect 0)
+      (declare (ignore body headers))
+      (test 302 (and :fourth code)))
+
+    
+    ; self redirect, we test that we eventually give up
+    (multiple-value-bind (body code headers)
+	(do-http-request (format nil "~a/redir-inf" prefix-local))
+      (declare (ignore body headers))
+      (test 302 (and :fifth code)))
+    ))
+  
   
   
 
