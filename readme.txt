@@ -31,7 +31,7 @@ other files are present to support the examples in examples/examples.cl.
    (or start Allegro cl 5.0.1 and use the toplevel ":cd" command to cd 
    to the directory containing the neo distribution).
 
-2. load  neo.fasl
+2. load iserve.fasl
     
         user(1): :ld iserve.fasl
 

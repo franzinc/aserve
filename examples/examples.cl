@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: examples.cl,v 1.1.2.3 2000/02/24 23:01:08 jkf Exp $
+;; $Id: examples.cl,v 1.1.2.4 2000/02/26 00:03:02 jkf Exp $
 
 ;; Description:
 ;;   neo examples
@@ -37,6 +37,13 @@
 
 ;; flush all publishing done so far:
 (unpublish :all t)
+
+(defparameter *example-pathname* *load-truename*) ; where this file is
+(eval-when (compile)
+  (defmacro example-file (name)
+    ;; create an absolute address for this file we'll load
+    `(merge-pathnames ,name *example-pathname*)))
+
 
 
 (publish :path "/" 
@@ -132,7 +139,7 @@
 
 
 ;; display a picture from a file.
-(publish-file :path "/pic" :file "examples/prfile9.jpg"
+(publish-file :path "/pic" :file (example-file "prfile9.jpg")
 	      :content-type "image/jpeg")
 
 
@@ -156,7 +163,8 @@
 		   ; we're just reading it from a file in this example
 		   (let ((stream (request-reply-stream req)))
 		     (with-open-file (p (nth selector
-					     '("examples/prfile9.jpg" "examples/fresh.jpg"))
+					     `(,(example-file "prfile9.jpg")
+					       ,(example-file "fresh.jpg")))
 				      :element-type '(unsigned-byte 8))
 
 		       (setq selector (mod (1+ selector) 2))
@@ -211,7 +219,7 @@
  :content-type "text/html"
  :function
  #'(lambda (req ent)
-     (format t "request uri is ~s~%" (request-uri req))
+     
      (let ((lookup (assoc "symbol" (request-query req) :test #'equal)))
        (with-http-response (req ent)
 	 (with-http-body (req ent)
@@ -266,18 +274,18 @@
 
 ;; a preloaded picture file
 (publish-file :path "/neoweb/fresh.jpg"
-	      :file "examples/fresh.jpg"
+	      :file (example-file "fresh.jpg")
 	      :content-type "image/jpeg"
 	      :preload t)
 
 ;; a preloaded text file
 (publish-file :path "/foo"
-	      :file "examples/foo.txt"
+	      :file (example-file "foo.txt")
 	      :content-type "text/plain"
 	      :preload t)
 
 (publish-file :path "/foo.txt"
-	      :file "examples/foo.txt"
+	      :file (example-file "foo.txt")
 	      :content-type "text/plain"
 	      :preload nil)
 
@@ -358,7 +366,6 @@
 		   (if* (null (setq h (get-multipart-header req)))
 		      then ; no more items
 			   (return))
-		   (format t "parsed headers: ~s~%" h)
 		   ; we can get the filename from the header if 
 		   ; it was an <input type="file"> item.  If there is
 		   ; no filename, we just create one.

@@ -1,3 +1,10 @@
+2000-02-25  John Foderaro  <jkf@tiger.franz.com>
+
+	* added code to the examples so that the pubished url
+	 handlers will find the files they reference (if any)
+	 no matter what the current directory is when the examples
+	 file is loaded.
+
 2000-02-18  John Foderaro  <jkf@tiger.franz.com>
 
 	* moved examples and doc to their own directories
