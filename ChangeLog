@@ -1,3 +1,9 @@
+2000-05-16  John Foderaro  <jkf@tiger.franz.com>
+1.1.17
+	* in order to make portions of the LGPL license meaningful
+	  for a Lisp program we've added a prequel to the license
+	  agreement in the file license-allegroserve.txt.
+
 2000-05-16  jkf  <jkf@main.verada.com>
 
 	* client.cl

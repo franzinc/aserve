@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.30 2000/04/26 18:11:48 jkf Exp $
+;; $Id: load.cl,v 1.31 2000/05/16 14:01:25 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -25,6 +25,7 @@
       "ChangeLog"
       "htmlgen/ChangeLog"
       "license-lgpl.txt"
+      "license-allegroserve.txt"
       "examples/examples.cl"
       "examples/foo.txt"
       "examples/fresh.jpg"

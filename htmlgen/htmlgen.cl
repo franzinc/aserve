@@ -7,7 +7,8 @@
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
 ;; the GNU Lesser General Public License as published by 
-;; the Free Software Foundation; 
+;; the Free Software Foundation, as clarified by the AllegroServe
+;; prequel found in license-allegroserve.txt.
 ;;
 ;; This code is distributed in the hope that it will be useful,
 ;; but without any warranty; without even the implied warranty of
@@ -23,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.6 2000/04/24 19:28:45 jkf Exp $
+;; $Id: htmlgen.cl,v 1.7 2000/05/16 14:01:26 jkf Exp $
 
 ;; Description:
 ;;   html generator

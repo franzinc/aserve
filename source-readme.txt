@@ -1,9 +1,11 @@
-				-[Mon Apr 17 14:04:22 2000 by jkf]-
+				-[Tue May 16 06:57:31 2000 by jkf]-
 
 AllegroServe Source Distribution ReadMe file
 
 The source for AllegroServe is distributed under version 2.1 of
-the Lesser GNU Public License.
+the Lesser GNU Public License, as clarified by the AllegroServe
+prequel found in license-allegroserve.txt.
+
 
 This document describes how to use the source to build AllegroServe.
 

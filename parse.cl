@@ -8,7 +8,8 @@
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
 ;; the GNU Lesser General Public License as published by 
-;; the Free Software Foundation; 
+;; the Free Software Foundation, as clarified by the AllegroServe
+;; prequel found in license-allegroserve.txt.
 ;;
 ;; This code is distributed in the hope that it will be useful,
 ;; but without any warranty; without even the implied warranty of
@@ -24,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.21 2000/05/16 13:43:32 jkf Exp $
+;; $Id: parse.cl,v 1.22 2000/05/16 14:01:25 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  

@@ -7,7 +7,8 @@
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
 ;; the GNU Lesser General Public License as published by 
-;; the Free Software Foundation; 
+;; the Free Software Foundation, as clarified by the AllegroServe
+;; prequel found in license-allegroserve.txt.
 ;;
 ;; This code is distributed in the hope that it will be useful,
 ;; but without any warranty; without even the implied warranty of
@@ -22,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.38 2000/05/04 20:21:14 jkf Exp $
+;; $Id: main.cl,v 1.39 2000/05/16 14:01:25 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -124,7 +125,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 1 16))
+(defparameter *aserve-version* '(1 1 17))
 
 
 (provide :aserve)
