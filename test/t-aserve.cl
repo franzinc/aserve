@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.1 2000/04/17 21:34:29 jkf Exp $
+;; $Id: t-aserve.cl,v 1.2 2000/04/26 18:11:49 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -53,7 +53,9 @@
 	  (progn
 	    (test-publish-file port)
 	    (test-publish-computed port)
-	    (test-authorization port))
+	    (test-authorization port)
+	    (test-encoding)
+	    )
 	(stop-aserve-running)))))
     
 
@@ -521,7 +523,25 @@
     
     
     
-    )))
+      )))
+
+
+(defun test-encoding ()
+  ;; test the encoding and decoding
+  (let ((str1 (make-string 256))
+	(str2 (make-string 256)))
+    (dotimes (i 256)
+      (setf (schar str1 i) (code-char i))
+      (setf (schar str1 i) (code-char (mod (+ i 10) 256))))
+    
+    (let ((query `(("foo bar" . "baz")
+		   (,str1 . "a b c d")
+		   ("efffg" . ,str2))))
+      (test (form-urlencoded-to-query
+	     (query-to-form-urlencoded query))
+	    query
+	    :test #'equal))))
+		       
 
     
     

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: tutorial.cl,v 1.2 2000/03/16 17:53:32 layer Exp $
+;; $Id: tutorial.cl,v 1.3 2000/04/26 18:11:48 jkf Exp $
 
 ;; Description:
 ;;   iserver tutorial examples
@@ -110,7 +110,7 @@
 	     (let* ((body (get-request-body req))
 		    (text (if* body
 			       then (cdr (assoc "quotation"
-				      (decode-form-urlencoded body)
+				      (form-urlencoded-to-query body)
 				      :test #'equal)))))
 	       (with-http-response (req ent)
 		 (with-http-body (req ent)

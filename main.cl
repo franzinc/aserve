@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.36 2000/04/24 19:32:31 jkf Exp $
+;; $Id: main.cl,v 1.37 2000/04/26 18:11:48 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -44,9 +44,9 @@
    ;; don't export, these should be private
    ; #:debug-off		
    ; #:debug-on			
-   #:decode-form-urlencoded
    #:denied-request
    #:failed-request
+   #:form-urlencoded-to-query
    #:get-basic-authorization
    #:get-cookie-values
    #:get-multipart-header
@@ -63,6 +63,7 @@
    #:publish
    #:publish-file
    #:publish-directory
+   #:query-to-form-urlencoded
    #:reply-header-slot-value 
    #:set-basic-authorization
    #:standard-locator
@@ -123,7 +124,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 1 14))
+(defparameter *aserve-version* '(1 1 15))
 
 
 (provide :aserve)
@@ -1535,10 +1536,10 @@
        else (let ((arg (uri-query (request-uri req))))
 	      (if* arg
 		 then (setf (request-query-alist req)
-			(decode-form-urlencoded arg))
+			(form-urlencoded-to-query arg))
 	       elseif (and handle-post (eq (request-method req) :post))
 		 then (setf (request-query-alist req)
-			(decode-form-urlencoded 
+			(form-urlencoded-to-query
 			 (get-request-body req))))))))
 
 

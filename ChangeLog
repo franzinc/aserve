@@ -1,3 +1,13 @@
+2000-04-26  John Foderaro  <jkf@tiger.franz.com>
+1.1.15
+	* ! Non upward-compatible change ! -- the function
+	    decode-form-urlencoded has been renamed
+	    form-urlencoded-to-query so as to match its new inverse
+	    function: query-to-form-urlencoded
+
+	* added query-to-form-urlencoded to allow one to encode
+	  query to strings for use by client code.
+
 2000-04-24  John Foderaro  <jkf@tiger.franz.com>
 1.1.14
 	* verify that it works in acl501 trial (Linux)

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.6 2000/04/24 19:28:44 jkf Exp $
+;; $Id: examples.cl,v 1.7 2000/04/26 18:11:48 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -210,7 +210,7 @@
 	       (let ((body (get-request-body req)))
 		 (format t "got body ~s~%" body)
 		 (let ((gotname (assoc "username"
-				       (decode-form-urlencoded body)
+				       (form-urlencoded-to-query body)
 					:test #'equal)))
 		   (if* gotname
 		      then (setq name (cdr gotname)))))

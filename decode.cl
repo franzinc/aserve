@@ -23,7 +23,7 @@
 ;;
 
 ;;
-;; $Id: decode.cl,v 1.5 2000/04/17 21:34:24 jkf Exp $
+;; $Id: decode.cl,v 1.6 2000/04/26 18:11:48 jkf Exp $
 
 ;; Description:
 ;;   decode/encode code
@@ -174,11 +174,129 @@
 
 ;----  form-urlencoding
 
+(defvar *url-form-encode*
+    ;; maps 7 bit characters to t iff they have to be encoded
+    ;; all characters with the 8th bit set must be encoded 
+    ;;
+    ;; what's stored in the table is
+    ;;  nil - no encoding needed
+    ;;  N (integer) - how many extra characters are needed to encode this
+    ;;               (i.e. one less than the total size encoded)
+    
+    (let ((res (make-array 128 :initial-element nil)))
+      
+      ; must escape the non printing characters
+      (dotimes (i 32) (setf (svref res i) 2))
+      (setf (svref res 127) 2)	; delete
+      
+      ; the printing characters needing escaping
+      (dolist (ch '(#\+ #\# #\; #\/ #\? #\: #\@ #\= #\& #\< #\> #\%))
+	(setf (svref res (char-code ch)) 2))
+      
+      ; note: character needing special handling are space and newline
+      (setf (svref res #.(char-code #\space)) 0)
+      (setf (svref res #.(char-code #\linefeed)) 5)
+      
+      
+      res))
 
-(defun decode-form-urlencoded (str)
+
+(defun query-to-form-urlencoded (query)
+  ;; query is a list of conses, each of which has as its 
+  ;; car the query name and as its cdr the value.  A value of
+  ;; nil means we encode  name=   and nothing else
+  ;; encode into single string
+  (let (res)
+    (dolist (ent query)
+      (if* res
+	 then (push "&" res) ; separator
+	      )
+      (push (encode-form-urlencoded (car ent)) res)
+      (push "=" res)
+      (if* (cdr ent) then (push (encode-form-urlencoded (cdr ent)) res)))
+    
+    (apply #'concatenate 'string (nreverse res))))
+      
+
+
+(defun encode-form-urlencoded (str)
+  ;; encode the given string using form-urlencoding
+  
+  ;; a x-www-form-urlencoded string consists of a sequence 
+  ;; of name=value items separated by &'s. 
+  ;; Each of the names and values is separately encoded using this function.
+  
+  ;; to build a complete x-www-form-urlencoded string use 
+  ;; query-to-form-urlencoded.
+  
+  ; first compute if encoding has to be done and what it will
+  ; cost in space
+  (assert (stringp str))
+  
+  (let (extra)
+    (dotimes (i (length str))
+      (let ((code (char-code (char str i))))
+	(let ((this-extra (if* (< code 128)
+			     then (svref *url-form-encode* code)
+			     else 2 ; encode as %xy
+				  )))
+	  (if* this-extra
+	     then (setq extra (+ (or extra 0) this-extra))))))
+    
+    (if* (null extra)
+       then ; great, no encoding necessary
+	    str
+       else ; we have to encode
+	    (let ((ret (make-string (+ (length str) extra))))
+	      (do ((from 0 (1+ from))
+		   (end (length str))
+		   (to 0))
+		  ((>= from end))
+		(let* ((ch (char str from))
+		       (code (char-code ch)))
+		  (if* (eq ch #\space)
+		     then ; space -> +
+			  (setf (schar ret to) #\+)
+			  (incf to)
+		   elseif (eq ch #\newline)
+		     then (dolist (nch '(#\% #\0 #\d #\% #\0 #\a))
+			    (setf (schar ret to) nch)
+			    (incf to))
+		   elseif (or (>= code 128)
+			      (svref *url-form-encode* code))
+		     then ; char -> %xx
+			  (macrolet ((hex-digit-char (num)
+				       ; number to hex char
+				       `(let ((xnum ,num))
+					  (if* (> xnum 9)
+					     then (code-char
+						   (+ #.(char-code #\a)
+						      (- xnum 10)))
+					     else (code-char
+						   (+ #.(char-code #\0)
+						      xnum))))))
+			    (setf (schar ret to) #\%)
+			    (setf (schar ret (+ to 1)) 
+			      (hex-digit-char (logand #xf (ash code -4))))
+			    (setf (schar ret (+ to 2)) 
+			      (hex-digit-char (logand #xf code))))
+			  (incf to 3)
+		     else ; normal char
+			  (setf (schar ret to) ch)
+			  (incf to))))
+	      ret))))
+
+			  
+			  
+	      
+				  
+  
+  
+
+(defun form-urlencoded-to-query (str)
   ;; decode the x-www-form-urlencoded string returning a list
   ;; of conses, the car being the name and the cdr the value, for
-  ;; each form element
+  ;; each form element.  This list is called a query list.
   ;;
   (let ((res nil)
 	(max (length str)))
@@ -215,7 +333,7 @@
       
       (incf i))
     
-    res))
+    (nreverse res)))
 
 (defun un-hex-escape (given spacep)
   ;; convert a string with %xx hex escapes into a string without
@@ -230,8 +348,22 @@
 	((>= i len))
       (let ((ch (schar given i)))
 	(if* (eq ch #\%) 
-	   then (incf count 2)
-		(incf i 2)
+	   then ; check for %0a%0d which is to be converted to #\newline
+		(if* (and (< (+ i 5) len)  ; enough chars left
+			  (do ((xi (+ i 1) (+ xi 1))
+			       (end (+ i 6))
+			       (pattern '(#\0 #\d #\% #\0 #\a)
+					(cdr pattern)))
+			      ((>= xi end) t)
+			    (if* (not (char-equal (schar given xi)
+						  (car pattern)))
+			       then (return nil))))
+		   then ; we are looking at crlf, turn into
+			; newline
+			(incf count 5) ; 5 char shrinkage
+			(incf i 5)
+		   else (incf count 2) 
+			(incf i 2))
 	 elseif (eq ch #\+)
 	   then (setq seenplus t))))
     
@@ -253,9 +385,18 @@
 	    ((>= from len))
 	  (let ((ch (schar given from)))
 	    (if* (eq ch #\%)
-	       then (setf (schar str to)
-		      (code-char (+ (ash (cvt-ch (schar given (1+ from))) 4)
-				    (cvt-ch (schar given (+ 2 from))))))
+	       then (let ((newchar 
+			   (code-char (+ (ash (cvt-ch (schar given (1+ from))) 
+					      4)
+					 (cvt-ch (schar given (+ 2 from)))))))
+		      (if* (and (eq newchar #\linefeed)
+				(> to 0)
+				(eq (schar str (1- to)) #\return))
+			 then ; replace return by newline
+			      (decf to))
+		      
+		      (setf (schar str to) newchar))
+		    
 		    (incf from 2)
 	     elseif (and spacep (eq ch #\+))
 	       then (setf (schar str to) #\space)
