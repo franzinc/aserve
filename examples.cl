@@ -16,7 +16,11 @@
 	       (with-http-body (req ent)
 		 (html
 		  (:head (:title "Welcome to Neo"))
-		  (:body (:b "Sample pages") :br
+		  (:body 
+		   (:i "This server's name is "
+		    (:princ-safe (header-slot-value req "host")))
+		   :p
+		   (:b "Sample pages") :br
 			 ((:a :href "/gc") "Garbage Collector Stats") :br
 			 ((:a :href "/apropos") "Apropos") :br
 			 ((:a :href "/pic") "Sample jpeg") :br

@@ -682,7 +682,7 @@
 ;; this isn't needed while the web server is running, it just
 ;; needs to be run periodically as new mime types are introduced.
 #+ignore
-(defun generate-mime-table (&optional (file "/etc/mimepa.types"))
+(defun generate-mime-table (&optional (file "/etc/mime.types"))
   ;; generate a file type to mime type table based on file type
   (let (res)
     (with-open-file (p file :direction :input)

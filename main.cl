@@ -32,7 +32,7 @@
 (in-package :neo)
 
 
-(defparameter *neo-version* '(1 0 2))
+(defparameter *neo-version* '(1 0 3))
 
 ;;;;;;;  debug support 
 

@@ -1,7 +1,7 @@
 ;; neo
 ;; url publishing
 ;;
-;; $Id: publish.cl,v 1.12 1999/08/16 18:59:53 jkf Exp $
+;; $Id: publish.cl,v 1.13 1999/11/02 18:41:45 jkf Exp $
 ;;
 
 
@@ -626,7 +626,7 @@
 	   (strategy (resp-strategy req))
 	   (post-headers (member :post-headers strategy :test #'eq))
 	   (content)
-	   (chunked-p nil)
+	   (chunked-p (member :chunked strategy :test #'eq))
 	   (code (resp-code req))
 	   (send-headers
 	    (if* post-headers
@@ -638,10 +638,10 @@
       
       (if* send-headers
 	 then (dformat sock "~a ~d  ~a~a"
-			 (protocol-string req)
-			 (response-number code)
-			 (response-desc   code)
-			 *crlf*))
+		       (protocol-string req)
+		       (response-number code)
+		       (response-desc   code)
+		       *crlf*))
       
       (if* (and post-headers
 		(eq time :post)
@@ -672,10 +672,9 @@
 			       (resp-content-type req)
 			       *crlf*))
 
-	      (if* (member :chunked strategy :test #'eq)
+	      (if* chunked-p
 		 then (dformat sock "Transfer-Encoding: Chunked~a"
-			       *crlf*)
-		      (setq chunked-p t))
+			       *crlf*))
 	      
 	      (if* (and (not chunked-p)
 			(resp-content-length req))
@@ -706,19 +705,21 @@
 			 *crlf*))
 	      (dformat sock "~a" *crlf*))
       
-      (if* (and send-headers chunked-p)
-	 then (if* (eq time :pre)
-		 then (force-output sock)
-		      (socket:socket-control sock :output-chunking t)
-		 else ; shut down chunking
-		      (socket:socket-control sock :output-chunking-eof t)
-		      (write-sequence *crlf* sock)))
+      (if* (and send-headers chunked-p (eq time :pre))
+	 then (force-output sock)
+	      (socket:socket-control sock :output-chunking t))
       
       
       ; if we did post-headers then there's a string input
       ; stream to dump out.
       (if* content
-	 then (write-sequence content sock)))))
+	 then (write-sequence content sock))
+      
+      ;; if we're chunking then shut that off
+      (if* (and chunked-p (eq time :post))
+	 then (socket:socket-control sock :output-chunking-eof t)
+	      (write-sequence *crlf* sock))
+      )))
 
       	
       
