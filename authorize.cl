@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: authorize.cl,v 1.4.10.1 2002/01/21 21:58:52 layer Exp $
+;; $Id: authorize.cl,v 1.4.10.2 2002/03/07 16:13:55 layer Exp $
 
 ;; Description:
 ;;   classes and functions for authorizing access to entities
@@ -52,7 +52,7 @@
 	    :initform nil)
    (realm  :accessor password-authorizer-realm
 	   :initarg :realm
-	   :initform "Allegro iServe")
+	   :initform "AllegroServe")
    ))
 
 
@@ -180,7 +180,23 @@
     ))
 
 		
-	      
+;; - function authorization
+
+(defclass function-authorizer (authorizer)
+  ((function :accessor function-authorizer-function
+	     :initarg :function
+	     :initform nil)))
+
+(defmethod authorize ((auth function-authorizer)
+		      (req http-request)
+		      (ent entity))
+  (let ((fun (function-authorizer-function auth)))
+    (if* fun
+       then (funcall fun req ent auth))))
+
+
+
+
 			  
 			  
 			  

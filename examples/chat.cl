@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.1.2.7 2002/01/21 21:58:52 layer Exp $
+;; $Id: chat.cl,v 1.1.2.8 2002/03/07 16:13:55 layer Exp $
 
 ;; Description:
 ;;   aserve chat program
@@ -40,6 +40,8 @@
 
 (defvar *chat-home-package* :user) ; :user for now while debugging
 (defvar *chat-home*)     ; home dir for chat info
+(defvar *chat-home-pics*)     ; home dir for chat pics
+(defvar *chat-picname* 0)
 (defvar *default-count* 10)
 (defvar *default-secs*  10)
 
@@ -136,6 +138,9 @@
 ; of just the owner
 (defvar *show-machine-name-to-all* t)
 
+; force it to be loaded
+;(defparameter *ensure-ef* (find-external-format :utf-8))
+  
 ;; sample building command to create a standalone chat serve
 #|
 (generate-application "allegrochat"
@@ -426,6 +431,16 @@
   
   (setq *chat-home* home)
   
+  (ignore-errors
+   (excl::mkdir (setq *chat-home-pics*
+		  (concatenate 'string *chat-home* "/pics")) #o755))
+  
+  (setq *chat-picname*
+    (logand #xffffff (* 8 (get-universal-time))))
+  
+  (publish-directory :prefix "/chatpics"
+		     :destination *chat-home-pics*
+		     )
   
   (setq *master-controller* nil)
   
@@ -439,7 +454,10 @@
 	  (start-chat-archiver *master-controller*)
 	  )
   
-  (publish :path "/setup-chat" :function 'setup-chat)
+  (publish :path "/setup-chat" :function 'setup-chat 
+	   ; :content-type "text/html; charset=utf-8"
+	   :content-type "text/html"
+	   )
 
   ; setup for reverse dns lookups.  don't do reverse lookups if we
   ; have to use the C library
@@ -452,7 +470,10 @@
 		socket::*dns-mode* :acldns))
   
   
-  (if* port then (net.aserve:start :port port :listeners listeners))
+  (if* port then (net.aserve:start :port port :listeners listeners
+				   ; :external-format (crlf-base-ef :utf-8)
+				   )
+	  )
   )
 
 
@@ -480,38 +501,84 @@
 (defun publish-chat-links ()
 
   ; debugging only.  builds link to the master controller page 
-  (publish :path *quick-return-path* :function 'quick-return-master)
+  (publish :path *quick-return-path* :function 'quick-return-master
+	   ; :content-type "text/html; charset=utf-8"
+	   :content-type "text/html"
+	   )
   
   
   ; post'ed from form in setup-chat
-  (publish :path "/new-controller" :function 'new-controller)
+  (publish :path "/new-controller" :function 'new-controller
+	   ;:content-type "text/html; charset=utf-8"	   
+	   :content-type "text/html"
+	   )
 
-  (publish :path "/controller" :function 'existing-controller)
+  (publish :path "/controller" :function 'existing-controller
+	   ;:content-type "text/html; charset=utf-8"
+	   :content-type "text/html"
+	   )
 
   ; get'ed from the controller page when user asks to create a chat
-  (publish :path "/create-chat" :function 'create-chat)
+  (publish :path "/create-chat" :function 'create-chat
+	   ;:content-type "text/html; charset=utf-8"
+	   :content-type "text/html"
+	   )
 
 
-  (publish :path "/chat"  :function 'chat)
-  (publish :path "/chattop" :function 'chattop)
+  (publish :path "/chat"  :function 'chat
+	   ;:content-type "text/html; charset=utf-8"
+	   :content-type "text/html"
+	   )
+  (publish :path "/chattop" :function 'chattop
+	   ;:content-type "text/html; charset=utf-8"	   
+	   :content-type "text/html"
+	   )
 
-  (publish :path "/chatenter" :function 'chatenter)
-  (publish :path "/chatenter-pic" :function 'chatenter-pic)
-
-  (publish :path "/chatcontrol" :function 'chatcontrol)
+  (publish :path "/chatenter" :function 'chatenter
+	   ;:content-type "text/html; charset=utf-8"	   
+	   :content-type "text/html"
+	   )
   
-  (publish :path "/chatlogin" :function 'chatlogin)
+  (publish :path "/chatenter-pic" :function 'chatenter-pic
+	   ;:content-type "text/html; charset=utf-8"	   
+	   :content-type "text/html"
+	   )
+
+  (publish :path "/chatcontrol" :function 'chatcontrol
+	   ;:content-type "text/html; charset=utf-8"	   
+	   :content-type "text/html"
+	   )
   
-  (publish :path "/chatloginnew" :function 'chatloginnew)
+  (publish :path "/chatlogin" :function 'chatlogin
+	   ;:content-type "text/html; charset=utf-8"	   
+	   :content-type "text/html"
+	   )
+  
+  (publish :path "/chatloginnew" :function 'chatloginnew
+	   ;:content-type "text/html; charset=utf-8"	   
+	   :content-type "text/html"
+	   )
   
   (publish :path "/chatlogincurrent" 
-	   :function 'chat-login-current)
+	   :function 'chat-login-current
+	   ;:content-type "text/html; charset=utf-8"	   
+	   :content-type "text/html"
+	   )
   
-  (publish :path "/chatviewers" :function 'chatviewers)
+  (publish :path "/chatviewers" :function 'chatviewers
+	   ;:content-type "text/html; charset=utf-8"
+	   :content-type "text/html"
+	   )
   
-  (publish :path "/chatmaster" :function 'chatmaster)
+  (publish :path "/chatmaster" :function 'chatmaster
+	   ;:content-type "text/html; charset=utf-8"
+	   :content-type "text/html"
+	   )
   
-  (publish :path "/chattranscript" :function 'chattranscript)
+  (publish :path "/chattranscript" :function 'chattranscript
+	   ;:content-type "text/html; charset=utf-8"
+	   :content-type "text/html"
+	   )
   )
 
 
@@ -532,7 +599,8 @@
 		       (probe-file (archive-filename chat))
 		       (let (did-delete)
 			 (with-open-file (p (archive-filename chat)
-					  :direction :input)
+					  :direction :input
+					  :external-format :octets)
 			   (do ((message (read p nil :eof) (read p nil :eof)))
 			       ((eq message :eof)
 				; use everything is archived we've read
@@ -558,7 +626,9 @@
 				 (let ((messages (chat-messages chat)))
 				   (with-open-file (p (archive-filename chat)
 						    :direction :output
-						    :if-exists :supersede)
+						    :if-exists :supersede
+						    ;:external-format :utf-8
+						    )
 				     (dotimes (i (chat-message-next chat))
 				       (let ((message (svref messages i)))
 					 (if* (message-to message)
@@ -615,7 +685,9 @@
 			
 	(with-open-file (p new-master-file 
 			 :direction :output
-			 :if-exists :supersede)
+			 :if-exists :supersede
+			 ;:external-format :utf-8
+			 )
 	  (with-standard-io-syntax 
 	    (let ((*package* (find-package *chat-home-package*)))
 	      (format p ";;Automatically generated, do not edit~%")
@@ -625,7 +697,13 @@
     
 	; success, so make it the official one
 	(ignore-errors (delete-file master-file))
-	(rename-file new-master-file master-file)))))
+	
+	#-(version>= 6 2 :pre-beta 11)
+	(rename-file new-master-file master-file)
+	
+	#+(version>= 6 2 :pre-beta 11)
+        (rename-file-raw new-master-file master-file)
+	))))
 
 
     
@@ -1312,7 +1390,7 @@
 	      
       (if* (and body (not (equal "" body)))
 	 then ; user added content to the chat
-	      (add-chat-data chat req handle body user to-users purl))
+	      (add-chat-data chat req handle body user to-users purl nil))
       
       (with-http-response (req ent)
 	(with-http-body (req ent)
@@ -1530,12 +1608,14 @@
 			     :type "submit")))))
 		 (:tr
 		  (:td
+		   "The picture file to upload (click Browse):" :br
 		   ((:input :type "file"
 			    :name "thefile"
 			    :size 40
 			    :value "*.jpg")))
 		  (:tr
 		   (:td 
+		    "Add commments about your picture" :br
 		    ((:textarea :name "comments"
 				:tabindex 1
 				:cols 50
@@ -1546,18 +1626,69 @@
 (defparameter *pic-counter* 0)
 
 (defun process-incoming-file (chat req user to-users)
+  (let ((comment "") type upload-pic)
+    (loop
+      (multiple-value-bind (kind name filename content-type)
+	  (parse-multipart-header
+	   (get-multipart-header req))
+	(case kind
+	  (:eof (return))
+	  (:data ; must be contents
+	   (if* (equal name "comments")
+		   then (setq comment (get-all-multipart-data req))))
+	  (:file 
+	   (let ((contents (get-all-multipart-data req :type :binary
+						   :limit 2000000)))
+	     ; see if it ends in .jpg or .gif
+	     (if* (member content-type '("image/jpeg" 
+					 "image/pjpeg"
+					 "image/jpg")
+			  :test #'equal)
+		then (setq type "jpg")
+	      elseif (equal content-type "image/gif")
+		then (setq type "gif")
+		else (format t "uploaded type of ~s is ~s~%" 
+			     filename content-type))
+	     (if* type
+		then (let ((filename (concatenate 'string
+				       (format nil "~x" (incf *chat-picname* 23))
+				       "."
+				       type)))
+		       (with-open-file (p (concatenate 'string
+					    *chat-home-pics*
+					    "/"
+					    filename)
+					:direction :output
+					:if-exists :supersede)
+			 (write-sequence contents p))
+		       (setq upload-pic
+			 `(:span :br ((:img :src ,(format nil "/chatpics/~a" filename))) :br))))))
+	  (t (get-all-multipart-data req :limit 1000)))))
+  
+    (if* (or (and  comment (> (length comment) 0))
+	     upload-pic)
+       then (add-chat-data chat req nil comment user to-users nil
+			   upload-pic))))
+    
+    
+  
+  
+		   
+		     
+#+ignore	
+(defun process-incoming-file (chat req user to-users)
   ;; read the multipart file, publish it
   ;; create the message referencing it, and then add that to the chat.
-  (let (file content-type comment)
+  (let (file content-type comment upload-pic)
     (loop (let ((h (get-multipart-header req)))
 	    (if* (null h) then (return))
 	    (pprint h)(force-output)
 	    (let ((name (cdr
 			 (assoc "name" 
-			       (cddr (assoc :param
-					    (cdr (assoc :content-disposition h :test #'eq))
-					    :test #'eq))
-			       :test #'equal))))
+				(cddr (assoc :param
+					     (cdr (assoc :content-disposition h :test #'eq))
+					     :test #'eq))
+				:test #'equal))))
 	      (if* (equal name "thefile")
 		 then ; the file we're uploading
 		      (setq content-type (cadr (assoc :content-type h :test #'eq)))
@@ -1577,11 +1708,14 @@
 			     :content-type content-type
 			     :items (list (list :binary file)))
 	      
-	      (setq comment
-		(format nil "{<<img src=\"~a\">>}~%~a" picname (or comment "")))))
+	      (setq upload-pic
+		`(:span :br ((:img :src ,picname)) :br))
+	      
+	      (setq comment (or comment ""))))
     
     (if* (and comment (> (length comment) 0))
-       then (add-chat-data chat req nil comment user to-users nil))
+       then (add-chat-data chat req nil comment user to-users nil
+			   upload-pic))
     
 	      
     ))
@@ -1717,7 +1851,7 @@
 
   
     
-(defun add-chat-data (chat req handle body user to-users purl)
+(defun add-chat-data (chat req handle body user to-users purl upload-pic)
   ;; chat is chat object
   ;; req is http request object
   ;; handle is handle typed by user (only matters  if user not logged in)
@@ -1730,6 +1864,8 @@
 	 then (scan-for-http purl))
     (declare (ignore prefix))
 
+    
+    
     (if* (stringp to-users) 
        then ; just one user, turn it into a list
 	    (setq to-users (list to-users)))
@@ -1740,6 +1876,9 @@
 		      (eq :img (caar link)))
 	       thenret  ; valid image url
 	       else (setq link nil)))
+    
+    (if* (null link)
+       then (setq link upload-pic))
     
     (let* ((cvted-body (html-chk-string-to-lhtml body))
 	   (ipaddr (socket:remote-host
@@ -2750,6 +2889,7 @@
 			       :direction :output
 			       :if-exists :append
 			       :if-does-not-exist :create
+			       ;:external-foramt :utf-8
 			       )
 		(do ((i start-to-save (1+ i)))
 		    ((>= i message-next))
@@ -2806,7 +2946,9 @@
 	 then (error "can't find chat with uc-string ~s" uc-string))
       
       (with-open-file (*html-stream* filename :direction :output
-		       :if-exists :supersede)
+		       :if-exists :supersede
+		       ;:external-format :utf-8
+		       )
 	(html 
 	 (:head
 	  (:title "Transcript of "

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.6.6.7 2002/01/21 21:58:52 layer Exp $
+;; $Id: t-aserve.cl,v 1.6.6.8 2002/03/07 16:13:56 layer Exp $
 
 ;; Description:
 ;;   test iserve
@@ -499,7 +499,23 @@
 			  (cdr (assoc :transfer-encoding headers 
 				      :test #'eq))
 			  :test #'equalp))
-	    (test (cadr pair) body :test #'equal)))))))
+	    (test (cadr pair) body :test #'equal)))))
+    
+    
+    ;; test whether we can read urls with space in them
+    (publish :path "/foo bar baz"
+	     :content-type "text/plain"
+	     :function
+	     #'(lambda (req ent)
+		 (with-http-response (req ent)
+		       (with-http-body (req ent)
+			 (write-sequence "foo" *html-stream*)))))
+    (multiple-value-bind (body code)
+	(x-do-http-request (format nil "~a/foo%20bar%20baz" prefix-local))
+      (test 200 code)
+      (test "foo" body :test #'equal))
+			   
+    ))
 
 
 (defun test-authorization (port)
@@ -541,12 +557,12 @@
     ; good password
     (test 200
 	  (values2 (x-do-http-request (format nil "~a/secret" prefix-local)
-		    :basic-authorization '("foo" . "bar"))))
+				      :basic-authorization '("foo" . "bar"))))
     
     ; bad password
     (test 401
 	  (values2 (x-do-http-request (format nil "~a/secret" prefix-local)
-		    :basic-authorization '("xxfoo" . "bar"))))
+				      :basic-authorization '("xxfoo" . "bar"))))
     
 
 
@@ -555,45 +571,45 @@
     
     (publish :path "/local-secret"
 	     ;; this only "works" if we reference via localhost
-	 :content-type "text/html"
-	 :function
-	 #'(lambda (req ent)
-	     (let ((net-address (ash (socket:remote-host
-				      (request-socket req))
-				     -24)))
-	       (if* (equal net-address 127)
-		  then (with-http-response (req ent)
-			 (with-http-body (req ent)
-			   (html (:head (:title "Secret page"))
-				 (:body (:b "Congratulations. ")
-					"You are on the local network"))))
-		  else (failed-request req)))))
+	     :content-type "text/html"
+	     :function
+	     #'(lambda (req ent)
+		 (let ((net-address (ash (socket:remote-host
+					  (request-socket req))
+					 -24)))
+		   (if* (equal net-address 127)
+		      then (with-http-response (req ent)
+			     (with-http-body (req ent)
+			       (html (:head (:title "Secret page"))
+				     (:body (:b "Congratulations. ")
+					    "You are on the local network"))))
+		      else (failed-request req)))))
     
     (test 200
 	  (values2 (x-do-http-request (format nil "~a/local-secret"
-					   prefix-local))))
+					      prefix-local))))
     
     (test 404
 	  (values2 (x-do-http-request (format nil "~a/local-secret"
-					   prefix-dns))))
+					      prefix-dns))))
     
     
     ;;
     ;; password authorizer class
     ;;
     (publish :path "/secret-auth"
-	 :content-type "text/html"
-	 :authorizer (make-instance 'password-authorizer
-		       :allowed '(("foo2" . "bar2")
-				  ("foo3" . "bar3")
-				  )
-		       :realm  "SecretAuth")
-	 :function
-	 #'(lambda (req ent)
-	     (with-http-response (req ent)
-	       (with-http-body (req ent)
-		 (html (:head (:title "Secret page"))
-		       (:body "You made it to the secret page"))))))
+	     :content-type "text/html"
+	     :authorizer (make-instance 'password-authorizer
+			   :allowed '(("foo2" . "bar2")
+				      ("foo3" . "bar3")
+				      )
+			   :realm  "SecretAuth")
+	     :function
+	     #'(lambda (req ent)
+		 (with-http-response (req ent)
+		   (with-http-body (req ent)
+		     (html (:head (:title "Secret page"))
+			   (:body "You made it to the secret page"))))))
     
     (multiple-value-bind (body ccode headers)
 	(x-do-http-request (format nil "~a/secret-auth" prefix-local))
@@ -605,52 +621,52 @@
     
     (test 200
 	  (values2 (x-do-http-request (format nil "~a/secret-auth" prefix-local)
-		    :basic-authorization '("foo2" . "bar2"))))
+				      :basic-authorization '("foo2" . "bar2"))))
     
     (test 200
 	  (values2 (x-do-http-request (format nil "~a/secret-auth" prefix-local)
-		    :basic-authorization '("foo3" . "bar3"))))
+				      :basic-authorization '("foo3" . "bar3"))))
     
     (test 401
 	  (values2 (x-do-http-request (format nil "~a/secret-auth" prefix-local)
-		    :basic-authorization '("foo4" . "bar4"))))
+				      :basic-authorization '("foo4" . "bar4"))))
     
 
     ;;
     ;; location authorizers
     ;; 
     (let ((loca (make-instance 'location-authorizer
-			       :patterns nil)))
+		  :patterns nil)))
       (publish :path "/secret-loc-auth"
-	 :content-type "text/html"
-	 :authorizer loca
-	 :function
-	 #'(lambda (req ent)
-	     (with-http-response (req ent)
-	       (with-http-body (req ent)
-		 (html (:head (:title "Secret page"))
-		       (:body "You made it to the secret page"))))))
+	       :content-type "text/html"
+	       :authorizer loca
+	       :function
+	       #'(lambda (req ent)
+		   (with-http-response (req ent)
+		     (with-http-body (req ent)
+		       (html (:head (:title "Secret page"))
+			     (:body "You made it to the secret page"))))))
       
       ;; with a nil pattern list this should accept connections
       ;; from anywhere
       
       (test 200
-	  (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
-					   prefix-local))))
+	    (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
+						prefix-local))))
       (test 200
-	  (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
-					   prefix-dns))))
+	    (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
+						prefix-dns))))
       
       ; now deny all
       (setf (location-authorizer-patterns loca) '(:deny)) 
       
       (test 404
-	  (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
-					   prefix-local))))
+	    (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
+						prefix-local))))
       
       (test 404
-	  (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
-					   prefix-dns))))
+	    (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
+						prefix-dns))))
       
       
       ;; accept from localhost only
@@ -658,12 +674,12 @@
 	'((:accept "127.0" 8)
 	  :deny))
       (test 200
-	  (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
-					   prefix-local))))
+	    (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
+						prefix-local))))
       
       (test 404
-	  (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
-					   prefix-dns))))
+	    (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
+						prefix-dns))))
       
       ;; accept from dns name only 
       
@@ -672,12 +688,12 @@
 	  :deny))
       
       (test 404
-	  (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
-					   prefix-local))))
+	    (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
+						prefix-local))))
       
       (test 200
-	  (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
-					   prefix-dns))))
+	    (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
+						prefix-dns))))
       
       
       ;; deny dns and accept all others
@@ -686,12 +702,12 @@
 	  :accept))
       
       (test 200
-	  (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
-					   prefix-local))))
+	    (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
+						prefix-local))))
       
       (test 404
-	  (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
-					   prefix-dns))))
+	    (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
+						prefix-dns))))
       
       
       ;; deny localhost and accept all others
@@ -700,20 +716,49 @@
 	  :accept))
       
       (test 404
-	  (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
-					   prefix-local))))
+	    (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
+						prefix-local))))
       
       (test 200
-	  (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
-					   prefix-dns))))
+	    (values2 (x-do-http-request (format nil "~a/secret-loc-auth"
+						prefix-dns))))
       
     
-    
-    
-    
-    
-    
-      )))
+
+      ;; function authorizer 
+      (let ((funa (make-instance 'function-authorizer
+		    :function #'(lambda (req ent auth)
+				  (declare (ignore ent auth))
+				  ;; authorized if the uri 
+				  ;; has a 'foo' in it
+				  (if* (search "foo" 
+					       (net.uri:uri-path
+						(request-uri req)))
+				     then t
+				     else :deny)))))
+	(publish :path "/func-auth-foo"
+		 :content-type "text/html"
+		 :authorizer funa
+		 :function #'(lambda (req ent)
+			       (with-http-response (req ent)
+				 (with-http-body (req ent)
+				   (html "foo")))))
+	(publish :path "/func-auth-foo"
+		 :content-type "text/html"
+		 :authorizer funa
+		 :function #'(lambda (req ent)
+			       (with-http-response (req ent)
+				 (with-http-body (req ent)
+				   (html "foo")))))
+	
+	(test 200 (values2 
+		   (x-do-http-request (format nil "~a/func-auth-foo" 
+					      prefix-local))))
+	(test 404 (values2 
+		   (x-do-http-request (format nil "~a/func-auth-bar" 
+					      prefix-local))))
+	
+	))))
 
 
 (defun test-encoding ()

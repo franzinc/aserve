@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.8.6.4 2001/10/22 16:12:57 layer Exp $
+;; $Id: htmlgen.cl,v 1.8.6.5 2002/03/07 16:13:55 layer Exp $
 
 ;; Description:
 ;;   html generator
@@ -76,9 +76,9 @@
 
 (defvar *html-stream* nil) ; where the output goes
 
-(defmacro html (&rest forms)
+(defmacro html (&rest forms &environment env)
   ;; just emit html to the curfent stream
-  (process-html-forms forms))
+  (process-html-forms forms env))
 
 (defmacro html-out-stream-check (stream)
   ;; ensure that a real stream is passed to this function
@@ -95,7 +95,7 @@
 
 
 
-(defun process-html-forms (forms)
+(defun process-html-forms (forms env)
   (let (res)
     (flet ((do-ent (ent args argsp body)
 	     ;; ent is an html-process object associated with the 
@@ -122,7 +122,7 @@
 			       nil
 			  else ; some args
 			       (push `(,(html-process-macro ent) ,args
-								 ,(process-html-forms body))
+								 ,(process-html-forms body env))
 				     res)
 			       nil)))))
 				 
@@ -131,6 +131,8 @@
       (do* ((xforms forms (cdr xforms))
 	    (form (car xforms) (car xforms)))
 	  ((null xforms))
+
+	(setq form (macroexpand form env))
 	
 	(if* (atom form)
 	   then (if* (keywordp form)

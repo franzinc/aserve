@@ -8,7 +8,7 @@
 <body>
 
 <h1 align="center">AllegroServe - A Web Application Server<br>
-<small><small><small>version <font face="Courier New">1.2.21</font></small></small></small></h1>
+<small><small><small>version <font face="Courier New">1.2.23</font></small></small></small></h1>
 
 <p align="left"><strong><small>copyright(c) 2000-2001. Franz Inc</small></strong></p>
 
@@ -62,6 +62,7 @@
 &nbsp; <a href="#f-set-basic-authorization">set-basic-authorization</a><br>
 &nbsp; <a href="#c-password-authorizer">password-authorizer</a><br>
 &nbsp; <a href="#c-location-authorizer">location-authorizer</a></font><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <a href="#c-function-authorizer"><font face="Courier New">function-authorizer</font></a><br>
 <a href="#cookies">Cookies</a><br>
 <font face="Courier New">&nbsp; <a href="#f-set-cookie-header">set-cookie-header</a><br>
 &nbsp; <a href="#f-get-cookie-values">get-cookie-values</a></font><br>
@@ -288,9 +289,13 @@ determine which entity will handle the request are
 
 <ul>
   <li>the <strong>path</strong> of the url.&nbsp; This is the part of the url after the host
-    name and before the query string (if any).&nbsp; For example in the url&nbsp; <a
-    href="http://bar.com:8030/files/foo?xx=3&amp;yy=4">http://bar.com:8030/files/foo?xx=3&amp;yy=4</a>
-    the part we call the path&nbsp; is just <strong>/files/foo.</strong></li>
+    name and before the query string (if any).&nbsp; For example in the url&nbsp; <font
+    color="#0080FF"><u><strong>http://bar.com:8030/files/foo?xx=3&amp;yy=4</strong></u></font>
+    the part we call the path&nbsp; is just <strong><font color="#0080FF">/files/foo</font>.<br>
+    If </strong>the path contains escaped characters (e.g. /foo%20bar) then we replace the %xx
+    in the path with the actual character before processing the request.&nbsp; Thus if you're
+    publishing an entity to handle a uri such as <font color="#0080FF"><u><strong>http://www.machine.com/foo%20bar</strong></u></font>
+    you should publish the path <strong>&quot;foo bar&quot;</strong> and <em>not</em> <strong>&quot;foo%20bar&quot;</strong>.</li>
   <li>the <strong>host</strong> to which the request is directed.&nbsp;&nbsp; This is not
     necessarily the host that is receiving the request due to virtual hosts and proxy
     servers.&nbsp; This value comes from the <strong>Host:</strong> header line, if one is
@@ -619,8 +624,11 @@ files<br>
 to subdirectories<br>
 ; publish html and cgi files, but not those beginning with a period<br>
 (:files :allow (&quot;\\.html$&quot; &quot;\\.cgi$&quot;) :deny (&quot;^\\.&quot;)) <br>
-(:mime :types ((&quot;text/jil&quot; &quot;jil&quot; &quot;jlc&quot;) (&quot;text/c&quot;
-&quot;c&quot; &quot;cc&quot;)))</font></p>
+; specify mime type for non-standard file extensions.&nbsp; Also<br>
+; specify that a file named exactly ChangeLog should be given<br>
+; mime type &quot;text/plain&quot;<br>
+(:mime :types ((&quot;text/jil&quot; &quot;jil&quot; &quot;jlc&quot;)
+(&quot;text/plain&quot; &quot;cl&quot; (&quot;ChangeLog&quot;))))</font></p>
 
 <p>&nbsp;</p>
 
@@ -1059,7 +1067,7 @@ ent program &amp;key path-info path-translated<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 script-name query-string <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-auth-type timeout error-output)</strong></font></p>
+auth-type timeout error-output env)</strong></font></p>
 
 <p>In response to an http request, this runs <strong>program</strong> which must be a
 string naming an exectuable program or script followed optionally by command line
@@ -1074,7 +1082,15 @@ automatically.&nbsp; <strong>path-info</strong> specifies the PATH_INFO environm
 variable, and similarly for<strong> path-translated, script-name, query-string</strong>
 and <strong>auth-type.</strong>&nbsp;&nbsp; If <strong>query-string</strong> is <em>not</em>
 given and the <strong>uri</strong> that invoked this request contains a query part then
-that query part is passed in the QUERY_STRING environment variable.</p>
+that query part is passed in the QUERY_STRING environment variable.&nbsp;&nbsp; If <strong>script-name</strong>
+is not given then its value defaults to the path of the uri of the request.&nbsp;&nbsp; If
+you wish to add or modify the environment variables set for the cgi process you can
+specify a value for <strong>env.&nbsp; </strong>The value of <strong>env</strong> should
+be a list of conses, the car of each cons containing the environment variable name (a
+string) and the cdr of each cons containing the environment variable value (a
+string).&nbsp;&nbsp; <strong>env</strong> is checked after all the standard environment
+variables are computed and the value given in <strong>env</strong> will override the value
+computed automatically.</p>
 
 <p>cgi programs send their result to standard output (file descriptor 1 on Unix).&nbsp; If
 they encounter problems they often send informative messages to standard error (file
@@ -1468,9 +1484,9 @@ and the password is <strong>bar</strong>.</p>
 
 <p>If an entity has an associated <strong>authorizer</strong> object, then before that
 entity's response function is run the authorizer is tested to see if&nbsp; it will accept
-or deny the current request.&nbsp;&nbsp;&nbsp; AllegroServe supplies two interesting
-subclasses of <strong>authorizer</strong> and users are free to add their own subclasses
-to support their own authorization needs.&nbsp;&nbsp; </p>
+or deny the current request.&nbsp;&nbsp;&nbsp; AllegroServe supplies three &nbsp;
+interesting subclasses of <strong>authorizer</strong> and users are free to add their own
+subclasses to support their own authorization needs.&nbsp;&nbsp; </p>
 
 <p>The protocol followed during authorization is this: 
 
@@ -1617,6 +1633,26 @@ so that anything not matching the preceding patterns will be denied.</p>
                        &quot;You made it to the secret page&quot;))))))
 
 </pre>
+
+<p><strong><a name="c-function-authorizer"></a>function-authorizer </strong>&nbsp; [class]</p>
+
+<p>This authorizer contains a function provided by the user which is used to test if the
+request is authorized.&nbsp;&nbsp; The function take three arguments, the http-request
+object, the entity and the authorizer object.&nbsp;&nbsp; It must return one of the four
+value that the <strong>authorize</strong> function returns, namely <strong>t, nil :deny</strong>
+or <strong>:done.</strong></p>
+
+<p>A function-authorizer is created as follows</p>
+
+<pre>(make-instance 'function-authorizer
+    :function #'(lambda (req ent auth)
+                          t  ; always authorize
+                 ))</pre>
+
+<p>The function slot can be set using (setf function-authorizer-function) if you wish to
+change it after the authorizer has been created.</p>
+
+<p>&nbsp;</p>
 
 <h2><a name="cookies"></a>Cookies</h2>
 

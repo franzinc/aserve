@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.21.2.6 2002/01/21 21:58:52 layer Exp $
+;; $Id: client.cl,v 1.21.2.7 2002/03/07 16:13:55 layer Exp $
 
 ;; Description:
 ;;   http client code.
@@ -398,6 +398,7 @@ or \"foo.com:8000\", not ~s" proxy))
 					     :remote-port pport
 					     :format :bivalent
 					     :type net.aserve::*socket-stream-type*
+					     :nodelay t
 					     )))
        else (setq sock 
 	      (socket:make-socket :remote-host host
@@ -405,6 +406,7 @@ or \"foo.com:8000\", not ~s" proxy))
 				  :format :bivalent
 				  :type 
 				  net.aserve::*socket-stream-type*
+				  :nodelay t
 					     
 				  ))
 	    (if* ssl

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.10.6.7 2002/01/21 21:58:52 layer Exp $
+;; $Id: examples.cl,v 1.10.6.8 2002/03/07 16:13:55 layer Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -832,7 +832,11 @@
 #+unix
 (publish :path "/cgi0" :function
 	 #'(lambda (req ent)
-	     (net.aserve::run-cgi-program req ent "aserve/examples/cgitest.sh")))
+	     (net.aserve::run-cgi-program req ent 
+					  "aserve/examples/cgitest.sh"
+					  :env '(("HTTP_CONNECTION" 
+						      . "hack replaced value")
+						     ("NewHead" . "NewVal")))))
 
 #+unix
 (publish :path "/cgi1" :function

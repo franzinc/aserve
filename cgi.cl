@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: cgi.cl,v 1.5.4.2 2002/01/21 21:58:52 layer Exp $
+;; $Id: cgi.cl,v 1.5.4.3 2002/03/07 16:13:55 layer Exp $
 
 ;; Description:
 ;;   common gateway interface (running external programs)
@@ -39,11 +39,12 @@
 			&key
 			path-info
 			path-translated
-			script-name
+			(script-name (net.uri:uri-path (request-uri req)))
 			(query-string nil query-string-p)
 			auth-type
 			(timeout 200)
 			error-output
+			env
 			)
   ;; program is a string naming a external command to run.
   ;; invoke the program after setting all of the environment variables
@@ -155,6 +156,18 @@
 					       (string (car head)))))
 			  (cdr head))
 		    envs)))
+
+    (dolist (header env)
+      (if* (not (and (consp header)
+		     (stringp (car header))
+		     (stringp (cdr header))))
+	 then (error "bad form for environment value: ~s" header))
+      (let ((ent (assoc (car header) envs :test #'equal)))
+	(if* ent
+	   then ; replace value with user specified value
+		(setf (cdr ent) (cdr header))
+	   else ; add new value
+		(push header envs))))
     
     ;; now to invoke the program
     ;; this requires acl6.1 on unix since this is the first version
