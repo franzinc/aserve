@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.85 2000/11/06 21:25:21 layer Exp $
+;; $Id: main.cl,v 1.86 2000/12/13 15:24:25 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -346,7 +346,15 @@
    (accept-thread   ;; thread accepting connetions and dispatching
     :initform nil
     :accessor wserver-accept-thread)
-     
+
+   (link-scan-thread  ;; thread scanning cached entries for links
+    :initform nil
+    :accessor wserver-link-scan-thread)
+   
+   (uri-scan-threads  ;; list of uri scanning processes
+    :initform nil
+    :accessor wserver-uri-scan-threads)
+   
    (invalid-request
     ;; entity to invoke given a request that can't be
     ;; satisfied
