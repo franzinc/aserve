@@ -1,3 +1,8 @@
+2003-01-10  John Foderaro  <jkf@tiger.franz.com>
+1.2.25
+	* publish.cl (get-cookie-values): handle case of a cookie parameter
+	not having value, i.e  name2;   Pretend it was  name2=;
+
 2003-01-07  John Foderaro  <jkf@tiger.franz.com>
 
 	* client.cl - when sending character data obey external formats
