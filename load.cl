@@ -4,8 +4,11 @@
 ;(require :defftype)
 
 (dolist (file '("../htmlgen/htmlgen"
+		"macs"
 		"neo"
+		"parse"
 		"publish"
+		"log"
 		"examples"))
   (case *loadswitch*
     (:compile-if-needed (compile-file-if-needed (format nil "~a.cl" file)))

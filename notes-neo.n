@@ -186,7 +186,7 @@ form:
 
 ==========================
 
-the web server loop
+the web server loop   [updated below]
 
 connection is detected
 
@@ -229,8 +229,6 @@ there are four common commands we'll have to deal with
    the data appears in the entity body using url encoding.
 
 
-=========
-
 general flow:
     we need two modes: testing and production:
         In testing mode we only have one process accepting connections
@@ -245,10 +243,92 @@ general flow:
         continue to handle that connection until it closes off or 
         fails to give a new request for N seconds.
 
-            
+	   
+
+==================
+webserver loop  6/14/99
+
+
+connection with web server
+
+
+We read the command (first line) and the headers and stop the
+reading at the point the entity data (if any) would occur.
+The header may remain unparsed at this point.
+If the protocol is 0.9 then there are no headers.
+
+We look for a handler for this command and this url.
+
+If no handler then we send back an error message and close the socket.
+
+If a handler exists then it is called.
+
+The handler is responsible for retrieving the entity data and 
+generating a response to the stream.
+
+The handler should generate the header first and then the data
+and it should signify when the header is done so that if we
+were just given a head command it could break off sending data
+back once the header was sent.
+
+
+-- handlers
+    we want to make the typical process work as efficiently as
+    possible and with the fewest switches to set... yet make
+    it possible to extend and change the behavior too.
+
+    thus we'll have diffenet macros to support the various http commands
+    
+
+ standard file publishing
+     - only supports :get and :head commands  and verifies that no
+       illegal command is given
+     - can do preloading of the file for fast response  
+     - can do caching of the file (with some timeout to release it)
+     - can auto-determine the mime type
+     - handles head requests automatically
+     - handles if-modified requests automatically
+     - handles range requests automatically
+    
 
 
 
+with-http-response2 ((req ent 
+			   &key (check-modified t)
+                                (timeout 60)
+				) 
+                      &rest body)
+    
+   req is the request object.
+   ent is the entity object describing the object we are
+   returning.
+
+   Surrounds code to respond to an http request
+   if :check-modified it true then if this is a conditional
+   get and if it should be short circuited based on the information
+   in ent then do that right now without running the body.
+
+   timeout sets the max amount of time we will take to respond
+   to this request.  If it takes too long we will simply close
+   off the connection.
+
+   This also sets header value that it can based on the
+   info in ent.
+
+   The code inside the body should set all the header values
+   and then invoke with-http-body
+
+
+with-http-body ((req ent) &rest body)
+
+    The headers for the response are sent out.
+
+    If this is a head request then nothing else is sent
+    else the body is run and it is responsible for sending out
+    the entity body.
+
+
+    
 
 
 

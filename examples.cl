@@ -2,7 +2,7 @@
 (defpackage :neoe ;; neo example
   (:use :common-lisp :excl :htmlgen :neo))
 
-(in-package :neoe)
+(in-package :neo)
 
 
 (publish :url "/" 
@@ -147,3 +147,17 @@
 	      :file "fresh.jpg"
 	      :mime-type "image/jpeg"
 	      :preload t)
+
+(publish-file :url "/foo"
+	      :file "foo.txt"
+	      :mime-type "text/plain"
+	      :preload t)
+
+
+
+
+
+
+
+
+;;;;;;; examples of where I'd like neo to go
