@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.43 2000/06/08 16:43:58 jkf Exp $
+;; $Id: main.cl,v 1.44 2000/06/10 19:06:41 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1733,24 +1733,25 @@
 (defun universal-time-to-date (ut)
   ;; convert a lisp universal time to rfc 1123 date
   ;;
-  (multiple-value-bind
-      (sec min hour date month year day-of-week dsp time-zone)
-      (decode-universal-time ut 0)
-    (declare (ignore time-zone dsp))
-    (format nil "~a, ~2,'0d ~a ~d ~2,'0d:~2,'0d:~2,'0d GMT"
-	    (svref
-	     '#("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun")
-	     day-of-week)
-	    date
-	    (svref
-	     '#(nil "Jan" "Feb" "Mar" "Apr" "May" "Jun"
-		"Jul" "Aug" "Sep" "Oct" "Nov" "Dec")
-	     month
-	     )
-	    year
-	    hour
-	    min
-	    sec)))
+  (let ((*print-pretty* nil))
+    (multiple-value-bind
+	(sec min hour date month year day-of-week dsp time-zone)
+	(decode-universal-time ut 0)
+      (declare (ignore time-zone dsp))
+      (format nil "~a, ~2,'0d ~a ~d ~2,'0d:~2,'0d:~2,'0d GMT"
+	      (svref
+	       '#("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun")
+	       day-of-week)
+	      date
+	      (svref
+	       '#(nil "Jan" "Feb" "Mar" "Apr" "May" "Jun"
+		  "Jul" "Aug" "Sep" "Oct" "Nov" "Dec")
+	       month
+	       )
+	      year
+	      hour
+	      min
+	      sec))))
 
 	    
 

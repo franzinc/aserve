@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: log.cl,v 1.9 2000/05/16 14:01:25 jkf Exp $
+;; $Id: log.cl,v 1.10 2000/06/10 19:06:41 jkf Exp $
 
 ;; Description:
 ;;   iserve's logging
@@ -34,6 +34,7 @@
 
 (in-package :net.aserve)
 
+(defvar *enable-logging* t) ; to turn on/off the standard logging method
 
 (defun logmess (message)
   (multiple-value-bind (csec cmin chour cday cmonth cyear)
@@ -58,24 +59,25 @@
 
 (defmethod log-request ((req http-request))
   ;; after the request has been processed, write out log line
-  (let ((ipaddr (socket:remote-host (request-socket req)))
-	(time   (request-reply-date req))
-	(code   (let ((obj (request-reply-code req)))
-		  (if* obj
-		     then (response-number obj)
-		     else 999)))
-	(length  (request-reply-content-length req))
+  (if* *enable-logging*
+     then (let ((ipaddr (socket:remote-host (request-socket req)))
+		(time   (request-reply-date req))
+		(code   (let ((obj (request-reply-code req)))
+			  (if* obj
+			     then (response-number obj)
+			     else 999)))
+		(length  (request-reply-content-length req))
 	
-	(stream (wserver-log-stream
-		 (request-wserver req))))
+		(stream (wserver-log-stream
+			 (request-wserver req))))
     
-    (format stream
-	    "~a - - [~a] ~s ~s ~s~%"
-	    (socket:ipaddr-to-dotted ipaddr)
-	    (universal-time-to-date time)
-	    (request-raw-request req)
-	    code
-	    (or length -1))))
+	    (format stream
+		    "~a - - [~a] ~s ~s ~s~%"
+		    (socket:ipaddr-to-dotted ipaddr)
+		    (universal-time-to-date time)
+		    (request-raw-request req)
+		    code
+		    (or length -1)))))
 
 	    	
     

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.31 2000/05/17 14:54:53 jkf Exp $
+;; $Id: publish.cl,v 1.32 2000/06/10 19:06:41 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -1157,7 +1157,8 @@
 	    (if* post-headers
 	       then (eq time :post)
 	       else (eq time :pre))
-	    ))
+	    )
+	   (*print-pretty* nil))
       
       
       
