@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.7 2000/10/19 16:37:47 jkf Exp $
+;; $Id: chat.cl,v 1.8 2000/10/19 21:37:39 jkf Exp $
 
 ;; Description:
 ;;   aserve chat program
@@ -1510,15 +1510,15 @@
 		 :target "_top"
 		 :method "POST")
 	  ((:input :type "text" :size "15" :name "handle")) "Your Handle" :br
-	  ((:input :type "text" :size "15" :name "password")) "Your password" :br
+	  ((:input :type "password" :size "15" :name "password")) "Your password" :br
 	  ((:input :type "submit" :name "submit" :value "login")))
 	 :hr
 	 (:h1 "Create a new account and login")
 	 ((:form :action (format nil "chatloginnew?~a" qstring)
 		 :method "POST")
 	  ((:input :type "text" :size "15" :name "handle")) "Your Handle" :br
-	  ((:input :type "text" :size "15" :name "password")) "Your password" :br
-	  ((:input :type "text" :size "15" :name "password2")) "Type your password again" :br
+	  ((:input :type "password" :size "15" :name "password")) "Your password" :br
+	  ((:input :type "password" :size "15" :name "password2")) "Type your password again" :br
 	  ((:input :type "submit" :name "submit" :value "New Account")))))))))
 
 

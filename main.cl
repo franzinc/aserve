@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.78 2000/10/15 15:18:45 jkf Exp $
+;; $Id: main.cl,v 1.79 2000/10/19 21:37:39 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -131,7 +131,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 1 31))
+(defparameter *aserve-version* '(1 1 32))
 
 
 (provide :aserve)
@@ -812,7 +812,7 @@ by keyword symbols and not by strings"
 
 				    
 			      
-(defun start (&key (port 80) 
+(defun start (&key (port 80 port-p) 
 		   (listeners 5)
 		   (chunking t)
 		   (keep-alive t)
@@ -823,7 +823,8 @@ by keyword symbols and not by strings"
 		   proxy
 		   cache       ; enable proxy cache
 		   debug-stream  ; stream to which to send debug messages
-		   (accept-hook nil ah-p) ; fcn of one arg, socket
+		   accept-hook
+		   ssl		 ; enable ssl
 		   )
   ;; -exported-
   ;;
@@ -842,8 +843,24 @@ by keyword symbols and not by strings"
   
   (if* (eq server :new)
      then (setq server (make-instance 'wserver)))
-  
-  (if* ah-p
+
+  (if* ssl
+     then (if* (pathnamep ssl)
+	     then (setq ssl (namestring ssl)))
+	  
+	  (if* (not (stringp ssl))
+	     then (error "The ssl argument should be a string or pathname holding the filename of the certificate and private key file"))
+	  
+	  (setq accept-hook 
+	    #'(lambda (socket)
+		(funcall 'socket::make-ssl-server-stream socket
+			 :certificate ssl)))
+	  (setq chunking nil) ; doesn't work well through ssl
+	  (if* (not port-p)
+	     then ; ssl defaults to port 443
+		  (setq port 443)))
+	    
+  (if* accept-hook
      then (setf (wserver-accept-hook server) accept-hook))
   
   
@@ -1938,7 +1955,9 @@ in get-multipart-sequence"))
 				   :external-format external-format)))))
 	      
       (if* post
-	 then (if* (eq (request-method req) :post)
+	 then (if* (and (eq (request-method req) :post)
+			(equal (header-slot-value req :content-type)
+			    "application/x-www-form-urlencoded"))
 		 then (setf res
 			(append res
 				(form-urlencoded-to-query

@@ -1,3 +1,14 @@
+2000-10-19  John Foderaro  <jkf@tiger.franz.com>
+1.1.32
+	* add ssl arguments to net.aserve.start and
+	  net.aserve.client:do-http-request so that a secure server
+	  can be started and secure http requests can be made.
+	  Make the aserve test suite test run though the tests using ssl.
+	  Note: the ssl module is only present in certain acl6 distributoins.
+	
+	* add examples/puzzle.cl  - a demo featuring the use of international
+	  characters in acl6.
+	
 2000-10-15  John Foderaro  <jkf@tiger.franz.com>
 1.1.31
 	* support caching requests with cookies
