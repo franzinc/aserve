@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.19 2000/10/10 15:46:14 jkf Exp $
+;; $Id: proxy.cl,v 1.20 2000/10/12 05:01:18 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -42,16 +42,13 @@
   table		; hash table mapping to pcache-ent objects
   disk-caches   ; list of pcache-disk items
   
-  ; memory cache statistics
-  (items  0)	 ; total number of objects cached (on the mru/lru list)
-  (bytes  0)	 ; total number of bytes of real data cached
-  (blocks 0) ; total number of blocks in memory
+
+  high-water    ; when blocks in cache gets above this start flushing to disk
+  low-water     ; when blocks in cache get below this stop flushing
   
   (dead-items 0) ; total number of objects on the dead-ent list
-  
-  ; double linked by next and prev
-  mru-ent	; most recently used  pcache-ent dummy block
-  lru-ent	; least recently used pcache-ent dummy block
+
+  queueobj	; queue object holding in-memory cache objects
   
   dead-ent	; linked list of dead pcache-ents, linked by next field only
   
@@ -96,10 +93,12 @@
   free-blocks   ; number of blocks remaining
   free-list ; list of (start . end) blocks that are free
 
+  high-water  ; when free blocks is less than this start flushing
+  low-water   ; when free blocks is more than this stop flushing
+  
   (lock (mp:make-process-lock :name "disk pcache"))
   ; doubly linked list of pcache-ents in this cache
-  mru-ent
-  lru-ent
+  queueobj
   )
 
 
@@ -144,14 +143,26 @@
   ; if cached to the disk this tells where
   disk-location
   pcache-disk
+  loading-flag  ; true when we are loading in from the disk
   
   ; linked list of pcache-ents
+  queueobj  ; queue  object we're stored in
   prev
   next
   
   )
 
 
+(defstruct queueobj 
+  (items 0)  ; number of items in the queue (aside from dummy ones)
+  (bytes 0)  ; number of data bytes cached
+  (blocks 0) ; number of buffer blocks
+  mru  ; points to dummy pcache-ent at the head of the queue
+  lru  ; points to dummy pcache-ent at the tail of the quee
+  
+  )
+  
+  
 
 
 (defclass locator-proxy (locator)
@@ -617,7 +628,7 @@
     
     (setq bytesleft (or size len))
     (loop
-      (let ((retv (read-sequence block sock 
+      (let ((retv (rational-read-sequence block sock 
 				:start start
 				:end (min len (+ start bytesleft)))))
 	(if* (<= retv start)
@@ -695,29 +706,31 @@
   (let (pcache)
     (setf (wserver-pcache server)
       (setq pcache (make-pcache 
-		    :table (make-hash-table :test #'equal))))
+		    :table (make-hash-table :test #'equal)
+		    :queueobj (make-and-init-queueobj)
+		    :high-water (truncate 30000 *header-block-size*)
+		    :low-water  (truncate 10000 *header-block-size*)
+		    )))
     
-    ; create initial link entries
-    (let ((mru (make-pcache-ent))
-	  (lru (make-pcache-ent)))
-      (setf (pcache-ent-next mru) lru
-	    (pcache-ent-prev lru) mru
-	    
-	    (pcache-mru-ent pcache) mru
-	    (pcache-lru-ent pcache) lru))
     
     ; create a sample 10mb cache disk for testing
     ; purposes
     (let ((pdisk (make-pcache-disk
-		  :filename "aserve-cache.asv")))
+		  :filename "aserve-cache.asv"
+		  :queueobj (make-and-init-queueobj)
+		  :high-water (truncate 9000000 *header-block-size*)
+		  :low-water  (truncate 9500000 *header-block-size*)
+		  )))
       (push pdisk (pcache-disk-caches pcache))
       (setf (pcache-disk-stream pdisk)
-		  (open "aserve-cache.asv" ; need unique names
-				:if-exists :supersede
-				#-(and allegro version>= 6)
-				:element-type
-				#-(and allegro version>= 6)
-				'(unsigned-byte 8)))
+	(open "aserve-cache.asv" ; need unique names
+	      :if-exists :supersede
+	      :if-does-not-exist :create
+	      :direction :io
+	      #-(and allegro version>= 6)
+	      :element-type
+	      #-(and allegro version>= 6)
+	      '(unsigned-byte 8)))
       
       ; 10mb 
       (setf (pcache-disk-free-blocks pdisk)
@@ -726,14 +739,7 @@
       (setf (pcache-disk-free-list pdisk)
 	(list (cons 0 (1- (pcache-disk-free-blocks pdisk)))))
       
-	
-    (let ((mru (make-pcache-ent))
-	  (lru (make-pcache-ent)))
-      (setf (pcache-ent-next mru) lru
-	    (pcache-ent-prev lru) mru
-	    
-	    (pcache-disk-mru-ent pcache) mru
-	    (pcache-disk-lru-ent pcache) lru)))
+      )
       
   
     (publish :path "/cache-stats"
@@ -746,6 +752,15 @@
 		 (display-proxy-cache-entries req ent pcache)))
     ))
 				
+
+(defun make-and-init-queueobj ()
+  ; make a queue object with the dummy mru,lru entries
+  (let ((q (make-queueobj
+	    :mru (make-pcache-ent)
+	    :lru (make-pcache-ent))))
+    (setf (pcache-ent-next (queueobj-mru q)) (queueobj-lru q)
+	  (pcache-ent-prev (queueobj-lru q)) (queueobj-mru q))
+    q))
 
 
 (defun display-proxy-cache-statistics (req ent pcache)
@@ -799,72 +814,146 @@
 
 	    (:tr
 	     (:td "Live entries in memory")
-	     (:td (:princ (pcache-items pcache)))
-	     (:td (:princ (pcache-bytes pcache)))
-	     (:td (:princ (pcache-blocks pcache))
-		  " ("
-		  (:princ (* (pcache-blocks pcache) *header-block-size*))
+	     (:td (:princ (queueobj-items (pcache-queueobj pcache)))
+		  (:td (:princ (queueobj-bytes (pcache-queueobj pcache))))
+		  (:td (:princ (queueobj-blocks (pcache-queueobj pcache)))
+		       " ("
+		       (:princ (* (queueobj-blocks (pcache-queueobj pcache)) 
+				  *header-block-size*))
 		
-		  " bytes)"))
+		       " bytes)"))
 	    
-	    (:tr
-	     (:td "Dead entries in memory") 
-	     (:td (:princ (pcache-dead-items pcache)))
-	     (:td (:princ dead-bytes))
-	     (:td (:princ dead-blocks)
-		  " ("
-		  (:princ (* dead-blocks *header-block-size*)) " bytes)"
-		  ))
+	     (:tr
+	      (:td "Dead entries in memory") 
+	      (:td (:princ (pcache-dead-items pcache)))
+	      (:td (:princ dead-bytes))
+	      (:td (:princ dead-blocks)
+		   " ("
+		   (:princ (* dead-blocks *header-block-size*)) " bytes)"
+		   ))
+	     )
+	    :br
+	    "Memory Cache"
+	    ((:table :border 2)
+	     (:tr
+	      (:th "items")
+	      (:th "blocks")
+	      (:th "bytes")
+	      )
+	     (let ((queueobj (pcache-queueobj pcache)))
+	       (html (:tr 
+		      (:td (:princ-safe (queueobj-items queueobj)))
+		      (:td (:princ-safe (queueobj-blocks queueobj)))
+		      (:td (:princ-safe (queueobj-bytes queueobj)))))))
+	    :br
+	    :br
+	    "Disk Caches"
+	    :br
+	    ((:table :border 2)
+	     (:tr
+	      (:th "filename")
+	      (:th "items")
+	      (:th "blocks")
+	      (:th "bytes")
+	      (:th "free blocks")
+	      (:th "free list")
+	      )
+	     (dolist (pcache-disk (pcache-disk-caches pcache))
+	       (let ((queueobj (pcache-disk-queueobj pcache-disk)))
+		 (html (:tr 
+			(:td (:princ-safe (pcache-disk-filename pcache-disk)))
+			(:td (:princ-safe (queueobj-items queueobj)))
+			(:td (:princ-safe (queueobj-blocks queueobj)))
+			(:td (:princ-safe (queueobj-bytes queueobj)))
+			(:td (:princ-safe (pcache-disk-free-blocks
+					   pcache-disk)))
+			(:td (:princ-safe (pcache-disk-free-list
+					   pcache-disk))))))))
+			  
 	    ))))))))
 				     
 				     
 (defun display-proxy-cache-entries (req ent pcache)
   ;; show all the proxy cache entries
   (let ((now (get-universal-time)))
-    (with-http-response (req ent)
-      (with-http-body (req ent)
-	(html
-	 (:html
-	  (:head (:title "Proxy Cache Entries"))
-	  (:body
-	   (:h1 "Proxy cache entries")
-	   :p
-	   "Here is a summary of " ((:a :href "cache-stats") "Cache Statistics.")
-	   :br
-	   "The current time is " (:princ-safe (universal-time-to-date now))
-	   :br
-	   :br
-
-	   (let ((ent (pcache-ent-next (pcache-mru-ent pcache)))
-		 (last-ent (pcache-lru-ent pcache)))
-	     (loop
-	       (if* (or (null ent)  (eq last-ent ent)) then (return))
-	       (html (:b "uri: ")
-		     (:princ-safe (pcache-ent-key ent))
-		     :br
-		     (if* (>= now (pcache-ent-expires ent))
-			then (html (:b ((:font :color "red")
-					"Stale -- ")))
-			else (html (:b ((:font :color "green")
-					"Fresh -- "))))
-		     (:b "Expires: ")
-		     (:princ-safe 
-		      (universal-time-to-date (pcache-ent-expires ent)))
+    (flet ((display-pcache-ent (ent)
+	     (html (:b "uri: ")
+		   (:princ-safe (pcache-ent-key ent))
+		   :br
+		   (if* (>= now (pcache-ent-expires ent))
+		      then (html (:b ((:font :color "red")
+				      "Stale -- ")))
+		      else (html (:b ((:font :color "green")
+				      "Fresh -- "))))
+		   (:b "Expires: ")
+		   (:princ-safe 
+		    (universal-time-to-date (pcache-ent-expires ent)))
 				
 				      
+		   :br
+		   (:b "Last Modified: ")
+		   (:princ-safe 
+		    (universal-time-to-date (pcache-ent-last-modified ent)))
+		   :br
+		   (:b "Size: ")
+		   (:princ (pcache-ent-data-length ent))
+		   (:b ", State: ")
+		   (:princ-safe (pcache-ent-state ent))
+		   (if* (pcache-ent-disk-location ent)
+		      then (html :br
+				 (:b "Disk Location: "
+				     (:princ-safe
+				      (pcache-ent-disk-location ent)))))
+		   :p
+		   :br
+		   )))
+      (with-http-response (req ent)
+	(with-http-body (req ent)
+	  (html
+	   (:html
+	    (:head (:title "Proxy Cache Entries"))
+	    (:body
+	     (:h1 "Proxy cache entries")
+	     :p
+	     "Here is a summary of " ((:a :href "cache-stats") "Cache Statistics.")
+	     :br
+	     "The current time is " (:princ-safe (universal-time-to-date now))
+	     :br
+	     :br
+
+	     (let ((ent (pcache-ent-next (queueobj-mru 
+					  (pcache-queueobj pcache))))
+		   (last-ent (queueobj-lru (pcache-queueobj pcache))))
+	       (loop
+		 (if* (or (null ent)  (eq last-ent ent)) then (return))
+		 (display-pcache-ent ent)
+		 (setq ent (pcache-ent-next ent))))
+	   
+	     ; now display the disk caches
+	     (dolist (pcache-disk (pcache-disk-caches pcache))
+	       (html :hr 
 		     :br
-		     (:b ", Last Modified: ")
-		     (:princ-safe 
-		      (universal-time-to-date (pcache-ent-last-modified ent)))
+		     "Disk Cache: " (:princ-safe (pcache-disk-filename pcache-disk))
 		     :br
-		     (:b "Size: ")
-		     (:princ (pcache-ent-data-length ent))
-		     (:b ", State: ")
-		     (:princ-safe (pcache-ent-state ent))
-		     :p
+		     "Free blocks: " (:princ-safe
+				      (pcache-disk-free-blocks pcache-disk))
 		     :br
-		     )
-	       (setq ent (pcache-ent-next ent)))))))))))
+		     "Free list: " (:princ-safe
+				    (pcache-disk-free-list pcache-disk))
+		     :br
+		     :br)
+	     
+	       ; display the entries
+	       (do ((ent (pcache-ent-next (queueobj-mru 
+					   (pcache-disk-queueobj pcache-disk)))
+			 (pcache-ent-next ent)))
+		   ((or (null ent)
+			(null (pcache-ent-key ent))))
+	       
+		 (display-pcache-ent ent)))
+		
+	    
+	     ))))))))
 
 				
       
@@ -883,8 +972,14 @@
 	     ; should handle :head requests too
 	     (not (eq (request-method req) :get))
 	     ; don't look in cache if request has cookies
-	     (header-slot-value req :authorization)
-	     (header-slot-value req :cookie)
+	     (and (header-slot-value req :authorization)
+		  (progn 
+		    (logmess "authorization forces direct")
+		    t))
+	     (and (header-slot-value req :cookie)
+		  (progn
+		    (logmess "cookie forces direct")
+		    t))
 	     )
        then (if* pcache then (incf (pcache-r-direct pcache)))
 	    (logmess (format nil "direct for ~a~%" rendered-uri))
@@ -932,13 +1027,13 @@
 	    (push new-ent
 		  (gethash rendered-uri
 			   (pcache-table pcache)))
-	    (record-new-pcache-ent-stats new-ent pcache)
-	    
-	    (most-recently-used-ent new-ent)  ; link it in.
+
+	    ; put at the head of the memory queue
+	    (move-pcache-ent new-ent nil (pcache-queueobj pcache))
 			      
 	    ; and disable the old entry
 	    (if* pcache-ent
-	       then (kill-pcache-ent pcache-ent))
+	       then (kill-pcache-ent pcache-ent pcache))
 	    
      elseif (and pcache-ent
 		 (eq (pcache-ent-code new-ent) 304))
@@ -1060,6 +1155,9 @@
 		   (pcache-ent-data-length pcache-ent)))
   (incf (pcache-ent-returned pcache-ent))
 
+
+  (if* (pcache-ent-disk-location pcache-ent)
+     then (retrieve-pcache-from-disk pcache-ent))
   
   
   (let ((rsock (request-socket req)))
@@ -1109,86 +1207,87 @@
 		 else (setf (pcache-ent-use pcache-ent) val))))))
 
 (defun most-recently-used-ent (pcache-ent)
-  ;; make this entry the most recently used
-  (mp:without-scheduling
-    (let* ((mru-head  (pcache-mru-ent (wserver-pcache *wserver*)))
-	   (mru  (pcache-ent-next mru-head)))
+  ;; make this entry the most recently used in whatever queue it's on
+  (let ((queueobj (pcache-ent-queueobj pcache-ent)))
+    (move-pcache-ent pcache-ent queueobj queueobj)))
 
-      (if* (not (eq mru pcache-ent))
-	 then (let ((prev (pcache-ent-prev pcache-ent))
-		    (next (pcache-ent-next pcache-ent)))
-		
-		; unlink it
-		(if* (and prev next)
-		   then (setf (pcache-ent-next prev) next
-			      (pcache-ent-prev next) prev))
-     
-		; link it at the mru spot
+(defun move-pcache-ent (pcache-ent fromq toq)
+  ;; move the pcache-ent between queues
+  ;; fromq and toq can be nil or the same.
+  ;;
+  (let ((prev (pcache-ent-prev pcache-ent))
+	(next (pcache-ent-next pcache-ent)))
+    
+    (mp:without-scheduling
+      ; unlink
+      (if* (and prev next)
+	 then (setf (pcache-ent-next prev) next
+		    (pcache-ent-prev next) prev))
+    
+      (if* (and fromq (not (eq fromq toq)))
+	 then ; must update counts in the from queue
+	      (decf (queueobj-items fromq))
+	      (decf (queueobj-bytes fromq) (pcache-ent-data-length pcache-ent))
+	      (decf (queueobj-blocks fromq)
+		    (pcache-ent-blocks pcache-ent)))
+    
+      ; link into the toq, at the mru position
+      (if* toq
+	 then (let* ((mru-head (queueobj-mru toq))
+		     (mru (pcache-ent-next mru-head)))
 		(setf (pcache-ent-next mru-head) pcache-ent
 		      (pcache-ent-prev pcache-ent) mru-head
 		      (pcache-ent-next pcache-ent) mru
-		      (pcache-ent-prev mru) pcache-ent))))))
+		      (pcache-ent-prev mru) pcache-ent))
+	      (if* (not (eq fromq toq))
+		 then ; increment counts
+		      (incf (queueobj-items toq))
+		      (incf (queueobj-bytes toq) 
+			    (pcache-ent-data-length pcache-ent))
+		      (incf (queueobj-blocks toq)
+			    (pcache-ent-blocks pcache-ent))))
+      
+      (setf (pcache-ent-queueobj pcache-ent) toq))))
 
 
-(defun record-new-pcache-ent-stats (pcache-ent pcache)
-  ;; record what we've added the memory cache
-  ;;
-  (mp:without-scheduling
-    (incf (pcache-items pcache))
-    (incf (pcache-bytes pcache) (pcache-ent-data-length pcache-ent))
-    (incf (pcache-blocks pcache) (pcache-ent-blocks pcache-ent))))
 
 
-(defun kill-pcache-ent (pcache-ent)
+
+(defun kill-pcache-ent (pcache-ent &optional (pcache (wserver-pcache
+						      *wserver*)))
   ; make this entry dead
-  (let ((pcache (wserver-pcache *wserver*)))
-    (mp::without-scheduling
-      (let ((state (pcache-ent-state pcache-ent)))
-	(if* (not (eq :dead state))
-	   then ; make it dead
-		(setf (pcache-ent-state pcache-ent) :dead)
+  (mp::without-scheduling
+    (let ((state (pcache-ent-state pcache-ent)))
+      (if* (not (eq :dead state))
+	 then ; make it dead
+	      (setf (pcache-ent-state pcache-ent) :dead)
 
-		(remove-from-memory-ru-list pcache-ent pcache)
-	      
-		; link onto the dead list
-		(setf (pcache-ent-next pcache-ent) (pcache-dead-ent pcache)
-		      (pcache-dead-ent pcache) pcache-ent)
-	      
-		; if currently not in use, then make sure it's never used
-		(if* (zerop (pcache-ent-use pcache-ent))
-		   then (setf (pcache-ent-use pcache-ent) nil))
+	      (move-pcache-ent pcache-ent
+			       (pcache-ent-queueobj pcache-ent)
+			       nil ; move to nowhere, 
+			       )
 		
-		;; stats
-		(incf (pcache-dead-items pcache))
+	      ; link onto the dead list
+	      (setf (pcache-ent-next pcache-ent) (pcache-dead-ent pcache)
+		    (pcache-dead-ent pcache) pcache-ent)
+	      
+	      ; if currently not in use, then make sure it's never used
+	      (if* (zerop (pcache-ent-use pcache-ent))
+		 then (setf (pcache-ent-use pcache-ent) nil))
 		
-		)))))
+	      ;; stats
+	      (incf (pcache-dead-items pcache))
+		
+	      ; remove from hash table
+	      (let ((ents (gethash (pcache-ent-key pcache-ent)
+				   (pcache-table pcache))))
+		(setf (gethash (pcache-ent-key pcache-ent)
+			       (pcache-table pcache))
+		  (delete pcache-ent ents :test #'eq)))
+		  
+		
+	      ))))
 
-(defun remove-from-memory-ru-list (pcache-ent pcache)
-  
-  ;; unlink this entry from the memory recentlyused list
-  ;; and update the counts.
-  ;; it's assumed that were inside a without-scheduling when this
-  ;; is called
-  (let ((prev (pcache-ent-prev pcache-ent))
-	(next (pcache-ent-next pcache-ent)))
-		
-    ; unlink it from the mru/lru list
-    (if* (and prev next)
-       then (setf (pcache-ent-next prev) next
-		  (pcache-ent-prev next) prev)
-			  
-	    ; stats
-	    (decf (pcache-items pcache))
-	    (decf (pcache-bytes pcache)
-		  (pcache-ent-data-length pcache-ent))
-	    (decf (pcache-blocks pcache)
-		  (pcache-ent-blocks pcache-ent))
-	    )))
-
-	      
-	      
-	      
-     
 	      
      
 
@@ -1211,17 +1310,7 @@
 		   then ; give up
 			(return nil)))))))
 
-#+ignore
-(defun response-is-young-enough (last-modified-ut request-block)
-  ;; return true if the last-modified date satisified
-  ;; the contraints of the request
-  
-  (declare (ignore last-modified-ut request-block))
-  
-  
-  ;; to be done
-  t
-  )
+
     
 
 (defun cache-response (req pcache-ent 
@@ -1304,6 +1393,122 @@
        then (free-header-blocks body-buffers))))
 
 
+; --- cleaning out old entries
+
+
+(defun cache-housekeeping (&optional (pcache (wserver-pcache *wserver*)))
+  ;; bring all the caches to within the appropriate tolerance
+  
+  ; first clean out disk caches so we can put more memory stuff in them
+  (dolist (pcache-disk (pcache-disk-caches pcache))
+    (if* (< (pcache-disk-free-blocks pcache-disk)
+	    (pcache-disk-high-water  pcache-disk))
+       then ; must flush it
+	    (flush-disk-cache pcache
+			      pcache-disk 
+			      (pcache-disk-low-water  pcache-disk))))
+  
+  ; clear out all entries made dead
+  (flush-dead-entries pcache)
+
+  ; now clean out the memory cache if needed by moving to a disk cache
+  (if* (> (queueobj-blocks (pcache-queueobj pcache))
+	  (pcache-high-water pcache))
+     then (flush-memory-cache pcache
+			      (pcache-low-water pcache))))
+
+
+(defun flush-disk-cache (pcache pcache-disk goal)
+  ;; flush entries from the disk cache until the number of blocks
+  ;; is less than or equal to the goal
+  (let* ((needed (- goal (pcache-disk-free-blocks pcache-disk)))
+	 (queueobj (pcache-disk-queueobj pcache-disk))
+	 (mru-head (queueobj-mru queueobj))
+	 (lru-head (queueobj-lru queueobj)))
+    (loop
+      (if* (<= needed 0)
+	 then (return))
+      
+      ; pick off the lru and kill it
+      (mp::with-process-lock ((pcache-disk-lock pcache-disk))
+	(let ((lru (pcache-ent-prev lru-head)))
+	  (if* (not (eq lru mru-head))
+	     then ; a legit block
+		  (logmess (format nil "kill ~s from disk queue"
+				   (pcache-ent-key lru)))
+		  (decf needed (pcache-ent-blocks lru))
+		  (kill-pcache-ent lru pcache)
+	     else (return) ; no more left ? shouldn't happen
+		  ))))))
+
+
+(defun flush-memory-cache (pcache goal)
+  ;; move memory cache items to a disk cache if possible
+  (let* ((needed (- (queueobj-blocks (pcache-queueobj pcache))
+		    goal))
+	 (queueobj (pcache-queueobj pcache))
+	 (mru-head (queueobj-mru queueobj))
+	 (lru-head (queueobj-lru queueobj))
+	 (disk-caches (pcache-disk-caches pcache)))
+    
+    (loop
+      (if* (<= needed 0) then (return))
+      
+      (block main
+	(mp:without-scheduling
+	  (let ((lru lru-head))
+	    (loop
+	      (setq lru (pcache-ent-prev lru))
+	      (if* (eq lru mru-head) then (return))
+	      (if* (lock-pcache-ent lru)
+		 then (dolist (dc disk-caches)
+			(if* (move-ent-to-disk lru dc)
+			   then ; successful move to disk
+				(decf needed (pcache-ent-blocks lru))
+				(unlock-pcache-ent lru)
+				(return-from main)))
+		      (unlock-pcache-ent lru)))))))))
+
+		  
+(defun flush-dead-entries (pcache)
+  ;; flush all the deal items from the cache, returning
+  ;; their resource
+  (let (ent)
+    (excl::atomically
+     (excl::fast
+      (setf ent (pcache-dead-ent pcache)
+	    (pcache-dead-ent pcache) nil)))
+    
+    ; now we have an exclusive link to the dead entries
+    ; which we can free at our leisure
+    (let ((count 0))
+      (loop
+	(if* (null ent) then (return))
+	(incf count)
+	(free-header-blocks (pcache-ent-data ent))
+	(let ((diskloc (pcache-ent-disk-location ent)))
+	  ; if stored on the disk, free those blocks
+	  (if* diskloc
+	     then (return-free-blocks (pcache-ent-pcache-disk ent)
+				      diskloc)))
+	(setq ent (pcache-ent-next ent)))
+      (excl::atomically 
+       (excl::fast 
+	(decf (the fixnum (pcache-dead-items pcache)) 
+	      (the fixnum count)))))))
+     
+     
+  
+
+      
+    
+
+
+
+  
+  
+    
+  
 
 (defun clean-memory-cache (&optional pcache)
   ; clear out the dead entries
@@ -1324,31 +1529,63 @@
 	  (if* (null ent) then (return))
 	  (incf count)
 	  (free-header-blocks (pcache-ent-data ent))
+	  (let ((diskloc (pcache-ent-disk-location ent)))
+	    ; if stored on the disk, free those blocks
+	    (return-free-blocks (pcache-ent-pcache-disk ent) diskloc))
 	  (setq ent (pcache-ent-next ent)))
 	(excl::atomically 
 	 (excl::fast 
 	  (decf (the fixnum (pcache-dead-items pcache)) 
-		(the fixnum count))))))))
+		(the fixnum count)))))
+      
+      ; now as a test move all entries in the cache to the disk
+      (let (res)
+	(let ((ent (pcache-ent-next  (queueobj-mru
+				      (pcache-queueobj pcache)))))
+	  (loop
+	    (if* (and ent (pcache-ent-key ent))
+	       then (push ent res)
+		    (setf ent (pcache-ent-next ent))
+	       else (return)))
+	  (dolist (ent res)
+	    (if* (lock-pcache-ent ent)
+	       then (move-ent-to-disk ent 
+				      (car (pcache-disk-caches pcache)))
+		    (unlock-pcache-ent ent))))))))
+	    
+	    
 
 
 
 ;------------ disk cache
   
-(defun move-ent-to-disk (pcache-ent pcache-disk pcache)
+(defun move-ent-to-disk (pcache-ent pcache-disk)
   ;; copy the given pcache-ent to the disk
   ;; assume that we've locked it at this point
   ;;
   ;; return t if we suceede and nil if we didn't
   ;;
-  (let ((to-store-list (get-disk-cache-blocks pcache-disk 
-					      (pcache-ent-blocks)))
+  (if* (pcache-ent-disk-location pcache-ent)
+     then (logmess (format nil "cached ~s is already on the disk"
+			   (pcache-ent-key pcache-ent)))
+	  (return-from move-ent-to-disk t))
+  
+  (let ((to-store-list (get-disk-cache-blocks 
+			pcache-disk (pcache-ent-blocks pcache-ent)))
 	(buffs))
+    (logmess (format nil "needed ~d blocks, got ~s~%" 
+		     (pcache-ent-blocks pcache-ent)
+		     to-store-list))
     (if* to-store-list
-       then (store-data-on-disk pcache-ent pcache-disk to-store-list)
+       then (logmess (format nil "store ~s on disk at ~s~%"
+			     (pcache-ent-key pcache-ent)
+			     to-store-list))
+	    (store-data-on-disk pcache-ent pcache-disk to-store-list)
+	    
 	    (let ((ans
 		   (mp:without-scheduling
 		     (if* (and (null (pcache-ent-state pcache-ent))
-			       (eql 1 (pcache-ent-use)))
+			       (eql 1 (pcache-ent-use pcache-ent)))
 			then ; we are tre sole user of this entry so we cna
 			     ; replace the buffers with the disk location
 			     (setf (pcache-ent-disk-location pcache-ent) 
@@ -1361,32 +1598,97 @@
 			       
 			       (pcache-ent-data pcache-ent) nil)
 		     
-		     
-			     (remove-from-memory-ru-list pcache-ent pcache)
-		
-			     ; put on the disk's ru list
-			     (let* ((mru-head (pcache-disk-mru-ent
+
+			     ; move to disk's list
+			     (move-pcache-ent pcache-ent
+					      (pcache-ent-queueobj pcache-ent)
+					      (pcache-disk-queueobj
 					       pcache-disk))
-				    (mru (pcache-ent-next mru-head)))
-			       (setf (pcache-ent-next pcache-ent) mru
-				     (pcache-ent-prev pcache-ent) mru-head
-			   
-				     (pcache-ent-prev mru) pcache-ent
-				     (pcache-ent-next mru-head) pcache-ent))
-		       
-		       
+		
 		     
 					    
 			     t
 		     
 			else ; someone started using the entry.. so forget we 
 			     ; wrote it
+			     (logmess 
+			      (format nil "can't complete store: use ~d, state ~s~%"
+				      (pcache-ent-use pcache-ent)
+				      (pcache-ent-state pcache-ent)))
+				      
 			     (return-free-blocks pcache-disk to-store-list)
 		     
 			     nil))))
     
 	      (free-header-blocks buffs)
 	      ans))))
+
+(defun retrieve-pcache-from-disk (pcache-ent)
+  ;; read the cache entry back in from the disk
+  
+  ; ensure the loading flag to true and set flagval
+  ; to the value before we set the flag.
+  ; If the value was nil and thus we set it to true, then
+  ; we are the process responsible for loading in the data
+  ;
+  (let ((flagval (excl::atomically
+		  (excl::fast 
+		   (let ((val (pcache-ent-loading-flag pcache-ent)))
+		     (if* (null val) 
+			then (setf (pcache-ent-loading-flag pcache-ent) t))
+		     val)))))
+    (if* flagval
+       then (mp:process-wait "cache entry to be loaded"
+			     #'(lambda (pcache-ent) 
+				 (null (pcache-ent-loading-flag pcache-ent)))
+			     pcache-ent)
+	    (return-from retrieve-pcache-from-disk))
+    
+    ; it's our job to load in the entry
+    (let* ((block-list (pcache-ent-disk-location pcache-ent))
+	   (pcache-disk (pcache-ent-pcache-disk pcache-ent))
+	   (stream (pcache-disk-stream pcache-disk))
+	   (bytes (+ (pcache-ent-data-length pcache-ent)
+		     *header-block-size*))
+	   (res))
+      (logmess (format nil "retrieve ~s in blocks ~s~%"
+		       (pcache-ent-key pcache-ent)
+		       block-list))
+      (mp:with-process-lock ((pcache-disk-lock pcache-disk))
+	; get a lock so we're the only thread doing operations
+	; on the stream to the cache
+	(dolist (ent block-list)
+	  (file-position stream (* (car ent) *header-block-size*))
+	  (dotimes (i (1+ (- (cdr ent) (car ent))))
+	    (let ((buff (get-header-block)))
+	      (read-sequence buff stream :end (min *header-block-size*
+						   bytes))
+	      (decf bytes *header-block-size*)
+	      (push buff res))))
+	(setf (pcache-ent-data pcache-ent) (nreverse res))
+      
+
+	(return-free-blocks pcache-disk block-list)
+	
+	; insert in the memory ru list
+	(most-recently-used-ent pcache-ent)
+    
+	; insert in memory 
+	
+	(excl::atomically
+	 (excl::fast
+	  (setf (pcache-ent-disk-location pcache-ent) nil
+		(pcache-ent-pcache-disk pcache-ent) nil
+		(pcache-ent-loading-flag pcache-ent) nil)))))))
+
+	
+	
+      
+      
+    
+    
+    
+			     
 		    
 (defun get-disk-cache-blocks (pcache-disk count)
   ;; return the location of count cache blocks
@@ -1402,13 +1704,13 @@
 		(loop
 		  (let ((ent (car free-list)))
 		    (if* (null ent)
-		       then ; should have run out.. this is bad
+		       then ; should not have run out.. this is bad
 			    (return-from get-disk-cache-blocks nil)
-		       else (let ((amt (- (cdr ent) (car ent))))
+		       else (let ((amt (1+ (- (cdr ent) (car ent)))))
 			      (if* (< amt count)
 				 then ; need this and more
 				      (push ent toret)
-				      (decf amt count)
+				      (decf count amt)
 				      (pop free-list)
 			       elseif (eql amt count)
 				      ; perfect
@@ -1430,12 +1732,76 @@
 
 (defun return-free-blocks (pcache-disk list-of-blocks)
   ;; return the given blocks to the free list
-  pcache-disk list-of-blocks
-  nil)
+  ;; list of block is a list of conses (start . end)
+  ;; and we must insert them in the free list which has the
+  ;; same form, and we want to merge blocks too.
+  (mp:with-process-lock ((pcache-disk-lock pcache-disk))
+    (let ((giveback 0)
+	  (free-list (pcache-disk-free-list pcache-disk)))
+      (dolist (ent list-of-blocks)
+	(incf giveback (1+ (- (cdr ent) (car ent))))
+	(do ((prev nil cur)
+	     (cur free-list (cdr cur)))
+	    ((null cur)
+	     ; add at end of the line 
+	     (if* prev
+		then (setf (cdr prev) (list ent))
+		else ; only thing
+		     (setq free-list (list ent))))
+	  (if* (< (cdr ent) (caar cur))
+	     then ; fit it in between prev and cur
+		  ; we know that it's not adjacent to the previous entry
+		  ; see if adjacent to this cur entry
+		  (if* (eql (1+ (cdr ent)) (caar cur))
+		     then ; adjacent, just adjust that one
+			  (setf (caar cur) (car ent))
+			  
+		     else ; not adjacent, link it in
+			  (if* prev
+			     then (setf (cdr prev) (cons ent cur))
+			     else (setq free-list
+				    (cons ent cur))))
+		  (return)
+	   elseif (eql (1+ (cdar cur)) (car ent))
+	     then ; is adjacent at the right end to cur
+		  (setf (cdar cur) (cdr ent))
+		  ; see if cur now joins with the one after cur
+		  (setq prev cur 
+			cur (cdr prev))
+		  (if* (and cur (eql (1+ (cdar prev)) (caar cur)))
+		     then ; it does 
+			  (setf (cdar prev) (cdar cur))
+			  (setf (cdr prev) (cdr cur)))
+			  
+		  (return))))
+      (setf (pcache-disk-free-list pcache-disk) free-list)
+      (incf (pcache-disk-free-blocks pcache-disk) giveback))))
+
+      
 
 (defun store-data-on-disk (pcache-ent pcache-disk list-of-blocks)
-  pcache-ent pcache-disk list-of-blocks
-  nil)
+  ;; store the data in the pcache-ent to the disk using
+  ;; the blocks in list-of-blocks (list of cons format)
+  ;;
+  (let ((buffers (pcache-ent-data pcache-ent))
+	(stream (pcache-disk-stream pcache-disk))
+	(bytes (+  *header-block-size*  ; for header block
+		   (pcache-ent-data-length pcache-ent))))
+    (logmess (format nil "writing ~d buffers to list ~d~%" 
+		     (length buffers)
+		     list-of-blocks))
+    (dolist (ent list-of-blocks)
+      ; prepare to write
+      (file-position stream (* (car ent) *header-block-size*))
+      
+      (dotimes (i (1+ (- (cdr ent) (car ent))))
+	(if* (null buffers)
+	   then (error "ran out of buffers before blocks"))
+	(write-sequence (car buffers) stream :end
+			(min *header-block-size* bytes))
+	(pop buffers)
+	(decf bytes *header-block-size*)))))
+    
 
 				      
 		    
@@ -1451,32 +1817,7 @@
 
   
 
-#+ignore	    
-(defun dump-cache ()
-  ;; dump the proxy cache
-  (let ((pcache (wserver-pcache *wserver*)))
-    (if* (null pcache)
-       then (format t "There is no cache~%")
-       else (format t  "~%---- proxy cache --- ~%")
-	    (maphash #'(lambda (k values)
-			 (format t "uri: ~a~%" k)
-			 (dolist (pcache-ent values)
-			   (format t " code: ~s~%data-length: ~s~%"
-				   (pcache-ent-code  pcache-ent)
-				   (pcache-ent-data-length pcache-ent))
-			   (format t " returned: ~s~%"
-				   (pcache-ent-returned pcache-ent))
-			   (format t " use: ~d~%max valid: ~d~%"
-				   (pcache-ent-use  pcache-ent)
-				   (pcache-ent-max-valid-time  pcache-ent))
-			   (format t " request header:~%")
-			   (dump-header-block (pcache-ent-request 
-					       pcache-ent))
-			   (format t "~%-----~%")
-			   
-			   
-			   (format t "~%")))
-		     (pcache-table pcache)))))
+
 
     
 

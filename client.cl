@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.30 2000/10/10 15:46:14 jkf Exp $
+;; $Id: client.cl,v 1.31 2000/10/12 05:01:18 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -631,7 +631,8 @@
        then ; just a normal read-sequence
 	    (if* (zerop bytes-left)
 	       then 0  ; eof
-	       else (let ((ans (read-sequence buffer socket :start start
+	       else (let ((ans (net.aserve::rational-read-sequence buffer 
+						       socket :start start
 					      :end (+ start 
 						      (min (- end start) 
 							   bytes-left)))))

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.18 2000/10/10 15:46:14 jkf Exp $
+;; $Id: t-aserve.cl,v 1.19 2000/10/12 05:01:19 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -917,7 +917,9 @@
 	 (proxy-wserver (start :port nil :server :new :proxy t :cache t))
 	 (proxy-host)
 	 (origin-server)
-	 (pcache (net.aserve::wserver-pcache proxy-wserver)))
+	 (pcache (net.aserve::wserver-pcache proxy-wserver))
+	 (*print-level* 4) ; in case we see some errors
+	 )
     
     (macrolet ((test-2 (res1 res2 form &key (test #'eql))
 		 `(multiple-value-bind (v1 v2) ,form
@@ -976,8 +978,8 @@
 	      (test 2 (net.aserve::pcache-r-fast-hit pcache))
 	  
 
-	      (format t "sleeping for 15 secs.....~%")(force-output)
-	      (sleep 15)
+	      (format t "sleeping for 10 secs.....~%")(force-output)
+	      (sleep 10)
 	      
 	      ; entry no longer fresh so get a slow hit
 	      (test-2 "foo" 200
@@ -995,7 +997,17 @@
 		      :test #'equal)
 	      
 	      (test 3 (net.aserve::pcache-r-fast-hit pcache))
-	  
+	      
+	      ; try flushing all to disk
+	      (net.aserve::clean-memory-cache pcache)
+	      
+	      ; and retrieve from the disk
+	      (test-2 "foo"  200
+		      (do-http-request 
+			  (format nil "~a/foo" origin-server)
+			:proxy proxy-host)
+		      :test #'equal)
+	      (test 4 (net.aserve::pcache-r-fast-hit pcache))
 		
 	      )
 	    

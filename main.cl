@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.74 2000/10/06 15:16:15 jkf Exp $
+;; $Id: main.cl,v 1.75 2000/10/12 05:01:18 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -974,24 +974,27 @@ by keyword symbols and not by strings"
 
 (defun http-worker-thread ()
   ;; made runnable when there is an socket on which work is to be done
-  (loop
+  (let ((*print-level* 5))
+    ;; lots of circular data structures in the caching code.. we 
+    ;; need to restrict the print level
+    (loop
 
-    (let ((sock (car (mp:process-run-reasons sys:*current-process*))))
-      (restart-case
-	  (if* (not (member :notrap *debug-current* :test #'eq))
-	     then (handler-case (process-connection sock)
-		    (error (cond)
-		      (logmess (format nil "~s: got error ~a~%" 
-				       (mp:process-name sys:*current-process*)
-				       cond))))
-	     else (process-connection sock))
-	(abandon ()
-	    :report "Abandon this request and wait for the next one"
-	  nil))
-      (atomic-incf (wserver-free-workers *wserver*))
-      (mp:process-revoke-run-reason sys:*current-process* sock))
+      (let ((sock (car (mp:process-run-reasons sys:*current-process*))))
+	(restart-case
+	    (if* (not (member :notrap *debug-current* :test #'eq))
+	       then (handler-case (process-connection sock)
+		      (error (cond)
+			(logmess (format nil "~s: got error ~a~%" 
+					 (mp:process-name sys:*current-process*)
+					 cond))))
+	       else (process-connection sock))
+	  (abandon ()
+	      :report "Abandon this request and wait for the next one"
+	    nil))
+	(atomic-incf (wserver-free-workers *wserver*))
+	(mp:process-revoke-run-reason sys:*current-process* sock))
     
-    ))
+      )))
 
 (defun http-accept-thread ()
   ;; loop doing accepts and processing them
@@ -1527,7 +1530,7 @@ by keyword symbols and not by strings"
 		    nil
 	       else ; read as much as we acn
 		    (let* ((end (mp-info-end mp-info))
-			   (pos (read-sequence mpbuffer 
+			   (pos (rational-read-sequence mpbuffer 
 					       (mp-info-socket mp-info)
 					       :start end
 					       :end (min
@@ -1809,7 +1812,7 @@ in get-multipart-sequence"))
   (mp:with-timeout (timeout nil)
     (let ((got 0))
       (loop
-	(let ((this (read-sequence string sock :start got)))
+	(let ((this (rational-read-sequence string sock :start got)))
 	  (if* (<= this 0)
 	     then (return nil) ; eof too early
 	     else (setq  got    this)

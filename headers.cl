@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.13 2000/10/10 15:46:14 jkf Exp $
+;; $Id: headers.cl,v 1.14 2000/10/12 05:01:18 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -277,6 +277,9 @@
 	       (declare (ignore sresource))
 	       (dotimes (i (length buffer))
 		 (setf (svref buffer i) nil)))))
+
+(defun get-header-block ()
+  (get-sresource *header-block-sresource*))
 
 
 (defun free-header-blocks (blocks)
