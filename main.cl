@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.102 2001/06/26 21:16:48 jkf Exp $
+;; $Id: main.cl,v 1.103 2001/06/27 18:28:05 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -107,6 +107,7 @@
    #:wserver
    #:wserver-enable-chunking
    #:wserver-enable-keep-alive
+   #:wserver-filters
    #:wserver-locators
    #:wserver-log-function
    #:wserver-log-stream
@@ -132,7 +133,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 1))
+(defparameter *aserve-version* '(1 2 2))
 
 (eval-when (eval load)
     (require :sock)
@@ -316,6 +317,14 @@
 		    (make-instance 'locator-prefix
 		      :name :prefix)) 
     :accessor wserver-locators)
+
+   (filters
+    ;; if non nil is is a list of functions
+    ;; of one arg (a request object) 
+    ;; to be called before looking for a locator.  This function can
+    ;; modify the request if it feels like it.
+    :initform nil
+    :accessor wserver-filters)
    
    (log-function
     ;; function to call after the request is done to 

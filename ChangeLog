@@ -1,3 +1,8 @@
+2001-06-27  jkf  <jkf@main.verada.com>
+1.2.2
+	* added the ability to filter requests before they get 
+	  processed.  see Request-Filters in aserve.html
+
 2001-06-26  John Foderaro  <jkf@tiger.franz.com>
 1.2.1
 	* main.cl - don't get blocked on a force-output that will
