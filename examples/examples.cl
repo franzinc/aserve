@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: examples.cl,v 1.1.2.4 2000/02/26 00:03:02 jkf Exp $
+;; $Id: examples.cl,v 1.1.2.5 2000/03/14 23:13:23 jkf Exp $
 
 ;; Description:
 ;;   neo examples
@@ -55,7 +55,8 @@
 		 (html
 		  (:head (:title "Welcome to Neo"))
 		  (:body 
-		   (:h1 "Welcome to Neo")
+		   (:center ((:img :src "iservelogo.gif")))
+		   (:h1 "Welcome to Allegro iServe")
 		   (:p "These links show off some of Neo's capabilities. ")
 		   (:i "This server's host name is "
 		    (:princ-safe (header-slot-value req "host")))
@@ -66,9 +67,21 @@
 			 ((:a :href "pic") "Sample jpeg") :br
 			 ((:a :href "pic-gen") "generated jpeg") "- hit reload to switch images" :br
 			 ((:a :href "cookietest") "test cookies") :br
-			 ((:a :href "secret") "Test authorization")
+			 ((:a :href "secret") "Test manual authorization")
  			 " (name: " (:b "foo") ", password: " (:b "bar") ")"
 			 :br
+			 ((:a :href "secret-auth") "Test automatic authorization")
+			 " (name: "
+			 (:b "foo2")
+			 " password: "
+			 (:b "bar2") ")"
+			 :br
+			 ((:a :href "local-secret") "Test source based authorization") " This will only work if you can use "
+			 "http:://localhost ... to reach this page" :
+			 :br
+			 ((:a :href "local-secret-auth") 
+			  "Like the preceeding but uses authorizer objects")
+			  :br
 			 ((:a :href "timeout") "Test timeout")
 			 :br
 			 ((:a :href "getfile") "Client to server file transfer")
@@ -143,6 +156,9 @@
 	      :content-type "image/jpeg")
 
 
+
+(publish-file :path "/iservelogo.gif" :file (example-file "iservelogo.gif")
+	      :content-type "image/gif")
 
 ;; this is a demonstration of how you can return a jpeg 
 ;; image that was created on the fly (rather thsn read from
@@ -296,24 +312,56 @@
 	 :content-type "text/html"
 	 :function
 	 #'(lambda (req ent)
-	     (let ((auth-val (header-slot-value req "authorization")))
-	       (if* (and (stringp auth-val)
-			 (equal (base64-decode 
-				 (cadr (split-into-words auth-val)))
-				"foo:bar"))
+	     (multiple-value-bind (name password) (get-basic-authorization req)
+	       (if* (and (equal name "foo") (equal password "bar"))
 		  then (with-http-response (req ent)
 			 (with-http-body (req ent)
 			   (html (:head (:title "Secret page"))
 				 (:body "You made it to the secret page"))))
 		  else
-		       (with-http-response (req ent :response *response-unauthorized*)
-			 (with-http-body (req ent
-					      :headers 
-					      '(("WWW-Authenticate" 
-						 . "Basic realm=\"secretserver\"")))))))))
+		       (with-http-response (req ent :response 
+						*response-unauthorized*)
+			 (set-basic-authorization req
+						   "secretserver")
+			 (with-http-body (req ent)))))))
 
 
+(publish :path "/local-secret"
+	 :content-type "text/html"
+	 :function
+	 #'(lambda (req ent)
+	     (let ((net-address (ash (socket:remote-host
+				      (request-socket req))
+				     -24)))
+	       (if* (equal net-address 127)
+		  then (with-http-response (req ent)
+			 (with-http-body (req ent)
+			   (html (:head (:title "Secret page"))
+				 (:body (:b "Congratulations. ")
+					"You are on the local network"))))
+		  else
+		       (with-http-response (req ent)
+			 (with-http-body (req ent)
+			   (html
+			    (:html (:head (:title "Unauthorized"))
+				   (:body 
+				    "You cannot access this page "
+				    "from your location")))))))))
 
+
+(publish :path "/local-secret-auth"
+	 :content-type "text/html"
+	 :authorizer (make-instance 'location-authorizer
+		       :patterns '((:accept "127.0" 8)
+				   (:accept "tiger.franz.com")
+				   :deny))
+	 :function
+	 #'(lambda (req ent)
+	     (with-http-response (req ent)
+	       (with-http-body (req ent)
+		 (html (:head (:title "Secret page"))
+		       (:body (:b "Congratulations. ")
+			      "You made it to the secret page"))))))
 
 ;; these two urls show how to transfer a user-selected file from
 ;; the client browser to the server.
@@ -349,6 +397,24 @@
 			 "check box two"
 			 :br
 			 ((:input :type "submit")))))))))
+
+
+(publish :path "/secret-auth"
+	 :content-type "text/html"
+	 :authorizer (make-instance 'password-authorizer
+		       :allowed '(("foo2" . "bar2")
+				  ("foo3" . "bar3")
+				  )
+		       :realm  "SecretAuth")
+	 :function
+	 #'(lambda (req ent)
+	     (with-http-response (req ent)
+	       (with-http-body (req ent)
+		 (html (:head (:title "Secret page"))
+		       (:body "You made it to the secret page"))))))
+
+
+
 
 ;; this called with the file from 
 (publish :path "/getfile-got"

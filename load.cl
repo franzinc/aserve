@@ -1,6 +1,6 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.12.2.4 2000/03/07 22:46:28 jkf Exp $
+;; $Id: load.cl,v 1.12.2.5 2000/03/14 23:13:23 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -13,6 +13,7 @@
       "parse"
       "decode"
       "publish"
+      "authorize"
       "log" ))
 
 (defparameter *iserve-other-files*

@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: publish.cl,v 1.23.2.5 2000/03/07 22:46:28 jkf Exp $
+;; $Id: publish.cl,v 1.23.2.6 2000/03/14 23:13:23 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -61,6 +61,9 @@
 		 :reader content-type
 		 :initform nil)
    
+   (authorizer  :initarg :authorizer  ; authorizer object, if any
+		:accessor entity-authorizer
+		:initform nil)
    )
   )
 
@@ -396,6 +399,7 @@
 		     (server *wserver*)
 		     locator
 		     remove
+		     authorizer
 		     )
   ;; publish the given url
   ;; if file is given then it specifies a file to return
@@ -418,7 +422,8 @@
 			 :path path
 			 :function function
 			 :format format
-			 :content-type content-type)))
+			 :content-type content-type
+			 :authorizer authorizer)))
 	      (publish-entity ent locator path hval)))))
 
 	     
@@ -429,7 +434,8 @@
 			  port path
 			  file content-type class preload
 			  cache-p ssi 
-			  remove)
+			  remove
+			  authorizer)
   ;; return the given file as the value of the url
   ;; for the given host.
   ;; If host is nil then return for any host
@@ -476,6 +482,7 @@
 			    :last-modified lastmod
 			    :cache-p cache-p
 			    :ssi     ssi
+			    :authorizer authorizer
 			    ))))
        else (setq ent (make-instance (or class 'file-entity)
 			:host (setq hval (if* host 
@@ -488,6 +495,7 @@
 			:content-type c-type
 			:cache-p cache-p
 			:ssi ssi
+			:authorizer authorizer
 			)))
 
     (publish-entity ent locator path hval)))
@@ -505,6 +513,7 @@
 			       (server *wserver*)
 			       locator
 			       remove
+			       authorizer
 			       )
   
   ;; make a whole directory available
@@ -520,6 +529,7 @@
 		       :prefix prefix
 		       :host host
 		       :port port
+		       :authorizer authorizer
 		       )))
     
   (dolist (entpair (locator-info locator))
@@ -678,8 +688,29 @@
 			req
 			locator)))
       (if* ent
-	 then (return-from handle-request
-		(process-entity req ent)))))
+	 then ; check if it is authorized
+	      (let ((authorizer (entity-authorizer ent)))
+		(if* authorizer
+		   then (let ((result (authorize authorizer
+						 req
+						 ent)))
+			  (if* (eq result t)
+			     then (return-from handle-request
+				    (process-entity req ent))
+			   elseif (eq result :done)
+			     then ; already responsed
+				  (return-from handle-request nil)
+			   elseif (eq result :deny)
+			     then ; indicate denied request
+				  (denied-request req)
+				  (return-from handle-request nil))
+			  ; the nil case falls through and will return
+			  ; failed request
+			  )
+		   else ; no authorizer, let anyone access
+			(return-from handle-request
+			  (process-entity req ent))
+			)))))
   
   ; no handler
   (failed-request req)
@@ -711,7 +742,30 @@
 	    (setf (wserver-invalid-request *wserver*) entity))
     (process-entity req entity)))
 
-  
+(defmethod denied-request ((req http-request))
+  ;; generate a response to a request that we can't handle
+  (let ((entity (wserver-denied-request *wserver*)))
+    (if* (null entity)
+       then (setq entity (make-instance 'computed-entity
+			   :function #'(lambda (req ent)
+					 (with-http-response 
+					     (req ent
+						  :response *response-not-found*)
+					   (with-http-body (req ent)
+					     (html 
+					      (:head (:title "404 - NotFound")
+						     (:body
+						      (:h1 "Not Found")
+						      "The request for "
+						      (:princ-safe 
+						       (render-uri 
+							(request-uri req)
+							nil
+							))
+						      " was denied."))))))
+			   :content-type "text/html"))
+	    (setf (wserver-denied-request *wserver*) entity))
+    (process-entity req entity)))
 
 
 (defmethod standard-locator ((req http-request)
@@ -930,6 +984,7 @@
     (process-entity req (publish-file :path (uri-path 
 					     (request-uri req))
 				      :file realname
+				      :authorizer (entity-authorizer ent)
 				      ))
       
     t))

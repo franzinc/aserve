@@ -18,10 +18,10 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: main.cl,v 1.19.2.4 2000/03/07 22:46:28 jkf Exp $
+;; $Id: main.cl,v 1.19.2.5 2000/03/14 23:13:23 jkf Exp $
 
 ;; Description:
-;;   neo's main loop
+;;   iserve's main loop
 
 ;;- This code in this file obeys the Lisp Coding Standard found in
 ;;- http://www.franz.com/~jkf/coding_standards.html
@@ -31,17 +31,23 @@
 (defpackage :net.iserve
   (:use :common-lisp :excl :net.html.generator)
   (:export
+   #:authorize
+   #:authorizer
    #:base64-decode
    #:base64-encode
    #:decode-form-urlencoded
+   #:get-basic-authorization
    #:get-cookie-values
    #:get-multipart-header
    #:get-multipart-sequence
    #:get-request-body
    #:header-slot-value
+   #:location-authorizer
+   #:password-authorizer
    #:publish
    #:publish-file
    #:publish-directory
+   #:set-basic-authorization
 
    #:request-method
    #:request-protocol
@@ -95,7 +101,7 @@
 (in-package :net.iserve)
 
 
-(defparameter *iserve-version* '(1 1 1))
+(defparameter *iserve-version* '(1 1 2))
 
 ;;;;;;;  debug support 
 
@@ -133,7 +139,7 @@
 
 
 
-
+	
 ;;;;;;;;;;;;;  end special vars
 
 
@@ -205,7 +211,13 @@
     ;; entity to invoke given a request that can't be
     ;; satisfied
     :initform nil  ; will build on demand if not present
-    :accessor wserver-invalid-request)))
+    :accessor wserver-invalid-request)
+   
+   (denied-request
+    ;; entity to invoke given a request that was denied
+    :initform nil  ; will build on demand if not present
+    :accessor wserver-denied-request)
+   ))
 
 
      
@@ -1592,4 +1604,34 @@
 
 		
 	
+;;-------------------
+;; authorization
+
+(defmethod get-basic-authorization ((req http-request))
+  ;; return the basic authorization information for this request, if any
+  ;; 
+  ;; basic authorization is used when a name/password dialog is
+  ;; put up by the browser
+  ;;
+  ;; if authorization info in found this request, return two values
+  ;;  name
+  ;;  password
+  ;;
+  (let ((auth-value (header-slot-value req "authorization")))
+    (if* auth-value
+       then (let ((words (split-into-words auth-value)))
+	      (if* (equalp (car words) "basic")
+		 then (setq auth-value 
+			(split-on-character (base64-decode (cadr words)) #\:))
+		      (values-list auth-value))))))
+		      
+	      
+(defmethod set-basic-authorization ((req http-request) realm)
+  ;; declare that you want to get authentication information
+  ;; for the given realm.
+  ;; This must be called after with-http-response and before
+  ;; with-http-body
+  (setq realm (string realm))
+  (push `("WWW-Authenticate" . ,(format nil "Basic realm=~s" realm))
+	(request-reply-headers req)))
 

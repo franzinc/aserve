@@ -267,7 +267,7 @@ where using Lisp to process the form data is significantly easier than the alter
 </ol>
 
 <p>The three attributes of a <strong>:form</strong> tag that determine how data is sent to
-the server are:
+the server are: 
 
 <ol>
   <li><strong>:method</strong>&nbsp; -- this is either &quot;GET&quot; (the default) or
@@ -289,16 +289,15 @@ the server are:
 <h2>form data in a query string</h2>
 
 <p>In a url like <a href="http://www.machine.com/foo/bar?name=joe&amp;age=34">http://www.machine.com/foo/bar?name=gen&amp;age=28</a>
-the characters after the question mark are the <strong>query-string</strong>.
-&nbsp;&nbsp; The query string is <strong>not</strong> used by iServe to determine the
-entity to handle the request.&nbsp; When the entity begins processing the request it can
-ask for the <strong>request-query </strong>of the <strong>request</strong> object.
-&nbsp;&nbsp; <strong>request-query </strong>will return a assoc list where the <strong>car</strong>
-&nbsp; of each entry is a string (e.g. &quot;name&quot; in the example) and the <strong>cdr</strong>
-is also a string (e.g. &quot;gen&quot; in the example).&nbsp;&nbsp;&nbsp; You can ask for
-the <strong>request-query</strong> of any request object and if there is no query string
-for the request <strong>request-query </strong>will return <strong>nil</strong>.
-&nbsp;&nbsp; </p>
+the characters after the question mark are the <strong>query-string</strong>. &nbsp;&nbsp;
+The query string is <strong>not</strong> used by iServe to determine the entity to handle
+the request.&nbsp; When the entity begins processing the request it can ask for the <strong>request-query
+</strong>of the <strong>request</strong> object. &nbsp;&nbsp; <strong>request-query </strong>will
+return a assoc list where the <strong>car</strong> &nbsp; of each entry is a string (e.g.
+&quot;name&quot; in the example) and the <strong>cdr</strong> is also a string (e.g.
+&quot;gen&quot; in the example).&nbsp;&nbsp;&nbsp; You can ask for the <strong>request-query</strong>
+of any request object and if there is no query string for the request <strong>request-query
+</strong>will return <strong>nil</strong>. &nbsp;&nbsp; </p>
 
 <p>This is a typical entity handler that generates a form and handles the result of
 filling out the form:</p>
@@ -352,7 +351,7 @@ the form.&nbsp;&nbsp; In this case the data for the form appears in the body of 
 request.&nbsp; There are two supported encodings of the form data in the body.&nbsp; In
 this section we'll describe how to handle&nbsp; the default encoding, called:
 &quot;application/x-www-form-urlencoded&quot;.&nbsp; First you must call <strong>get-request-body
-</strong> to read and return the body of the request.&nbsp;&nbsp; Second you must call <strong>decode-form-urlencoded</strong>
+</strong>to read and return the body of the request.&nbsp;&nbsp; Second you must call <strong>decode-form-urlencoded</strong>
 to convert the encoded body into an assoc list, where every entry is a cons consisting of
 a string naming the value and then the string containing the value.</p>
 
@@ -434,11 +433,108 @@ iServe examples.cl file (search in that file for&nbsp; &quot;getfile-got&quot;)<
 
 <h1>Authenticating a request</h1>
 
+<p>You don't necessarily want to allow everyone to access every page you publish.
+&nbsp;&nbsp; We will describe common ways to check whether someone has permission to
+access a page.</p>
+
 <h2>password</h2>
+
+<p>One way to control access to a page is to request that the person at the browser enter
+a name and password.&nbsp;&nbsp; You can create a form and have the user enter the
+information and then click on a button to submit it.&nbsp;&nbsp; Another way is to return
+a 401 (response unauthorized) code to the request made to access your page. &nbsp;&nbsp;
+When given that response, the web browser will pop up a window requesting a name and
+password, and after that's entered the browser resends the request but includes the name
+and password in the header.</p>
+
+<p>The method you choose for asking for the name and password may depend on how secure you
+want the response to be.&nbsp; Using a form the name and password are sent to the web
+server without any encoding at all (other than the simple urlencoding which only affects
+unusual characters).&nbsp;&nbsp; If your form uses the &quot;GET&quot; method then the
+name and password appear in the url which makes them very easy to spot, so you at least
+want to the &quot;POST&quot; method if you use a form.&nbsp;&nbsp;&nbsp; If on the other
+hand you use the 401 response code, then the name and password are sent in a more
+encrypted form (using an encoding called <strong>base64</strong>) however anyone
+sufficiently motivated can decrypt this without a lot of trouble.&nbsp;&nbsp; iServe does
+not yet support <strong>md5</strong> authentication which is the most secure way to do
+authentication in the HTTP/1.1 protocol.</p>
+
+<p>One advantage of using the 401 response to cause the user to enter a name and password
+is that most web browsers will continue to send the entered name and password along with
+future requests to the server until the web browser is restarted.&nbsp;&nbsp; Thus you can
+simultaneously unlock a whole group of pages.&nbsp; If you choose to handle the
+authentication in a form you must use a cookie to make a record that this web brower is
+now qualified to access a certain group of pages.&nbsp; Cookies aren't hard to store, but
+some users turn off cookie saving thus you will&nbsp; make your site inaccessible to these
+people.</p>
+
+<p>This is an example of using the 401 response to do user authorization.&nbsp;&nbsp; </p>
+
+<pre>(publish :path &quot;/secret&quot;
+    :content-type &quot;text/html&quot;
+    :function
+    #'(lambda (req ent)
+         (multiple-value-bind (name password) (get-basic-authorization req)
+            (if* (and (equal name &quot;foo&quot;) (equal password &quot;bar&quot;))
+               then (with-http-response (req ent)
+                      (with-http-body (req ent)
+                        (html (:head (:title &quot;Secret page&quot;))
+                              (:body &quot;You made it to the secret page&quot;))))
+               else ; cause browser to ask name and password
+                    (with-http-response (req ent :response 
+                                                 *response-unauthorized*)
+                      (set-basic-authorization req &quot;secretserver&quot;)
+                      (with-http-body (req ent)))))))</pre>
+
+<p>&nbsp;</p>
 
 <h2>source address</h2>
 
+<p>You can determine the address from which a request was made and restrict access based
+on that address.&nbsp;&nbsp;&nbsp; If the request came through a proxy server then you are
+really determing the address of the proxy server.&nbsp; The following code only serves the
+'secret' page if the request came from a browser running on the same machine as the
+server, and which is made over the loopback network on the machine.&nbsp;&nbsp; The
+loopback network is a network that exists entirely inside the operating system of the
+machine.&nbsp; The convention is that a loopback network address has 127 in the most
+significant byte, and that is what we test for in the following example:</p>
+
+<pre>(publish :path &quot;/local-secret&quot;
+    :content-type &quot;text/html&quot;
+    :function
+    #'(lambda (req ent)
+    (let ((net-address (ash (socket:remote-host
+                              (request-socket req))
+                            -24)))
+       (if* (equal net-address 127)
+          then (with-http-response (req ent)
+                 (with-http-body (req ent)
+                   (html (:head (:title &quot;Secret page&quot;))
+                     (:body (:b &quot;Congratulations. &quot;)
+                        &quot;You are on the local network&quot;))))
+          else
+               (with-http-response (req ent)
+                 (with-http-body (req ent)
+                   (html
+                     (:html (:head (:title &quot;Unauthorized&quot;))
+                            (:body 
+                                &quot;You cannot access this page &quot;
+                                &quot;from your location&quot;)))))))))
+</pre>
+
 <h1>Multiple servers</h1>
+
+<p>iServe can run multiple independent web servers.&nbsp; Each web server listens for
+requests on a different port.&nbsp; Because each web server can appear to be serving pages
+for different hosts (using the virtual host facility already described in the discussion
+of the <strong>publish </strong>functions), it is usually not necessary to use the
+multiple server facility we describe here.&nbsp; </p>
+
+<p>All of the information about a web server, including the entities it serves, are stored
+in a <strong>wserver</strong> object.&nbsp;&nbsp;&nbsp;&nbsp; The <em>current<strong> </strong></em>wserver
+object is stored in the variable <strong>*wserver*</strong>.&nbsp;&nbsp;&nbsp; The publish
+functions use the value of <strong>*wserver* </strong>as the default server into which
+they publish entities.</p>
 
 <h1>The entity lookup algorithm</h1>
 

@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: parse.cl,v 1.14.2.3 2000/03/03 03:07:07 jkf Exp $
+;; $Id: parse.cl,v 1.14.2.4 2000/03/14 23:13:23 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -557,19 +557,23 @@
   ;; of the given character.
   ;; If the character isn't present then the list will contain just
   ;; the given string.
-  (let ((po (split-string str char)))
-    (prog1 (let ((items (parseobj-next po)))
-	     (if* (eql items 1)
-		then ; character doesn't exist, just return the 
-		     ; string in a list
-		     (list str)
-		else (let ((start (parseobj-start po))
-			   (end   (parseobj-end   po))
-			   (res))
-		       (dotimes (i items)
-			 (push (subseq str (svref start i) (svref end i)) res))
-		       (nreverse res))))
-      (free-parseobj po))))
+  (let ((loc (position char str))
+	(start 0)
+	(res))
+    (if* (null loc)
+       then ; doesn't appear anywhere, just the original string
+	    (list str)
+       else ; must do some work
+	    (loop
+	      (push (subseq str start loc) res)
+	      (setq start (1+ loc))
+	      (setq loc (position char str :start start))
+	      (if* (null loc)
+		 then (if* (< start (length str))
+			 then (push (subseq str start) res)
+			 else (push "" res))
+		      (return (nreverse res)))))))
+
     
 
 

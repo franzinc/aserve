@@ -7,7 +7,7 @@
 
 <body>
 
-<h1 align="center">Allegro iServe</h1>
+<h1 align="center">iAllegro iServe</h1>
 
 <h2 align="left">Introduction</h2>
 
@@ -627,7 +627,149 @@ so program should be sure to make use of the index returned by <strong>get-multi
 
 <hr>
 
-<hr>
+<h2>Authorization </h2>
+
+<p>You may want to restrict certain entities to be accessible from only certain machines
+or people.&nbsp;&nbsp; You can put the test for authorization in the entity response
+function using one of the following functions, or you can have the check done
+automatically by storing an <strong>authorizer</strong> object in the entity.</p>
+
+<p>&nbsp;</p>
+
+<h3>functions</h3>
+
+<p><strong><font face="Courier New">(get-basic-authorization request)</font></strong></p>
+
+<p>This function retrieve the Basic authorization information associated with this
+request, if any.&nbsp;&nbsp;&nbsp; The two returned values are the name and password, both
+strings.&nbsp; If there is no Basic authorization information with this request, <strong>nil</strong>
+is returned.</p>
+
+<p>&nbsp;</p>
+
+<p><strong><font face="Courier New">(set-basic-authorization request realm)</font></strong></p>
+
+<p>This add a header line that requests Basic authorization in the given realm (a string).
+&nbsp;&nbsp; This should be called between <strong>with-http-response</strong> and <strong>with-http-body</strong>
+and only for response of type 401 (i.e. <strong>*response-unauthorized*</strong>).
+&nbsp;&nbsp; The realm is an identifier, unique on this site, for the set of pages for
+which access should be authorized by a certain name and password.</p>
+
+<p>&nbsp;</p>
+
+<h3>authorizer classes</h3>
+
+<p>If an entity has an associated <strong>authorizer</strong> object, then before that
+entity's response function is run the authorizer is tested to see if&nbsp; it will accept
+or deny the current request.&nbsp;&nbsp;&nbsp; iServe supplies two interesting subclasses
+of <strong>authorizer</strong> and users are free to add their own subclasses to support
+their own authorization needs.&nbsp;&nbsp; </p>
+
+<p>The protocol followed during authorization is this: 
+
+<ol>
+  <li>an entity object is selected that matches the request</li>
+  <li>if the entity object's authorizer slot is <strong>nil</strong> then it is considered
+    authorized.</li>
+  <li>otherwise the <strong>authorize</strong> generic function is called, passing it the
+    authorization object, the http-request object and the entity object</li>
+  <li>the return value from <strong>authorize </strong>can be&nbsp; <br>
+    <strong>t </strong>- meaning this request is authorized to access this entity<br>
+    <strong>nil - </strong>meaning that this request isn't authorized.&nbsp; The response from
+    iServe will be the standard &quot;failed request&quot; response so the user won't be able
+    to distinguish this response from one that would be received in the entity didn't exist at
+    all.<br>
+    <strong>:deny</strong> - a denied request response will be returned.&nbsp;&nbsp; It will <strong>not</strong>
+    use the 401 return code so this will not cause a password box to be displayed by the
+    browser.<br>
+    <strong>:done</strong> - the request is denied, and a response has already been sent to
+    the requestor by the <strong>authorize </strong>function so no further response should be
+    made.</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p><strong>password-authorizer</strong>&nbsp; [class]</p>
+
+<p>This subclass of <strong>authorizer</strong> is useful if you want to protect an entity
+using the basic authorization scheme that asks for a name and a password.
+&nbsp;&nbsp;&nbsp; When you create this class of object you should supply values for the
+two slots:</p>
+
+<table border="1" width="100%">
+  <tr>
+    <td width="13%"><big><strong>Slot Name</strong></big></td>
+    <td width="11%"><big><strong>initarg</strong></big></td>
+    <td width="76%"><big><strong>what</strong></big></td>
+  </tr>
+  <tr>
+    <td width="13%"><strong>allowed</strong></td>
+    <td width="11%">:<strong>allowed</strong></td>
+    <td width="76%">list of conses, each cons having the form <strong>(&quot;name&quot; .
+    &quot;password&quot;) </strong>where any of the listed name password pairs will allow
+    access to this page.</td>
+  </tr>
+  <tr>
+    <td width="13%"><strong>realm</strong></td>
+    <td width="11%"><strong>:realm</strong></td>
+    <td width="76%">A string which names the protection space for the given name and password.
+    &nbsp; The realm will appear in the dialog box the browser displays when asking for a name
+    and password. </td>
+  </tr>
+</table>
+
+<p>An example of it's use is the following where we allow access only the user enters a
+name of <strong>joe</strong> and a password of <strong>eoj</strong> or a name of <strong>fred</strong>
+and a password of<strong> derf</strong>.</p>
+
+<pre>  (publish :path &quot;/foo&quot;
+    :content-type &quot;text/html&quot;
+    :authorizer (make-instance 'password-authorizer
+                       :allowed '((&quot;joe&quot; . &quot;eoj&quot;)
+                                  (&quot;fred&quot; . &quot;derf&quot;))
+                       :realm &quot;SecretAuth&quot;)
+    :function
+    #'(lambda (req ent)
+        (with-http-response (req ent)
+           (with-http-body (req ent)
+              (html (:head (:title &quot;Secret page&quot;))
+                    (:body &quot;You made it to the secret page&quot;))))))</pre>
+
+<p>&nbsp;</p>
+
+<p><strong>location-authorizer</strong> [class]</p>
+
+<p>This authorizer class checks the IP address of the request to see if it is permitted
+access to the entity.&nbsp; The&nbsp; authorizer can specify a sequence of&nbsp; patterns
+and for each pattern a command of <strong>:accept </strong>(permit the access) or <strong>:deny</strong>
+(forbid the access).&nbsp;&nbsp;&nbsp; The single slot of an object of class <strong>location-authorizer</strong>
+is</p>
+
+<p>&nbsp;</p>
+
+<table border="1" width="100%">
+  <tr>
+    <td width="13%"><big><strong>Slot Name</strong></big></td>
+    <td width="11%"><big><strong>initarg</strong></big></td>
+    <td width="76%"><big><strong>what</strong></big></td>
+  </tr>
+  <tr>
+    <td width="13%"><strong>patterns</strong></td>
+    <td width="11%">:<strong>patterns</strong></td>
+    <td width="76%">a list of patterns and commands, where the syntax of a pattern-command is
+    described below.</td>
+  </tr>
+</table>
+
+<p>A pattern can be
+
+<ul>
+  <li>:accept -- this is a pattern that matches all IP address and causes the access to be
+    authorized</li>
+  <li>:deny -- this is a pattern that matches all IP address and causes the access to be
+    rejected</li>
+  <li>(:accept ipaddress [bits]) -- [.......... to be continued ........]</li>
+</ul>
 
 <h2>Cookies</h2>
 
