@@ -33,6 +33,9 @@
 			  
 			  ("testctype" "file3.clp")
 			  ("file3.clp" (:content-type "text/plain"))
+			  
+			  ; test nested clp elements
+			  ("file4"  "file4.clp")
 			  ))
 		   
 		   

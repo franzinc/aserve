@@ -1,3 +1,9 @@
+2004-03-04  John Foderaro  <jkf@tiger.franz.com>
+
+	* main.cl - ensure that get-request-body always reads from
+	 a stream with the :octets external format so that the
+	 content-length header value is meaningful.
+
 2004-03-03    <jkf@main.verada.com>
 1.2.36
 	* main.cl: add request-variable-value (moved from webactions)

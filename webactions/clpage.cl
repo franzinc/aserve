@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: clpage.cl,v 1.4 2004/03/04 01:57:33 jkf Exp $
+;; $Id: clpage.cl,v 1.5 2004/03/04 21:52:38 jkf Exp $
 
 
 (eval-when (compile load eval) (require :aserve))
@@ -600,7 +600,7 @@
 	
 	
     
-(defun scan-for-end-tag (p module fcn)
+#+ignore(defun old-scan-for-end-tag (p module fcn)
   ;; look for </module_fcn>
   ;; leave the file position after the tag
   ;;
@@ -624,6 +624,75 @@
 	     then ;(format t "ch: ~s~%" ch)
 		  (return)))))))
 
+
+
+(defun scan-for-end-tag (p module fcn)
+  ;; look for </module_fcn>
+  ;; leave the file position after the tag
+  ;;
+  ;; return the number of characters read not including
+  ;; the end tag
+  ;; 
+  ;; return  nil if the end tag wasn't found
+  ;;
+  
+  ;; we define a search obj as a cons holding how far we've
+  ;; matched so far and the string we're matching
+  (macrolet ((create-search-obj (string)
+	       `(cons 0 ,string))
+	     
+	     (init-search-obj (obj)
+	       ;; set back to initial state
+	       `(setf (car ,obj) 0))
+	     
+	     (end-of-search-p (obj)
+	       ;; see if we've matched all characters
+	       `(equal (car ,obj) (length (cdr ,obj))))
+	     
+	     (search-string (obj)
+	       `(cdr ,obj))
+	     
+	     (search-counter (obj)
+	       `(car ,obj))
+	     
+	     (match-search-string (obj ch)
+	       `(if* (eql ,ch (schar (search-string ,obj) 
+				      (search-counter ,obj)))
+		   then (incf (search-counter ,obj))
+		   else (init-search-obj ,obj))))
+	     
+    (let ((end-tag   (create-search-obj (format nil "</~a_~a>" module fcn)))
+	  (start-tag (create-search-obj (format nil "<~a_~a>" module fcn)))
+	  (nest-level 0)
+	  (ch)
+	  (chcount 0))
+
+    
+      (loop
+	
+	(if* (end-of-search-p end-tag)
+	   then (if* (> nest-level 0)
+		   then (decf nest-level)
+			(init-search-obj end-tag)
+		   else (return (- chcount (length (search-string end-tag))))))
+	
+	(if* (end-of-search-p start-tag)
+	   then (incf nest-level)
+		(init-search-obj start-tag))
+	    
+
+    
+	; get next character ...
+	(if* (null (setq ch (read-char p nil nil)))
+	   then ; no end tag found
+		(return nil))
+	
+	(incf chcount)
+
+	;; and look for matches
+	(match-search-string end-tag ch)
+	(match-search-string start-tag ch)))))
+	    
 
 (defun collect-comment (p)
   ;; return a text object holding a whole comment

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-webactions.cl,v 1.2 2004/01/16 19:31:14 layer Exp $
+;; $Id: t-webactions.cl,v 1.3 2004/03/04 21:52:38 jkf Exp $
 
 ;; Description:
 ;;   test webactions in aserve
@@ -125,7 +125,7 @@
 	(x-do-http-request (format nil "~a/sitea/pagea" prefix-local))
       
       (test "test
-" data :test #'equal)
+" data :test #'equal-nocr)
       (test 200 retcode))
     
     
@@ -143,9 +143,9 @@
 	(x-do-http-request (format nil "~a/sitea/action" prefix-local))
       
       (test "test
-" data :test #'equal)
+" data :test #'equal-nocr)
       (test 200 retcode)
-      (test '(:foo :foo :foo) *sitea-vara* :test #'equal))
+      (test '(:foo :foo :foo) *sitea-vara* :test #'equal-nocr))
       
 
     ;; test redir to previous page preceeded by one push
@@ -155,9 +155,9 @@
 	(x-do-http-request (format nil "~a/sitea/redirtry" prefix-local))
       
       (test "test
-" data :test #'equal)
+" data :test #'equal-nocr)
       (test 200 retcode)
-      (test '(:foo :foo :foo :foo) *sitea-vara* :test #'equal))
+      (test '(:foo :foo :foo :foo) *sitea-vara* :test #'equal-nocr))
       
 
       
@@ -169,7 +169,7 @@
 	(x-do-http-request (format nil "~a/sitea/action2" prefix-local))
       
       (test "test
-" data :test #'equal)
+" data :test #'equal-nocr)
       (test 200 retcode))
     
     
@@ -179,7 +179,7 @@
 	(x-do-http-request (format nil "~a/sitea/action3" prefix-local))
       
       (test "test
-" data :test #'equal)
+" data :test #'equal-nocr)
       (test 200 retcode))
       
 
@@ -196,9 +196,9 @@
 	(x-do-http-request (format nil "~a/sitea/act" prefix-local))
       
       (test "test
-" data :test #'equal)
+" data :test #'equal-nocr)
       (test 200 retcode)
-      (test '(:foo) *sitea-vara* :test #'equal))
+      (test '(:foo) *sitea-vara* :test #'equal-nocr))
 
       
     ; bigger suffix
@@ -208,9 +208,9 @@
 	(x-do-http-request (format nil "~a/sitea/act234234/asd/asd/ad" prefix-local))
       
       (test "test
-" data :test #'equal)
+" data :test #'equal-nocr)
       (test 200 retcode)
-      (test '(:foo) *sitea-vara* :test #'equal))
+      (test '(:foo) *sitea-vara* :test #'equal-nocr))
           
 
       
@@ -221,7 +221,7 @@
 	(x-do-http-request (format nil "~a/sitea/filesss/act234234/asd/asd/ad" prefix-local))
       
       (test "the second test file: file2
-" data :test #'equal)
+" data :test #'equal-nocr)
       (test 200 retcode)
       (test "text/html" (cdr (assoc :content-type headers))
 	    :test #'equal)
@@ -235,15 +235,32 @@
 	(x-do-http-request (format nil "~a/sitea/testctype" prefix-local))
 	
       (test "This is a plain text file
-" data :test #'equal)
+" data :test #'equal-nocr)
       (test 200 retcode)
       (test "text/plain" (cdr (assoc :content-type headers))
-	    :test #'equal))
+	    :test #'equal-nocr))
+      
+
+    (multiple-value-bind (data retcode)
+	(x-do-http-request (format nil "~a/sitea/file4" prefix-local))
+	
+      (test "X{start_foo}Y{start_foo}Z{end_foo}W{end_foo}
+" data :test #'equal-nocr)
+      (test 200 retcode)
       
       
-      
-      
-    ))
+      )))
+
+
+
+(defun equal-nocr (a b)
+  ;; compare strings after removing all #\return's since they
+  ;; can appears in web results on certain machines
+  (equal (remove #\return a)
+	 (remove #\return b)))
+
+
+
 
 
 (defun action-sitea-pushit (req ent)
@@ -273,7 +290,11 @@
 
 
 
-
+(def-clp-function tweb_foo (req ent args body)
+  (declare (ignore args))
+  (html "{start_foo}")
+  (emit-clp-entity req ent body)
+  (html "{end_foo}"))
 
 
 
