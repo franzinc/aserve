@@ -1,5 +1,8 @@
 *******************************************************************************
 merge from trunk to acl6 branch (for 6.1.beta)
+command: ../../join.sh trunk trunk_to_acl6_merge5 trunk_to_acl6_merge6 aserve
+*******************************************************************************
+merge from trunk to acl6 branch (for 6.1.beta)
 command: ../../join.sh trunk trunk_to_acl6_merge4 trunk_to_acl6_merge5 aserve
 *******************************************************************************
 merge from trunk to acl6 branch (for 6.1.pre-beta)
@@ -20,6 +23,17 @@ join from trunk to layer6 branch
 command:
   ../../join.sh trunk acl6_branch_point trunk_to_layer6_merge1 aserve
 *******************************************************************************
+2001-06-26  John Foderaro  <jkf@tiger.franz.com>
+1.2.1
+	* main.cl - don't get blocked on a force-output that will
+	    never return due to the other side of the connection 
+	    going away.
+	* examples/chat.cl - support private chats amoung groups of
+	    people.  Support deleting messages. Support levels
+	    of users. Support redirecting
+	    people at certain IP addresses away from the chat if
+	    they cause problems.
+
 2001-06-05  John Foderaro  <jkf@tiger.franz.com>
 1.2.0
 	* main.cl - update version to 1.2.0 to mark acl 6.1 release.

@@ -22,7 +22,7 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-;; $Id: publish.cl,v 1.33.6.3 2001/06/01 21:22:37 layer Exp $
+;; $Id: publish.cl,v 1.33.6.4 2001/06/26 21:21:08 layer Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -159,7 +159,7 @@
 	 :initarg :info
 	 :accessor locator-info)
    
-   ; for random extra nifo
+   ; for random extra info
    (extra    :initarg :extra  :reader locator-extra)
    ))
 
