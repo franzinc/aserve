@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: main.cl,v 1.14 2000/01/18 22:59:41 jkf Exp $
+;; $Id: main.cl,v 1.15 2000/01/24 20:34:06 jkf Exp $
 
 ;; Description:
 ;;   neo's main loop
@@ -26,7 +26,6 @@
 ;;- This code in this file obeys the Lisp Coding Standard found in
 ;;- http://www.franz.com/~jkf/coding_standards.html
 ;;-
-
 
 
 (defpackage :neo
@@ -146,14 +145,6 @@
      (accept-thread   ;; thread accepting connetions and dispatching
       :initform nil
       :accessor wserver-accept-thread)
-     
-     (exact-url 
-      :initform (make-hash-table :test #'equal)
-      :accessor wserver-exact-url)
-     
-     (prefix-url
-      :initform nil
-      :accessor wserver-prefix-url)
      
      (locators
       ;; list of locators objects in search order

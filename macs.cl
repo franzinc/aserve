@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: macs.cl,v 1.3 2000/01/07 22:40:35 jkf Exp $
+;; $Id: macs.cl,v 1.4 2000/01/24 20:34:06 jkf Exp $
 
 ;; Description:
 ;;   useful internal macros
@@ -28,10 +28,11 @@
 ;;-
 
 
+(require :uri)
 
 ;; macros used by neo
 (defpackage :neo
-  (:use :common-lisp :excl :htmlgen))
+  (:use :common-lisp :excl :htmlgen :net.uri))
 
 (in-package :neo)
 
