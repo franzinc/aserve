@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: cgi.cl,v 1.1 2001/09/21 19:02:40 jkf Exp $
+;; $Id: cgi.cl,v 1.2 2001/09/21 19:17:02 jkf Exp $
 
 ;; Description:
 ;;   common gateway interface (running external programs)
@@ -148,7 +148,8 @@
 			   :error-output :output
 			   :separate-streams t
 			   :wait nil
-			   :environment envs)
+			   :environment envs
+			   :show-window :hide)
       (declare (ignore ignore-this))
 	    
       (unwind-protect
