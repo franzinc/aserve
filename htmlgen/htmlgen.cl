@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.18 2002/09/06 17:52:01 jkf Exp $
+;; $Id: htmlgen.cl,v 1.19 2002/09/10 16:30:12 jkf Exp $
 
 ;; Description:
 ;;   html generator
@@ -354,7 +354,8 @@
     (if* (keywordp possible-kwd)
        then (if* (null (setq ent (gethash possible-kwd *html-process-table*)))
 	       then (if* unknown
-		       then (funcall unknown form stream)
+		       then (return-from html-print-subst
+			      (funcall unknown form stream))
 		       else (error "unknown html tag: ~s" possible-kwd))
 	       else ; see if we should subst
 		    (if* (and subst 
