@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.40 2001/12/01 00:20:35 jkf Exp $
+;; $Id: t-aserve.cl,v 1.41 2002/01/15 20:06:46 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -1278,6 +1278,15 @@
       (declare (ignore res))
       (test 200 code)
       (test "text/html" (cdr (assoc :content-type headers :test #'eq)) 
+	    :test #'equal))
+    
+    ; now try full name mime type
+    (multiple-value-bind (res code headers)
+	(x-do-http-request (format nil "~a/acc-test/readme"
+				   prefix-local))
+      (declare (ignore res))
+      (test 200 code)
+      (test "frob/frib" (cdr (assoc :content-type headers :test #'eq)) 
 	    :test #'equal))
     
     ; test blocking via ip address, can't access if not using localhost

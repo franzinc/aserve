@@ -1,3 +1,20 @@
+2002-01-15  John Foderaro  <jkf@tiger.franz.com>
+1.2.21
+	* main.cl - fix bug where the value of 
+	  *default-aserve-external-format* was captured at macroexpansion
+	  time rather than run time.  All code using with-http-body
+	  should be recompiled.
+
+	* publish.cl - allow mime types to be specified for filenames that
+	  don't have a type component (e.g. ReadMe files).
+	* publish.cl - set-cookie-header takes an encode-value argument
+	 to control whether it does encoding of its argument.
+
+2002-01-07  John Foderaro  <jkf@tiger.franz.com>
+
+	* main.cl - fix problem of restarting aserve in non-ssl mode
+	  after starting it is ssl mode.
+
 2002-01-06  John Foderaro  <jkf@tiger.franz.com>
 
 	* add :nofile return code to parse-multipart-header

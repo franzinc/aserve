@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.69 2001/11/28 17:52:03 jkf Exp $
+;; $Id: publish.cl,v 1.70 2002/01/15 20:06:46 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -266,6 +266,10 @@
 
 ; we can specify either an exact url or one that handles all
 ; urls with a common prefix.
+;;
+;; if the prefix is given as a list: e.g. ("ReadMe") then it says that
+;; this mime type applie to file named ReadMe.  Note that file types
+;; are checked first and if no match then a filename match is done.
 ;
 (defparameter *file-type-to-mime-type*
     ;; this list constructed by generate-mime-table in parse.cl
@@ -410,7 +414,19 @@
 
 (build-mime-types-table)  ;; build the table now
 
+(defmethod lookup-mime-type (filename)
+  ;; return mime type if known
+  (if* (pathnamep filename)
+     then (setq filename (namestring filename)))
+  (multiple-value-bind (root tail name type)
+      (split-namestring filename)
+    (declare (ignore root name))
+    (if* (and type (gethash type *mime-types*))
+       thenret
+     elseif (gethash (list tail) *mime-types*) 
+       thenret)))
 
+		     
 
 (defun unpublish (&key all (server *wserver*))
   (if* all
@@ -583,8 +599,7 @@
   
   
     (setq c-type (or content-type
-		     (gethash (pathname-type (pathname file))
-			      *mime-types*)
+		     (lookup-mime-type file)
 		     "application/octet-stream"))
     
     (if* preload
@@ -1447,23 +1462,29 @@
   ;; a file it needs to publish
   
   ; check to see if there is an applicable mime type
-  (let ((posdot (position #\. realname :from-end t))
-	content-type
+  (let (content-type
 	local-authorizer
 	pswd-authorizer
 	ip-authorizer
 	)
-    (if* (and posdot
-	      (>= posdot (or (position #\/ realname :from-end t) 0)))
-       then ; we have a file type
-	    (let ((type (subseq realname (1+ posdot))))
-	      ; check for matches in the local table 
-	      (let ((mime (assoc :mime info :test #'eq)))
-		(if* mime
-		   then (dolist (pat (getf (cdr mime) :types))
-			  (if* (member type (cdr pat) :test #'equalp)
-			     then (setq content-type (car pat))
-				  (return)))))))
+    
+    ; look for local mime info that would set the content-type
+    ; of this file
+    (block out
+      (multiple-value-bind (root tail name type)
+	  (split-namestring realname)
+	(declare (ignore root name))
+	(dolist (inf info)
+	  (if* (eq :mime (car inf))
+	     then ; test this mime info
+		  (dolist (pat (getf (cdr inf) :types))
+		    (if* (or (and type (member type (cdr pat) :test #'equalp))
+			     (and tail 
+				  (member (list tail) (cdr pat) 
+					  :test #'equalp)))
+		       then (setq content-type (car pat))
+			    (return-from out t)))))))
+		
     
     ; look for authorizer
     (let ((ip (assoc :ip info :test #'eq)))
@@ -2096,7 +2117,9 @@
 				   (path "/")
 				   secure
 				   (external-format 
-				    *default-aserve-external-format*))
+				    *default-aserve-external-format*)
+				   (encode-value t)
+				   )
   ;; put a set cookie header in the list of header to be sent as
   ;; a response to this request.
   ;; name and value are required, they should be strings
@@ -2110,12 +2133,18 @@
   ;; than "franz.com".... as netscape why this is important
   ;; secure is either true or false
   ;;
-  (let ((res (concatenate 'string 
-	       (uriencode-string (string name)
-				 :external-format external-format)
-	       "="
-	       (uriencode-string (string value)
-				 :external-format external-format))))
+  (let (res)
+    
+    (setq res
+      (concatenate 'string 
+	(uriencode-string (string name) :external-format external-format)
+	"="
+	(if* encode-value
+	   then (uriencode-string (string value)
+				  :external-format external-format)
+	   else ; use value unencoded
+		(string value))))
+    
     (if* expires
        then (if* (eq expires :never)
 	       then (setq expires *far-in-the-future*))

@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.34 2001/10/31 19:43:47 jkf Exp $
+;; $Id: parse.cl,v 1.35 2002/01/15 20:06:46 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -673,7 +673,59 @@
 		   then (return nil)))))))
 		
   
-			     
+;----
+(defun split-namestring (file)
+  ;; split the namestring into root and tail and then the tail
+  ;; into name and type
+  ;; 
+  ;; any of the return value can be nil if the corresponding item
+  ;; isn't present.
+  ;;
+  ;; rules for splitting the tail into name and type components:
+  ;;  if the last period in the tail is at the beginning or end of the
+  ;;  tail, then the name is exactly the tail and type is nil.
+  ;;  Thus .foo and bar.  are just names, no type
+  ;;  but .foo.c  has a name of ".foo" and a type of "c"
+  ;;  Thus if there is a non-nil type then it means that 
+  ;;    1. there will be a non nil name as well
+  ;;    2. to reconstruct the filename you need to add a period between
+  ;;       the name and type.
+  ;;
+  (let ((pos (min (or (or (position #\/ file :from-end t) most-positive-fixnum)
+		      #+mswindows (position #\\ file :from-end t))))
+	root
+	tail)
+    
+    (if* (equal file "") then (return-from split-namestring nil))
+    
+    (if* (and pos (< pos most-positive-fixnum))
+       then ; we have root and tail
+	    (if* (eql pos (1- (length file)))
+	       then ; just have root
+		    (return-from split-namestring
+		      (values file nil nil nil)))
+	    
+    
+	    (setq root (subseq file 0 (1+ pos))
+		  tail (subseq file (1+ pos)))
+       else (setq tail file))
+    
+    
+    ; split the tail
+    (let ((pos (position #\. tail :from-end t)))
+      (if* (or (null pos)
+	       (zerop pos)
+	       (equal pos (1- (length tail))))
+	 then ; name begins or ends with . so it's not
+	      ; a type separator
+	      (values root tail tail nil)
+	 else ; have all pieces
+	      (values root tail
+		      (subseq tail 0 pos)
+		      (subseq tail (1+ pos)))))))
+
+			      
+		
 
     
 

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.133 2002/01/06 19:51:17 jkf Exp $
+;; $Id: main.cl,v 1.134 2002/01/15 20:06:46 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -154,7 +154,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 20))
+(defparameter *aserve-version* '(1 2 21))
 
 (eval-when (eval load)
     (require :sock)
@@ -589,7 +589,7 @@ Problems with protocol may occur." (ef-name ef)))))
 (defmacro with-http-body ((req ent
 			   &key headers 
 				(external-format 
-				 *default-aserve-external-format*))
+				 '*default-aserve-external-format*))
 			  &rest body)
   (declare (ignorable external-format))
   (let ((g-req (gensym))
@@ -609,7 +609,8 @@ Problems with protocol may occur." (ef-name ef)))))
        (if* ,g-headers
 	  then (bulk-set-reply-headers ,g-req ,g-headers))
        (send-response-headers ,g-req ,g-ent :pre)
-       (if* (not (member :omit-body (request-reply-strategy ,g-req)))
+       (if* (not (member :omit-body (request-reply-strategy ,g-req) 
+			 :test #'eq))
 	  then (let ((*html-stream* (request-reply-stream ,g-req)))
 		 #+(and allegro (version>= 6 0 pre-final 1))
 		 (if* (and (streamp *html-stream*)
@@ -620,7 +621,7 @@ Problems with protocol may occur." (ef-name ef)))))
 			   ,g-external-format))
 		 (progn ,@body)))
        
-       (if* (member :keep-alive (request-reply-strategy ,g-req))
+       (if* (member :keep-alive (request-reply-strategy ,g-req) :test #'eq)
 	  then ; force the body to be read so we can continue
 	       (get-request-body ,g-req))
        (send-response-headers ,g-req ,g-ent :post))))
@@ -1033,8 +1034,7 @@ by keyword symbols and not by strings"
 	     then ; ssl defaults to port 443
 		  (setq port 443)))
 	    
-  (if* accept-hook
-     then (setf (wserver-accept-hook server) accept-hook))
+  (setf (wserver-accept-hook server) accept-hook)
   
   
   ; shut down existing server
