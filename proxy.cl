@@ -619,6 +619,9 @@
   
   (let ((pcache (wserver-pcache *wserver*)))
     
+    (if* (null pcache)
+       then (return-from cache-response nil))
+    
     (if* (eq (request-method req) :get)
        then ; cache only gets
 	    
