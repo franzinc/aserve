@@ -1,3 +1,8 @@
+2000-05-04  John Foderaro  <jkf@tiger.franz.com>
+1.1.16
+	* request-query can now read from uri and/or post'ed body
+	  see doc/aserve.html for details
+
 2000-04-26  John Foderaro  <jkf@tiger.franz.com>
 1.1.15
 	* ! Non upward-compatible change ! -- the function

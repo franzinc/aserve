@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.37 2000/04/26 18:11:48 jkf Exp $
+;; $Id: main.cl,v 1.38 2000/05/04 20:21:14 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -124,7 +124,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 1 15))
+(defparameter *aserve-version* '(1 1 16))
 
 
 (provide :aserve)
@@ -1521,26 +1521,35 @@
       
 		      
 				  
-(defmethod request-query ((req http-request) &key (handle-post t))
+(defmethod request-query ((req http-request) &key (post t) (uri t))
   ;; decode if necessary and return the alist holding the
   ;; args to this url.  In the alist items the value is the 
   ;; cdr of the alist item.
   ;;
-  ;; If there is no query string and this is a post method then
-  ;; the body of will be grabbed and turned into a query alist.
-  ;; If :handle-post is nil then, this automatic process won't be done
+  ;; If uri is true then we look for query information in the uri
+  ;; (following a question mark)
+  ;; If post is true and this is a post request then we look for
+  ;; query information in the body of the query.
+  ;; If both are true (and this is a post) then we look both places.
+  ;;
   ;;
   (let ((alist (request-query-alist req)))
     (if* (not (eq alist :empty))
        then alist
-       else (let ((arg (uri-query (request-uri req))))
-	      (if* arg
-		 then (setf (request-query-alist req)
-			(form-urlencoded-to-query arg))
-	       elseif (and handle-post (eq (request-method req) :post))
-		 then (setf (request-query-alist req)
-			(form-urlencoded-to-query
-			 (get-request-body req))))))))
+       else (let (res)
+	      (if* uri
+		 then (let ((arg (uri-query (request-uri req))))
+			(if* arg
+			   then (setq res (form-urlencoded-to-query arg)))))
+	      
+	      (if* post
+		 then (if* (eq (request-method req) :post)
+			 then (setf res
+				(append res
+					(form-urlencoded-to-query
+					 (get-request-body req))))))
+	      (setf (request-query-alist req) res)))))
+			
 
 
 

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.2 2000/04/26 18:11:49 jkf Exp $
+;; $Id: t-aserve.cl,v 1.3 2000/05/04 20:21:14 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -55,6 +55,7 @@
 	    (test-publish-computed port)
 	    (test-authorization port)
 	    (test-encoding)
+	    (test-forms port)
 	    )
 	(stop-aserve-running)))))
     
@@ -545,7 +546,180 @@
 
     
     
+(defun test-forms (port)
+  ;; test encoding and decoding info
+  ;;
+  ;; we can send the info as a uri query or as the body of a post
+  ;;
+  (let ((prefix-local (format nil "http://localhost:~a" port))
+	(uri-var-vals '(("marketing" . "sammy c")
+			("sales" . "masako o")
+			("tech group" . "A Whole Big <Group> of Folks?")))
+	(post-var-vals
+	 '(("cessna" . "good#")
+	   ("piper"  . "better###")
+	   ("grumman" . "best<>###")))
+	(req-query-res)
+	)
     
+
+    ;;-------------------------
+    
+    (publish :path "/form-tester-both"
+	     :content-type "text/html"
+	     :function
+	     #'(lambda (req ent)
+		 ;; get both uri and post
+		 (setq req-query-res (request-query req))
+		 (with-http-response (req ent)
+		   (with-http-body (req ent)
+		     (html "hi")))))
+
+    ;; send query only on uri
+    (do-http-request (format nil "~a/form-tester-both?~a" 
+			     prefix-local
+			     (query-to-form-urlencoded uri-var-vals)))
+    
+    (test nil (set-difference uri-var-vals req-query-res
+			      :test #'equal))
+    
+    
+    
+    ;; send query only on post
+    (do-http-request (format nil "~a/form-tester-both" 
+			     prefix-local)
+      :method :post
+      :content (query-to-form-urlencoded post-var-vals))
+    
+    (test nil (set-difference post-var-vals req-query-res
+			      :test #'equal))
+    
+    
+    ;; send query on both uri and post
+    (do-http-request (format nil "~a/form-tester-both?~a" 
+			     prefix-local
+			     (query-to-form-urlencoded uri-var-vals))
+	
+      :method :post
+      :content (query-to-form-urlencoded post-var-vals))
+    
+    (test nil (set-difference (append post-var-vals 
+				      uri-var-vals)
+			      req-query-res
+			      :test #'equal))
+    
+    
+    ;;------------------------------------
+    
+    ;; only check uri
+    
+    (publish :path "/form-tester-uri"
+	     :content-type "text/html"
+	     :function
+	     #'(lambda (req ent)
+		 ;; get both uri and post
+		 (setq req-query-res (request-query req :post nil))
+		 (with-http-response (req ent)
+		   (with-http-body (req ent)
+		     (html "hi")))))
+    
+    
+    (do-http-request (format nil "~a/form-tester-uri?~a" 
+			     prefix-local
+			     (query-to-form-urlencoded uri-var-vals)))
+    
+    (test nil (set-difference uri-var-vals req-query-res
+			      :test #'equal))
+    
+    
+    
+    ;; send query only on post
+    (do-http-request (format nil "~a/form-tester-uri" 
+			     prefix-local)
+      :method :post
+      :content (query-to-form-urlencoded post-var-vals))
+    
+    (test nil req-query-res)
+    
+    
+    ;; send query on both uri and post
+    (do-http-request (format nil "~a/form-tester-uri?~a" 
+			     prefix-local
+			     (query-to-form-urlencoded uri-var-vals))
+	
+      :method :post
+      :content (query-to-form-urlencoded post-var-vals))
+    
+    (test nil (set-difference uri-var-vals
+			      req-query-res
+			      :test #'equal))
+    
+    ;;-------------------------
+    
+    ; only check post
+    
+    (publish :path "/form-tester-post"
+	     :content-type "text/html"
+	     :function
+	     #'(lambda (req ent)
+		 ;; get both uri and post
+		 (setq req-query-res (request-query req :uri nil))
+		 (with-http-response (req ent)
+		   (with-http-body (req ent)
+		     (html "hi")))))
+    
+
+    (do-http-request (format nil "~a/form-tester-post?~a" 
+			     prefix-local
+			     (query-to-form-urlencoded uri-var-vals)))
+    
+    (test nil  req-query-res)
+    
+    
+    
+    ;; send query only on post
+    (do-http-request (format nil "~a/form-tester-post" 
+			     prefix-local)
+      :method :post
+      :content (query-to-form-urlencoded post-var-vals))
+    
+    (test nil (set-difference req-query-res post-var-vals :test #'equal))
+    
+    
+    ;; send query on both uri and post
+    (do-http-request (format nil "~a/form-tester-post?~a" 
+			     prefix-local
+			     (query-to-form-urlencoded uri-var-vals))
+	
+      :method :post
+      :content (query-to-form-urlencoded post-var-vals))
+    
+    (test nil (set-difference post-var-vals req-query-res :test #'equal))
+
+    
+    ))
+    
+
+  
+  
+  
+  
+
+
+    
+    
+
+
+
+
+
+      
+    
+    
+    
+    
+			  
+		   
     
     
     
