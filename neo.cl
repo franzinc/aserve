@@ -1,4 +1,16 @@
-(in-package :user)
+(defpackage :neo
+  (:use :common-lisp :excl :htmlgen)
+  (:export
+   #:decode-form-urlencoded
+   #:publish
+   #:publish-file
+   #:with-http-response
+   #:*response-ok*
+	  )
+  )
+
+(in-package :neo)
+
 
 (defvar *ndebug* t)   ; print debugging stuff
 
@@ -151,7 +163,6 @@
 			   '(#\return #\linefeed)))
 
 
-(defvar *response-stream* ) ; bound to the stream to write html to.
 
 (defmacro with-http-response ((kind request mime-type &rest args) &rest body)
   ;; write a response back to the server
@@ -224,7 +235,8 @@
   
   (let ((main-socket (socket:make-socket :connect :passive
 					 :local-port port
-					 :reuse-address t)))
+					 :reuse-address t
+					 :format :bivalent)))
     
     (unwind-protect
 	(loop

@@ -1,6 +1,8 @@
 ;; examples of web pages
+(defpackage :neoe ;; neo example
+  (:use :common-lisp :excl :htmlgen :neo))
 
-(in-package :user)
+(in-package :neoe)
 
 
 (publish :url "/" 
@@ -67,7 +69,7 @@
 	       (setq *rr* req)
 	       (let ((gotname (assoc "username"
 				     (decode-form-urlencoded 
-				      (args req))
+				      (neo::args req))
 				     :test #'equal)))
 		 (if* gotname
 		    then (setq name (cdr gotname))))
@@ -91,7 +93,7 @@
  #'(lambda (req ent)
      (let ((lookup (assoc "symbol"
 			  (decode-form-urlencoded
-			   (args req))
+			   (neo::args req))
 			  :test #'equal)))
        (with-http-response (*response-ok* req "text/html")
 	 (html (:head (:title "Allegro Apropos"))

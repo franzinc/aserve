@@ -1,4 +1,4 @@
-(in-package :user)
+(in-package :neo)
 
 
 (defclass entity ()

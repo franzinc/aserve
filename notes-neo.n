@@ -211,7 +211,7 @@ Next we must determine the entity that is being accessed.
 
 
 
-there are four common commands we'll have to deal wtih
+there are four common commands we'll have to deal with
 
 1. :get  - retrieve an entity.
            may be conditional (if-modified-since) so we have to deal with that
@@ -226,8 +226,26 @@ there are four common commands we'll have to deal wtih
 4. :post  ... used in forms where there is too much data coming
    back to put in the url after a question mark.
 
+   the data appears in the entity body using url encoding.
 
-	   
+
+=========
+
+general flow:
+    we need two modes: testing and production:
+        In testing mode we only have one process accepting connections
+        and doing the work.  This makes for easier debugging.
+
+        In production mode we have a bunch of lisp threads with no
+        run reasons.  They are the worker threads.
+        When accept connection returns with a stream that stream is
+        made the run reason for once of the threads so it will wake up
+        and handle the command from that stream.
+        If the connection is a keepalive connection then that thread will
+        continue to handle that connection until it closes off or 
+        fails to give a new request for N seconds.
+
+            
 
 
 

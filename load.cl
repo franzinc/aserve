@@ -3,7 +3,7 @@
 (defvar *loadswitch* :compile-if-needed)
 ;(require :defftype)
 
-(dolist (file '("html"
+(dolist (file '("../htmlgen/htmlgen"
 		"neo"
 		"publish"
 		"examples"))
@@ -21,7 +21,7 @@
    "neoserver"
    "neoserver/"
    '(:sock :process :defftype :foreign :ffcompat "loadonly.cl" "load.cl")
-   :restart-init-function 'start-cmd
+   :restart-init-function 'neo::start-cmd
    :application-administration '(:resource-command-line
 				 ;; Quiet startup:
 				 "-Q")
