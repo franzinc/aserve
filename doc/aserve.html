@@ -7,7 +7,8 @@
 
 <body>
 
-<h1 align="center">AllegroServe - A Web Application Server</h1>
+<h1 align="center">AllegroServe - A Web Application Server<br>
+<small><small><small>version <font face="Courier New">1.2.16</font></small></small></small></h1>
 
 <p align="left"><strong><small>copyright(c) 2000-2001. Franz Inc</small></strong></p>
 
@@ -23,6 +24,7 @@
 <font face="Courier New">&nbsp; <a href="#f-publish-file">publish-file</a><br>
 &nbsp; <a href="#f-publish-directory">publish-directory</a><br>
 &nbsp; <a href="#f-publish">publish</a></font><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-publish-prefix">publish-prefix</a></font><br>
 &nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-publish-multi"><font face="Courier New">publish-multi</font></a><br>
 <a href="#generating-a-computed-response">Generating a Computed Response</a><br>
 <font face="Courier New">&nbsp; <a href="#f-with-http-response">with-http-response</a><br>
@@ -311,7 +313,7 @@ an entity assigned, the old entity is replaced by the new entity.</p>
 <p><a name="f-publish-file"></a><strong><font face="Courier New">(publish-file &amp;key
 path host port&nbsp; file content-type class preload cache-p remove <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-authorizer server timeout)</font></strong></p>
+authorizer server timeout plist)</font></strong></p>
 
 <p>This creates an entity that will return the contents of a file on the disk in response
 to a request.&nbsp;&nbsp; The <strong>url</strong> and <strong>file</strong>&nbsp; must be
@@ -362,6 +364,7 @@ given, the rest of the arguments are optional..&nbsp; The arguments have these m
     transfer.&nbsp;&nbsp; If I/O timeouts are not supported then the default value of this
     argument is <strong>nil</strong> meaning ignore this value and use the timeout value held
     in the server object and retrieved with<strong> wserver-response-timeout</strong>..</li>
+  <li><strong>plist</strong> - initial property list for this entity</li>
 </ul>
 
 <p>The function that handles requests for files will respond correctly to <strong>If-Modified-Since</strong>
@@ -380,7 +383,7 @@ header lines and thus minimizes network traffic. </p>
 <p><a name="f-publish-directory"></a><strong><font face="Courier New">(publish-directory
 &amp;key prefix host port destination remove authorizer server <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-indexes filter timeout publisher access-file)</font></strong></p>
+indexes filter timeout plist publisher access-file)</font></strong></p>
 
 <p><strong>publish-directory</strong> is used to publish a complete directory tree of
 files.&nbsp; This is similar to how web servers such as Apache publish files. &nbsp;
@@ -390,7 +393,7 @@ created and published.&nbsp; </p>
 
 <p><strong>publish-directory</strong> creates a mapping from all urls whose name begins
 with<strong> prefix</strong> to files stored in the directory specified by the <strong>destination</strong>.&nbsp;&nbsp;
-The <strong>host</strong>, <strong>port, remove, authorizer </strong>and <strong>server</strong>
+The <strong>host</strong>, <strong>port, remove, authorizer, plist </strong>and <strong>server</strong>
 arguments are as described above for <strong>publish.</strong> &nbsp;&nbsp;&nbsp;&nbsp;
 The <strong>timeout</strong> argument defaults as described in <strong>publish-file</strong>.
 &nbsp; The <strong>access-file</strong> argument names the <a
@@ -570,7 +573,7 @@ to subdirectories<br>
 <p>&nbsp;</p>
 
 <p><a name="f-publish"></a><strong><font face="Courier New">(publish &amp;key path host
-port content-type function class format remove server authorizer timeout)</font></strong></p>
+port content-type function class format remove server authorizer timeout plist)</font></strong></p>
 
 <p>This creates a mapping from a url to a <strong>computed-entity</strong>, that is an
 entity that computes its response every time a request comes in.&nbsp; The <strong>path</strong>,
@@ -591,6 +594,22 @@ request.&nbsp;&nbsp; This function must generate a response to the http request,
 the response is only that the request wasn't found.</p>
 
 <p>&nbsp;</p>
+
+<p><a name="f-publish"></a><a name="f-publish-prefix"></a><strong><font face="Courier New">(publish-prefix
+&amp;key prefix host port content-type function class <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; format
+remove server authorizer timeout plist)</font></strong></p>
+
+<p>This is like <strong>publish </strong> except that it declares <strong>function</strong>
+to be the handler for all urls that begin with the string <strong>prefix</strong>.
+&nbsp;&nbsp; Note however that prefix handlers have lower priority than exact handlers.
+&nbsp; Thus if you declare a prefix handler for &quot;/foo&quot; and also a specific
+handler for &quot;/foo/bar.html&quot; then the specific handler will be chosen if
+&quot;/foo/bar.html&quot; is found in an http request.&nbsp;&nbsp; Typically a prefix
+handler is used to make available a whole directory of files since their complete names
+being with a common prefix (namely the directory in which the files are located).
+&nbsp;&nbsp; If you want to publish a whole directory then you probably want to use <strong>publish-directory</strong>
+since it has a number of features to support file publishing.</p>
 
 <p>&nbsp;</p>
 
