@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.5 2000/03/17 15:02:00 jkf Exp $
+;; $Id: client.cl,v 1.6 2000/03/20 15:52:26 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -614,6 +614,14 @@
     :accessor client-request-protocol)
    (response-comment  ;; comment passed back with the response
     :accessor client-request-response-comment)
+   ;
+   (bytes-left  ;; indicates how many bytes in response left
+    ; value is nil (no body)
+    ;          integer (that many bytes left, not chunking)
+    ;		:unknown - read until eof, not chunking
+    ;		:chunking - read until chunking eof
+    :accessor client-request-bytes-left
+    :initform nil)
    ))
 
 
@@ -669,9 +677,101 @@
      ,@body))
 
 
+(defun do-http-request (uri 
+			&key 
+			(method  :get)
+			(protocol  :http/1.1)
+			(accept "*/*")
+			content
+			(format :text) ; or :binary
+			)
+  
+  ;; send an http request and return the result as three values:
+  ;; the response code, the headers and the body
+  (let ((creq (make-http-client-request 
+	       uri  
+	       :method method
+	       :protocol protocol
+	       :accept  accept
+	       :content content)))
+
+    (unwind-protect
+	(progn 
+	  (read-client-response-headers creq)
+	  (let* ((atype (if* (eq format :text) 
+			   then 'character
+			   else '(unsigned-byte 8)))
+		 ans
+		 res
+		 (start 0)
+		 (end nil)
+		 body)
+	    (loop
+	
+	      (if* (null ans)
+		 then (setq ans (make-array 1024 :element-type atype)
+			    start 0))
+		
+	
+	      (setq end (client-request-read-sequence ans creq :start start))
+	      (if* (zerop end)
+		 then ; eof
+		      (return))
+	      (if* (eql end 1024)
+		 then ; filled up
+		      (push ans res)
+		      (setq ans nil)
+		 else (setq start end)))
+      
+	    ; we're out with res containing full arrays and 
+	    ; ans either nil or holding partial data up to but not including
+	    ; index start
+      
+	    (if* res
+	       then ; multiple items
+		    (let* ((total-size (+ (* 1024 (length res)) start))
+			   (bigarr (make-array total-size :element-type atype)))
+		      (let ((sstart 0))
+			(dolist (arr (reverse res))
+			  (replace bigarr arr :start1 sstart)
+			  (incf sstart (length arr)))
+			(if* ans 
+			   then ; final one 
+				(replace bigarr ans :start1 sstart)))
+		
+		      (setq body bigarr)
+		      )
+	       else ; only one item
+		    (if* (eql 0 start)
+		       then ; nothing returned
+			    (setq body nil)
+		       else (setq body (subseq ans 0 start))))
+      
+      
+	    ; return the values
+	    (values 
+	     (client-request-response-code creq)
+	     (client-request-headers  creq)
+	     body)))
+      
+      ; protected form:
+      (client-request-close creq))))
+
+
+    
+		
+		
+		
+		
+		
+		
+		      
+
+
+
 (defun make-http-client-request (uri &key 
 				     (method  :get)  ; :get, :post, ....
-				     (protocol  :http/1.0)
+				     (protocol  :http/1.1)
 				     keep-alive 
 				     (accept "*/*") 
 				     cookies 
@@ -680,8 +780,7 @@
 				     content)
   
   ;; to be done:
-  (declare (ignore content content-length basic-authorization
-		   cookies))
+  (declare (ignore basic-authorization cookies))
    
   ;; start a request 
   
@@ -724,11 +823,31 @@
 
     (if* accept
        then (format sock "Accept: ~a~a" accept crlf))
+    
+    (if* content
+       then (typecase content
+	      ((array character (*)) nil)
+	      ((array (unsigned-byte 8) (*)) nil)
+	      (t (error "Illegal content array: ~s" content)))
+	    
+	    (setq content-length (length content)))
+    
+    (if* content-length
+       then (format sock "Content-Length: ~s~a" content-length crlf))
+    
 	    
     ; cookies ?
     
 
     (write-string crlf sock)  ; final crlf
+    
+    ; send out the content if there is any.
+    ; this has to be done differently so that if it looks like we're
+    ; going to block doing the write we start another process do the
+    ; the write.  
+    (if* content
+       then (write-sequence content sock))
+    
     
     (force-output sock)
     
@@ -750,6 +869,7 @@
 	response
 	comment
 	saveheader
+	val
 	)
     (unwind-protect
 	(with-better-scan-macros
@@ -828,7 +948,7 @@
 			   `(let ((i 0))
 			      (error "header line missing a colon:  ~s" 
 				     (collect-to-eol buff i len)))))
-		(setq headername (collect-to #\: buff pos len)))
+		(setq headername (collect-to #\: buff pos len :downcase)))
 	  
 	      (incf pos) ; past colon
 	      (macrolet ((fail ()
@@ -841,11 +961,91 @@
       
 	  (setf (client-request-headers creq) headers)
 	  
+	  (if* (equalp "chunked" (client-response-header-value 
+				  creq "transfer-encoding"))
+	     then ; data will come back in chunked style
+		  (setf (client-request-bytes-left creq) :chunked)
+		  (socket:socket-control (client-request-socket creq)
+				  :input-chunking t)
+	   elseif (setq val (client-response-header-value
+			     creq "content-length"))
+	     then ; we know how many bytes are left
+		  (setf (client-request-bytes-left creq) 
+		    (quick-convert-to-integer val))
+	   elseif (not (equalp "keep-alive"
+			       (client-response-header-value
+				creq "connection")))
+	     then ; connection will close, let it indicate eof
+		  (setf (client-request-bytes-left creq) :unknown)
+	     else ; no data in the response
+		  nil)
+	  
+		  
+	  
 	  creq  ; return the client request object
 	  )
       (progn (put-header-line-buffer buff2 buff)))))
 		  
-	      
+
+
+(defmethod client-request-read-sequence (buffer
+					 (creq client-request)
+					 &key
+					 (start 0)
+					 (end (length buffer)))
+  ;; read the next (end-start) bytes from the body of client request, handling
+  ;;   turning on chunking if needed
+  ;;   return index after last byte read.
+  ;;   return 0 if eof
+  (let ((bytes-left (client-request-bytes-left creq))
+	(socket (client-request-socket creq))
+	(last start))
+    (if* (integerp bytes-left)
+       then ; just a normal read-sequence
+	    (if* (zerop bytes-left)
+	       then 0  ; eof
+	       else (let ((ans (read-sequence buffer socket :start start
+					      :end (+ start 
+						      (min (- end start) 
+							   bytes-left)))))
+		      (if* (eq ans start)
+			 then 0  ; eof
+			 else (setf (client-request-bytes-left creq)
+				(- bytes-left (- ans start)))
+			      ans)))
+     elseif (or (eq bytes-left :chunked)
+		(eq bytes-left :unknown))
+       then (handler-case (do ((i start (1+ i))
+			       (stringp (stringp buffer)))
+			      ((>= i end) (setq last end))
+			    (setq last i)
+			    (let ((ch (if* stringp
+					 then (read-char socket nil nil)
+					 else (read-byte socket nil nil))))
+			      (if* (null ch)
+				 then (return)
+				 else (setf (aref buffer i) ch))))
+	      (excl::socket-chunking-end-of-file
+		  (cond)
+		(declare (ignore cond))
+		; remember that there is no more data left
+		(setf (client-request-bytes-left creq) :eof)
+		nil))
+	    ; we return zero on eof, regarless of the value of start
+	    ; I think that this is ok, the spec isn't completely clear
+	    (if* (eql last start) 
+	       then 0 
+	       else last)
+     elseif (eq bytes-left :eof)
+       then 0
+       else (error "socket not setup for read correctly")
+	    )))
+  
+
+(defmethod client-request-close ((creq client-request))
+  (close (client-request-socket creq)))
+
+
 (defun quick-convert-to-integer (str)
   ; take the simple string and convert it to an integer
   ; it's assumed to be a positive number
@@ -858,6 +1058,17 @@
     res))
 
 
+(defmethod client-response-header-value ((creq client-request)
+					 name &key parse)
+  ;; return the value associated with the given name
+  ;; parse it too if requested
+  (let ((val (cdr (assoc name (client-request-headers creq) :test #'equal))))
+    (if* (and parse val)
+       then (net.iserve::parse-header-value val)
+       else val)))
+
+    
+  
 
 
 (defun read-socket-line (socket buffer max)
@@ -914,11 +1125,13 @@
 
 
     
-(defun  doit ()
-  ;;test function
-  (setq xx 
-    (net.iserve.client::make-http-client-request "http://www.franz.com"))
-  (net.iserve.client::read-client-response-headers xx))
+
+;;;;; cookies
+
+(defclass cookie-jar ()
+  ())
+
+
 
     
   

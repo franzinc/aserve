@@ -1,6 +1,6 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.14 2000/03/17 22:53:14 jkf Exp $
+;; $Id: load.cl,v 1.15 2000/03/20 15:52:27 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -60,7 +60,9 @@
    "iserveserver"
    "iserveserver/"
    '(:sock :process :defftype :foreign :ffcompat "loadonly.cl" "load.cl")
-   :restart-init-function 'net.iserve::start-cmd
+   ; strange use of find-symbol below so this form can be read without
+   ; the net.iserve package existing
+   :restart-init-function (find-symbol (symbol-name :start-cmd) :net.iserve)
    :application-administration '(:resource-command-line
 				 ;; Quiet startup:
 				 "-Q")
@@ -112,7 +114,11 @@
 		
 
 (defparameter iserve-version-name 
-    (apply #'format nil "iserve-~d.~d.~d" net.iserve::*iserve-version*))
+    (apply #'format nil "iserve-~d.~d.~d" 
+	   (symbol-value
+	    (find-symbol 
+	     (symbol-name :*iserve-version*)
+	     :net.iserve))))
 
 
 (defun make-iserve.fasl ()
