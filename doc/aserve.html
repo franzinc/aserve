@@ -86,6 +86,9 @@
 <a href="#cache">Cache</a><br>
 <a href="#filters">Request Filters</a><br>
 <a href="#virtual_hosts">Virtual Hosts</a><br>
+<a href="#timeouts">Timeouts</a><br>
+<font face="Courier New">&nbsp; <a href="#f-wserver-io-timeout">wserver-io-timeout</a><br>
+&nbsp; <a href="#f-wserver-response-timeout">wserver-response-timeout</a></font><br>
 <a href="#debugging">Debugging</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-debug-on">net.aserve::debug-on</a><br>
 &nbsp; <a href="#f-debug-off">net.aserve::debug-off</a></font><br>
@@ -2153,6 +2156,72 @@ that we first do a complete search for a vhost specific handler and then restart
 search this time looking for a <strong>:wild</strong> handler.</p>
 
 <p>&nbsp;</p>
+
+<hr>
+
+<h2><a name="timeouts"></a>Timeouts</h2>
+
+<p>A web server is a program that provides resources to client program connecting over the
+network.&nbsp; The resources a web server has to offer is limited and it's important that
+network problems or buggy clients don't cause those resources to be unavailable to new
+clients.&nbsp;&nbsp; AllegroServe uses timeouts to ensure that no client can hold a web
+server resource for more than a certain amount of time.</p>
+
+<p>Three common ways for a resource to be held are
+
+<ol>
+  <li>A client stops sending a request in the middle of the request.&nbsp;&nbsp; This can
+    happen if the client machine crashes or&nbsp; if the client's machine loses network
+    connectivity with the&nbsp; machine running AllegroServe.</li>
+  <li>A client stops reading the response to its request.&nbsp;&nbsp;&nbsp; The networking
+    code will automatically stop the sender from writing new data if the receiver has a lot of
+    existing data to read. </li>
+  <li>The response function to an http request can take a very long time, or may even be in an
+    infinite loop.&nbsp;&nbsp; This could be due to a bug in a http response function or
+    something unexpected, like a database query taking a long time to finish.</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<h3>Acl 6.0 or older</h3>
+
+<p>For AllegroServe running in Acl 6.0 or <em>older</em> timeouts are done this way:</p>
+
+<p><strong>net.aserve::*read-request-timeout*</strong>&nbsp; - number of seconds
+AllegroServe allows for the request line (the first line) and all following header lines.
+&nbsp; The default is 20 seconds.</p>
+
+<p><strong>net.aserve::*read-request-body-timeout* </strong>- number of seconds
+AllegroServe allows for the body of the request (if any) to be read.&nbsp;&nbsp; The
+default is 60 seconds.</p>
+
+<p><strong>(wserver-response-timeout wserver)</strong> - the number of seconds
+AllegroServe allows for an http request&nbsp; function to be run and finished sending back
+its response.&nbsp; The initial value for this slot of the wserver object is found in <strong>*http-response-timeout*
+</strong>which defaults to 120 seconds.&nbsp; You can alter this timeout value with the <strong>:timeout</strong>
+argument to <strong>with-http-response</strong>. </p>
+
+<h3>Acl 6.1 or newer</h3>
+
+<p>In Acl 6.1 we added the capability of having each I/O operation to a socket stream time
+out.&nbsp;&nbsp; This means that we don't have to predict how long it should take to get a
+request or send a response.&nbsp; As long as we're making progress reading or writing we
+know that the client on the other end of the network connection is alive and well.
+&nbsp;&nbsp; We still need a timeout to handle case (3) above but we can allow a lot more
+time for the http response since we aren't using this timer to catch dead clients as well.
+&nbsp;&nbsp; Thus we have these timeout values:</p>
+
+<p><a name="f-wserver-io-timeout"></a><strong>(wserver-io-timeout wserver)</strong> - the
+number of seconds that AllegroServe will wait for any read or write operation to the
+socket to finish.&nbsp;&nbsp; The value is initialized to the value of *http-io-timeout*
+&nbsp; which defaults to 60 seconds.</p>
+
+<p><a name="f-wserver-response-timeout"></a><strong>(wserver-response-timeout wserver)</strong>
+-&nbsp; the number of seconds AllegroServe allows for an http request function to be run
+and finished sending back its response. The initial value for this slot of the wserver
+object is found in <strong>*http-response-timeout*</strong> which defaults to 300 seconds.
+You can alter this timeout value with the :timeout argument to <strong>with-http-response</strong>.
+</p>
 
 <hr>
 
