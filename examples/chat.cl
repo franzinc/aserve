@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.3 2000/07/26 02:23:58 jkf Exp $
+;; $Id: chat.cl,v 1.4 2000/08/04 15:52:09 jkf Exp $
 
 ;; Description:
 ;;   aserve chat program
@@ -44,6 +44,8 @@
 (defvar *default-secs*  10)
 
 (defvar *do-dnscheck* nil) ; translate ip to dns names
+
+(defvar *chat-hook* nil) ; invoked when the chat page is accessed
 
 ;; parameters
 ;
@@ -69,7 +71,7 @@
 (defparameter *bottom-frames-bgcolor* "#dddddd") ; gray
 (defparameter *bottom-frames-private* "#ff5555") ; for private messaging
 
-(defparameter *private-font-color*  "#ff0000") ; red
+(defparameter *private-font-color*  "#ff4444") ; red
 (defparameter *public-font-color* "#ffcc66") ; gold
 
 (defstruct color-style
@@ -121,7 +123,9 @@
 ;  s = secret key (specific to the object being accessed)
 ;  x = user uid
 ;  pp = uid of person sending message to, * means all
-;
+;  purl = picture url
+;  z = lurk
+;  y = delete message
 
 
 (defclass master-chat-controller ()
@@ -877,11 +881,19 @@
   (let ((chat (chat-from-req req))
 	(user (user-from-req req))
 	(qstring))
+    
+    (if* *chat-hook*
+       then (if* (funcalll *chat-hook* req ent)
+	       then (return-from chat)))
+    
+    
     (if* (null chat)
        then (ancient-link-error req ent)
        else (setq qstring 
-	      (add-secret req
-			  (add-user req (chat-query-string chat))))
+	      (add-lurk
+	       req
+	       (add-secret req
+			   (add-user req (chat-query-string chat)))))
 	    
 	    (format t "qstring ~s~%" qstring) (force-output)
 	    (with-http-response  (req ent)
@@ -920,6 +932,12 @@
 		     "This chat program requires a browser that supports frames"
 		     ))))))))))
 
+
+
+
+	      
+	
+    
 (defun add-user (req current-string)
   ;; if a user has been specified in the chat
   ;; the add it's x string to the current string
@@ -944,6 +962,14 @@
        then (format nil "~a&rv=~a" current-string val)
        else current-string)))
 
+(defun add-lurk (req current-string)
+  ;; if a lurk has been defined then add it onto the 
+  ;; current string
+  (let ((val (request-query-value "z" req)))
+    (if* val
+       then (format nil "~a&z=~a" current-string val)
+       else current-string)))
+
 (defun chattop (req ent)
   ;; put out the top part of the chat
   (let* ((chat (chat-from-req req))
@@ -956,7 +982,7 @@
     (if* (null chat)
        then (return-from chattop (ancient-link-error req ent)))
 
-    (let ((delete (request-query-value "z" req)))
+    (let ((delete (request-query-value "y" req)))
       (if* delete
 	 then (delete-chat-message chat (compute-integer-value delete))))
     
@@ -966,14 +992,22 @@
 	   (secs  (or (compute-integer-value
 		       (request-query-value "secs" req))
 		      0)))
-      (track-viewer chat user req)
+      
+      (if* (null (request-query-value "z" req))
+	 then (track-viewer chat user req))
+      
       (with-http-response (req ent)
 	(setq qstring 
 	  (format nil "~a&count=~d&secs=~d"
-		  (add-reverse req
-			       (add-secret req
-					   (add-user req 
-						     (chat-query-string chat))))
+		  (add-lurk
+		   req
+		   (add-reverse 
+		    req
+		    (add-secret 
+		     req
+		     (add-user 
+		      req 
+		      (chat-query-string chat)))))
 		  count 
 		  secs))
 	(with-http-body (req ent)
@@ -1013,6 +1047,7 @@
   (let* ((chat (chat-from-req req))
 	 (user (user-from-req req))
 	 (pp (or (request-query-value "pp" req) "*")) ; who to send to
+	 (purl (request-query-value "purl" req))
 	 (kind :multiline)
 	 (to-user (user-from-ustring pp))
 	 (qstring))
@@ -1032,7 +1067,7 @@
 	      
       (if* (and body (not (equal "" body)))
 	 then ; user added content to the chat
-	      (add-chat-data chat req handle body user to-user))
+	      (add-chat-data chat req handle body user to-user purl))
       
       (with-http-response (req ent)
 	(with-http-body (req ent)
@@ -1101,8 +1136,9 @@
 			  (:td
 			   (:center
 			    ((:input :type "text"
-				     :size 20
-				     :value "Not working yet"
+				     :size 40
+				     :maxlength 100
+				     :value (or purl "")
 				    :name "purl"))
 			   " Picture Url")))))
 		  else ; single line
@@ -1143,8 +1179,10 @@
 	   (secs  (or (request-query-value "secs" req) *default-secs*)))
       
       (setq qstring 
-	(add-secret req
-		    (add-user req (chat-query-string chat))))
+	(add-lurk
+	 req
+	 (add-secret req
+		     (add-user req (chat-query-string chat)))))
       (with-http-response (req ent)
 	(with-http-body (req ent)
 	  (html
@@ -1152,9 +1190,9 @@
 	    ((:body :bgcolor *bottom-frames-bgcolor*)
 	     ((:form :action
 		     (concatenate 'string
-			      "chattop?"
-			      qstring
-			      )
+		       "chattop?"
+		       qstring
+		       )
 		     :target "chattop"
 		     :method "POST")
 	      ((:input :type "text"
@@ -1203,26 +1241,41 @@
 
   
     
-(defun add-chat-data (chat req handle body user to-user)
-  (let* ((cvted-body (string-to-lhtml body))
-	 (ipaddr (socket:remote-host
-		  (request-socket req)))
-	 (dns (or #+ignore (socket:ipaddr-to-hostname ipaddr)
-		  (socket:ipaddr-to-dotted ipaddr)))
+(defun add-chat-data (chat req handle body user to-user purl)
+  ;; purl is picture url value
+  (multiple-value-bind (prefix link) 
+      (if* (and (stringp purl) (not (equal "" purl)))
+	 then (scan-for-http purl))
+    (declare (ignore prefix))
+    
+    (if* link
+       then (if* (and (consp link)
+		      (consp (car link))
+		      (eq :img (caar link)))
+	       thenret  ; valid image url
+	       else (setq link nil)))
+    
+    (let* ((cvted-body (string-to-lhtml body))
+	   (ipaddr (socket:remote-host
+		    (request-socket req)))
+	   (dns (or #+ignore (socket:ipaddr-to-hostname ipaddr)
+		    (socket:ipaddr-to-dotted ipaddr)))
 	 
-	 (message 
-	  (make-message
-	   :number (chat-message-number chat)
-	   :ipaddr ipaddr
-	   :dns dns
-	   :handle (if* user then (user-handle user) else handle)
-	   :to (if* to-user then (list (user-handle to-user)) else t)
-	   :real (if* user then t else nil)
-	   :time (compute-chat-date)
-	   :body cvted-body)))
+	   (message 
+	    (make-message
+	     :number (chat-message-number chat)
+	     :ipaddr ipaddr
+	     :dns dns
+	     :handle (if* user then (user-handle user) else handle)
+	     :to (if* to-user then (list (user-handle to-user)) else t)
+	     :real (if* user then t else nil)
+	     :time (compute-chat-date)
+	     :body (if* link
+		      then (cons link cvted-body)
+		      else cvted-body))))
 				     
-    (mp:with-process-lock ((chat-message-lock chat))
-      (add-chat-message chat message))))
+      (mp:with-process-lock ((chat-message-lock chat))
+	(add-chat-message chat message)))))
 
 (defun compute-chat-date ()
   ; return string to use as time for this message
@@ -1253,19 +1306,24 @@
 
 (defun delete-chat-message (chat messagenum)
   ;; remove the given message by setting the to field to nil
-  (let ((messages (chat-messages chat)))
-    (let ((first (svref messages 0)))
-      (if* (null first)
-	 then ; some kind of bug
-	      (return-from delete-chat-message nil))
-      (let ((offset (- messagenum (message-number first))))
-	(if* (or (< offset 0)
-		 (>= offset (chat-message-next chat)))
-	   thenret ; do nothing
-	   else (let ((message (svref messages offset)))
-		  (if* message
-		     then (setf (message-to message) nil))))))))
+  (let ((message (find-chat-message chat messagenum)))
+    (if* message
+       then (setf (message-to message) nil))))
 
+
+(defun find-chat-message (chat number)
+  ;; find the message with the given number
+  (let* ((messages (chat-messages chat))
+	 (len (and messages (length messages))))
+    (if* messages
+       then ; find first message
+	    (dotimes (i len)
+	      (let ((message (svref messages i)))
+		(if* (null message)
+		   then (return nil)
+		 elseif (eql (message-number message) number)
+		   then (return message)))))))
+		      
   
   
 (defun show-chat-info (chat count recent-first handle ownerp)
@@ -1300,12 +1358,18 @@
 	      (let ((message (svref messages i)))
 		(if* (null message)
 		   then (warn "null message at index ~d" i)
-		 elseif (and (not (eq t (message-to message)))
-			     (not (member handle (message-to message)
-					  :test #'equal))
-			     ; we can see messages we send
-			     (not (equal (message-handle message)
-					 handle)))
+		 elseif (if* (or (eq t (message-to message))
+				 (member handle (message-to message)
+					 :test #'equal))
+			   then ;; to everyone or us
+				nil	 ; don't skip
+			 elseif (and (equal (message-handle message)
+					    handle)
+				     (message-to message))
+			   then ;; from us to someone, anyone
+				nil ; don't skip
+			   else t ; skip
+				)
 		   thenret ; skip this message
 		 elseif (eq *show-style* 1)
 		   then
@@ -1334,7 +1398,7 @@
 			       (if* ownerp
 				  then (html
 					((:a :href 
-					     (format nil "chattop?z=~a&~a"
+					     (format nil "chattop?y=~a&~a"
 						     (message-number message)
 						     ownerp))
 					 "Delete")))

@@ -1,3 +1,8 @@
+2000-08-04  jkf  <jkf@main.verada.com>
+
+	*  examples/chat.cl - add user logins and private messages 
+	        between users.
+
 2000-07-31  jkf  <jkf@main.verada.com>
 
 	*  main.cl: if a multipart-mixed body was being sent then
