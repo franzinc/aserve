@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: puzzle.cl,v 1.1.2.1 2000/10/21 15:09:16 layer Exp $
+;; $Id: puzzle.cl,v 1.1.2.2 2001/06/01 21:22:38 layer Exp $
 
 ;; Description:
 ;;   Allegro Serve puzzle example
@@ -441,49 +441,49 @@
 	  ((>= i (length word))
 	   ;; if we're not already installing, then we arrive here when
 	   ;; we've passed all the tests and can begin installing.
-	   (unless install
-	     (setq install t)
-	     (go :restart)))
+	   (if* (not install)
+	      then (setq install t)
+		   (go :restart)))
 	;; If we're installing, then just slap in the letter.  Otherwise,
 	;; check  if the letter fits and/or if the puzzle needs extending.
 	(if* install
 	   then (setf (aref puzzle row col) (schar word i))
-	   else (when (or (< row 0)
-			  (< col 0)
-			  (>= row (first (array-dimensions puzzle)))
-			  (>= col (second (array-dimensions puzzle)))
-			  (>= attempt attempt-limit))
-		  ;; Don't allow puzzle size to extend unless we've tried
-		  ;; several attempts.
-		  (when (>= attempt attempt-limit)
-		    (incf extend-limit)
-		    (setq attempt 0))
-		  (multiple-value-bind (npuzzle nroff ncoff)
-		      ;; We add 1 randomly to the row extension and to
-		      ;; the column extension to work around the problem where
-		      ;; the puzzle may already be completely full.
-		      (extend-puzzle puzzle
-				     extend-limit
-				     (+ (car start) (* (car dir)
-						       (- length (random 2))))
-				     (+ (cdr start) (* (cdr dir)
-						       (- length (random 2)))))
-		    (if* npuzzle
-		       then (setq puzzle npuzzle)
-			    (incf roff nroff)
-			    (incf coff ncoff)
-			    (incf row nroff) (incf (car start) nroff)
-			    (incf col ncoff) (incf (cdr start) ncoff)
-		       else ;; extend-puzzle rejected because of
-			    ;; extend-limit, so we just loop around to
-			    ;; try again...
-			    (retry))))
-		(when (and (aref puzzle row col)
-			   (not (eq (aref puzzle row col)
-				    (schar word i))))
-		  ;; existing letters in puzzle didn't match.  So we
-		  ;; try again...
-		  (retry)))))
+	   else (if* (or (< row 0)
+			 (< col 0)
+			 (>= row (first (array-dimensions puzzle)))
+			 (>= col (second (array-dimensions puzzle)))
+			 (>= attempt attempt-limit))
+		   then ;; Don't allow puzzle size to extend unless we've tried
+			;; several attempts.
+			(if* (>= attempt attempt-limit)
+			   then (incf extend-limit)
+				(setq attempt 0))
+			(multiple-value-bind (npuzzle nroff ncoff)
+			    ;; We add 1 randomly to the row extension and to
+			    ;; the column extension to work around the problem where
+			    ;; the puzzle may already be completely full.
+			    (extend-puzzle puzzle
+					   extend-limit
+					   (+ (car start) (* (car dir)
+							     (- length (random 2))))
+					   (+ (cdr start) (* (cdr dir)
+							     (- length (random 2)))))
+			  (if* npuzzle
+			     then (setq puzzle npuzzle)
+				  (incf roff nroff)
+				  (incf coff ncoff)
+				  (incf row nroff) (incf (car start) nroff)
+				  (incf col ncoff) (incf (cdr start) ncoff)
+			     else ;; extend-puzzle rejected because of
+				  ;; extend-limit, so we just loop around to
+				  ;; try again...
+				  (retry))))
+		(if* (and (aref puzzle row col)
+			  (not (eq (aref puzzle row col)
+				   (schar word i))))
+		   then ;; existing letters in puzzle didn't match.  So we
+			;; try again...
+			(retry)))))
     (values puzzle start dir roff coff)))
 
 (defun extend-puzzle (puzzle extend-limit erow ecol

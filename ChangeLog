@@ -1,4 +1,7 @@
 *******************************************************************************
+merge from trunk to acl6 branch (for 6.1.pre-beta)
+command: ../../join.sh trunk trunk_to_acl6_merge3 trunk_to_acl6_merge4 aserve
+*******************************************************************************
 merge from trunk to acl6 branch (for 6.0.final.0)
 command: ../../join.sh trunk trunk_to_acl6_merge2 trunk_to_acl6_merge3 aserve
 *******************************************************************************
@@ -14,6 +17,86 @@ join from trunk to layer6 branch
 command:
   ../../join.sh trunk acl6_branch_point trunk_to_layer6_merge1 aserve
 *******************************************************************************
+2001-04-04  John Foderaro  <jkf@tiger.franz.com>
+
+	* changed how publish-directory deals with urls that
+	  point to directories and not files.  It used to 
+	  pretend that you specified an index.html or index.htm
+	  file in that directory.  This was bad since relative urls
+	  in the index file would not be processed correctly. with
+	  the change it now redirects to the index.html or index.htm
+	  file so that the browser knows what it's getting.
+
+2001-03-22  John Foderaro  <jkf@tiger.franz.com>
+1.1.41
+	* add os-processes argument to net.aserve:start 
+	 which causes aserve to fork (on unix only) and create
+	 multiple operating system processes listening on the
+	 same port.
+	
+
+2001-02-08  John Foderaro  <jkf@tiger.franz.com>
+1.1.40
+	* added the proxy-proxy argument to net.aserve:start that
+	  permits you to specify that the allegroserve proxy should
+	  sent its requests through another proxy. 
+
+2001-02-06  John Foderaro  <jkf@tiger.franz.com>
+1.1.39
+	* proxy and scanning fixes
+
+2001-01-22  John Foderaro  <jkf@tiger.franz.com>
+1.1.38
+	* main.cl: incf version.  Also hooks added for links scanning.
+
+2001-01-18  John Foderaro  <jkf@tiger.franz.com>
+
+	* examples/urian.cl - new international character set demo
+	    (reachable from the main aserve examples page)
+
+2001-01-02  jkf  <jkf@main.verada.com>
+1.1.37
+	* main.cl, proxy.cl - add the ability to save and restore
+	 the whole state of the proxy cache. (see docs for start
+	 and shutdown in the manual).
+    
+        * ensure that proxy cache threads are killed off when a shutdown
+	  is done.
+	
+>>>     incompatible change: the net.aserve:shutdown function used to
+	take an optional argument.  Now it takes keyword arguments.
+	
+2000-12-27  John Foderaro  <jkf@tiger.franz.com>
+1.1.36
+	* client.cl: handle illegal set-cookie headers sent by Netscape's
+	  v3 web server.  In a client request Split the single large 
+	  Cookie line into muliple Cookie lines so that Netscape's v3
+	  web server can understand them.
+	  Add a redirect-methods argument to do-http-request to support
+	  more user control of redirection.
+	* proxy.cl - many enhancements including connection caching
+
+2000-11-06  Kevin Layer  <layer@ultra>
+1.1.35
+	* log.cl: make logmess a method, so I can define an after method
+	on it in my own code
+	* main.cl: maybe-universal-time-to-date and
+	universal-time-to-date: take time-zone optional argument, so my
+	redefined version of log-request can specify the local time zone
+
+2000-10-31  John Foderaro  <jkf@tiger.franz.com>
+1.1.34
+	* add to the list of characters to escape in form-urlencoding
+	  those that must be escaped so that the result can be put
+	  in the query string of a uri
+
+	* in proxy code write request and headers in one big block
+	  to get around bug in IP redirectors (such as found in www.cbs.com)
+
+2000-10-25  jkf  <jkf@main.verada.com>
+1.1.33
+	* hooks for link checking and experimenting with caching
+
 2000-10-19  John Foderaro  <jkf@tiger.franz.com>
 1.1.32
 	* add ssl arguments to net.aserve.start and

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.1.2.3 2000/10/21 15:09:15 layer Exp $
+;; $Id: chat.cl,v 1.1.2.4 2001/06/01 21:22:38 layer Exp $
 
 ;; Description:
 ;;   aserve chat program
@@ -116,6 +116,16 @@
 
 (defvar *show-style* 1)     ; 1 = tables, 2 = just entries
 
+; true if we wish to restrict messaging at all based on logged in 
+; and level
+(defvar *restrict-messages* nil) 
+
+; true if we show the machine name of chatters to everyone instead
+; of just the owner
+(defvar *show-machine-name-to-all* t)
+
+
+
 ;
 ; query attribute usage:
 ;  u = controller ustring
@@ -126,6 +136,7 @@
 ;  purl = picture url
 ;  z = lurk
 ;  y = delete message
+;  b = upgrade user
 
 
 (defclass master-chat-controller ()
@@ -247,6 +258,7 @@
   handle	; official handle of the user
   password	; password string
   ustring		; unique string of this user
+  level      ; nil - novice, 1 - higher privs
   )
 
 
@@ -851,6 +863,10 @@
   (find ustring (users *master-controller*)
 	:key #'user-ustring :test #'equal))
 
+(defun user-from-handle (handle)
+  ;; locate the user object given the handle
+  (find handle (users *master-controller*)
+	:key #'user-handle :test #'equal))
 
 (defun make-new-chat (controller &key name filename ustring)
   ;; make a new chat object
@@ -989,6 +1005,13 @@
       (if* delete
 	 then (delete-chat-message chat (compute-integer-value delete))))
     
+    (let ((upgrade (request-query-value "b" req)))
+      (if* upgrade
+	 then (let ((user (user-from-ustring upgrade)))
+		(if* user 
+		   then (setf (user-level user) 1)
+			(dump-existing-chat *chat-home*)))))
+    
     (let* ((count (or (compute-integer-value
 		       (request-query-value "count" req))
 		      10))
@@ -1035,7 +1058,6 @@
 		     :vlink *top-frame-vlink-color*
 		     :alink *top-frame-alink-color*
 		     )
-	      
 	      (show-chat-info chat count 
 			      (not (equal "1" (request-query-value
 					       "rv"
@@ -1265,7 +1287,7 @@
 	       thenret  ; valid image url
 	       else (setq link nil)))
     
-    (let* ((cvted-body (string-to-lhtml body))
+    (let* ((cvted-body (html-chk-string-to-lhtml body))
 	   (ipaddr (socket:remote-host
 		    (request-socket req)))
 	   (dns (or #+ignore (socket:ipaddr-to-hostname ipaddr)
@@ -1379,8 +1401,18 @@
 	(nth-message)
 	(message-increment)
 	)
+    
+    ;; if the person is not logged in then minimize the count 
+    (if* *restrict-messages*
+       then (if* (null handle) 
+	       then (setq count (min 5 count))
+	       else (let ((user (user-from-handle handle)))
+		      (if* (and user (null (user-level user)))
+			 then (setq count (min 10 count))))))
+    
+    
     (if* (zerop message-next)
-       then (html (:b "There are no messages in this chat"))
+       then (html (:b "There are no messsages in this chat"))
      elseif (<= count 0)
        thenret ; nothing to show
        else ; starting at the end find the counth message
@@ -1448,7 +1480,21 @@
 					     (format nil "chattop?y=~a&~a"
 						     (message-number message)
 						     ownerp))
-					 "Delete")))
+					 "Delete"))
+				       
+				       (let ((user (and (message-real message)
+							(user-from-handle
+							 (message-handle message)))))
+					 (if* (and user (null (user-level user)))
+					    then ; can upgrade if desired
+						 (html "  "
+						       ((:a :href
+							    (format nil 
+								    "chattop?b=~a&~a"
+								    (user-ustring
+								     user)
+								    ownerp))
+							" Upgrade ")))))
 			       :newline
 			       :br
 			       (html-print-list (message-body message)
@@ -1478,7 +1524,27 @@
 	    
 	    (if* (not recent-first)
 	       then ; tag most recent message
-		    (html ((:div :id "recent")))))))
+		    (html ((:div :id "recent")))))
+    
+    (if* (null handle)
+       then (html :br 
+		  ((:table :border 1)
+		   (:tr
+		    (:td
+		     (if* *restrict-messages*
+			then (html
+			     
+			      "In order to have access to the other facilities of this chat, "
+			      "such as private messaging and viewing the history of messages "
+			      "you must log in, by clicking on the Login link below.")
+			else (html
+			     
+			      "In order to have access to the other facilities of this chat, "
+			      "such as private messaging "
+			      "you must log in, by clicking on the Login link below.")
+			     ))))))
+	     
+    ))
 
 
 (defun chatlogin (req ent)
@@ -1622,7 +1688,18 @@
       
       
     
-      
+(defun html-chk-string-to-lhtml (form)
+  ;; look for {< to start html and >} to end it.
+  ;;
+  (multiple-value-bind (match full first quoted last)
+      (match-regexp "\\(.*\\){<\\(.*\\)>}\\(.*\\)" form :newlines-special nil)
+    (declare (ignore full))
+    (if* match
+       then ; contains embedded html
+	    (append (string-to-lhtml first)
+		    (list quoted)
+		    (string-to-lhtml last))
+       else (string-to-lhtml form))))      
 	
 	
 	 
@@ -1654,10 +1731,10 @@
 			    (multiple-value-bind (pref link rest)
 				(scan-for-http line)
 				(if* link
-				   then (push pref res)
+				   then (push (de-angle pref) res)
 					(push link res)
 					(setq line rest)
-				   else (push pref res)
+				   else (push (de-angle pref) res)
 					(setq line nil))))))
 		(push :br res)
 		
@@ -1673,7 +1750,17 @@
 	    
 	(if* (> i max) then (return))))
     (nreverse res)))
-      
+
+
+(defun de-angle (str)
+  ;; replace < and > in strings by their entity tags
+  (if* (find #\< str)
+     then (setq str (replace-regexp str "<" "&lt;")))
+  (if* (find #\> str)
+     then (setq str (replace-regexp str ">" "&gt;")))
+  str)
+
+
 (defun scan-for-http (line)
   ;; look for http:// in the line and if found return it as
   ;; a link or image lhtml
@@ -1787,7 +1874,9 @@
 			       )
 		(do ((i start-to-save (1+ i)))
 		    ((>= i message-next))
-		  (pprint (svref messages i) archive-port)))
+		  (if* (eq t (message-to (svref messages i)))
+		     then ; a public message, archive it
+			  (pprint (svref messages i) archive-port))))
 	      
 	      (setf (chat-message-archive chat) (1+ last-mnum))))))
 	      
@@ -1848,10 +1937,9 @@
   ;; note that this user/req has read the postings for this chat
   (let* ((time (get-universal-time))
 	 (viewers (chat-viewers chat))
-	 (ipaddr (if* (null user)
-		    then (socket:remote-host 
-			  (request-socket req))))
+	 (ipaddr (socket:remote-host (request-socket req)))
 	 (empty-ent))
+
     
     (mp::with-process-lock ((viewers-lock viewers))
       
@@ -1878,9 +1966,14 @@
 	   then (if* (eq user (viewent-user viewent))
 		   then ; update this one
 			(setf (viewent-time viewent) time)
+			(if* (not (eql ipaddr (viewent-ipaddr viewent)))
+			   then ; hmm, changed ipaddr
+				(setf (viewent-ipaddr viewent) ipaddr
+				      (viewent-hostname viewent) nil))
 			(return))
 	   else ; ipaddr test
-		(if* (eql ipaddr (viewent-ipaddr viewent))
+		(if* (and (null (viewent-user viewent))
+			  (eql ipaddr (viewent-ipaddr viewent)))
 		   then (setf (viewent-time viewent) time)
 			(return)))
 	(if* (null (viewent-time viewent))
@@ -1895,13 +1988,13 @@
 (defun chatviewers (req ent)
   ;; display page of chat viewers (except us)
   (let* ((chat (chat-from-req req))
-	(user (user-from-req req))
-	(time (get-universal-time))
-	(is-owner
+	 (user (user-from-req req))
+	 (time (get-universal-time))
+	 (is-owner
 	  (equal (and chat (secret-key chat)) 
 		 (request-query-value "s" req)))
-	(qstring)
-	(viewers))
+	 (qstring)
+	 (viewers))
     (if* (null chat)
        then (return-from chatviewers (ancient-link-error req ent)))
     
@@ -1927,67 +2020,69 @@
 		 )
 	     "Send to All")
 	    :hr
-	    (mp::with-process-lock ((viewers-lock viewers))
-	      (dolist (viewent (viewers-list viewers))
-		(let* ((vtime (viewent-time viewent))
-		       (vuser (viewent-user viewent))
-		       (alive-time (if* vtime then (- time vtime)))
-		       )
+	    :newline
+	    (:pre
+	     (mp::with-process-lock ((viewers-lock viewers))
+	       (dolist (viewent (viewers-list viewers))
+		 (let* ((vtime (viewent-time viewent))
+			(vuser (viewent-user viewent))
+			(alive-time (if* vtime then (- time vtime)))
+			)
 		  
-		  (if* (and alive-time
-			    (> alive-time *max-active-time*))
-		     then (setq vtime nil)
-			  (setf (viewent-time viewent) nil))
+		   (if* (and alive-time
+			     (> alive-time *max-active-time*))
+		      then (setq vtime nil)
+			   (setf (viewent-time viewent) nil))
 		  
-		  (if* vtime
-		     then (if* (not (eq vuser user))
-			     then ; list this one
-				  (if* vuser
-				     then ; link to create a private message
-					  (html
-					   ((:a :href 
-						(format nil
-							"chatenter?pp=~a&~a"
-							(user-ustring vuser)
-							qstring)
-						:target "chatenter"
-						)
-					    (:princ-safe
-					     (user-handle vuser))))
-				   elseif (and is-owner *do-dnscheck*)
-				     then ; name then ip address
-					  (let ((name (viewent-hostname
-						       viewent)))
-					    #+(version>= 6 0)
-					    (if* (null name)
-					       then (setq name
-						      (setf (viewent-hostname
-							     viewent)
-							(socket::dns-query
-							 (viewent-ipaddr
-							  viewent)
-							 :type :ptr
-							 :repeat 1
-							 :timeout 0))))
-					    (if* (null name)
-					       then (setf name
-						      (socket:ipaddr-to-dotted
-						       (viewent-ipaddr
-							viewent))))
-					    
-					  (html
-					   (:princ name)))
-				     else ; ip address
+		   (if* vtime
+		      then ; fill in the hostname if it's not there yet
+			   #+(version>= 6 0)
+			   (if* (null (viewent-hostname viewent))
+			      then (setf (viewent-hostname
+					  viewent)
+				     (socket::dns-query
+				      (viewent-ipaddr
+				       viewent)
+				      :type :ptr
+				      :repeat 1
+				      :timeout 0)))
+					      
+			   (if* (not (eq vuser user))
+			      then ; list this one
+				   (if* vuser
+				      then ; link to create a private message
+					   (html
+					    ((:a :href 
+						 (format nil
+							 "chatenter?pp=~a&~a"
+							 (user-ustring vuser)
+							 qstring)
+						 :target "chatenter"
+						 )
+					     (:princ-safe
+					      (user-handle vuser))))
+					  
+				      else ; ip address
 						    
-					  (html
-					   (:princ
-					    (socket:ipaddr-to-dotted
-					     (viewent-ipaddr viewent)))))
-				  (html 
-				   " ("
-				   (:princ (- time vtime))
-				   "s)"
-				   :br))))))))))))))
+					   (html
+					    (:princ
+					     (or (viewent-hostname viewent)
+						 (socket:ipaddr-to-dotted
+						  (viewent-ipaddr viewent))))))
+				   (html 
+				    " ("
+				    (:princ (- time vtime))
+				    "s)")
+
+				   (if* (or *show-machine-name-to-all* 
+					    is-owner)
+				      then ; name then ip address
+					   (if* (viewent-hostname viewent)
+					      then 
+						   (html " @" 
+							 (:princ-safe
+							  (viewent-hostname viewent)))))
+				   (html :newline)))))))))))))))
 						
 					  
 	    

@@ -22,8 +22,7 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-;;
-;; $Id: main.cl,v 1.48.2.4 2000/10/21 15:09:13 layer Exp $
+;; $Id: main.cl,v 1.48.2.5 2001/06/01 21:22:35 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -55,6 +54,7 @@
    #:get-multipart-sequence
    #:get-request-body
    #:handle-request
+   #:handle-uri		; add-on component..
    #:header-slot-value
    #:http-request  	; class
    #:locator		; class
@@ -131,8 +131,13 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 1 32))
+(defparameter *aserve-version* '(1 1 41))
 
+(eval-when (eval load)
+    (require :sock)
+    (require :process)
+    #+(version>= 6) (require :acldns) ; not strictly required but this is preferred
+)
 
 (provide :aserve)
 
@@ -247,9 +252,15 @@
 
 ;; foreign function imports
 #+unix
-(ff:def-foreign-call (setuid "setuid") ((x :int)) :returning :int)
-#+unix
-(ff:def-foreign-call (setgid "setgid") ((x :int)) :returning :int)
+(progn 
+    (ff:def-foreign-call (setuid "setuid") ((x :int)) :returning :int)
+    (ff:def-foreign-call (setgid "setgid") ((x :int)) :returning :int)
+    (ff:def-foreign-call (getpid "getpid") (:void) :returning :int)
+    (ff:def-foreign-call (unix-fork "fork") (:void) :returning :int)
+    (ff:def-foreign-call (unix-kill "kill") ((pid :int) (sig :int))
+      :returning :int)
+    
+)
 
 
 ;; more specials
@@ -283,6 +294,7 @@
    ;; (accessors exported)
    
    (socket 		;; listening socket 
+    :initform nil
     :initarg :socket
     :accessor wserver-socket)
      
@@ -346,7 +358,15 @@
    (accept-thread   ;; thread accepting connetions and dispatching
     :initform nil
     :accessor wserver-accept-thread)
-     
+
+   (link-scan-threads  ;; threads scanning cached entries for links
+    :initform nil
+    :accessor wserver-link-scan-threads)
+   
+   (uri-scan-threads  ;; list of uri scanning processes
+    :initform nil
+    :accessor wserver-uri-scan-threads)
+   
    (invalid-request
     ;; entity to invoke given a request that can't be
     ;; satisfied
@@ -368,11 +388,23 @@
     ;; proxy cache
     :initform nil
     :accessor wserver-pcache)
-    
+
+   (shutdown-hooks
+    ;; list of functions to call, passing this wserver object as an arg
+    ;; when the server shuts down
+    :initform nil
+    :accessor wserver-shutdown-hooks)
    ))
 
 
-     
+
+(defmethod print-object ((wserver wserver) stream)
+  (print-unreadable-object (wserver stream :type t :identity t)
+    (format stream "port ~a" 
+	    (let ((sock (wserver-socket wserver)))
+	      (if* sock 
+		 then (socket:local-port sock)
+		 else "-no socket-")))))
      
      
      
@@ -821,10 +853,13 @@ by keyword symbols and not by strings"
 		   setuid
 		   setgid
 		   proxy
+		   proxy-proxy ; who if anyone the proxy proxies to
 		   cache       ; enable proxy cache
+		   restore-cache ; restore a proxy cache
 		   debug-stream  ; stream to which to send debug messages
 		   accept-hook
 		   ssl		 ; enable ssl
+		   os-processes  ; to fork and run multiple instances
 		   )
   ;; -exported-
   ;;
@@ -865,12 +900,25 @@ by keyword symbols and not by strings"
   
   
   ; shut down existing server
-  (shutdown server) 
+  (shutdown :server server) 
 
   (if* proxy 
-     then (enable-proxy :server server))
+     then (enable-proxy :server server :proxy-proxy proxy-proxy))
+
+  (if* (and (or restore-cache cache)
+	    os-processes)
+     then ; coordinating the cache between processes is something we're
+	  ; not ready to do ... *yet*.
+	  (error "Can't have caching and os-processes in the same server"))
   
-  (if* cache
+  #-unix
+  (if* os-processes
+     then (error "os-processes supported on Unix only at this time"))
+  
+  
+  (if* restore-cache
+     then (restore-proxy-cache restore-cache :server server)
+   elseif cache
      then ; cache argument can have many forms
 	  (let ((memory-size #.(* 10 1024 1024)) ; default 10mb
 		(disk-caches nil))
@@ -909,7 +957,8 @@ by keyword symbols and not by strings"
 					  
 					  :type 
 					  *socket-stream-type*
-					  )))
+					  ))
+	 (is-a-child))
 
     #+unix
     (progn
@@ -920,7 +969,38 @@ by keyword symbols and not by strings"
     (setf (wserver-terminal-io server) *terminal-io*)
     (setf (wserver-enable-chunking server) chunking)
     (setf (wserver-enable-keep-alive server) keep-alive)
-    
+
+    #+unix
+    (if* os-processes
+       then ; create a number of processes, letting only the main
+	    ; one keep access to the tty
+	    (if* (not (and (integerp os-processes) 
+			   (>= os-processes 1)))
+	       then (error "os-processes should be an integer greater than zero"))
+	    (let (children child)
+	      (dotimes (i (1- os-processes))
+		(if* (zerop (setq child (unix-fork)))
+		   then ; we're a child, let the *lisp-listener* go 
+			; catatonic
+			(excl::unix-signal 15 0) ; let term kill it
+			(setq is-a-child t 
+			      children nil)
+			(return) ; exit dotimes 
+		   else (push child children)))
+	      (if* children
+		 then ; setup to kill children when main server 
+		      ; shutdown
+		      (push #'(lambda (wserver)
+				(declare (ignore wserver))
+				(dolist (proc children)
+				  (unix-kill proc 15) ; 15 is sigterm
+				  )
+				; allow zombies to die
+				(sleep 2)
+				(loop (if* (null
+					    (sys:reap-os-subprocess :wait nil))
+					 then (return))))
+			    (wserver-shutdown-hooks server)))))
     
     (let ((*wserver* server)) ; bind it too for privacy
       (if* (or (null listeners) (eq 0 listeners))
@@ -930,11 +1010,14 @@ by keyword symbols and not by strings"
 	 else (error "listeners should be nil or a non-negative fixnum, not ~s"
 		     listeners)))
     
+
+    (if* is-a-child then (loop (sleep 10000)))
+    
     server
     ))
 
 
-(defun shutdown (&optional (server *wserver*))
+(defun shutdown (&key (server *wserver*) save-cache)
   ;; shutdown the neo server
   ; first kill off old processes if any
   (let ((proc (wserver-accept-thread server)))
@@ -953,8 +1036,14 @@ by keyword symbols and not by strings"
   
   (setf (wserver-worker-threads server) nil)
   
-  (kill-proxy-cache :server server)
-  )
+  (dolist (hook (wserver-shutdown-hooks server))
+    (funcall hook server))
+  
+  (if* save-cache
+     then (save-proxy-cache save-cache :server server)
+     else (kill-proxy-cache :server server)))
+
+
 
 
 (defun start-simple-server ()
@@ -1015,6 +1104,8 @@ by keyword symbols and not by strings"
     (mp:process-preset proc #'http-worker-thread)
     (push proc (wserver-worker-threads *wserver*))
     (atomic-incf (wserver-free-workers *wserver*))
+    (setf (getf (mp:process-property-list proc) 'short-name) 
+      (format nil "w~d" *thread-index*))
     ))
 
 
@@ -1111,7 +1202,14 @@ by keyword symbols and not by strings"
 		    (pop workers))))
 	  
 	    (error (cond)
-	      (logmess (format nil "accept: error on accept ~s" cond))
+	      (logmess (format nil "accept: error ~s on accept ~a" 
+			       error-count cond))
+	      ;; we seem to get a string of connection reset by peers,
+	      ;; perhaps due to connections that piled up before
+	      ;; we started work. So we don't want to close down
+	      ;; the accepting loop ever, thus we'll ignore the 
+	      ;; code below.
+	      #+ignore
 	      (if* (> (incf error-count) 4)
 		 then (logmess "accept: too many errors, bailing")
 		      (return-from http-accept-thread nil)))))
@@ -2121,44 +2219,45 @@ in get-multipart-sequence"))
     
      
 
-(defun maybe-universal-time-to-date (ut-or-string)
+(defun maybe-universal-time-to-date (ut-or-string &optional (time-zone 0))
   ;; given a ut or a string, only do the conversion on the string
   (if* (stringp ut-or-string) 
      then ut-or-string
-     else (universal-time-to-date ut-or-string)))
+     else (universal-time-to-date ut-or-string time-zone)))
 
-(defvar *saved-ut-to-date* nil)
-    
-(defun universal-time-to-date (ut)
+(defparameter *saved-ut-to-date* nil)
+
+(defun universal-time-to-date (ut &optional (time-zone 0))
   ;; convert a lisp universal time to rfc 1123 date
   ;;
   (let ((cval *saved-ut-to-date*))
-    (if* (eql ut (car cval))
+    (if* (and (eql ut (caar cval))
+	      (eql time-zone (cdar cval)))
        then ; turns out we often repeatedly ask for the same conversion
 	    (cdr cval)
        else
 	    (let ((*print-pretty* nil))
 	      (multiple-value-bind
-		  (sec min hour date month year day-of-week dsp time-zone)
-		  (decode-universal-time ut 0)
-		(declare (ignore time-zone dsp))
-		(let ((ans (format nil "~a, ~2,'0d ~a ~d ~2,'0d:~2,'0d:~2,'0d GMT"
-				   (svref
-				    '#("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun")
-				    day-of-week)
-				   date
-				   (svref
-				    '#(nil "Jan" "Feb" "Mar" "Apr" "May" "Jun"
-				       "Jul" "Aug" "Sep" "Oct" "Nov" "Dec")
-				    month
-				    )
-				   year
-				   hour
-				   min
-				   sec)))
-		  (setf *saved-ut-to-date* (cons ut ans))
-		  ans
-		  ))))))
+		  (sec min hour date month year day-of-week dsp tz)
+		  (decode-universal-time ut time-zone)
+		(declare (ignore tz dsp))
+		(let ((ans
+		       (format
+			nil
+			"~a, ~2,'0d ~a ~d ~2,'0d:~2,'0d:~2,'0d~@[ GMT~]"
+			(svref '#("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun")
+			       day-of-week)
+			date
+			(svref '#(nil "Jan" "Feb" "Mar" "Apr" "May" "Jun"
+				  "Jul" "Aug" "Sep" "Oct" "Nov" "Dec")
+			       month)
+			year
+			hour
+			min
+			sec
+			(= 0 time-zone))))
+		  (setf *saved-ut-to-date* (cons (cons ut time-zone) ans))
+		  ans))))))
 
 
 
@@ -2194,11 +2293,13 @@ in get-multipart-sequence"))
 	   else ; just get any buffer
 		(if* buffers
 		   then (setf (sresource-data sresource) (cdr buffers))
-			(setq to-return (car buffers))))))
+			(setq to-return (car buffers)))
+		
+		)))
   
     (if* to-return
        then ; found one to return, must init
-		      
+	    
 	    (let ((init (sresource-init sresource)))
 	      (if* init
 		 then (funcall init sresource to-return)))
@@ -2214,8 +2315,7 @@ in get-multipart-sequence"))
   (if* buffer 
      then (mp:without-scheduling
 	    ;; if debugging
-	    (if* (member buffer (sresource-data sresource)
-			 :test #'eq)
+	    (if* (member buffer (sresource-data sresource) :test #'eq)
 	       then (error "freeing freed buffer"))
 	    ;;
 	    
@@ -2245,21 +2345,76 @@ in get-multipart-sequence"))
 ;;-----------------
 
 
-(defun string-to-number (string start end)
+(defun string-to-number (string &optional (start 0) (end (length string)))
   ;; convert the string into a number.
-  ;; the number is decimal
+  ;; the number is integer base 10
   ;; this is faster than creating a string input stream and
   ;; doing a lisp read
   ;; string must be a simple string
-  (let ((ans 0))
-    (do ((i start (1+ i)))
+  ;;
+  ;; we allow whitespace before and after the number, anything else
+  ;; will cause us to return 0
+  ;;
+  (let ((ans)
+	(state :pre))
+    (do ((i start)
+	 (ch)
+	 (digit))
 	((>= i end)
-	 ans)
-      (let ((digit (- (char-code (schar string i)) #.(char-code #\0))))
-	(if* (<= 0 digit 9)
-	   then (setq ans (+ (* ans 10) digit))
-	   else (return ans))))))
+	 (if* (member state '(:number :post) :test #'eq)
+	    then ans
+	    else nil))
+      
+      (setq ch (schar string i)
+	    digit (- (char-code ch) #.(char-code #\0)))
+      
+      (case state
+	(:pre (if* (member ch '(#\space #\tab #\newline #\return) :test #'eq)
+		 then (incf i)
+		 else (setq state :number-first)))
+	(:number-first
+	 (if* (<= 0 digit 9)
+	    then (setq ans digit)
+		 (incf i)
+		 (setq state :number) ; seen a digit
+	    else (return-from string-to-number nil) ; bogus
+		 ))
+	(:number
+	 (if* (<= 0 digit 9)
+	    then (setq ans (+ (* ans 10) digit))
+		 (incf i)
+	    else (setq state :post)))
+	
+	(:post 
+	 (if* (member ch '(#\space #\tab #\newline #\return) :test #'eq)
+	    then (incf i)
+	    else (return-from string-to-number nil)))))))
+	
+(defun get-host-port (string &optional (port 80))
+  ;; return the host and port from the string 
+  ;; which should have the form: "www.foo.com" or "www.foo.com:9000"
+  ;;
+  ;; port is the default value for the port arg
+  ;;
+  ;; return two values:
+  ;;	host	string
+  ;;	port	integer
+  ;; or nil if there host string is malformed.
+  ;;
+  (let ((parts (split-on-character string #\:)))
+    (if* (null (cdr parts))
+       then (values (car parts) port)
+     elseif (null (cddr parts))
+       then ; exactly two
+	    (if* (equal "" (cadr parts))
+	       then ; treat nothing after a colon like no colon present
+		    (values (car parts) port)
+	       else (setq port (string-to-number (cadr parts)))
+		    (if* port
+		       then (values (car parts) port))))))
 
+	    
+	
 		
 	
 ;;-------------------
@@ -2324,3 +2479,4 @@ in get-multipart-sequence"))
        then (push (setq obj (make-resp code "unknown code")) *responses*))
     obj))
   
+

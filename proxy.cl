@@ -22,8 +22,7 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-;;
-;; $Id: proxy.cl,v 1.8.4.4 2000/10/21 15:09:14 layer Exp $
+;; $Id: proxy.cl,v 1.8.4.5 2001/06/01 21:22:36 layer Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -34,8 +33,36 @@
 
 (in-package :net.aserve)
 
+; denotes a request from the browser
+(defconstant *browser-level* 100) ;
 
 (defparameter *extra-lifetime-factor* 1.1)
+
+; number of seconds to add to expiration time of any entry in cache
+(defparameter *extra-lifetime* 0) 
+	
+
+; true if we are to save cached connections
+(defparameter *connection-caching* t) 
+
+
+
+
+; statistics about connection caching
+
+(defparameter *connections-cached* 0) ; number of connections put in to cache
+(defparameter *connections-made*  0) ; number of make-socket calls made
+(defparameter *connections-used-cached* 0) ; number of cached connections used
+; the cache
+(defparameter *connection-cache-queue* (cons nil nil)) ; (first . last) queue of conn-cache objects
+(defparameter *connection-cache-expire* 10)  ; number of seconds to live
+
+
+; number of seconds we wait for a connect before we consider it timed
+; out.  Given the chance Linux seems to wait forever for a connection
+; so we need to shut it down ourselves.
+(defparameter *connection-timed-out-wait* 30)
+
 
 (defstruct pcache 
   ;; proxy cache
@@ -51,9 +78,20 @@
   
   (dead-items 0) ; total number of objects on the dead-ent list
 
+  (level0-time 0) ; last time level0 access was done
+  
   queueobj	; queue object holding in-memory cache objects
   
   dead-ent	; linked list of dead pcache-ents, linked by next field only
+
+  ; hash table of handlers for uris, keyed by host
+  uri-info-table
+
+  ; pointer to linkscan object if we are doing automatic link scanning
+  ; in the proxy cache
+  linkscan
+
+  entry-cached-hook ; funcalled with pcache, pcache-ent and level
   
   ; requests that completely bypass the cache
   (r-direct 0)
@@ -62,6 +100,10 @@
   ; and the request headers
   (r-miss 0)
 
+  ; like r-miss except the level is greater than 0 thus this is a
+  ; cache fill rather than a direct user request
+  (r-cache-fill 0)
+  
   ; non-ims request.  value within the min-freshness contstraints
   ; ims request where we know that the value in the cache is fresh
   ;  and has been modified since the ims time
@@ -121,17 +163,17 @@
 
 
 (defstruct pcache-ent
-  key		; copy of the key for debugging purposes
+  key		; the string form of the uri 
+  uri		; the actual uri
   last-modified-string  ; last modified time from the header
   last-modified  ; universal time entry was last modified
   expires	; universal time when this entry expires
   
   
-  request	; request header block 
   data		; data blocks (first is the response header block)
   data-length	; number of octets of data
   blocks	; number of cache blocks (length of the value in data slot)
-  code		; response code
+  code		; response code.   200 or 302
   comment	; response comment 
   
   cookie	; the cookie if any with this request
@@ -142,6 +184,8 @@
   (state :new)	; nil - normal , 
                 ; :dead - trying to kill off, 
   		; :new - filling the entry
+
+  ;; scanned	; true when link scanning has been done
   
   ; number of times this entry was returned due to a request
   (returned 0)
@@ -155,7 +199,23 @@
   queueobj  ; queue  object we're stored in
   prev
   next
-  
+
+  ; scanning for links
+  ; notes:
+  ;  links is initially nil and once the page has been scanned for links
+  ;      it is t or a list of uri objects 
+  ;      or it is :scanning when then pcache-ent is in the to be link scanned
+  ;  level is non-zero when this entry is on the link-scan queue or
+  ;	uri-scan queue.
+  ;  scan-next is valid (nil or non-nil) when this entry is on the 
+  ;    link-scan queue or uri-scan queue.
+  ;  
+  links	    ; nil or list of uris to img's then  list of uris from a links
+  links-left ; list of uris still to scan
+  level	    ; level at which to scan these links
+  scan-next ; next pcache-ent to scan
+
+  (autoscan-time 0) ; univeral time when last scanned by the link scanner
   )
 
 
@@ -168,6 +228,32 @@
   
   )
   
+
+(defstruct uri-info
+  ;; information on how to handle a uri or set of uris
+  host	    ; string naming the host of the uri
+  (port 80) 
+  path      ; string in regexp form denoting the path. nil means all
+  path-regexp ; compiled regular expression for the path (or nil)
+  
+  ; nil or number of extra seconds of lifetime to add to uri
+  ; nil means use systemwide default
+  extra-lifetime
+  
+  ; nil or default depth for link scanning
+  ; nil means use systemwide default
+  scan-depth 
+  exclude ; list of regexps for links to not scan
+  exclude-regexp ; compiled regexp versions of dont-follow
+  
+  ; called on links to determine at which level they should be followed
+  scan-function 
+  
+  ; true if we should follow links to a site different than this page
+  offsite
+  )
+
+
   
 
 
@@ -177,26 +263,35 @@
   ())
 
 
-(defvar *locator-proxy-obj* nil)  ; the object in the locator chain if proxying
-(defvar *entity-proxy* nil)	  ; the entity denoting we should proxy
 
-(defun enable-proxy (&key (server *wserver*))
-  (if* (null *locator-proxy-obj*)
-     then (setq *locator-proxy-obj* (make-instance 'locator-proxy :name :proxy)
-		*entity-proxy* (make-instance 'computed-entity
-				 :function #'(lambda (req ent)
-					       (do-proxy-request req ent)))))
+(defun enable-proxy (&key (server *wserver*)
+			  proxy-proxy)
+  ;; 
+  (let ((locator-proxy-obj 
+	 (make-instance 'locator-proxy 
+	   :name :proxy
+	   :extra (make-instance 'computed-entity
+		    :function #'(lambda (req ent)
+				  (do-proxy-request req ent))
+		    :extra (if* proxy-proxy
+			      then (multiple-value-bind (host port)
+				       (get-host-port proxy-proxy)
+				     (if* (null host)
+					then (error "bad host port specification: ~s" proxy-proxy))
+				     (cons host port)))))))
+	   
   
-  ; must be first as other locators may not ignore absolute proxy urls
-  (pushnew *locator-proxy-obj* (wserver-locators server))
+    ; must be first as other locators may not ignore absolute proxy urls
+    (pushnew locator-proxy-obj (wserver-locators server))
   
-  )
+    ))
 
 (defmethod standard-locator ((req http-request) (locator locator-proxy))
   ;; see if this is a proxy request and if so return the entity that
   ;; denotes we're proxying
   (if* (uri-scheme (request-raw-uri req))
-     then *entity-proxy*))
+     then ; compute entity object
+	  (locator-extra locator)))
 
 
 (defun do-proxy-request (req ent)
@@ -240,7 +335,8 @@
 			(net.uri:copy-uri uri :scheme nil :host nil))
 		      (handle-request req)
 		 else ; must really proxy
-		      (proxy-cache-request req ent))))))
+		      (check-cache-then-proxy-request 
+		       req ent t *browser-level*))))))
 
 
   
@@ -250,7 +346,8 @@
 
 		     
 
-(defun proxy-request (req ent &key pcache-ent (respond t))
+(defun proxy-request (req ent &key pcache-ent (respond t) 
+				   (level *browser-level*))
   ;; a request has come in with an http scheme given in uri
   ;; and a machine name which isn't ours.
   ;; 
@@ -260,7 +357,7 @@
   ;; get the response and if respond is true send back the response
   ;;
   (let* ((request-body (get-request-body req))
-	 (outbuf (get-sresource *header-block-sresource*))
+	 (outbuf (get-header-block))
 	 (outend)
 	 (clibuf)
 	 (cliend)
@@ -271,36 +368,52 @@
 	 (method (request-method req))
 	 (protocol :http/1.0)
 	 (state :pre-send)
-	 )
+	 (keep-alive)
+	 (cached-connection)
+	 (phostport (and ent (entity-extra ent))))
 
+    (if* phostport
+       then ; we're proxying to a proxy. yikes
+	    (setq host (car phostport)
+		  port (cdr phostport)))
+    
     (unwind-protect
-	(progn
+	(tagbody
 	  
-	  (format *debug-stream* "do proxy to ~s~%" uri)
-	  (force-output *debug-stream*)
+	 retry-proxy
 
-	  (handler-bind ((error #'(lambda (cond)
-				    (format *debug-stream*
-					    "error during proxy: ~a~%" cond)
+	  (handler-bind ((error 
+			  #'(lambda (cond)
+			      (logmess
+			       (format nil "error during proxy: ~a ~% with ~
+cached connection = ~s~%" cond cached-connection))
+			      (if* cached-connection
+				 then ; retry
+				      (logmess "retry proxy")
+				      (if* sock
+					 then (ignore-errors
+					       (close sock :abort t)))
+				      (go retry-proxy))
 				    
-				    (if* pcache-ent
-				       then (kill-pcache-ent pcache-ent))
+			      (if* pcache-ent
+				 then (kill-pcache-ent pcache-ent))
 				    
 						   
-				    (if* (not (member :notrap *debug-current* 
-						      :test #'eq))
-				       then ; we want to auto-handle the error
-					    (if* (eq state :pre-send)
-					       then ; haven't sent anything
-						    ; so send failed response
-						    (ignore-errors
-						     (proxy-failure-response req ent)))
-					    (return-from proxy-request nil)))))
+			      (if* (not (member :notrap *debug-current*
+						:test #'eq))
+				 then ; we want to auto-handle the error
+				      (if* (eq state :pre-send)
+					 then ; haven't sent anything
+					      ; so send failed response
+					      (ignore-errors
+					       (proxy-failure-response req ent)))
+				      (return-from proxy-request nil)))))
 	    
 
-	    ;(logmess "got proxy request")
-	    ;(dump-header-block (request-header-block req) *initial-terminal-io*)
-				    
+
+	    (setq keep-alive nil ; assume not keep alive
+		  cached-connection nil)
+	    
 	    ; create outgoing headers by copying
 	    (copy-headers (request-header-block req) outbuf
 			  *header-client-array*)
@@ -318,7 +431,11 @@
 	    ; connection  we'll set to 'close' for now but at some point
 	    ; we'll connection caching so we'll want to do some keep-alive'ing
 	    ;  
-	    (insert-header outbuf :connection "close")
+	    
+	    (insert-header outbuf :connection 
+			   (if* *connection-caching*
+			      then "Keep-Alive"
+			      else "close"))
     
 
 	    ;(logmess "outbuf now")
@@ -348,24 +465,24 @@
 		   
 	    ; time to make a call to the server
 	    (handler-case
-		(setq sock (socket:make-socket :remote-host host
-					       :remote-port (or port 80)
-					       :format :bivalent
-					       :type *socket-stream-type*))
+		(multiple-value-setq (sock cached-connection)
+		  (get-possibly-cached-connection
+		   host (or port 80)))
 	      (error (cond)
 		(declare (ignore cond))
-		(with-http-response (req ent :response
-					 *response-not-found*)
-		  (with-http-body (req ent)
-		    (html
-		     (:html
-		      (:head (:title "404 - Not Found"))
-		      (:body
-		       (:h1 "404 - Not Found")
-		       "The proxy failed to connect to machine "
-		       (:b (:princ-safe host))
-		       " on port "
-		       (:b (:princ-safe (or port 80))))))))
+		(if* respond
+		   then (with-http-response (req ent :response
+						 *response-not-found*)
+			  (with-http-body (req ent)
+			    (html
+			     (:html
+			      (:head (:title "404 - Not Found"))
+			      (:body
+			       (:h1 "404 - Not Found")
+			       "The proxy failed to connect to machine "
+			       (:b (:princ-safe host))
+			       " on port "
+			       (:b (:princ-safe (or port 80)))))))))
 		(return-from proxy-request)))
 
 	    (if* *watch-for-open-sockets*
@@ -373,15 +490,140 @@
 		     sock 
 		     #'check-for-open-socket-before-gc))
 	    
-	    (net.aserve::format-dif :xmit sock "~a ~a ~a~a"
-				    (string-upcase (string method))
-				    (net.aserve.client::uri-path-etc uri)
-				    (string-upcase (string protocol))
-				    *crlf*)
-	  
-	    ; now the headers
-	    (write-sequence outbuf sock :end outend)
-    
+
+	    ;; there are bogus ip redirectors out there that want to
+	    ;; see the whole request in the packet. (e.g www.cbs.com)
+	    ;; so we build as much as we can and then blast that out
+	    
+	    ; this is written in this non-pretty way for speed
+	    
+	    
+	    (let ((firstbuf (get-header-block))
+		  (ind 0)
+		  (cmdstrings
+		   '((:get . #.(make-array 3
+					   :element-type '(unsigned-byte 8)
+					   :initial-contents
+					   (list
+					    (char-int #\G)
+					    (char-int #\E)
+					    (char-int #\T))))
+		     (:post . #.(make-array 4
+				 :element-type '(unsigned-byte 8)
+				 :initial-contents
+				 (list
+				  (char-int #\P)
+				  (char-int #\O)
+				  (char-int #\S)
+				  (char-int #\T))))
+				       
+		     ))
+		  (prot-strings
+		   '((:http/1.0 . #.(make-array 8
+						:element-type '(unsigned-byte 8)
+						:initial-contents
+						(list
+						 (char-int #\H)
+						 (char-int #\T)
+						 (char-int #\T)
+						 (char-int #\P)
+						 (char-int #\/)
+						 (char-int #\1)
+						 (char-int #\.)
+						 (char-int #\0)
+						 )))
+		     (:http/1.1 . #.(make-array 8
+				     :element-type '(unsigned-byte 8)
+				     :initial-contents
+				     (list
+				      (char-int #\H)
+				      (char-int #\T)
+				      (char-int #\T)
+				      (char-int #\P)
+				      (char-int #\/)
+				      (char-int #\1)
+				      (char-int #\.)
+				      (char-int #\1)
+				      )))))
+		     
+		  )
+	      (let ((cmd (cdr (assoc method cmdstrings :test #'eq))))
+		
+		; write method
+		(if* cmd
+		   then (dotimes (i (length cmd))
+			  (setf (ausb8 firstbuf i)  (ausb8 cmd i)))
+			(incf ind (length cmd))
+		   else ; unusual method, turn method into a string
+			(let ((str (string-upcase (string method))))
+			  (dotimes (i (length str))
+			    (setf (ausb8 firstbuf i) 
+			      (char-int (schar str i))))
+			  (incf ind (length str))))
+		
+		(setf (ausb8 firstbuf ind) #.(char-int #\space))
+		(incf ind)
+		
+		
+		; now the uri
+		(let ((str (if* phostport
+			      then ; proxying so send http://...
+				   (net.uri:render-uri (request-raw-uri req) 
+						       nil)
+			      else (net.aserve.client::uri-path-etc uri))))
+		  (dotimes (i (length str))
+		    ; should do string-to-octets...
+		    (setf (ausb8 firstbuf ind) 
+		      (char-int (schar str i)))
+		    (incf ind)))
+		
+		(setf (ausb8 firstbuf ind) #.(char-int #\space))
+		(incf ind)
+		
+		; now the protocol
+		    
+		(let ((cmd (cdr (assoc protocol prot-strings :test #'eq))))
+		  (if* (null cmd)
+		     then (error "can't proxy protocol ~s" protocol))
+		  (dotimes (i (length cmd))
+		    (setf (ausb8 firstbuf ind)  (ausb8 cmd i))
+		    (incf ind)))
+		    
+		(setf (ausb8 firstbuf ind) #.(char-int #\return))
+		(incf ind)
+		(setf (ausb8 firstbuf ind) #.(char-int #\newline))
+		(incf ind)
+		    
+		    
+		; now add as much of the headers as we can 
+		(do ((i 0 (1+ i))
+		     (tocopy (min (- (length firstbuf) ind) outend)))
+		    ((>= i tocopy)
+		     
+		     ; 
+		     (if-debug-action 
+		      :xmit
+		      (format *debug-stream* "about to send~%")
+		      (dotimes (i ind)
+			(write-char (code-char (ausb8 firstbuf i))
+				    *debug-stream*))
+		      (format *debug-stream* "<endof xmission>~%"))
+		     (write-sequence firstbuf sock :end ind)
+		     (if* (< i outend)
+			then ; still more from original buffer left
+			     (write-sequence outbuf sock
+					     :start i
+					     :end outend))
+		     )
+		      
+		  (setf (ausb8 firstbuf ind) (ausb8 outbuf i))
+		  (incf ind))
+		    
+		(free-header-block firstbuf)))
+
+	    
+	    
+	    
 	    ; now the body if any
 	    (if* request-body
 	       then (write-sequence request-body sock))
@@ -390,7 +632,7 @@
 	  
 	    ; a shutdown would make sense here but it seems to confuse
 	    ; the aol servers
-	    ; (socket:shutdown sock :direction :output)
+	    ;(socket:shutdown sock :direction :output)
 
 	    (let (protocol response comment header-start given-content-length
 		  body-buffers body-length)
@@ -402,8 +644,7 @@
 
 		(if* (null outend)
 		   then ; response coming back was truncated
-			(return-from proxy-request
-			  (proxy-failure-response req ent)))
+			(error "truncated proxy response"))
 		      
   
 		(multiple-value-setq (protocol response comment header-start)
@@ -457,8 +698,18 @@
 	      
 	      (setf (request-reply-content-length req) 
 		(or body-length given-content-length 0))
-    
-	      (close sock)  (setq sock nil)
+
+	      (setq keep-alive
+		(equalp (header-buffer-header-value outbuf :connection)
+			"keep-alive"))
+	      
+	      (if* keep-alive
+		 then (add-to-connection-cache sock
+					       host
+					       (or port 80))
+		 else (close sock))
+	      
+	      (setq sock nil)
 
 	    
 	      ; convert the header we received from the server into one
@@ -508,25 +759,27 @@
 	      (if* (and pcache-ent 
 			(eq (request-method req) :get))
 		 then ; we are caching
-		      (cache-response req pcache-ent
-				      response comment clibuf 
-				      body-buffers body-length)
-		      ; these buffers have been saved in the cache
-		      ; so nil them out so they aren't freed
-		      (setf clibuf nil
-			    body-buffers nil
-			    (request-header-block req) nil))
+		      (let ((tmp-clibuf clibuf)
+			    (tmp-body-buffers body-buffers))
+			(setf clibuf nil
+			      body-buffers nil)
+			(cache-response req pcache-ent
+					response comment tmp-clibuf 
+					tmp-body-buffers body-length level)
+			; these buffers have been saved in the cache
+			; so nil them out so they aren't freed
+			))
 		
-	      (dolist (block body-buffers)
-		(free-sresource *header-block-sresource* block))
+	      (dolist (block body-buffers) (free-header-block block))
 	      )))
     
       ;; cleanup forms
       (if* sock 
 	 then (ignore-errors (force-output sock))
 	      (ignore-errors (close sock :abort t)))
-      (free-sresource *header-block-sresource* outbuf)
-      (free-sresource *header-block-sresource* clibuf))))
+      
+      (free-header-block outbuf)
+      (free-header-block clibuf))))
 
     
 (defun parse-response-buffer (buff)
@@ -552,8 +805,8 @@
 			 #.(char-int #\1)
 			 #.(char-int #\.)))
 	 then (case (aref buff 7)
-		(#.(char-code #\0) (setq protocol :http/1.0))
-		(#.(char-code #\1) (setq protocol :http/1.1)))
+		(#.(char-int #\0) (setq protocol :http/1.0))
+		(#.(char-int #\1) (setq protocol :http/1.1)))
 	      (if* (null protocol)
 		 then (return-from parse-response-buffer nil)))
     
@@ -681,6 +934,111 @@
 	     "The proxy could not find the requested uri")))))
 
   
+;;;--------------------- connection cache -------------
+(defstruct connection-cache-ent 
+  expire		; time when this entry expires
+  host
+  port
+  socket
+  )
+
+  
+(defun add-to-connection-cache (socket host port)
+  (let* ((now (get-universal-time))
+	 (ent (list (make-connection-cache-ent 
+		     :expire (+ now *connection-cache-expire*)
+		     :host host
+		     :port port
+		     :socket socket)))
+	 (queue *connection-cache-queue*))
+    
+    (incf *connections-cached*)
+    
+    (mp:without-scheduling
+      (let ((start (first-valid-entry now queue)))
+		
+	(if* (null start)
+	   then ; empty, this is the first entry
+		(setf (car queue) 
+		  (setf (cdr queue) ent))
+		; add at the end
+	   else (setf (cdr (cdr queue)) ent)
+		(setf (cdr queue) ent))))))
+
+(defun first-valid-entry (now queue)
+  ;; remove expired entries and return the list of entries
+  ;; beginning with the first non expired entry
+  (let ((start (car queue)))
+    ; scan down cache removing expired entries
+    (loop
+      (if* (null start) then (return))
+      (if* (< (connection-cache-ent-expire 
+	       (car start))
+	      now)
+	 then ; kill this one
+	      (ignore-errors 
+	       (close (connection-cache-ent-socket
+		       (car start))
+		      :abort t))
+	      (setf (car queue)
+		(setq start (cdr start)))
+	 else (return)))
+	
+    start))
+	
+  
+(defun get-possibly-cached-connection (host port)
+  ;; check the cache and then return a cached connection
+  ;; build a new one if there isn't  one cached
+  (let ((now (get-universal-time))
+	(queue *connection-cache-queue*))
+    (mp:without-scheduling
+      (let ((start (first-valid-entry now queue))
+	    (prev nil))
+	(loop
+	  (if* (null start) then (return))
+	  
+	  (if* (and (equalp host (connection-cache-ent-host (car start)))
+		    (eql port (connection-cache-ent-port (car start))))
+	     then ; a match
+		  (if* prev
+		     then ; slice it out
+			  (if* (null (setf (cdr prev) (cdr start)))
+			     then ; we removed last entry, fix last
+				  (setf (cdr queue) prev))
+		     else ; we're removing the first
+			  (setf (car queue) (cdr start)))
+		  (incf *connections-used-cached*)
+		  (return-from get-possibly-cached-connection 
+		    (values (connection-cache-ent-socket (car start)) t)))
+	  
+	  (setq prev start
+		start (cdr start)))))
+	
+    ; get here if there is no match
+
+    (incf *connections-made*)
+    (socket:with-pending-connect
+	(mp:with-timeout (*connection-timed-out-wait*
+			  (error "connection timed out"))
+	  (socket:make-socket :remote-host host
+			      :remote-port port
+			      :format :bivalent
+			      :type *socket-stream-type*)))))
+
+	
+	
+			  
+				  
+			  
+  
+	      
+		
+		
+		
+		
+		
+					 
 
 
 ;;;--------------------- proxy cache ------------------      
@@ -712,37 +1070,60 @@
   (let (pcache)
     (setf (wserver-pcache server)
       (setq pcache (make-pcache 
-		    :table (make-hash-table :test #'equal)
-		    :queueobj (make-and-init-queueobj))))
+		    :table (make-hash-table :size 1000 :test #'equal)
+		    :queueobj (make-and-init-queueobj)
+		    :uri-info-table (make-hash-table :test #'equalp)
+		    )))
     
     (configure-memory-cache :server server :size size)
-    
+    (start-proxy-cache-processes server pcache)))
 
-    (let ((name (format nil "~d-cache-cleaner" (incf *thread-index*))))
-      (setf (pcache-cleaner pcache)
-	(mp:process-run-function 
-	 name
-	 #'(lambda (server)
-	     (let ((*wserver* server)
-		   (pcache (wserver-pcache server)))
-	       (loop
-		 (mp:with-process-lock ((pcache-cleaner-lock pcache))
-		   (if* (null (pcache-cleaner pcache))
-		      then ; indication that we should exit
-			   (return))
-		   (ignore-errors (cache-housekeeping)))
-		 (sleep 30))))
-	 server)))
+
+(defun start-proxy-cache-processes (server pcache)
+  (let ((name (format nil "~d-cache-cleaner" (incf *thread-index*))))
+    (setf (pcache-cleaner pcache)
+      (mp:process-run-function 
+       name
+       #'(lambda (server)
+	   (let ((*wserver* server)
+		 (pcache (wserver-pcache server)))
+	     (loop
+	       (if* (null (wserver-accept-thread server))
+		  then ; we are shutting down, exit thread
+		       (return))
+		 
+	       (mp:with-process-lock ((pcache-cleaner-lock pcache))
+		 (ignore-errors (cache-housekeeping)))
+	       (sleep 30))))
+       server))
+    (setf (getf (mp:process-property-list (pcache-cleaner pcache))
+		'short-name)
+      (format nil "c~d" *thread-index*))
+    )
   
-    (publish :path "/cache-stats"
-	     :function
-	     #'(lambda (req ent)
-		 (display-proxy-cache-statistics req ent pcache)))
-    (publish :path "/cache-entries"
-	     :function
-	     #'(lambda (req ent)
-		 (display-proxy-cache-entries req ent pcache)))
-    ))
+  (publish :path "/cache-stats"
+	   :function
+	   #'(lambda (req ent)
+	       (display-proxy-cache-statistics req ent pcache)))
+  (publish :path "/cache-entries"
+	   :function
+	   #'(lambda (req ent)
+	       (display-proxy-cache-entries req ent pcache)))
+  
+  (publish :path "/cache-entries-gc"
+	   :function
+	   #'(lambda (req ent)
+	       (gc)
+	       (display-proxy-cache-statistics req ent pcache)))
+  
+  (publish :path "/cache-entries-global-gc"
+	   :function
+	   #'(lambda (req ent)
+	       (gc t)
+	       (display-proxy-cache-statistics req ent pcache)))
+  
+	       
+  )
 
 
 (defun kill-proxy-cache (&key (server *wserver*))
@@ -755,7 +1136,7 @@
     (mp:with-process-lock ((pcache-cleaner-lock pcache))
       ;; now we know that the other thread cleaning out
       ;; the cache won't call cache-housekeeping while we're
-      ;; busy doing out business.
+      ;; busy doing our business.
       
       ; this will signal the cache cleaner process to exit
       (setf (pcache-cleaner pcache) nil)
@@ -812,9 +1193,9 @@
 				     :if-exists :supersede
 				     :if-does-not-exist :create
 				     :direction :io
-				     #-(and allegro version>= 6)
+				     #-(and allegro (version>= 6))
 				     :element-type
-				     #-(and allegro version>= 6)
+				     #-(and allegro (version>= 6))
 				     '(unsigned-byte 8)))))
     (push pcache-disk (pcache-disk-caches 
 		       (wserver-pcache server)))
@@ -860,8 +1241,11 @@
 	  (:body 
 	   (:h1 "AllegroServe Proxy Cache Statistics")
 	   :p
-	   "Here are details on existing " ((:a :href "cache-entries")
-					    "Cache Entries.")
+	   "Show " ((:a :href "cache-entries") "Cache Entries,")
+	   " Refresh " ((:a :href "cache-stats") "this page")
+	   :br
+	   "Perform a " ((:a :href "cache-entries-gc") "normal gc,")
+	   " Perform a " ((:a :href "cache-entries-global-gc") "global gc")
 	   :br
 	   ((:table :border 2)
 	    (:tr
@@ -870,7 +1254,8 @@
 		       
 	    (dolist (ent
 			'(("direct"   pcache-r-direct)
-			  ("miss"     pcache-r-miss)
+			  ("miss (user request)"     pcache-r-miss)
+			  ("miss (anticipated request)"  pcache-r-cache-fill)
 			  ("consistency miss" pcache-r-consistency-miss)
 			  ("fast hit" pcache-r-fast-hit)
 			  ("fast validation" pcache-r-fast-validation)
@@ -879,8 +1264,26 @@
 	       (:tr 
 		(:td (:princ (car ent)))
 		(:td (:princ (funcall (cadr ent) pcache)))))))
-	  
-	  
+
+	   :br
+	   ;; info on connection caching
+	   "Connection caching is " 
+	   (:princ (if* *connection-caching* 
+		      then "enabled"
+		      else "diabled"))
+	   :br
+	   ((:table :border 2)
+	    (:tr
+	     (:td "make-socket calls") (:td (:princ *connections-made*)))
+	    (:tr
+	     (:td "connections cached") (:td (:princ *connections-cached*)))
+	    (:tr
+	     (:td "cached connections used")
+	     (:td (:princ *connections-used-cached*))))
+	   
+			 
+
+	   :br
 	   ((:table :border 2)
 	    (:tr
 	     (:th "Kind of Entry")
@@ -897,64 +1300,70 @@
 		       (:princ (* (queueobj-blocks (pcache-queueobj pcache)) 
 				  *header-block-size*))
 		
-		       " bytes)"))
+		       " bytes)")))
 	    
-	     (:tr
-	      (:td "Dead entries in memory") 
-	      (:td (:princ (pcache-dead-items pcache)))
-	      (:td (:princ dead-bytes))
-	      (:td (:princ dead-blocks)
-		   " ("
-		   (:princ (* dead-blocks *header-block-size*)) " bytes)"
-		   ))
+	    (:tr
+	     (:td "Dead entries in memory") 
+	     (:td (:princ (pcache-dead-items pcache)))
+	     (:td (:princ dead-bytes))
+	     (:td (:princ dead-blocks)
+		  " ("
+		  (:princ (* dead-blocks *header-block-size*)) " bytes)"
+		  ))
+	    )
+	   :br
+	   "Memory Cache"
+	   ((:table :border 2)
+	    (:tr
+	     (:th "items")
+	     (:th "used-blocks/total-blocks")
+	     (:th "bytes")
 	     )
-	    :br
-	    "Memory Cache"
-	    ((:table :border 2)
-	     (:tr
-	      (:th "items")
-	      (:th "used-blocks/total-blocks")
-	      (:th "bytes")
-	      )
-	     (let ((queueobj (pcache-queueobj pcache)))
-	       (html (:tr 
-		      (:td (:princ-safe (queueobj-items queueobj)))
-		      (:td (:princ-safe (queueobj-blocks queueobj))
-			   "/"
-			   (:princ-safe (pcache-size pcache)))
-		      (:td (:princ-safe (queueobj-bytes queueobj)))))))
-	    :br
-	    :br
-	    "Disk Caches"
-	    :br
-	    ((:table :border 2)
-	     (:tr
-	      (:th "filename")
-	      (:th "items")
-	      (:th "blocks")
-	      (:th "bytes")
-	      (:th "free blocks")
-	      (:th "free list")
-	      )
-	     (dolist (pcache-disk (pcache-disk-caches pcache))
-	       (let ((queueobj (pcache-disk-queueobj pcache-disk)))
-		 (html (:tr 
-			(:td (:princ-safe (pcache-disk-filename pcache-disk)))
-			(:td (:princ-safe (queueobj-items queueobj)))
-			(:td (:princ-safe (queueobj-blocks queueobj)))
-			(:td (:princ-safe (queueobj-bytes queueobj)))
-			(:td (:princ-safe (pcache-disk-free-blocks
-					   pcache-disk)))
-			(:td (:princ-safe (pcache-disk-free-list
-					   pcache-disk))))))))
+	    (let ((queueobj (pcache-queueobj pcache)))
+	      (html (:tr 
+		     (:td (:princ-safe (queueobj-items queueobj)))
+		     (:td (:princ-safe (queueobj-blocks queueobj))
+			  "/"
+			  (:princ-safe (pcache-size pcache)))
+		     (:td (:princ-safe (queueobj-bytes queueobj)))))))
+	   :br
+	   :br
+	   "Disk Caches"
+	   :br
+	   ((:table :border 2)
+	    (:tr
+	     (:th "filename")
+	     (:th "items")
+	     (:th "blocks")
+	     (:th "bytes")
+	     (:th "free blocks")
+	     (:th "free list")
+	     )
+	    (dolist (pcache-disk (pcache-disk-caches pcache))
+	      (let ((queueobj (pcache-disk-queueobj pcache-disk)))
+		(html (:tr 
+		       (:td (:princ-safe (pcache-disk-filename pcache-disk)))
+		       (:td (:princ-safe (queueobj-items queueobj)))
+		       (:td (:princ-safe (queueobj-blocks queueobj)))
+		       (:td (:princ-safe (queueobj-bytes queueobj)))
+		       (:td (:princ-safe (pcache-disk-free-blocks
+					  pcache-disk)))
+		       (:td (:princ-safe (pcache-disk-free-list
+					  pcache-disk))))))))
+	   :br
+	   "Current memory usage"
+	   :br
+	   (:pre (:princ-safe (with-output-to-string (*standard-output*)
+				 (room t))))
 			  
-	    ))))))))
+	   )))))))
 				     
 				     
 (defun display-proxy-cache-entries (req ent pcache)
   ;; show all the proxy cache entries
   (let ((now (get-universal-time)))
     (flet ((display-pcache-ent (ent)
+	     
 	     (html (:b "uri: ")
 		   (:princ-safe (pcache-ent-key ent))
 		   :br
@@ -977,6 +1386,10 @@
 		   (:princ (pcache-ent-data-length ent))
 		   (:b ", State: ")
 		   (:princ-safe (pcache-ent-state ent))
+		   (:b ", Use: ")
+		   (:princ-safe (pcache-ent-use ent))
+		   (:b ", Code: ")
+		   (:princ-safe (pcache-ent-code ent))
 		   (if* (pcache-ent-disk-location ent)
 		      then (html :br
 				 (:b "Disk Location: "
@@ -984,7 +1397,9 @@
 				      (pcache-ent-disk-location ent)))))
 		   :p
 		   :br
-		   )))
+		   )
+	     
+	     ))
       (with-http-response (req ent)
 	(with-http-body (req ent)
 	  (html
@@ -1033,18 +1448,36 @@
 	    
 	     ))))))))
 
-				
-      
+#+ignore
+(defun verify-memory-cache (tag)
+  ;; verify that all memory cache items are not on the free list too
+  
+  (let ((pcache (wserver-pcache *wserver*)))
+    (let ((ent (pcache-ent-next (queueobj-mru 
+				 (pcache-queueobj pcache))))
+	  (last-ent (queueobj-lru (pcache-queueobj pcache))))
+      (loop
+	(if* (or (null ent)  (eq last-ent ent)) then (return))
+	;; test to see if block are on the free list
+	  (setq *bug* ent)
+	(dolist (db (pcache-ent-data ent))
+	  (chk-header-block db tag))
+	(setq ent (pcache-ent-next ent))))
+    ))
   
 
+; was 'proxy-cache-request'
 
-(defun proxy-cache-request (req ent)
+(defun check-cache-then-proxy-request (req ent respond level)
   ;; if we've got a proxy cache then retrieve it from there
   ;; else just proxy the request
   
+  ;; respond is true if we really want to respond, it will be 
+  ;; nil if we just want to ensure that what we need is in the cache
+  ;;
   
   (let ((pcache (wserver-pcache *wserver*))
-	(rendered-uri (net.uri:render-uri (request-raw-uri req) nil)))
+	(rendered-uri))
     
     (if* (or (null pcache)
 	     ; should handle :head requests too
@@ -1056,58 +1489,121 @@
 		    t))
 	     )
        then (if* pcache then (incf (pcache-r-direct pcache)))
-	    (logmess (format nil "direct for ~a~%" rendered-uri))
-	    (return-from proxy-cache-request
-	      (proxy-request req ent)))
+	    (return-from check-cache-then-proxy-request
+	      (proxy-request req ent :respond respond)))
 
-    (logmess (format nil "cache: look in cache for ~a~%" rendered-uri))
+    ; clear out the fragment part (after the #) so that we don't match
+    ; on that.
+    (setf (net.uri:uri-fragment (request-raw-uri req)) nil)
+    (setq rendered-uri
+      (transform-uri (net.uri:render-uri (request-raw-uri req) nil)))
+      
+    
+    (dlogmess (format nil "cache: look in cache for ~a, level ~d, ents ~d~%" 
+		      rendered-uri
+		      level
+		      (length (gethash rendered-uri (pcache-table pcache)))
+		      ))
 
     (dolist (pcache-ent (gethash rendered-uri (pcache-table pcache))
 	      ; not found, must proxy and then cache if the
 	      ; result looks good
 	      (progn
-		(logmess "not in cache, proxy it")
-		(incf (pcache-r-miss pcache))
-		(proxy-and-cache-request req ent (get-universal-time) nil t)))
+		(dlogmess (format nil "not in cache, proxy it level ~d" level))
+		(if* (eql *browser-level* level)
+		   then (incf (pcache-r-miss pcache))
+			(log-proxy rendered-uri level :mi nil)
+		   else (incf (pcache-r-cache-fill pcache))
+			(log-proxy rendered-uri level :pf nil))
+		
+			
+		(proxy-and-cache-request req ent (get-universal-time) 
+					 nil respond level)))
       (if* (lock-pcache-ent pcache-ent)
 	 then (unwind-protect
 		  (if* (equal (pcache-ent-cookie pcache-ent)
 			      (header-slot-value req :cookie))
 		     then ; can use this one
-			  (use-value-from-cache req ent pcache-ent)
-			  (return))
+			     
+			  (multiple-value-bind (response new-pcache-ent)
+			      (use-value-from-cache req ent pcache-ent
+						    level respond)
+
+			      
+			    ; run hook only if we're at the browser level
+			    ; (since this will allow us to flush the queue)
+			    ; of if this wasn't a fast hit and thus there
+			    ; is new data to cache
+			    (if* (and (pcache-entry-cached-hook pcache)
+				      (or (eql level *browser-level*)
+					  (not (member response '(:fh :fv :sh)
+						       :test #'eq))))
+			       then ; we want to do link scanning of this
+				    (if* (null new-pcache-ent)
+				       then (setq new-pcache-ent 
+					      pcache-ent))
+				    
+				    (if* (lock-pcache-ent new-pcache-ent)
+				       then ; it will be unlocked by the hook fcn
+					    (funcall (pcache-entry-cached-hook pcache)
+						     pcache
+						     new-pcache-ent level))))
+			  (return)
+		     else (dlogmess 
+			   (format nil "can't use cached ~s due to cookie difference~%"
+				   rendered-uri))
+			  (dlogmess (format nil
+					    "cached cookie ~s~%, current cookie: ~s~%" 
+					    (pcache-ent-cookie pcache-ent)
+					    (header-slot-value req :cookie))))
 				 
-		(unlock-pcache-ent pcache-ent))))))
+		(unlock-pcache-ent pcache-ent))
+	 else (logmess "entry could not be locked~%")))))
 
 
 
-(defun proxy-and-cache-request (req ent now pcache-ent respond)
+(defun proxy-and-cache-request (req ent now pcache-ent respond level)
   ;; must send the request to the net via the proxy.
   ;; if pcache-ent is non-nil then this is the existing
   ;; cache entry which may get updated or killed.
   ;; 
   ;; return the reponse code from the proxy call
+  ;; return the new pcache-ent that got the new value if the return
+  ;;  code is 200 or 302
+  ;;
   ;;
   (let ((new-ent (make-pcache-ent))
-	(rendered-uri (net.uri:render-uri (request-raw-uri req) nil))
+	(rendered-uri 
+	 (transform-uri (net.uri:render-uri (request-raw-uri req) nil)))
 	(pcache (wserver-pcache *wserver*)))
-    (proxy-request req ent :pcache-ent new-ent :respond respond)
-    (if* (eq (pcache-ent-code new-ent) 200)
+    
+    (setf (pcache-ent-key new-ent) rendered-uri
+	  (pcache-ent-uri new-ent) (request-raw-uri req))
+    
+    (proxy-request req ent :pcache-ent new-ent :respond respond :level level)
+    (if* (member (pcache-ent-code new-ent) '(200 
+					     302 ; redirect
+					     ))
        then ; turns out it was modified, must
 	    ; make this the new entry
 
 	    (if* pcache-ent
-	       then (logmess (format nil "replace cache entry for ~a"
+	       then (dlogmess (format nil "replace cache entry for ~a"
 				     rendered-uri)))
 	    
-	    (setf (pcache-ent-key new-ent) rendered-uri)
 	    
 	    (push new-ent
 		  (gethash rendered-uri
 			   (pcache-table pcache)))
 
 	    ; put at the head of the memory queue
-	    (move-pcache-ent new-ent nil (pcache-queueobj pcache))
+	    ; could already be dead from some other threads o
+	    ; be careful
+	    (if* (lock-pcache-ent new-ent)
+	       then (if* (not (eq (pcache-ent-state new-ent) :dead))
+		       then (move-pcache-ent new-ent nil 
+					     (pcache-queueobj pcache)))
+		    (unlock-pcache-ent new-ent))
 			      
 	    ; and disable the old entry
 	    (if* pcache-ent
@@ -1121,7 +1617,7 @@
 	    ; that the item is older
 	    ;* this may end up violation the expiration
 	    ; time in a header from a previous call
-	    (logmess (format nil "change expiration date for ~a"
+	    (dlogmess (format nil "change expiration date for ~a"
 			     rendered-uri))      
 	    (setf (pcache-ent-expires pcache-ent)
 	      (max (pcache-ent-expires pcache-ent)
@@ -1129,13 +1625,17 @@
 		    (pcache-ent-last-modified pcache-ent)
 		    now))))
     
-    (pcache-ent-code new-ent)))
+    (values (pcache-ent-code new-ent) new-ent)))
   
 
 
-(defun use-value-from-cache (req ent pcache-ent)
+(defun use-value-from-cache (req ent pcache-ent level respond)
   ;; we've determined that pcache-ent matches the request.
   ;; now deal with the issue of it possibily being out of date
+  ;;
+  ;; return a keyword specifying the kind of access that was
+  ;; done
+  ;;
   (let* ((ims (header-slot-value req :if-modified-since))
 	 (now (get-universal-time))
 	 (pcache (wserver-pcache *wserver*))
@@ -1143,10 +1643,14 @@
     
     (most-recently-used-ent pcache-ent)
     
-    (logmess (format nil "ims is ~s" ims))
+    (dlogmess (format nil "ims is ~s" ims))
 
     ; compute if the entry is fresh or stale
     (setq fresh (<= now (pcache-ent-expires pcache-ent)))
+    
+    
+    (dlogmess (format nil "ims is ~s, fresh by ~s seconds" ims 
+		      (-  (pcache-ent-expires pcache-ent) now)))
     
     
     (if* (and ims (not (equal "" ims)))
@@ -1159,29 +1663,63 @@
 	       then (if* (< ims (pcache-ent-last-modified pcache-ent))
 		       then ; it has been modified since the ims time
 			    ; must return the whole thing
-			    (logmess "validation->fast hit")
+			    (dlogmess "validation->fast hit")
 			    (incf (pcache-r-fast-hit pcache))
-			    (send-cached-response req pcache-ent)
+			    (if* respond
+			       then (send-cached-response req pcache-ent))
+			    (log-proxy (pcache-ent-key pcache-ent)
+				       level
+				       :fh
+				       (- (pcache-ent-last-modified pcache-ent)
+					  ims))
+			    :fh
 		       else ; it hasn't been modified since the ims time
-			    (logmess "fast validation")
+			    (dlogmess "fast validation")
 			    (incf (pcache-r-fast-validation pcache))
-			    (send-not-modified-response req ent))
+			    (if* respond
+			       then (send-not-modified-response req ent))
+			    (log-proxy (pcache-ent-key pcache-ent)
+				       level
+				       :fv
+				       (- (pcache-ent-last-modified pcache-ent)
+					  ims))
+			    :fv
+			    )
 	       else ; stale, must revalidate
 		    (let ((code
 			   (proxy-and-cache-request req ent 
-						    now pcache-ent t)))
+						    now pcache-ent respond
+						    level)))
 		      (if* (eql code 304)
-			 then (logmess "slow validation")
+			 then (dlogmess "slow validation")
 			      (incf (pcache-r-slow-validation pcache))
-			 else (logmess "consistency miss")
+			      (log-proxy (pcache-ent-key pcache-ent)
+					 level
+					 :sv
+					 (- (pcache-ent-last-modified pcache-ent)
+					    ims))
+			      :sv 
+			 else (dlogmess "consistency miss")
 			      (incf (pcache-r-consistency-miss
-				     pcache)))))
+				     pcache))
+			      (log-proxy (pcache-ent-key pcache-ent)
+					 level
+					 :cm
+					 (- (pcache-ent-last-modified pcache-ent)
+					    ims))
+			      :cm
+			      )))
 			    
        else ; unconditional get
 	    (if* fresh
-	       then (logmess "fast hit")
+	       then (dlogmess "fast hit")
 		    (incf (pcache-r-fast-hit pcache))
-		    (send-cached-response req pcache-ent)
+		    (if* respond then (send-cached-response req pcache-ent))
+		    (log-proxy (pcache-ent-key pcache-ent)
+			       level
+			       :fh
+			       nil)
+		    :fh
 	       else ; issue a validating send
 		    
 		    (insert-header 
@@ -1191,20 +1729,37 @@
 			 (setf (pcache-ent-last-modified-string pcache-ent)
 			   (universal-time-to-date
 			    (pcache-ent-last-modified pcache-ent)))))
-
-		    (let ((code 
-			   (proxy-and-cache-request req ent now pcache-ent nil)))
+		    
+		    (multiple-value-bind (code new-pcache-ent)
+			   (proxy-and-cache-request req ent now pcache-ent nil
+						    -1)
 		      ; we didn't respond just sent out a probe
-		      (if* (eql code 304)
-			 then ; hasn't been modified since our 
-			      ; cached entry
-			      (logmess "slow hit")
-			      (incf (pcache-r-slow-hit pcache))
-			 else ; was modified, so new item is cached
-			      (logmess "consistency miss")
-			      (incf (pcache-r-consistency-miss pcache)))
-		      (send-cached-response req pcache-ent))))))
-		      
+		      (multiple-value-prog1
+			  (if* (eql code 304)
+			     then ; hasn't been modified since our 
+				  ; cached entry
+				  (dlogmess "slow hit")
+				  (incf (pcache-r-slow-hit pcache))
+				  (log-proxy (pcache-ent-key pcache-ent)
+					     level
+					     :sh
+					     nil)
+				  :sh
+				  
+			     else ; was modified, so new item is cached
+				  (setq pcache-ent new-pcache-ent)
+				  (dlogmess "consistency miss")
+				  (incf (pcache-r-consistency-miss pcache))
+				  (log-proxy (pcache-ent-key pcache-ent)
+					     level
+					     :cm
+					     nil)
+				  (values :cm pcache-ent)
+				  )
+			(if* respond 
+			   then (send-cached-response req pcache-ent))))))))
+
+
 		    
 (defun compute-approx-expiration (changed  now)
   ;; compute the expires time based on the last time the file was
@@ -1228,7 +1783,7 @@
 
 (defun send-cached-response (req pcache-ent)
   ;; send back this response
-  (logmess (format nil "cache: sending back cached response: ~a, length ~d~%" 
+  (dlogmess (format nil "cache: sending back cached response: ~a, length ~d~%" 
 		   (net.uri:render-uri (request-raw-uri req) nil)
 		   (pcache-ent-data-length pcache-ent)))
   (incf (pcache-ent-returned pcache-ent))
@@ -1311,7 +1866,11 @@
     
       ; link into the toq, at the mru position
       (if* toq
-	 then (let* ((mru-head (queueobj-mru toq))
+	 then ;debugging
+	      (if* (eq (pcache-ent-state pcache-ent) :dead)
+		 then (break "shouldn't be dead during move"))
+	      
+	      (let* ((mru-head (queueobj-mru toq))
 		     (mru (pcache-ent-next mru-head)))
 		(setf (pcache-ent-next mru-head) pcache-ent
 		      (pcache-ent-prev pcache-ent) mru-head
@@ -1335,6 +1894,10 @@
 						      *wserver*)))
   ; make this entry dead
   (mp::without-scheduling
+    
+    ; stop any scanning of this uri
+    (setf (pcache-ent-level pcache-ent) -1) 
+    
     (let ((state (pcache-ent-state pcache-ent)))
       (if* (not (eq :dead state))
 	 then ; make it dead
@@ -1350,7 +1913,7 @@
 		    (pcache-dead-ent pcache) pcache-ent)
 	      
 	      ; if currently not in use, then make sure it's never used
-	      (if* (zerop (pcache-ent-use pcache-ent))
+	      (if* (eql 0 (pcache-ent-use pcache-ent))
 		 then (setf (pcache-ent-use pcache-ent) nil))
 		
 	      ;; stats
@@ -1393,20 +1956,23 @@
 
 (defun cache-response (req pcache-ent 
 		       response-code comment client-response-header
-		       body-buffers body-length)
+		       body-buffers body-length level)
   
   ;; we are caching, save the information about this response 
   ;; in the pcache-ent we are passed, which should be blank
   
 	    
-  (logmess (format nil "cache: caching response to ~a, code ~d, length ~d~%" 
-		   (net.uri:render-uri (request-raw-uri req) nil)
-		   response-code
-		   body-length
-		   ))
+  (dlogmess (format nil "cache: caching response to ~a, code ~d, length ~d~%" 
+		    (net.uri:render-uri (request-raw-uri req) nil)
+		    response-code
+		    body-length
+		    ))
   
-  (let (now)
-    (if* (eql response-code 200)
+  (let (now uri-info
+	(pcache (wserver-pcache *wserver*)))
+    (if* (or (eql response-code 200)
+	     (eql response-code 302) ; redirect
+	     )
        then ; full response
 	    
 	    (setf (pcache-ent-code pcache-ent) response-code)
@@ -1426,7 +1992,13 @@
 	  
 	    (setf (pcache-ent-state pcache-ent) nil ; means valid data
 		  (pcache-ent-use  pcache-ent) 0)
-	  
+
+	    (setq uri-info (find-uri-info (request-raw-uri req)))
+	    
+	    (if* uri-info
+	       then (dlogmess (format nil "have uri info for ~a"
+				      (request-raw-uri req))))
+	    
 	    (let* ((last-mod (header-buffer-header-value 
 			      client-response-header
 			      :last-modified))
@@ -1460,7 +2032,19 @@
 		      (setf (pcache-ent-expires pcache-ent)
 			(compute-approx-expiration
 			 (pcache-ent-last-modified pcache-ent)
-			 (or now (get-universal-time))))))
+			 (or now (get-universal-time)))))
+	      
+	      ;; add extra lifetime for certain entries
+	      (incf (pcache-ent-expires pcache-ent)
+		    (if* (and uri-info (uri-info-extra-lifetime uri-info))
+		       then (uri-info-extra-lifetime uri-info)
+		       else *extra-lifetime*))
+	      
+	      (if* (pcache-entry-cached-hook pcache)
+		 then (if* (lock-pcache-ent pcache-ent)
+			 then ; it will be unlocked by the hook fcn
+			      (funcall (pcache-entry-cached-hook pcache)
+				       pcache pcache-ent level))))
 		       
      elseif (eql response-code 304)
        then ; just set that so the reader of the response will know
@@ -1497,7 +2081,15 @@
   (if* (> (queueobj-blocks (pcache-queueobj pcache))
 	  (pcache-high-water pcache))
      then (flush-memory-cache pcache
-			      (pcache-low-water pcache))))
+			      (pcache-low-water pcache)))
+  
+  ; now rotate caches so they are evenly used
+  (let ((caches (pcache-disk-caches pcache)))
+    (if* (cdr caches)
+       then (let ((new (cdr caches)))
+	      (setf (cdr caches) nil)
+	      (nconc new caches)
+	      (setf (pcache-disk-caches pcache) new)))))
 
 
 (defun flush-disk-cache (pcache pcache-disk goal)
@@ -1518,10 +2110,11 @@
 	(let ((lru (pcache-ent-prev lru-head)))
 	  (if* (not (eq lru mru-head))
 	     then ; a legit block
-		  (logmess (format nil "kill ~s from disk queue"
+		  (dlogmess (format nil "kill ~s from disk queue"
 				   (pcache-ent-key lru)))
 		  (decf needed (pcache-ent-blocks lru))
 		  (kill-pcache-ent lru pcache)
+		  (log-proxy (pcache-ent-key lru) 0 :kd nil)
 	     else (return) ; no more left ? shouldn't happen
 		  ))))))
 
@@ -1537,13 +2130,18 @@
 	 (queueobj (pcache-queueobj pcache))
 	 (mru-head (queueobj-mru queueobj))
 	 (lru-head (queueobj-lru queueobj))
-	 (disk-caches (pcache-disk-caches pcache)))
+	 (disk-caches (pcache-disk-caches pcache))
+	 (ent-todo)
+	 )
     
     (loop
       (if* (<= needed 0) then (return))
       
       (block main
+	(setq ent-todo nil)
+	
 	(mp:without-scheduling
+	  ;; find the next ent to process without other processes running
 	  (let ((lru lru-head))
 	    (loop
 	      (setq lru (pcache-ent-prev lru))
@@ -1551,17 +2149,22 @@
 		 then (setq needed 0) 
 		      (return-from main))
 	      (if* (lock-pcache-ent lru)
-		 then (dolist (dc disk-caches)
-			(if* (move-ent-to-disk lru dc)
-			   then ; successful move to disk
-				(decf needed (pcache-ent-blocks lru))
-				(unlock-pcache-ent lru)
-				(return-from main)))
-		      ; couldn't get it into a disk cache.. just kill it
-		      (kill-pcache-ent lru pcache)
-		      (unlock-pcache-ent lru)
-		      (setq lru lru-head)
-		      ))))))))
+		 then (setq ent-todo lru)
+		      (return-from main))))))
+      
+      (if* ent-todo
+	 then ; move this one to disk or kill it off
+	      (if* (dolist (dc disk-caches t)
+		     (if* (move-ent-to-disk ent-todo dc)
+			then ; successful move to disk
+			     (decf needed (pcache-ent-blocks ent-todo))
+			     (unlock-pcache-ent ent-todo)
+			     (return nil)))
+		 then ; can't put on disk.  kill it in memory
+		      (decf needed (pcache-ent-blocks ent-todo))
+		      (kill-pcache-ent ent-todo pcache)
+		      (unlock-pcache-ent ent-todo))))))
+
 
 		  
 (defun flush-dead-entries (pcache)
@@ -1595,7 +2198,16 @@
   
 
       
-    
+(defun empty-all-caches (&key (server *wserver*))
+  ;; remove everything from all caches
+  
+  (let ((pcache (wserver-pcache server)))
+    (mp:with-process-lock ((pcache-cleaner-lock pcache))
+      (flush-dead-entries pcache)
+      (flush-memory-cache pcache 0) ; empty memory
+      (dolist (dcache (pcache-disk-caches pcache))
+	(flush-disk-cache pcache dcache 0)))))
+
 
 
 
@@ -1619,7 +2231,7 @@
   ;; return t if we suceede and nil if we didn't
   ;;
   (if* (pcache-ent-disk-location pcache-ent)
-     then (logmess (format nil "cached ~s is already on the disk"
+     then (dlogmess (format nil "cached ~s is already on the disk"
 			   (pcache-ent-key pcache-ent)))
 	  (return-from move-ent-to-disk t))
   
@@ -1628,11 +2240,11 @@
 	(buffs))
     
     (if* to-store-list
-       then (logmess (format nil "store ~s on disk at ~s~%"
+       then (dlogmess (format nil "store ~s on disk at ~s~%"
 			     (pcache-ent-key pcache-ent)
 			     to-store-list))
 	    (store-data-on-disk pcache-ent pcache-disk to-store-list)
-	    
+	    (log-proxy (pcache-ent-key pcache-ent) 0 :wd nil)
 	    (let ((ans
 		   (mp:without-scheduling
 		     (if* (and (null (pcache-ent-state pcache-ent))
@@ -1702,9 +2314,11 @@
 	   (bytes (+ (pcache-ent-data-length pcache-ent)
 		     *header-block-size*))
 	   (res))
-      (logmess (format nil "retrieve ~s in blocks ~s~%"
+      (dlogmess (format nil "retrieve ~s in blocks ~s~%"
 		       (pcache-ent-key pcache-ent)
 		       block-list))
+      (log-proxy (pcache-ent-key pcache-ent) 0 :rd nil)
+      
       (mp:with-process-lock ((pcache-disk-lock pcache-disk))
 	; get a lock so we're the only thread doing operations
 	; on the stream to the cache
@@ -1838,7 +2452,7 @@
 	(stream (pcache-disk-stream pcache-disk))
 	(bytes (+  *header-block-size*  ; for header block
 		   (pcache-ent-data-length pcache-ent))))
-    (logmess (format nil "writing ~d buffers to list ~d~%" 
+    (dlogmess (format nil "writing ~d buffers to list ~d~%" 
 		     (length buffers)
 		     list-of-blocks))
     (dolist (ent list-of-blocks)
@@ -1848,8 +2462,9 @@
       (dotimes (i (1+ (- (cdr ent) (car ent))))
 	(if* (null buffers)
 	   then (error "ran out of buffers before blocks"))
-	(write-sequence (car buffers) stream :end
-			(min *header-block-size* bytes))
+	(let ((length (min *header-block-size* bytes)))
+	  (if* (> length 0)
+	     then (write-sequence (car buffers) stream :end length)))
 	(pop buffers)
 	(decf bytes *header-block-size*)))))
     
@@ -1862,53 +2477,245 @@
 		
 ;--- end disk cache  
   
+;--- uri transforms 
+
+(defparameter *uri-transforms* 
+    ;; list of functions that take a string and if they make a change
+    ;; return a string (else they return nil)
+    nil)
+
+
+(defun transform-uri (string)
+  ;; transform the string
+  (let (ans)
+    (dolist (tr *uri-transforms* string)
+      (if* (setq ans (funcall tr string))
+	 then (return ans)))))
+
+
+; define sample transform
+(defun add-transform (function)
+  (pushnew function *uri-transforms*))
+
+
+
+;--- specification of uri handling by proxy
+(defun handle-uri (host path
+		   &key (server *wserver*)
+			(extra-lifetime nil el-p)
+			(scan-depth nil sd-p)
+			(exclude nil ex-p)
+			(scan-function nil sf-p)
+			(offsite t ofs-p)
+			)
+  
+  ;; store info about how to handle this uri during the scan
+
+  ;; host can be "foo.com" or "foo.com:8000"
+  ;;
+  
+  (let ((pcache (wserver-pcache server))
+	(table)
+	(uri-info)
+	(ahost)
+	(aport)
+	)
+    (if* (null pcache) then (error "proxying isn't enabled"))
+    (setq table (pcache-uri-info-table pcache))
+    
+    (multiple-value-setq (ahost aport) (get-host-port host))
+    (if* (null ahost)
+       then (error "bad form for the host:port ~s" host))
+    
+    (dolist (ent (gethash ahost table))
+      (if* (and (equal path (uri-info-path ent))
+		(eql aport (uri-info-port ent)))
+	 then (return (setq uri-info ent))))
+    
+    (if* (null uri-info)
+       then ; add new one
+	    (setq uri-info (make-uri-info 
+			    :host ahost 
+			    :port aport
+			    :offsite offsite
+			    :path path
+			    :path-regexp (if* path
+					    then (compile-regexp path))))
+	    (push uri-info (gethash ahost table)))
+    
+    ; set fields
+    (if* el-p
+       then (setf (uri-info-extra-lifetime uri-info) extra-lifetime))
+    
+    (if* sd-p 
+       then (setf (uri-info-scan-depth uri-info) scan-depth))
+    
+    (if* ex-p
+       then (if* (and exclude 
+		      (not (consp exclude)))
+	       then (setq exclude (list exclude)))
+	    
+	    (setf (uri-info-exclude uri-info) exclude
+		  (uri-info-exclude-regexp uri-info) (mapcar #'compile-regexp exclude))
+	    )
+    
+    (if* sf-p
+       then (setf (uri-info-scan-function uri-info) scan-function))
+    
+    (if* ofs-p
+       then (setf (uri-info-offsite uri-info) offsite))
+    
+    uri-info))
+
+	      
+    
+    
+(defmethod find-uri-info ((uri net.uri:uri))
+  ;; locate the uri-info corresponding to this uri, if
+  ;; there is one
+  (let ((pcache (wserver-pcache *wserver*))
+	(path (net.uri:uri-path uri))
+	(host (net.uri:uri-host uri))
+	(port (or (net.uri:uri-port uri) 80)))
+    (if* pcache
+       then (dolist (ent (gethash host (pcache-uri-info-table pcache)))
+	      (if* (eql port (uri-info-port ent))
+		 then 
+		      (let ((pregexp (uri-info-path-regexp ent)))
+			(if* (null pregexp)
+			   then ; matches everything
+				(return ent)
+			 elseif (match-regexp pregexp path :return nil)
+			   then (return ent))))))))
+
+
+
+	      
+	    
+    
+    
+	    
+      
+  
+			
+
+
+
+
+
+;-------- state save/restore
+
+; items to save
+;  pcache   (wserver-pcache)
+; 
+
+; structures needing saving
+(defmethod make-load-form ((obj pcache) &optional env) 
+  (make-load-form-saving-slots obj :environment env))
+
+(defmethod make-load-form ((obj pcache-disk) &optional env)
+  (make-load-form-saving-slots obj :environment env))
+
+(defmethod make-load-form ((obj pcache-ent) &optional env)
+  (make-load-form-saving-slots obj :environment env))
+
+(defmethod make-load-form ((obj queueobj) &optional env)
+  (make-load-form-saving-slots obj :environment env))
+
+(without-package-locks
+(defmethod make-load-form ((obj mp:process-lock) &optional env)
+  (make-load-form-saving-slots obj :environment env))
+
+; this is just temporary until we get a patch for this in uri.fasl
+(defmethod make-load-form ((self net.uri:uri) &optional env)
+  (declare (ignore env))
+  `(make-instance ',(class-name (class-of self))
+     :scheme ,(uri-scheme self)
+     :host ,(uri-host self)
+     :port ,(uri-port self)
+     :path ',(uri-path self)
+     :query ,(uri-query self)
+     :fragment ,(uri-fragment self)
+     :plist ',(uri-plist self)
+     :string ,(net.uri::uri-string self)
+     ; bug is missing ' in parsed-path value
+     :parsed-path ',(net.uri::.uri-parsed-path self)))
+)
+
+(defun save-proxy-cache (filename &key (server *wserver*))
+  ;; after the server threads have been saved, this function can 
+  ;; be called to save out the state of the proxy cache
+  
+  ; prepare to save by removing objects that can't be saved
+  
+  (let ((pcache (wserver-pcache server)))
+    (if* (null pcache) 
+       then (return-from save-proxy-cache nil))
+    
+    (setf (pcache-cleaner pcache) nil)
+    
+    ; don't save the hash table since we can recreate it as since
+    ; saving it is very expensive due to the fasl-circle check
+    (setf (pcache-table pcache) nil)
+    
+    
+    (dolist (pcache-disk (pcache-disk-caches pcache))
+      ; for each disk cache
+      (ignore-errors (close (pcache-disk-stream pcache-disk)))
+      (setf (pcache-disk-stream pcache-disk) nil)))
     
   
-
-
+  (with-open-file (p filename :direction :output :if-exists :supersede)
+    (fasl-write (wserver-pcache server) p t))
   
+  (setf (wserver-pcache server) nil))
 
 
 
+(defun restore-proxy-cache (filename &key (server *wserver*))
+  (let ((pcache (car (fasl-read filename))))
+    (if* (not (typep pcache 'pcache))
+       then (error "file didn't contain a saved cache"))
     
-
-		  
+    (dolist (pcache-disk (pcache-disk-caches pcache))
+      ; open each cache
+      (let ((filename (pcache-disk-filename pcache-disk)))
+	(setf (pcache-disk-stream pcache-disk)
+	  (open filename 
+		:if-exists :overwrite
+		:if-does-not-exist :error
+		:direction :io
+		#-(and allegro (version>= 6))
+		:element-type
+		#-(and allegro (version>= 6))
+		'(unsigned-byte 8)))))
+    
+    (setf (wserver-pcache server) pcache)
+    
+    ; rebuild the hash table
+    (let ((table (make-hash-table :size 1000 :test #'equal)))
+      (flet ((process-queue (table queueobj)
+	       ;; add all entries to the hash table
+	       (let ((lru-head (queueobj-lru queueobj))
+		     (cur (pcache-ent-next (queueobj-mru queueobj))))
+		 (loop
+		   (if* (eq cur lru-head) then (return))
+		   
+		   (if* (not (eq :dead (pcache-ent-state cur)))
+		      then (push cur
+				 (gethash (pcache-ent-key cur)
+					  table)))
+		   (setq cur (pcache-ent-next cur))))))
+		 
+	(dolist (pcache-disk (pcache-disk-caches pcache))
+	  (process-queue table (pcache-disk-queueobj pcache-disk)))
+	(process-queue table (pcache-queueobj pcache))
 	
-    
-
-    
-    
-	    
-	    
-		    
-	    
-				  
-		    
-	    
-  
-
-  
-  
-
-
-    
-    
-	    
-	    
-	    
-	    
-    
-    
-		  
-
-
+	(setf (pcache-table pcache) table)
+	))
       
     
-  
+    (start-proxy-cache-processes server pcache)))
 
-
-  
-
-
-
-
+    
+;----

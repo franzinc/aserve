@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.6.6.4 2000/10/21 15:09:17 layer Exp $
+;; $Id: t-aserve.cl,v 1.6.6.5 2001/06/01 21:22:39 layer Exp $
 
 ;; Description:
 ;;   test iserve
@@ -48,6 +48,9 @@
 (defvar *x-ssl*   nil) ; true when we want to do ssl client calls
 (defvar *proxy-wserver* nil)
 
+; stack of old values
+(defvar *save-x-proxy* nil)
+(defvar *save-proxy-wserver* nil)
 
 (defun test-aserve ()
   ;; run the allegroserve tests three ways:
@@ -80,9 +83,14 @@
 	    (start-proxy-running)
 	    (do-tests)
 	    
+	    (format t "~%~%===== test through proxy to proxy~%~%")
+	    (start-proxy-running)
+	    (do-tests)
+	    
 	    (format t "~%>> checking to see if ssl is present~%~%")
 	    (if* (errorset (require :ssl))
 	       then ; we have ssl capability, run tests through ssl
+		    (stop-proxy-running)
 		    (stop-proxy-running)
 		    (stop-aserve-running)
 		    (format t "~%~%===== test through ssl ~%~%")
@@ -93,6 +101,7 @@
 	       else (format t "~%>> it isn't so ssl tests skipped~%~%")))
 	; cleanup forms:
 	(stop-aserve-running)
+	(stop-proxy-running)
 	(stop-proxy-running)
 	)))
   (if* (or (> util.test::*test-errors* 0)
@@ -121,17 +130,25 @@
 
 (defun start-proxy-running ()
   ;; start another web server to be the proxy
-  (setq *proxy-wserver* (start :server :new :port nil :proxy t))
+  (push *proxy-wserver* *save-proxy-wserver*)
+  
+  (setq *proxy-wserver* (start :server :new 
+			       :port nil 
+			       :proxy t
+			       :proxy-proxy *x-proxy*))
+  
+  (push *x-proxy* *save-x-proxy*)
   (setq *x-proxy* (format nil "localhost:~d" 
 			  (socket:local-port
 			   (wserver-socket *proxy-wserver*))))
   )
 
+
 (defun stop-proxy-running ()
   (if* *proxy-wserver*
-     then (shutdown *proxy-wserver*)
-	  (setq *proxy-wserver* nil))
-  (setq *x-proxy* nil))
+     then (shutdown :server *proxy-wserver*)
+	  (setq *proxy-wserver* (pop *save-proxy-wserver*)))
+  (setq *x-proxy* (pop *save-x-proxy*)))
 
 	  
 
@@ -1035,8 +1052,8 @@
       
 
 	  (ignore-errors (delete-file "aservetest.xx"))
-	  (shutdown  proxy-wserver)
-	  (shutdown  *wserver*))))))
+	  (shutdown  :server proxy-wserver)
+	  (shutdown  :server *wserver*))))))
 
     
     

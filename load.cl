@@ -1,7 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.31.10.3 2000/10/21 15:09:13 layer Exp $
-;;
+;; $Id: load.cl,v 1.31.10.4 2001/06/01 21:22:35 layer Exp $
 
 (defvar *loadswitch* :compile-if-needed)
 (defparameter *aserve-root* (directory-namestring *load-truename*))
@@ -37,6 +36,7 @@
       "examples/chat.cl"
       "examples/file2000.txt"
       "examples/puzzle.cl"
+      "examples/urian.cl"
       "load.cl"
       "test/t-aserve.cl"
       "test/server.pem"
@@ -48,11 +48,14 @@
 (defparameter *aserve-examples*
     '("examples/examples"
       "examples/puzzle"
+      "examples/urian"
       ))
 
 (defparameter *aserve-international-only*
     ;; files that should only be loaded into a international lisp
-    '("examples/puzzle"))
+    '("examples/puzzle"
+      "examples/urian"
+      ))
 
 
 ;; end experimental
@@ -174,7 +177,7 @@
 ;; 10. ftp download.sourceforge.net and put the tar file in the
 ;;     incoming directory, then go to the aserve sourceforge web page and 
 ;;     select the file manager and publish it.
-;; 11. cd /www/opensource/htdocs/aserve 
+;; 11. cd /www/opensource/devel/www/aserve 
 ;;     on cobweb and rsync the files with SourceForge
 
 
@@ -240,7 +243,7 @@
 	   aserve-version-name
 	   aserve-version-name))
   (run-shell-command 
-   (format nil "cp ~aaserve-src/~a.tgz /net/candyman/home/ftp/pub/aserve"
+   (format nil "cp ~aaserve-src/~a.tgz /net/cobweb/home/ftp/pub/aserve"
 	   *aserve-root*
 	   aserve-version-name)))
 
@@ -251,7 +254,7 @@
 	   *aserve-root*
 	   *aserve-root*
 	   *aserve-root*))
-  (run-shell-command "~/bin/sync-a-opensource"))
+  (run-shell-command "rsh cobweb bin/sync-a-opensource"))
 	   
 	    
   

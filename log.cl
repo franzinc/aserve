@@ -22,8 +22,7 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-;;
-;; $Id: log.cl,v 1.11.6.2 2000/10/12 05:10:59 layer Exp $
+;; $Id: log.cl,v 1.11.6.3 2001/06/01 21:22:35 layer Exp $
 
 ;; Description:
 ;;   iserve's logging
@@ -36,17 +35,26 @@
 
 (defvar *enable-logging* t) ; to turn on/off the standard logging method
 
-(defun logmess (message)
+(defmethod logmess (message)
   (multiple-value-bind (csec cmin chour cday cmonth cyear)
       (decode-universal-time (get-universal-time))
-    
-    (format (or *aserve-debug-stream* *initial-terminal-io*)
-	    "~a: ~2,'0d/~2,'0d/~2,'0d - ~2,'0d:~2,'0d:~2,'0d - ~a~%"
-	    (mp:process-name sys:*current-process*)
-	    cmonth cday (mod cyear 100)
-	    chour cmin csec
-	    message)))
+    (let ((str (format nil
+		       "~a: ~2,'0d/~2,'0d/~2,'0d - ~2,'0d:~2,'0d:~2,'0d - ~a~%"
+		       (mp:process-name sys:*current-process*)
+		       cmonth cday (mod cyear 100)
+		       chour cmin csec
+		       message)))
+      (write-sequence str (or *aserve-debug-stream* *initial-terminal-io*)))))
 
+(defmethod brief-logmess (message)
+  ;; omit process name and month, day, year
+  (multiple-value-bind (csec cmin chour)
+      (decode-universal-time (get-universal-time))
+    (let ((str (format nil
+		       "~2,'0d:~2,'0d:~2,'0d - ~a~%"
+		       chour cmin csec
+		       message)))
+      (write-sequence str (or *aserve-debug-stream* *initial-terminal-io*)))))
 
 
 
@@ -86,6 +94,22 @@
 	    	
     
     
-    
+(defun log-proxy (uri level action extra)
+  ;; log information from the proxy module
+  ;;
+  (brief-logmess 
+   (format nil "~a ~d ~a ~a~@[ ~s~]"
+	   (or (getf (mp:process-property-list mp:*current-process*)
+		     'short-name)
+	       (mp:process-name mp:*current-process*))
+	   level
+	   action
+	   (if* (stringp uri) 
+	      then uri 
+	      else (net.uri:render-uri uri nil))
+	   extra))
+  (force-output (or *aserve-debug-stream* *initial-terminal-io*)))
+
     
   
+

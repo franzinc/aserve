@@ -23,9 +23,7 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-
-;;
-;; $Id: parse.cl,v 1.22.10.3 2000/10/21 15:09:14 layer Exp $
+;; $Id: parse.cl,v 1.22.10.4 2001/06/01 21:22:36 layer Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -337,7 +335,7 @@
       
       (let ((ch (read-byte sock nil nil)))
 	(if* (null ch) 
-	   then (format *debug-stream* "early eof reading response~%")
+	   then (format *debug-stream* "early eof reading response after ~d bytes~%" i)
 		(return nil) ; eof - failure
 		)
 	(if* echo then (write-char (code-char ch) *debug-stream*))
@@ -563,7 +561,7 @@
     (if* (stringp val)
        then (if* (equalp key val)
 	       then (return val))
-     elseif (equal (car val) key)
+     elseif (equalp (car val) key)
        then (return val))))
 
   

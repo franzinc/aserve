@@ -72,7 +72,8 @@
 &nbsp; <a href="#c-cookie-jar">cookie-jar</a><br>
 &nbsp; <a href="#f-make-http-client-request">make-http-client-request</a><br>
 &nbsp; <a href="#f-read-client-response">read-client-response-headers</a><br>
-&nbsp; <a href="#f-client-request-read-sequence">client-request-read-sequence</a></font><br>
+&nbsp; <a href="#f-client-request-read-sequence">client-request-read-sequence</a><br>
+&nbsp; <a href="#f-client-request-read-close">client-request-close</a></font><br>
 <a href="#proxy">Proxy</a><br>
 <a href="#cache">Cache</a><br>
 <a href="#debugging">Debugging</a><br>
@@ -134,9 +135,9 @@ and after you start the server.</p>
 server running.</p>
 
 <p><strong><font face="Courier New"><a name="f-start"></a>(start &amp;key port listeners
-chunking keep-alive<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; server setuid setgid
-debug proxy cache accept-hook ssl)</font></strong></p>
+chunking keep-alive server setuid setgid <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; debug proxy proxy-proxy
+cache restore-cache accept-hook ssl os-processes)</font></strong></p>
 
 <p>If no arguments are given then <strong>start</strong>&nbsp; starts a multi-threaded web
 server on port 80, which is the standard web server port.&nbsp;&nbsp;&nbsp; If you are
@@ -184,9 +185,23 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
     removed in future versions.</li>
   <li>proxy -- if true then this server will also act as a proxy server and will forward http
     requests to other servers.</li>
+  <li>proxy-proxy -- if <strong>proxy</strong> is also given a true value, then this argument
+    determines where the proxy will forward&nbsp; requests.&nbsp; If proxy-proxy is nil then
+    the requests go directly to the server sgiven in the request.&nbsp; If proxy-proxy is
+    given&nbsp; a value of a host and an optional port then the request is forwarded to the
+    proxy server at that address.&nbsp;&nbsp; Valid values for proxy-proxy look like
+    &quot;proxy.myfirm.com&quot; and &quot;localhost:8000&quot;.&nbsp;&nbsp; If no port is not
+    specified, 80 is assumed.</li>
   <li>cache -- if true (and if proxy is true as well) cache locally the work done by the proxy
     server.&nbsp; The value of this variable specifies the size of the caches, both memory and
     disk.&nbsp; See the section on caches for more details on the format of the argument.</li>
+  <li>restore-cache - if given a value then this value should be the name of the file created
+    by <strong>net.aserve:shutdown</strong> when given the <strong>save-cache</strong>
+    argument.&nbsp;&nbsp; The state of the cache is restored as of when it was saved.
+    &nbsp;&nbsp; This will only succeed if the external cache files that were in use when the <strong>shutdown</strong>
+    was done are in exactly the same state they were when the <strong>shutdown </strong>was
+    done.&nbsp;&nbsp; When the <strong>restore-cache</strong> argument is given, the value of
+    the <strong>cache </strong>argument is ignored.</li>
   <li>accept-hook -- this should be a function of one argument, the socket which was created
     when a http request was accepted by AllegroServe.&nbsp; The function should return a
     socket for AllegroServe to use.&nbsp; This hook is normally used to turn a regular socket
@@ -197,17 +212,28 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
     than 80).&nbsp; This makes use of the <strong>accept-hook</strong> argument so if <strong>ssl</strong>
     is specified then <strong>accept-hook</strong> should not be specified.&nbsp;&nbsp; ssl is
     supported only in certain versions of Allegro CL.</li>
+  <li>os-processes - if given it should be an integer number of operating system processes in
+    which to run AllegroServe.&nbsp; This is available on Unix only at the moment.&nbsp; The
+    AllegroServes in different processes do <strong>not</strong> share a common Lisp heap..
+    &nbsp; </li>
 </ul>
 
 <p>&nbsp;</p>
 
 <h2><a name="shutting-down-the-server"></a>Shutting down the server</h2>
 
-<p><strong><font face="Courier New"><a name="f-shutdown"></a>(shutdown &amp;optional
-server)</font></strong></p>
+<p><strong><font face="Courier New"><a name="f-shutdown"></a>(shutdown &amp;key server
+save-cache)</font></strong></p>
 
 <p>This shuts down the web server given (or the most recently started web server if no
-argument is passed in).</p>
+argument is passed for <strong>server</strong>).&nbsp; If <strong>save-cache</strong> is
+given then it should be the name of a file to which the current state of the proxy cache
+will be written.&nbsp;&nbsp; The <strong>save-cache</strong> file will only contain
+in-memory information about the cache.&nbsp; The cache usually consists of disk files as
+well and in order to maintain the complete state of the cache these files must be saved by
+the user as well.&nbsp; The information in the <strong>save-cache</strong> file refers to
+the disk cache files so those disk cache files must exist and be in the same state and
+location should the user choose to restore the state of the cache.</p>
 
 <p>&nbsp;</p>
 
@@ -1282,7 +1308,7 @@ page.</p>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 content content-type query format cookies <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-redirect basic-authorization<br>
+redirect redirect-methods basic-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 keep-alive headers proxy user-agent external-format ssl)</font></strong></p>
 
@@ -1376,12 +1402,19 @@ keep-alive headers proxy user-agent external-format ssl)</font></strong></p>
   <tr>
     <td width="22%">redirect</td>
     <td width="16%">5</td>
-    <td width="62%">If the response is a redirect (code 301, 302, 303), and the method is <strong>:get</strong>
-    or <strong>:head,</strong> then if this argument is true (and, if an integer, positive), <strong>do-http-request</strong>
-    will call itself to access the page to which the redirection is pointed.&nbsp; If <strong>redirect</strong>
-    is an integer then in the recursiive call the valued passed for <strong>redirect</strong>
+    <td width="62%">If the response is a redirect (code 301, 302, 303), and the method is one
+    given by the value of <strong>redirect-methods </strong>then if this argument is true
+    (and, if an integer, positive), <strong>do-http-request</strong> will call itself to
+    access the page to which the redirection is pointed.&nbsp; If <strong>redirect</strong> is
+    an integer then in the recursiive call the valued passed for <strong>redirect</strong>
     will be one less than the current value.&nbsp; This prevents infinite recursion due to
     redirection loops.</td>
+  </tr>
+  <tr>
+    <td width="22%">redirect-methods</td>
+    <td width="16%">(:get :head)</td>
+    <td width="62%">List of http methods which will be redirected if <strong>redirect</strong>
+    is true.</td>
   </tr>
   <tr>
     <td width="22%">basic-authorization</td>
@@ -1618,7 +1651,7 @@ basic-authorization query<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 content content-type content-length<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-external-format)</font></strong></p>
+user-agent external-format ssl)</font></strong></p>
 
 <p>This function connects to the web server indicated by the <strong>uri</strong> and
 sends the request.&nbsp;&nbsp; The arguments are the same as those for <strong>do-http-request</strong>
@@ -1676,9 +1709,17 @@ caller of the function must be prepared for having the buffer only partially fil
 
 <p>&nbsp;</p>
 
+<p><a name="f-client-request-read-close"><font face="Courier New"><strong>(client-request-close
+client-request)</strong></font></p>
+
+<p>The client-request object returned by make-http-request is closed.&nbsp;&nbsp; This
+returns the resources used by this connection to the operating system.&nbsp; </p>
+
+<p>&nbsp;</p>
+
 <hr>
 
-<h2><a name="proxy">Proxy</h2>
+<h2></a><a name="proxy">Proxy</h2>
 
 <p>AllegroServe can serve as an http proxy.&nbsp;&nbsp; What this means is that web
 clients can ask AllegroServe to fetch a URL for them.&nbsp;&nbsp; The two primary uses for

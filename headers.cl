@@ -22,8 +22,7 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-;;
-;; $Id: headers.cl,v 1.5.4.3 2000/10/21 15:09:13 layer Exp $
+;; $Id: headers.cl,v 1.5.4.4 2001/06/01 21:22:35 layer Exp $
 
 ;; Description:
 ;;   header parsing
@@ -266,6 +265,18 @@
 		 (make-array *header-block-size*
 			     :element-type '(unsigned-byte 8)))))
 
+(defparameter *header-block-plus-sresource*
+    ;; (+ 4096 100) element usb8 arrays
+    ;; used to hold things slight larger than a header block will hold
+    (create-sresource
+     :create #'(lambda (sresource &optional size)
+		 (declare (ignore sresource))
+		 (if* size
+		    then (error "size can't be specifed for header blocks"))
+		 
+		 (make-array (+ *header-block-size* 100)
+			     :element-type '(unsigned-byte 8)))))
+
 (defparameter *header-index-sresource*
     ;; used in parsing to hold location of header info in header-block
     (create-sresource
@@ -284,6 +295,8 @@
   (get-sresource *header-block-sresource*))
 
 
+
+
 (defun free-header-blocks (blocks)
   ;; free a list of blocks
   (dolist (block blocks)
@@ -295,6 +308,12 @@
    elseif block
      then (error "bad value passed to free-header-block ~s" block)))
 
+
+(defun get-header-plus-block ()
+  (get-sresource *header-block-plus-sresource*))
+
+(defun free-header-plus-block (block)
+  (if* block then (free-sresource *header-block-plus-sresource* block)))
 
 	      
 ;; parsed header array
@@ -313,7 +332,7 @@
 ;;
 ;;  min-db is a 2 byte value telling where the lowest data-block entry starts
 ;;
-;;  The header-index-block is 2 bytes per entry and specifies in index
+;;  The header-index-block is 2 bytes per entry and specifies an index
 ;;  into the data-block where a descriptor for the value associated with
 ;;  this header are located.  This file lists the headers we know about
 ;;  and each is given an index.  The header-index-block is stored
@@ -594,7 +613,10 @@
 
 (defun header-buffer-req-header-value (req header)
   ;; see header-buffer-header-value for what this does.
-  (header-buffer-header-value (request-header-block req) header))
+  (let ((buff (request-header-block req)))
+    ; there will be no buffer for http/0.9 requests
+    (and buff  
+	 (header-buffer-header-value (request-header-block req) header))))
 
 
 (defun header-buffer-header-value (buff header)
@@ -686,7 +708,27 @@
 	    (error "Incomplete headers sent by server"))))
 
 							   
-							   
+
+(defun initialize-header-block (buf)
+  ;; set the parsed header block buf to the empty state
+  
+  ; clear out the indicies pointing to the values
+  (let ((index (header-block-header-index 0)))
+    (dotimes (i *header-count*)
+      (setf (unsigned-16-value buf index) 0)
+      (decf index 2)))
+  
+  ; no headers yet
+  (setf (unsigned-16-value buf *header-block-used-size-index*) 0)
+  
+  ; start of where to put data
+  (setf (unsigned-16-value buf *header-block-data-start-index*)
+    (header-block-data-start))
+  
+  buf)
+  
+  
+  
 (defun copy-headers (frombuf tobuf header-array)
   ;; copy the headers denoted as :p (pass) in header array 
   ;; in frombuf to the tobuf
@@ -876,7 +918,39 @@
 			 (pop cest)
 		    else (return t))))))))
 	       
-			 
+
+(defun header-match-prefix-string (buff header string)
+  ;; match the prefix of the header vlue against the given string
+  
+  (if* (symbolp header)
+     then (let ((val (get header 'kwdi)))
+	    (if* (null val)
+	       then (error "no such header as ~s" header))
+	    (setq header val)))
+  
+  (multiple-value-bind (rstart rend)
+      (header-buffer-values buff header)
+    (if* (and rstart (>= (- rend rstart) (length string)))
+       then ; compare byte by byte
+	    (dotimes (i (length string) t)
+	      (if* (not (eql (ausb8 buff rstart) 
+			     (char-code (schar string i))))
+		 then (return nil))
+	      (incf rstart)))))
+
+  
+(defun header-empty-p (buff header)
+  ;; test to see if there is no value for this header
+  
+  (if* (symbolp header)
+     then (let ((val (get header 'kwdi)))
+	    (if* (null val)
+	       then (error "no such header as ~s" header))
+	    (setq header val)))
+  
+  (header-buffer-values buff header))
+
+  
 	       
 (defun add-trailing-crlf (buff xx)
   ;; buff is a parsed header block.

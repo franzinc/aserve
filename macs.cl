@@ -22,9 +22,7 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-
-;;
-;; $Id: macs.cl,v 1.10.8.1 2000/10/12 05:10:59 layer Exp $
+;; $Id: macs.cl,v 1.10.8.2 2001/06/01 21:22:35 layer Exp $
 
 ;; Description:
 ;;   useful internal macros
@@ -130,4 +128,66 @@
 
 
 ;;;; response macros
+
+
+;----  unsigned byte 8 array macros:
+
+(defmacro ausb8 (vec index)
+  ; like aref but it declares the type
+  `(aref (the (simple-array (unsigned-byte 8) 1) ,vec) ,index))
+
+(defmacro copy-usb8 (from-vector from-start
+		     to-vector   to-start
+		     count)
+  ;; copy count bytes from from-vector[start] to to-vector[start].
+  ;; vectors are usb8
+  (let ((from (gensym))
+	(to   (gensym))
+	(i (gensym)))
+
+
+    `(do ((,from ,from-start (1+ ,from))
+	  (,to   ,to-start   (1+ ,to))
+	  (,i ,count (1- ,i)))
+	 ((<= ,i 0))
+       (setf (ausb8 ,to-vector ,to)
+	 (ausb8 ,from-vector ,from)))))
+
+
+(defmacro copy-usb8-up (from-vector from-start
+			to-vector   to-start
+			count)
+  ;; copy count bytes from from-vector[start] to to-vector[start],
+  ;; going from the top down.  this is designed to be used if we are
+  ;; copying upward in place so we have to copy from the top down
+  ;;
+  ;; vectors are usb8
+  (let ((from (gensym))
+	(to   (gensym))
+	(i    (gensym)))
+
+
+    `(do* ((,i ,count (1- ,i))
+	   (,from (+ ,from-start ,i -1) (1- ,from))
+	   (,to   (+ ,to-start   ,i -1) (1- ,to)))
+	 ((<= ,i 0))
+       (setf (ausb8 ,to-vector ,to)
+	 (ausb8 ,from-vector ,from)))))
+
+
+;-------------
+
+
+
+
+(defmacro dlogmess (&rest args)
+  ;; for now we just disable completely the log messages.
+  ;; in the future we'll turn on and off the log messages 
+  ;; at runtime with a switch.
+  (declare (ignore args))
+  nil)
+
+
+
+
 

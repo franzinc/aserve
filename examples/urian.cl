@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: urian.cl,v 1.2 2001/05/11 21:43:53 jkf Exp $
+;; $Id: urian.cl,v 1.2.2.1 2001/06/01 21:22:38 layer Exp $
 
 ;; Description:
 ;;   urian example
