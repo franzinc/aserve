@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.58.2.1 2001/10/19 16:40:27 jhoward Exp $
+;; $Id: publish.cl,v 1.58.2.2 2001/10/19 17:10:59 jhoward Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -823,7 +823,7 @@
 		       (locator-info locator))))
    #+ignore(format t "~S ; Ents: ~S~%" (uri-host (request-uri req)) ents)
     (cdr 
-     (or (assoc (uri-host (request-uri req)) ents :test #'equal)
+     (or (assoc (request-vhost req) ents :test #'equal)
 	 (assoc :wild ents :test #'eq)))))
 
 (defmethod standard-locator ((req http-request)
