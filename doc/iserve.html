@@ -26,7 +26,7 @@
 <a href="#generating-a-computed-response">Generating a Computed Response</a><br>
 <font face="Courier New">&nbsp; <a href="#f-with-http-response">with-http-response</a><br>
 &nbsp; <a href="#f-with-http-body">with-http-body</a><br>
-&nbsp; <a href="#f-get-request-body">get-request</a><br>
+&nbsp; <a href="#f-get-request-body">get-request-body</a><br>
 &nbsp; <a href="#f-header-slot-value">header-slot-value</a><br>
 &nbsp; <a href="#f-request-query">request-query</a></font><br>
 <a href="#request-object-readers">Request Object Readers and Accessors</a><br>
@@ -39,7 +39,7 @@
 &nbsp; <a href="#f-request-reply-code">request-reply-code</a><br>
 &nbsp; <a href="#f-request-reply-date">request-reply-date</a><br>
 &nbsp; <a href="#f-request-reply-headers">request-reply-headers</a><br>
-<a href="#f-request-reply-content-length"> request-reply-content-length</a><br>
+&nbsp; <a href="#f-request-reply-content-length">request-reply-content-length</a><br>
 &nbsp; <a href="#f-request-reply-plist">request-reply-plist</a><br>
 &nbsp; <a href="#f-request-reply-strategy">request-reply-strategy</a><br>
 &nbsp; <a href="#f-request-reply-stream">request-reply-stream</a></font><br>
@@ -55,7 +55,7 @@
 <font face="Courier New">&nbsp; <a href="#f-set-cookie-header">set-cookie-header</a><br>
 &nbsp; <a href="#f-get-cookie-values">get-cookie-values</a></font><br>
 <a href="#iseve-request-proc">iServe Request Processing Protocol<br>
-</a><font face="Courier New"> <a href="#f-handle-request"> handle-request</a><br>
+</a><font face="Courier New">&nbsp; <a href="#f-handle-request">handle-request</a><br>
 &nbsp; <a href="#f-standard-locator">standard-locator</a><br>
 &nbsp; <a href="#f-unpublish-locator">unpublish-locator</a><br>
 &nbsp; <a href="#f-authorize">authorize</a><br>
@@ -65,7 +65,7 @@
 <a href="#cliient-request">Client Functions</a><br>
 <font face="Courier New">&nbsp; <a href="#f-do-http-request">do-http-request</a><br>
 &nbsp; <a href="#c-client-request">client-request</a><br>
-<a href="#c-cookie-jar"> cookie-jar</a><br>
+<a href="#c-cookie-jar">cookie-jar</a><br>
 &nbsp; <a href="#f-make-http-client-request">make-http-client-request</a><br>
 &nbsp; <a href="#f-read-client-response">read-client-response-headers</a><br>
 &nbsp; <a href="#f-client-request-read-sequence">client-request-read-sequence</a></font><br>
@@ -1162,7 +1162,7 @@ keep-alive headers)</font></strong></p>
     <td width="22%">accept</td>
     <td width="16%">&quot;*/*&quot;</td>
     <td width="62%">A list of MIME types that are acceptable as a response to this request.
-    &nbsp; The default is to accept anything</td>
+    &nbsp; The default is to accept anything.</td>
   </tr>
   <tr>
     <td width="22%">content</td>
@@ -1194,9 +1194,8 @@ keep-alive headers)</font></strong></p>
   <tr>
     <td width="22%">basic-authorization</td>
     <td width="16%">nil</td>
-    <td width="62%">If given, the it is a cons whose <strong>car</strong> is the name and
-    whose <strong>cdr </strong>is the password to be used to get authorization to access this
-    page.</td>
+    <td width="62%">If given, it is a cons whose <strong>car</strong> is the name and whose <strong>cdr
+    </strong>is the password to be used to get authorization to access this page.</td>
   </tr>
   <tr>
     <td width="22%">keep-alive</td>
@@ -1221,7 +1220,7 @@ keep-alive headers)</font></strong></p>
 <p>&nbsp;</p>
 
 <p>Before we describe the lower level client request functions we will describe two
-classes of objects used in that interface</p>
+classes of objects used in that interface.</p>
 
 <h2><a name="c-client-request"></a>client-request</h2>
 
@@ -1281,7 +1280,7 @@ the <strong>client-request</strong> objects are set:</p>
     <td width="39%">client-request-response-comment</td>
     <td width="61%">A string giving a textual version of the response code.&nbsp;&nbsp; The
     string is arbitrary and you should not depend on all web servers returning the same string
-    for any given response code..</td>
+    for any given response code.</td>
   </tr>
 </table>
 
@@ -1293,7 +1292,7 @@ the <strong>client-request</strong> objects are set:</p>
 a jar when a response from a client request includes <font face="Courier New">Set-Cookie</font>
 headers.&nbsp;&nbsp; Cookies from a jar are sent along with a request when they are
 applicable to the given request.&nbsp;&nbsp; We won't describe the rules for cookie
-applicability here, you need need only know that if you use our client functions &nbsp;to
+applicability here, you need only know that if you use our client functions &nbsp;to
 access a site that uses cookies to implement persistence, then you should create a <strong>cookie-jar</strong>
 object and pass that same object in with each request.&nbsp;&nbsp; More information on
 cookies can be found <a
@@ -1310,7 +1309,7 @@ href="http://developer.netscape.com:80/docs/manuals/js/client/jsref/cookies.htm"
 
 <p><strong>(hostname cookie-item ...)</strong></p>
 
-<p>The <strong>hostname</strong> is a string which must matched against the suffix of the
+<p>The <strong>hostname</strong> is a string which is matched against the suffix of the
 name of the host in the request (that is, a hostname of&nbsp; <font face="Courier New">&quot;.foo.com&quot;</font>
 matches <font face="Courier New">&quot;a.foo.com&quot;</font> and <font face="Courier New">&quot;b.foo.com&quot;</font>.
 ).&nbsp;&nbsp;&nbsp; The hostname should have at least two periods in it.
@@ -1378,7 +1377,7 @@ signalled.</p>
 server, thus you must ensure that client-request object isn't discarded before <strong>client-request-close</strong>
 is called on it to close the socket and reclaim that resource.</p>
 
-<p>After calling <strong>make-http-client-request </strong> the program will send the body
+<p>After calling <strong>make-http-client-request </strong>the program will send the body
 of the request (if any), and then it will call <strong>read-client-response-headers</strong>
 to partially read the web server's response to the request.</p>
 
@@ -1406,7 +1405,7 @@ buffer client-request<br>
 
 <p>This fills the <strong>buffer</strong> with the body of the response from the web
 server.&nbsp;&nbsp; The buffer should either be a character array or an array of
-(unsigned-byte 8).&nbsp;&nbsp;&nbsp; If given, <strong>start</strong> specifes the index
+(unsigned-byte 8).&nbsp;&nbsp;&nbsp; If given, <strong>start</strong> specifies the index
 of the <em>first</em> element in the buffer in which to store, and <strong>end </strong>is
 one plus the index of the <em>last</em> element in which to store.&nbsp; </p>
 
