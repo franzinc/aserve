@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.23 2001/02/12 16:53:41 jkf Exp $
+;; $Id: t-aserve.cl,v 1.24 2001/07/18 19:05:13 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -214,28 +214,35 @@
     ;; the result will be the same since given that we know the
     ;; length of the file, chunking won't be needed
     ;; 
-    (publish-file :path "/frob" :file dummy-1-name
-		  :content-type "text/plain")
+    (let ((ent (publish-file :path "/frob" :file dummy-1-name
+			     :content-type "text/plain"
+			     :cache-p t
+			     )))
+      (test nil (net.aserve::contents ent)) ; nothing cached yet
 
-    ;; 
-    (dolist (cur-prefix (list prefix-local prefix-dns))
-      (dolist (keep-alive '(nil t))
-	(dolist (protocol '(:http/1.0 :http/1.1))
-	  (format t "test 1 - ~s~%" (list keep-alive protocol))
-	  (multiple-value-bind (body code headers)
-	      (x-do-http-request (format nil "~a/frob" cur-prefix)
-		:protocol protocol
-		:keep-alive keep-alive)
-	    (test 200 code)
-	    (test (format nil "text/plain" port)
-		  (cdr (assoc :content-type headers :test #'eq))
-		  :test #'equal)
-	    #+ignore (if* (eq protocol :http/1.1)
-			then (test "chunked"
-				   (cdr (assoc :transfer-encoding headers 
-					       :test #'eq))
-				   :test #'equalp))
-	    (test dummy-1-contents body :test #'equal)))))
+      ;; 
+      (dolist (cur-prefix (list prefix-local prefix-dns))
+	(dolist (keep-alive '(nil t))
+	  (dolist (protocol '(:http/1.0 :http/1.1))
+	    (format t "test 1 - ~s~%" (list keep-alive protocol))
+	    (multiple-value-bind (body code headers)
+		(x-do-http-request (format nil "~a/frob" cur-prefix)
+				   :protocol protocol
+				   :keep-alive keep-alive)
+	      (test 200 code)
+	      (test (format nil "text/plain" port)
+		    (cdr (assoc :content-type headers :test #'eq))
+		    :test #'equal)
+	      #+ignore (if* (eq protocol :http/1.1)
+			  then (test "chunked"
+				     (cdr (assoc :transfer-encoding headers 
+						 :test #'eq))
+				     :test #'equalp))
+	      (test dummy-1-contents body :test #'equal)))))
+      
+      ;; stuff should be cached by now
+      (test t (not (null (net.aserve::contents ent))))
+      )
 
 
     (setq dummy-2-contents (build-dummy-file 8055 65 dummy-2-name))
@@ -260,8 +267,8 @@
 	  (format t "test 2 - ~s~%" (list keep-alive protocol))
 	  (multiple-value-bind (body code headers)
 	      (x-do-http-request (format nil "~a/frob2" cur-prefix)
-		:protocol protocol
-		:keep-alive keep-alive)
+				 :protocol protocol
+				 :keep-alive keep-alive)
 	    (test 200 code)
 	    (test (format nil "text/plain" port)
 		  (cdr (assoc :content-type headers :test #'eq))
@@ -334,7 +341,7 @@
 		  :remove t)
     ; verify it's gone:
     (test 404 (values2 (x-do-http-request (format nil "~a/checkit" 
-					       prefix-local))))
+						  prefix-local))))
     ; but the the dns one is still there
     (test 200 (values2 (x-do-http-request (format nil "~a/checkit" prefix-dns))))
     
@@ -345,7 +352,7 @@
     
     ; verify it's gone too
     (test 404 (values2 (x-do-http-request (format nil "~a/checkit" 
-					       prefix-dns))))
+						  prefix-dns))))
 
     
     

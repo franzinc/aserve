@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.45 2001/06/27 18:28:05 jkf Exp $
+;; $Id: publish.cl,v 1.46 2001/07/18 19:05:12 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -85,7 +85,7 @@
   ;; a file to be published
   (
    (file  :initarg :file :reader file)
-   (contents :initarg :contents :reader contents
+   (contents :initarg :contents :accessor contents
 	     :initform nil)
    (cache-p 
     ;; true if the contents should be cached when accessed
@@ -882,83 +882,102 @@
   
 (defmethod process-entity ((req http-request) (ent file-entity))
     
-  (let ((contents (contents ent)))
-    (if* contents
-       then ;(preloaded)
-	    ; set the response code and 
-	    ; and header fields then dump the value
+  (tagbody 
+   retry 
+    (let ((contents (contents ent)))
+      (if* contents
+	 then ;(preloaded)
+	      ; set the response code and 
+	      ; and header fields then dump the value
 	      
-	    ; * should check for range here
-	    ; for now we'll send it all
-	    (with-http-response (req ent
-				     :content-type (content-type ent))
-	      (setf (request-reply-content-length req) (length contents))
-	      (push (cons "Last-Modified" (last-modified-string ent))
-		    (request-reply-headers req))
+	      ; * should check for range here
+	      ; for now we'll send it all
+	      (with-http-response (req ent
+				       :content-type (content-type ent))
+		(setf (request-reply-content-length req) (length contents))
+		(setf (reply-header-slot-value req :last-modified)
+		  (last-modified-string ent))
 	      
-	      (with-http-body (req ent :format :binary)
-		;; at this point the header are out and we have a stream
-		;; to write to 
-		(write-sequence contents (request-reply-stream req))
-		))
-       else ; the non-preloaded case
-	    (let (p)
 	      
-	      (setf (last-modified ent) nil) ; forget previous cached value
+		(with-http-body (req ent :format :binary)
+		  ;; at this point the header are out and we have a stream
+		  ;; to write to 
+		  (write-sequence contents (request-reply-stream req))
+		  ))
+       
+	    
+	    
+	 else ; the non-preloaded case
+	      (let (p)
 	      
-	      (if* (null (errorset 
-			  (setq p (open (file ent) 
-					:direction :input
-					:element-type '(unsigned-byte 8)))))
-		 then ; file not readable
+		(setf (last-modified ent) nil) ; forget previous cached value
+	      
+		(if* (null (errorset 
+			    (setq p (open (file ent) 
+					  :direction :input
+					  :element-type '(unsigned-byte 8)))))
+		   then ; file not readable
 		      
-		      (return-from process-entity nil))
+			(return-from process-entity nil))
 	      
-	      (unwind-protect 
-		  (progn
-		    (let ((size (excl::filesys-size (stream-input-fn p)))
-			  (lastmod (excl::filesys-write-date 
-				    (stream-input-fn p)))
-			  (buffer (make-array 1024 
-					      :element-type '(unsigned-byte 8))))
-		      (declare (dynamic-extent buffer))
+		(unwind-protect 
+		    (progn
+		      (let ((size (excl::filesys-size (stream-input-fn p)))
+			    (lastmod (excl::filesys-write-date 
+				      (stream-input-fn p)))
+			    (buffer (make-array 1024 
+						:element-type '(unsigned-byte 8))))
+			(declare (dynamic-extent buffer))
 		      
-		      (setf (last-modified ent) lastmod
-			    (last-modified-string ent)
-			    (universal-time-to-date lastmod))
+			(setf (last-modified ent) lastmod
+			      (last-modified-string ent)
+			      (universal-time-to-date lastmod))
 		      
+			(if* (cache-p ent)
+			   then ; we should read and cache the contents
+				; and then do the cached thing
+				(let ((wholebuf 
+				       (make-array
+					size
+					:element-type '(unsigned-byte 8))))
+				  (read-sequence wholebuf p)
+				  (setf (contents ent) wholebuf))
+				(go retry))
+			      
+				
+			      
 		      
-		      (with-http-response (req ent)
+			(with-http-response (req ent)
 
-			;; control will not reach here if the request
-			;; included an if-modified-since line and if
-			;; the lastmod value we just calculated shows
-			;; that the file hasn't changed since the browser
-			;; last grabbed it.
+			  ;; control will not reach here if the request
+			  ;; included an if-modified-since line and if
+			  ;; the lastmod value we just calculated shows
+			  ;; that the file hasn't changed since the browser
+			  ;; last grabbed it.
 			
-			(setf (request-reply-content-length req) size)
-			(push (cons "Last-Modified"
-				    (last-modified-string ent))
-			      (request-reply-headers req))
+			  (setf (request-reply-content-length req) size)
+			  (setf (reply-header-slot-value req :last-modified)
+			    (last-modified-string ent))
 			
 			
-			(with-http-body (req ent :format :binary)
-			  (loop
-			    (if* (<= size 0) then (return))
-			    (let ((got (read-sequence buffer 
-						      p :end 
-						      (min size 1024))))
-			      (if* (<= got 0) then (return))
-			      (write-sequence buffer (request-reply-stream req)
-					      :end got)
-			      (decf size got)))))))
+			
+			  (with-http-body (req ent :format :binary)
+			    (loop
+			      (if* (<= size 0) then (return))
+			      (let ((got (read-sequence buffer 
+							p :end 
+							(min size 1024))))
+				(if* (<= got 0) then (return))
+				(write-sequence buffer (request-reply-stream req)
+						:end got)
+				(decf size got)))))))
 		      
 		      
 		
-		(close p))))
+		  (close p))))))
     
-    t	; we've handled it
-    ))
+  t	; we've handled it
+  )
 
 	      
 		

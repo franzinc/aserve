@@ -1,3 +1,11 @@
+2001-07-18  jkf  <jkf@main.verada.com>
+
+	* publish.cl - add cache-p argument to publish-file which will
+	    cache the file contents on first use
+	* chat.cl - add support for removing selective private messages
+	    after a certain amount of time.
+	* test/t-aserve.cl - test cache-p argument to publish-file
+
 2001-06-27  jkf  <jkf@main.verada.com>
 1.2.2
 	* added the ability to filter requests before they get 

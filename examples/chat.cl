@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.11 2001/07/10 01:00:45 jkf Exp $
+;; $Id: chat.cl,v 1.12 2001/07/18 19:05:12 jkf Exp $
 
 ;; Description:
 ;;   aserve chat program
@@ -269,6 +269,10 @@
 		    :initarg :message-archive
 		     ;; 1+ last message number archived so far
 		    :accessor chat-message-archive)
+   ; used by experimental code to delete private messages
+   ; message number to scan next
+   (message-prvcheck :initform 0
+		     :accessor chat-message-prvcheck)
    
    ; list of deleted message numbers since the last archive
    (messages-deleted :initform nil
@@ -326,10 +330,11 @@
   dns     ; dns name corresponding to the ip address
   handle  ; from handle (for unlogged in user)
   real    ; true if this is a real handle of a logged in user
-  to	  ; if non nil then a list of uids who are the target of this message
+  to	  ; if non nil then a list of handles who are the target of this message
           ; if nil then this goes to no-one
           ; if t then this goes to everyone
-  time
+  time    ; string - message time in a pretty format
+  (ut 0)  ; universal time of message
   body)
 
 
@@ -1281,8 +1286,7 @@
 	      
 	      (if* ppp
 		 then ; add this user
-		      (format t "tu ~s ... ppp ~s~%" (user-to-users user)
-			      ppp)
+		      
 		      (setq pp (setf (user-to-users user)
 				 (concatenate 'string
 				   (or (user-to-users user) "")
@@ -1293,7 +1297,6 @@
 		 then (setf (user-to-users user) nil)
 		 else (setf (user-to-users user) pp)))
 
-      (format t "pp ~s~%" pp)
       ; do redirect check
       (if* (null user)
 	 then ; do not logged in check
@@ -1545,6 +1548,7 @@
 		    (request-socket req)))
 	   (dns (or #+ignore (socket:ipaddr-to-hostname ipaddr)
 		    (socket:ipaddr-to-dotted ipaddr)))
+	   (ut (get-universal-time))
 	 
 	   (message 
 	    (make-message
@@ -1556,7 +1560,8 @@
 		    then (mapcar #'user-handle to-users)
 		    else t)
 	     :real (if* user then t else nil)
-	     :time (compute-chat-date)
+	     :time (compute-chat-date ut)
+	     :ut   ut
 	     :body (if* link
 		      then (cons link cvted-body)
 		      else cvted-body))))
@@ -1564,11 +1569,11 @@
       (mp:with-process-lock ((chat-message-lock chat))
 	(add-chat-message chat message)))))
 
-(defun compute-chat-date ()
+(defun compute-chat-date (ut)
   ; return string to use as time for this message
   ; quick hack - hardwire in pdt
   (multiple-value-bind (sec min hour day month)
-      (decode-universal-time (get-universal-time))
+      (decode-universal-time ut)
     (format nil "~d:~2,'0d:~2,'0d Pacific Time, ~a ~d" hour min sec
 	    (month-name month) day
 	    )))
@@ -2484,6 +2489,20 @@
 
 
 
+(defun find-index-of-message (chat number)
+  ;; find index of message 'number' or the first one after that
+  (let ((messages (chat-messages chat))
+	(message-next (chat-message-next chat)))
+    (do ((i (1- message-next) (1- i)))
+	((< i 0) 0)
+      (let* ((message (svref messages i))
+	     (num (message-number message)))
+	(if* (and num
+		  (< num number))
+	   then (return (1+ i))
+	 elseif (eql num number)
+	   then (return i))))))
+    
 (defun archive-chat (chat)
   ;; write out new messages for this chat
   ;; we are inside a process lock for this chat's message lock
@@ -2499,21 +2518,8 @@
 	    ; would be no messages stored
 	    
 	    ; locate the message numbered message-archive
-	    (let ((start-to-save 0))
-	      (do ((i (1- message-next) (1- i)))
-		  ((< i 0))
-		(let* ((message (svref messages i))
-		       (num (message-number message)))
-		  (if* (and num
-			    (< num message-archive))
-		     then (setq start-to-save (1+ i))
-			  (return)
-		   elseif (eq num message-archive)
-		     then (setq start-to-save i)
-			  (return))))
-		
-	
-	    
+	    (let ((start-to-save 
+		   (find-index-of-message chat message-archive)))
 	    
 	      (with-open-file (archive-port (archive-filename chat)
 			       :direction :output
@@ -2783,7 +2789,8 @@
   (let* ((chat (or (chat-from-req req)
 		   (return-from chattranscript (ancient-link-error req ent))))
 	 (title (format nil "full transcript of chat ~a as of ~a"
-			(chat-name chat) (compute-chat-date))))
+			(chat-name chat) (compute-chat-date
+					  (get-universal-time)))))
 
     (with-http-response (req ent)
       (with-http-body (req ent)
