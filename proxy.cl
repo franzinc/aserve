@@ -166,7 +166,8 @@
     
   (force-output sock)
 
-  (let (protocol response commment header-start)
+  (let (protocol response commment header-start given-content-length
+	body-buffers body-length)
     (loop
       ; loop until we don't get a 100 continue
       ;
@@ -178,6 +179,32 @@
 	(parse-response-buffer outbuf outend))
     
       (if* (not (eql response 100)) then (return)))
+    
+    
+    ; now get the body of the message if any.
+    ; there is never a response  to a :head request although the header
+    ;  fields may imply there is.
+    ; These response codes don't have a message body:
+    ;	1xx, 204, 304
+    ; All other responses include a message body which may be of zero size
+    ;
+    
+    (setq given-content-length
+      (header-buffer-value outbut :content-length))
+    
+    
+    (if* (not (or (<= 100 response 199) 
+		  (eq response 204)
+		  (eq response 304)))
+       then ; got to read the body
+	    (let (buffers 
+	    (if* (null content-length)
+	       then (warn "no content length, read till eof")
+		    (multiple-value-setq (body-buffers body-length)
+		      (read-into-block-buffers sock nil))
+		    else (
+		    
+	    
   
 
   
