@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.45 2005/02/21 23:28:52 jkf Exp $
+;; $Id: client.cl,v 1.46 2005/02/22 14:22:56 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -896,7 +896,6 @@ or \"foo.com:8000\", not ~s" proxy))
   ;; return true if did the authentication thing
   (let ((val (cdr (assoc :www-authenticate (client-request-headers creq))))
 	(params))
-    (format t "auth on ~s~%" val)
     
     
     (if* (not (and val
@@ -924,7 +923,6 @@ or \"foo.com:8000\", not ~s" proxy))
       (md5-update md ":")
       (md5-update md (digest-password da))
       (setq ha1 (md5-final md :return :hex))
-      (format t " ha1 is ~s~%" ha1)
       
       ; compute a2
       
@@ -941,7 +939,6 @@ or \"foo.com:8000\", not ~s" proxy))
       
       (setq ha2 (md5-final md :return :hex))
       
-      (format t "ha2 is ~s~%" ha2)
       
       
       
