@@ -72,7 +72,8 @@
 &nbsp; <a href="#c-cookie-jar">cookie-jar</a><br>
 &nbsp; <a href="#f-make-http-client-request">make-http-client-request</a><br>
 &nbsp; <a href="#f-read-client-response">read-client-response-headers</a><br>
-&nbsp; <a href="#f-client-request-read-sequence">client-request-read-sequence</a></font><br>
+&nbsp; <a href="#f-client-request-read-sequence">client-request-read-sequence</a><br>
+&nbsp; <a href="#f-client-request-read-close">client-request-close</a></font><br>
 <a href="#proxy">Proxy</a><br>
 <a href="#cache">Cache</a><br>
 <a href="#debugging">Debugging</a><br>
@@ -1646,7 +1647,7 @@ basic-authorization query<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 content content-type content-length<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-external-format)</font></strong></p>
+user-agent external-format ssl)</font></strong></p>
 
 <p>This function connects to the web server indicated by the <strong>uri</strong> and
 sends the request.&nbsp;&nbsp; The arguments are the same as those for <strong>do-http-request</strong>
@@ -1704,9 +1705,17 @@ caller of the function must be prepared for having the buffer only partially fil
 
 <p>&nbsp;</p>
 
+<p><a name="f-client-request-read-close"><font face="Courier New"><strong>(client-request-close
+client-request)</strong></font></p>
+
+<p>The client-request object returned by make-http-request is closed.&nbsp;&nbsp; This
+returns the resources used by this connection to the operating system.&nbsp; </p>
+
+<p>&nbsp;</p>
+
 <hr>
 
-<h2><a name="proxy">Proxy</h2>
+<h2></a><a name="proxy">Proxy</h2>
 
 <p>AllegroServe can serve as an http proxy.&nbsp;&nbsp; What this means is that web
 clients can ask AllegroServe to fetch a URL for them.&nbsp;&nbsp; The two primary uses for
