@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.8 2000/03/21 06:32:46 jkf Exp $
+;; $Id: client.cl,v 1.9 2000/03/22 03:16:20 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -232,7 +232,7 @@
 	       else ; only one item
 		    (if* (eql 0 start)
 		       then ; nothing returned
-			    (setq body nil)
+			    (setq body "")
 		       else (setq body (subseq ans 0 start))))
 
 	    (if* (and redirect

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-iserve.cl,v 1.4 2000/03/21 17:20:14 jkf Exp $
+;; $Id: t-iserve.cl,v 1.5 2000/03/22 03:16:20 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -52,6 +52,7 @@
       (unwind-protect 
 	  (progn
 	    (test-publish-file port)
+	    (test-publish-computed port)
 	    )
 	(stop-iserve-running)))
     (format t "~%succeses: ~d~%errors ~d~%unexpected errors: ~d~%"
@@ -79,8 +80,7 @@
 
 (defun build-dummy-file (length line-length name)
   ;; write a dummy file named  name  (if name isn't nil)
-  ;; of a given   length   with lines no longer than
-  ;; line-length.
+  ;; of a given   length   with spaces every line-length characters
   ;; Return the string holding the contents of the file.
   (let ((strp (make-string-output-stream))
 	(result))
@@ -265,7 +265,64 @@
 
 
 
+(defun test-publish-computed (port)
+  ;; test publishing computed entities
+  (let ((dummy-1-content (build-dummy-file 0 50 nil))
+	(dummy-2-content (build-dummy-file 1 50 nil))
+	(dummy-3-content (build-dummy-file 100 50 nil))
+	(dummy-4-content (build-dummy-file 1000 50 nil))
+	(dummy-5-content (build-dummy-file 10000 50 nil))
+	(dummy-6-content (build-dummy-file 100000 50 nil))
+	
+	(prefix-local (format nil "http://localhost:~a" port))
+	)
 
+    ;;
+    ;; publish strings of various sizes using various protocols
+    ;; verify that chunking is turned on when we select http/1.1
+    ;; 
+    (dolist (pair `(("/dum1" ,dummy-1-content)
+		    ("/dum2" ,dummy-2-content)
+		    ("/dum3" ,dummy-3-content)
+		    ("/dum4" ,dummy-4-content)
+		    ("/dum5" ,dummy-5-content)
+		    ("/dum6" ,dummy-6-content)))
+
+      (let ((this (cadr pair)))
+	;; to make a separate binding for each function
+	(publish :path (car pair) 
+		 :content-type "text/plain"
+		 :function
+		 #'(lambda (req ent)
+		     (with-http-response (req ent)
+		       (with-http-body (req ent)
+			 (write-sequence this *html-stream*))))))
+      (dolist (keep-alive '(nil t))
+	(dolist (protocol '(:http/1.0 :http/1.1))
+	  (multiple-value-bind (code headers body)
+	      (do-http-request (format nil "~a~a" prefix-local (car pair))
+		:protocol protocol
+		:keep-alive keep-alive)
+	    (test 200 code)
+	    (test (format nil "text/plain" port)
+		  (cdr (assoc "content-type" headers :test #'equal))
+		  :test #'equal)
+	    (if* (eq protocol :http/1.1)
+	       then (test "chunked"
+			  (cdr (assoc "transfer-encoding" headers 
+				      :test #'equal))
+			  :test #'equalp))
+	    (test (cadr pair) body :test #'equal)))))))
+
+
+
+    
+    
+	
+    
+   
+  
+  
 
 	
   
