@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: clp.cl,v 1.2 2003/10/27 17:00:05 jkf Exp $
+;; $Id: clp.cl,v 1.3 2003/12/03 02:43:04 jkf Exp $
 
 
 (in-package :net.aserve)
@@ -87,19 +87,39 @@
    elseif (stringp value)
      then (parse-integer value :junk-allowed t)))
 
+
 (def-clp-function clp_value (req ent args body)
   ;; name=xxxx
+  ;; safe
+  ;; external-format=fmt
+  ;;
   ;; print the value of the variable
   (declare (ignore ent body))
   (let* ((name (cdr (assoc "name" args :test #'equal)))
 	 
 	 (value (and name
 		     (locate-any-value req args name)))
-	 (safe (assoc "safe" args :test #'equal)))
+	 (safe (assoc "safe" args :test #'equalp))
+	 (external-format 
+	  (cdr (assoc "external-format" args :test #'equalp))))
+    (if* external-format
+       then (setq external-format (find-external-format external-format)))
+    
     (if* value 
-       then (if* safe
-	       then (html (:princ-safe value))
-	       else (html (:princ value))))))
+       then (if* external-format
+	       then (let ((old-ef (stream-external-format *html-stream*)))
+		      (force-output *html-stream*)
+		      (setf (stream-external-format *html-stream*)
+			(find-external-format :octets))
+		      (if* safe
+			 then (html (:princ-safe value))
+			 else (html (:princ value)))
+		      (force-output *html-stream*)
+		      (setf (stream-external-format *html-stream*) old-ef))
+	       else 
+		    (if* safe
+		       then (html (:princ-safe value))
+		       else (html (:princ value)))))))
 
 
 (def-clp-function clp_set (req ent args body)

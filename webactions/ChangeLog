@@ -1,3 +1,7 @@
+2003-12-02    <jkf@main.verada.com>
+
+	* clp_value now takes external-format argument
+
 2003-10-22  John Foderaro  <jkf@tiger.franz.com>
 1.4
 	*  webact.cl - add :content-type flag and :redirect flag
