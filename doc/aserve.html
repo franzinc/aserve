@@ -1,8 +1,6 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"><html><head><title>AllegroServe</title>
   
-  <meta name="GENERATOR" content="Microsoft FrontPage 3.0"></head>
-
-<body>
+  <meta content="Microsoft FrontPage 3.0" name="GENERATOR"></head><body>
 <h1 align="center">AllegroServe - A Web Application Server<br>
 <small><small><small>version <font face="Courier New">1.2.35</font></small></small></small></h1>
 <p align="left"><strong><small>copyright(c) 2000-2003. Franz Inc</small></strong></p>
@@ -456,7 +454,7 @@ is
 usually <strong>nil</strong> but will be one of the following symbols
 to tell&nbsp; the
 hook function if it's being called in a special context.</p>
-<table border="1" width="100%">
+<table width="100%" border="1">
   <tbody>
     <tr>
       <td width="21%"><strong>:illegal-range</strong></td>
@@ -579,7 +577,7 @@ function may
 wish to publish that entity but it need not do so.</p>
 <div align="center">
 <center>
-<table border="1" width="86%" cellpadding="5">
+<table cellpadding="5" width="86%" border="1">
   <tbody>
     <tr>
       <td width="100%">Note:&nbsp; <strong>publish-directory</strong>
@@ -701,7 +699,7 @@ false. &nbsp;
 Information not given with :<strong>:inherit t</strong> will be
 eliminated as AllegroServe
 descends directory levels.</p>
-<table border="1" width="100%">
+<table width="100%" border="1">
   <tbody>
     <tr>
       <th width="15%">name</th>
@@ -1404,7 +1402,7 @@ argument to
 run-cgi-program allows the caller to specify what happens to data sent
 to standard error.
 &nbsp; The possibile values for <strong>error-output</strong> are:</p>
-<table border="1" width="100%">
+<table width="100%" border="1">
   <tbody>
     <tr>
       <td width="32%"><strong>nil</strong></td>
@@ -1802,7 +1800,7 @@ password.
 &nbsp;&nbsp;&nbsp; When you create this class of object you should
 supply values for the
 two slots:</p>
-<table border="1" width="100%">
+<table width="100%" border="1">
   <tbody>
     <tr>
       <td width="13%"><big><strong>Slot Name</strong></big></td>
@@ -1847,7 +1845,7 @@ no pattern
 matches, then the request is accepted.&nbsp; </p>
 <p>The single slot of an object of class <strong>location-authorizer</strong>
 is</p>
-<table border="1" width="100%">
+<table width="100%" border="1">
   <tbody>
     <tr>
       <td width="13%"><big><strong>Slot Name</strong></big></td>
@@ -2225,8 +2223,9 @@ string is returned.</li>
   <li>the response code (for example, 200, meaning that the request
 succeeded)</li>
   <li>an alist of headers where the <strong>car</strong> of each entry
-is a lowercase string with the header name and the <strong>cdr</strong>
-is a string with the value of that header item.</li>
+is a keyword symbol or a lowercase string with the header name and the <strong>cdr</strong>
+is a string with the value of that header item.&nbsp;&nbsp; A keyword symbol is returned for standard headers.<br>
+</li>
   <li>the uri object denoting the page accessed.&nbsp; This is normally
 computed from the <strong>uri</strong> value passed in but if
 redirection was done then this reflects the target of the
@@ -2238,7 +2237,7 @@ string.&nbsp;&nbsp; The scheme of the
 <strong>uri</strong> must be nil or "http".&nbsp;&nbsp; The keyword
 arguments to
 <strong>do-http-request </strong>are</p>
-<table border="1" width="100%">
+<table width="100%" border="1">
   <tbody>
     <tr>
       <th width="22%">Name</th>
@@ -2356,9 +2355,10 @@ keep-alive request.</td>
     <tr>
       <td width="22%">headers</td>
       <td width="16%">nil</td>
-      <td width="62%">an alist of conses <font face="Courier New">("header-name"
+      <td width="62%">an alist of conses <font face="Courier New">(header-name
 . "header-value")</font> for additional headers to send with the
-request.</td>
+request.&nbsp;&nbsp; The header-name should be a keyword symbol naming the header, but it can be a string as well.<br>
+</td>
     </tr>
     <tr>
       <td width="22%">proxy</td>
@@ -2443,7 +2443,7 @@ the response.</p>
 <p>The public fields of a <strong>client-request</strong> that are
 filled in after a call
 to <strong>make-http-client-request</strong> are:</p>
-<table border="1" width="100%">
+<table width="100%" border="1">
   <tbody>
     <tr>
       <th width="31%">Accessor</th>
@@ -2469,7 +2469,7 @@ this request.</td>
 <p>After <strong>read-client-response-headers</strong> is called, the
 following fields of
 the <strong>client-request</strong> objects are set:</p>
-<table border="1" width="100%">
+<table width="100%" border="1">
   <tbody>
     <tr>
       <th width="39%">Accessor</th>
@@ -2535,7 +2535,7 @@ in the list all
 apply to that hostname. &nbsp;&nbsp; A <strong>cookie-item</strong> is
 a defstruct object
 and has these fields</p>
-<table border="1" width="100%">
+<table width="100%" border="1">
   <tbody>
     <tr>
       <th width="29%">Accessor</th>
@@ -2569,8 +2569,7 @@ secure connection.</td>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
 <p><a name="f-make-http-client-request"></a><strong><font face="Courier New">(make-http-client-request
-uri &amp;key method protocol keep-alive<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+uri &amp;key method protocol keep-alive<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 accept cookies headers proxy<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 basic-authorization query<br>
@@ -2889,7 +2888,7 @@ read on.</p>
 <h3>vhost class</h3>
 <p>In AllegroServe a virtual host is denoted by a instance of class <strong>vhost</strong>.
 &nbsp;&nbsp; The contents of a vhost object are:</p>
-<table border="1" width="83%">
+<table width="83%" border="1">
   <tbody>
     <tr>
       <th width="26%">Accessor Function</th>
@@ -3374,7 +3373,7 @@ enabled.</p>
 <p>This function turns off the given list of features.</p>
 <p>&nbsp;</p>
 <p>The list of debug features are:</p>
-<table border="1" width="100%">
+<table width="100%" border="1">
   <tbody>
     <tr>
       <td width="18%"><strong>:info</strong></td>
