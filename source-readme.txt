@@ -1,11 +1,11 @@
-				-[Fri Mar 17 15:54:15 2000 by jkf]-
+				-[Fri Mar 24 16:36:48 2000 by jkf]-
 
 Allegro iServe Source Distribution ReadMe file
 
 The source for Allegro iServe is distributed under version 2.1 of
 the Lesser GNU Public License.
 
-This document describes how to us the source to build iServe.
+This document describes how to use the source to build iServe.
 
 To determine the version number for this software, look
 in main.cl for *iserve-version*.
@@ -38,8 +38,12 @@ How to build and test iServe:
 
 4.  try out the server
 
-    go to a web browser and try http://your-machine-name/
-
+    go to a web browser and try http://your-machine-name:8000/
+    
+    If the web browser is on the same machine as iServe is running
+    you can use
+	   http://localhost:8000/
+    as well
 
 
 

@@ -1,6 +1,6 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.21 2000/03/22 11:46:55 jkf Exp $
+;; $Id: load.cl,v 1.22 2000/03/27 15:06:14 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -129,7 +129,7 @@
 ;; 1. incf version number, edit ChangeLog and commit
 ;; 2. start lisp and load iserve/load to compile all files
 ;; 3. start the server and run through the samples
-;; 4. :cl test/t-iserve to run the automated tests 
+;; 4. :cl test/t-iserve
 ;; 5. (make-src-distribution)
 ;; 6. (ftp-publish-src)
 ;; 7. (publish-docs)   ;  to put latest docs on iserve web page
