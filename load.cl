@@ -1,6 +1,6 @@
 ;; load in neo
 ;;
-;; $Id: load.cl,v 1.11 2000/01/11 18:38:55 jkf Exp $
+;; $Id: load.cl,v 1.12 2000/01/28 19:44:29 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -29,12 +29,13 @@
     '("examples"))
 
 
-(dolist (file (append *neo-files* *neo-examples*))
-  (case *loadswitch*
-    (:compile-if-needed (compile-file-if-needed (format nil "~a.cl" file)))
-    (:compile (compile-file (format nil "~a.cl" file)))
-    (:load nil))
-  (load (format nil "~a.fasl" file)))
+(with-compilation-unit  nil
+  (dolist (file (append *neo-files* *neo-examples*))
+    (case *loadswitch*
+      (:compile-if-needed (compile-file-if-needed (format nil "~a.cl" file)))
+      (:compile (compile-file (format nil "~a.cl" file)))
+      (:load nil))
+    (load (format nil "~a.fasl" file))))
 
       
 

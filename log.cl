@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: log.cl,v 1.4 2000/01/25 22:54:37 jkf Exp $
+;; $Id: log.cl,v 1.5 2000/01/28 19:44:29 jkf Exp $
 
 ;; Description:
 ;;   neo's logging
@@ -53,15 +53,13 @@
 
 (defmethod log-request ((req http-request))
   ;; after the request has been processed, write out log line
-  (let ((ipaddr (socket:remote-host (socket req)))
-	(time   (resp-date req))
-	(code   (let ((obj (resp-code req)))
+  (let ((ipaddr (socket:remote-host (request-socket req)))
+	(time   (request-reply-date req))
+	(code   (let ((obj (request-reply-code req)))
 		  (if* obj
 		     then (response-number obj)
 		     else 999)))
-	(method (request-method req))
-	(protocol (protocol-string req))
-	(length  (resp-content-length req))
+	(length  (request-reply-content-length req))
 	
 	(stream (wserver-log-stream
 		 (request-wserver req))))
@@ -70,9 +68,6 @@
 	    "~a - - [~a] ~s ~s ~s~%"
 	    (socket:ipaddr-to-dotted ipaddr)
 	    (universal-time-to-date time)
-	    ; method
-	    ; (render-uri (request-uri req) nil)
-	    ; protocol
 	    (request-raw-request req)
 	    code
 	    (or length -1))))

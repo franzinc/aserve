@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: parse.cl,v 1.13 2000/01/25 16:26:39 jkf Exp $
+;; $Id: parse.cl,v 1.14 2000/01/28 19:44:29 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -281,11 +281,11 @@
 			
 			; now add or append
 			
-			(let* ((alist (alist req))
+			(let* ((alist (request-headers req))
 			       (ent (assoc key alist :test #'equal)))
 			  (if* (null ent)
 			     then (push (setq ent (cons key "")) alist)
-				  (setf (alist req) alist))
+				  (setf (request-headers req) alist))
 			  (setf (cdr ent)
 			    (concatenate 'string
 			      (cdr ent)

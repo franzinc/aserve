@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: examples.cl,v 1.21 2000/01/25 22:54:37 jkf Exp $
+;; $Id: examples.cl,v 1.22 2000/01/28 19:44:29 jkf Exp $
 
 ;; Description:
 ;;   neo examples
@@ -64,6 +64,9 @@
 			 ((:a :href "/timeout") "Test timeout")
 			 :br
 			 ((:a :href "/getfile") "Client to server file transfer")
+			 :br
+			 ((:a :href "/missing-link") "Missing Link")
+			 "should get error"
 			 )
 		  
 			 )))))
@@ -174,7 +177,7 @@
  :function
  #'(lambda (req ent)
      (format t "request uri is ~s~%" (neo::request-uri req))
-     (let ((lookup (assoc "symbol" (url-argument-alist req) :test #'equal)))
+     (let ((lookup (assoc "symbol" (request-query req) :test #'equal)))
        (with-http-response (req ent)
 	 (with-http-body (req ent)
 	   (html (:head (:title "Allegro Apropos"))

@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: macs.cl,v 1.4 2000/01/24 20:34:06 jkf Exp $
+;; $Id: macs.cl,v 1.5 2000/01/28 19:44:29 jkf Exp $
 
 ;; Description:
 ;;   useful internal macros
@@ -27,8 +27,8 @@
 ;;- http://www.franz.com/~jkf/coding_standards.html
 ;;-
 
-
-(require :uri)
+(eval-when (compile load eval)
+ (require :uri))
 
 ;; macros used by neo
 (defpackage :neo

@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: main.cl,v 1.17 2000/01/25 22:54:37 jkf Exp $
+;; $Id: main.cl,v 1.18 2000/01/28 19:44:29 jkf Exp $
 
 ;; Description:
 ;;   neo's main loop
@@ -44,16 +44,17 @@
    #:publish-directory
 
    #:request-method
+   #:request-query
    #:request-uri
    #:request-wserver
    
-   #:resp-code
-   #:resp-date
-   #:resp-content-length
-   #:resp-content-type
-   #:resp-plist
-   #:resp-strategy
-   #:resp-stream
+   #:request-reply-code
+   #:request-reply-date
+   #:request-reply-content-length
+   #:request-reply-content-type
+   #:request-reply-plist
+   #:request-reply-strategy
+   #:request-reply-stream
    
    #:set-cookie-header
    #:shutdown
@@ -68,8 +69,12 @@
    #:with-http-body
    
    #:wserver
+   #:wserver-enable-chunking
+   #:wserver-enable-keep-alive
+   #:wserver-locators
    #:wserver-log-function
    #:wserver-log-stream
+   #:wserver-socket
    
    #:*neo-version*
    #:*response-ok*
@@ -85,7 +90,7 @@
 (in-package :neo)
 
 
-(defparameter *neo-version* '(1 0 7))
+(defparameter *neo-version* '(1 0 8))
 
 ;;;;;;;  debug support 
 
@@ -123,66 +128,73 @@
 
 (defclass wserver ()
   ;; all the information contained in a web server
-    ((socket 		;; listening socket 
-      :initarg :socket
-      :accessor wserver-socket)
+  (
+   ;;
+   ;;-- user visible slots --
+   ;; (accessors exported)
+   
+   (socket 		;; listening socket 
+    :initarg :socket
+    :accessor wserver-socket)
      
-     (enable-keep-alive ;; do keep alive if it's possible
-      :initform t
-      :initarg :enable-keep-alive
-      :accessor wserver-enable-keep-alive)
+   (enable-keep-alive ;; do keep alive if it's possible
+    :initform t
+    :initarg :enable-keep-alive
+    :accessor wserver-enable-keep-alive)
      
-     (enable-chunking  ;; do chunking if it's possible
-      :initform t
-      :initarg :enable-chunking
-      :accessor wserver-enable-chunking)
+   (enable-chunking  ;; do chunking if it's possible
+    :initform t
+    :initarg :enable-chunking
+    :accessor wserver-enable-chunking)
      
-     (terminal-io  ;; stream active when we started server
-      :initform *terminal-io*
-      :initarg  :terminal-io
-      :accessor wserver-terminal-io)
+   (locators
+    ;; list of locators objects in search order
+    :initform (list (make-instance 'locator-exact
+		      :name :exact)
+		    (make-instance 'locator-prefix
+		      :name :prefix)) 
+    :accessor wserver-locators)
+   
+   (log-function
+    ;; function to call after the request is done to 
+    ;; do the logging
+    :initarg :log-function
+    :initform nil	; no logging initially
+    :accessor wserver-log-function)
+   
+   (log-stream
+    ;; place for log-function to store stream to log to if
+    ;; it makes sense to do so
+    :initarg :log-stream
+    :initform  t 	; initially to *standard-output*
+    :accessor wserver-log-stream)
+   
+   ;;
+   ;; -- internal slots --
+   ;;
+   
+   (terminal-io  ;; stream active when we started server
+    :initform *terminal-io*
+    :initarg  :terminal-io
+    :accessor wserver-terminal-io)
+   
+   (worker-threads  ;; list of threads that can handle http requests
+    :initform nil
+    :accessor wserver-worker-threads)
      
-     (worker-threads  ;; list of threads that can handle http requests
-      :initform nil
-      :accessor wserver-worker-threads)
+   (free-workers    ;; estimate of the number of workers that are idle
+    :initform 0
+    :accessor wserver-free-workers)
      
-     (free-workers    ;; estimate of the number of workers that are idle
-      :initform 0
-      :accessor wserver-free-workers)
+   (accept-thread   ;; thread accepting connetions and dispatching
+    :initform nil
+    :accessor wserver-accept-thread)
      
-     (accept-thread   ;; thread accepting connetions and dispatching
-      :initform nil
-      :accessor wserver-accept-thread)
-     
-     (locators
-      ;; list of locators objects in search order
-      :initform (list (make-instance 'locator-exact
-			:name :exact)
-		      (make-instance 'locator-prefix
-				     :name :prefix)) 
-      :accessor wserver-locators)
-     
-     (invalid-request
-      ;; entity to invoke given a request that can't be
-      ;; satisfied
-      :initform nil  ; will build on demand if not present
-      :accessor wserver-invalid-request)
-     
-     (log-function
-      ;; function to call after the request is done to 
-      ;; do the logging
-      :initarg :log-function
-      :initform nil	; no logging initially
-      :accessor wserver-log-function)
-     
-     (log-stream
-      ;; place for log-function to store stream to log to if
-      ;; it makes sense to do so
-      :initarg :log-stream
-      :initform  t 	; initially to *standard-output*
-      :accessor wserver-log-stream)
-     
-     ))
+   (invalid-request
+    ;; entity to invoke given a request that can't be
+    ;; satisfied
+    :initform nil  ; will build on demand if not present
+    :accessor wserver-invalid-request)))
 
 
      
@@ -222,10 +234,10 @@
 			       else 9999999)
 			    (timedout-response ,g-req ,g-ent))
 	   ,(if* response
-	       then `(setf (resp-code ,g-req) ,response))
+	       then `(setf (request-reply-code ,g-req) ,response))
 	   ,(if* content-type
-	       then `(setf (resp-content-type ,g-req) ,content-type)
-	       else `(setf (resp-content-type ,g-req) (content-type ,g-ent)))
+	       then `(setf (request-reply-content-type ,g-req) ,content-type)
+	       else `(setf (request-reply-content-type ,g-req) (content-type ,g-ent)))
 	   ,@body
 	   )))))
 
@@ -246,11 +258,11 @@
        ,(if* body 
 	   then `(compute-response-stream ,g-req ,g-ent))
        (if* ,g-headers
-	  then (setf (resp-headers ,g-req)
-		 (append ,g-headers (resp-headers ,g-req))))
+	  then (setf (request-reply-headers ,g-req)
+		 (append ,g-headers (request-reply-headers ,g-req))))
        (send-response-headers ,g-req ,g-ent :pre)
-       (if* (not (member :omit-body (resp-strategy ,g-req)))
-	  then (let ((htmlgen:*html-stream* (resp-stream ,g-req)))
+       (if* (not (member :omit-body (request-reply-strategy ,g-req)))
+	  then (let ((htmlgen:*html-stream* (request-reply-stream ,g-req)))
 		 (progn ,@body)))
        (send-response-headers ,g-req ,g-ent :post))))
 			  
@@ -300,7 +312,7 @@
        then ; has a fast accesor
 	    `(,(cdr ent) ,obj)
        else ; must get it from the alist
-	    `(cdr (assoc ,name (alist ,obj) :test #'equal)))))
+	    `(cdr (assoc ,name (request-headers ,obj) :test #'equal)))))
 
 (defsetf header-slot-value (obj name) (newval)
   ;; set the header value regardless of where it is stored
@@ -310,11 +322,11 @@
        else (let ((genvar (gensym))
 		  (nobj (gensym)))
 	      `(let* ((,nobj ,obj)
-		      (,genvar (assoc ,name (alist ,nobj) 
+		      (,genvar (assoc ,name (request-headers ,nobj) 
 				      :test #'equal)))
 		 (if* (null ,genvar)
 		    then (push (setq ,genvar (cons ,name nil))
-			       (alist ,nobj)))
+			       (request-headers ,nobj)))
 		 (setf (cdr ,genvar) ,newval))))))
 
 (defmacro header-slot-value-integer (obj name)
@@ -354,33 +366,33 @@
 
 
 (defclass http-request (http-header-mixin)
-  ;; incoming
-  ((method  ;; keyword giving the command in this request :get .. etc.
+  ;;
+  ;; incoming request and information about the reply we send to it
+  ;;
+  (
+   ;;
+   ;; -- external slots --
+   ;;  (accessors exported)
+   
+   (method  ;; keyword giving the command in this request :get .. etc.
     :initarg :method
     :reader request-method)
    
    (uri  ;; uri object holding the current request
     :initarg :uri
     :reader request-uri)
-   
-   (url-argument  ;; alist of arguments if there were any after a ? on the url
-    :initarg :url-argument
-    :reader url-argument)
-   (url-argument-alist-cache
-    :initform nil
-    :accessor url-argument-alist-cache)
-   (protocol ;; symbol naming the http protocol 
+
+   (protocol ;; symbol naming the http protocol  (e.g. :http/1.0)
     :initarg :protocol
-    :reader protocol)
+    :reader request-protocol)
+   
    (protocol-string ;; string naming the protcol
     :initarg :protocol-string
-    :reader protocol-string)
-   (alist ;; alist of headers not stored in slots
-    :initform nil
-    :accessor alist)
+    :reader request-protocol-string)
+   
    (socket ;; the socket we're communicating through
     :initarg :socket
-    :reader socket)
+    :reader request-socket)
    
    (wserver ;; wserver object for web server this request came to
     :initarg :wserver
@@ -389,33 +401,61 @@
    (raw-request  ;; the actual command line from the browser
     :initarg :raw-request
     :reader request-raw-request)
+   
+   ;;
+   ;; -- internal slots --
+   ;;
+   
+   (query-alist 
+    ;; list of conses (name . value) for the query part of the 
+    ;; current uri.  This slot is filled in when information
+    ;; is first requested by  the  request-query function
+    :initform :empty
+    :accessor request-query-alist)
+   
+   
+   (headers ;; alist of headers *not* stored in slots
+    ;* use header-slot-value to retrieve header values sinc
+    ;  rather than looking here since not all headers are stored 
+    ;  here
+    :initform nil
+    :accessor request-headers)
+   
+   
+   
 
    ;; response
-   (resp-code   ;; one of the *response-xx* objects
+   (reply-code   ;; one of the *response-xx* objects
     :initform nil
-    :accessor resp-code)
-   (resp-date
-    :initform (get-universal-time)  ; when we're responding
-    :reader resp-date)
-   (resp-headers  ;; alist of headers to send out
-    :initform nil
-    :accessor resp-headers)
-   (resp-content-type ;; mime type of the response
-    :initform nil
-    :accessor resp-content-type)
-   (resp-stream   ;; stream to which to send response
-    :initform nil
-    :accessor resp-stream)
-   (resp-content-length
-    :initform nil  ;; nil means "i don't know"
-    :accessor resp-content-length)
-   (resp-strategy  ;; list of strategy objects
-    :initform nil
-    :accessor resp-strategy)
+    :accessor request-reply-code)
    
-   (resp-plist    ;; general stuff in a property list form
+   (reply-date
+    :initform (get-universal-time)  ; when we're responding
+    :reader request-reply-date)
+   
+   (reply-headers  ;; alist of headers to send out
     :initform nil
-    :accessor resp-plist)
+    :accessor request-reply-headers)
+   
+   (reply-content-type ;; mime type of the response
+    :initform nil
+    :accessor request-reply-content-type)
+   
+   (reply-stream   ;; stream to which to send response
+    :initform nil
+    :accessor request-reply-stream)
+   
+   (reply-content-length
+    :initform nil  ;; nil means "i don't know"
+    :accessor request-reply-content-length)
+   
+   (reply-strategy  ;; list of strategy objects
+    :initform nil
+    :accessor request-reply-strategy)
+   
+   (reply-plist    ;; general stuff in a property list form
+    :initform nil
+    :accessor request-reply-plist)
    
    )
   
@@ -687,9 +727,9 @@
 	     else ;; got a request
 		  (handle-request req)
 		  (log-request req)
-		  (let ((sock (socket req)))
+		  (let ((sock (request-socket req)))
 		    (if* (member :keep-alive
-				 (resp-strategy req)
+				 (request-reply-strategy req)
 				 :test #'eq)
 		       then ; continue to use it
 			    (debug-format 10 "request over, keep socket alive~%")
@@ -885,7 +925,7 @@
       (if* believe-it
 	 then ; we know the length
 	      (let ((ret (make-string length)))
-		(read-sequence-with-timeout ret length (socket req)
+		(read-sequence-with-timeout ret length (request-socket req)
 					    *read-request-body-timeout*))
 	 else ; no content length given
 	      (if* (equalp "keep-alive" 
@@ -896,7 +936,7 @@
 		      (mp:with-timeout (*read-request-body-timeout* nil)
 			(let ((ans (make-array 2048 :element-type 'character
 					       :fill-pointer 0))
-			      (sock (socket req))
+			      (sock (request-socket req))
 			      (ch))
 			  (loop (if* (eq :eof 
 					 (setq ch (read-char sock nil :eof)))
@@ -937,13 +977,13 @@
 	    (return-from start-multipart-capture nil))
     
     
-    (setf (getf (resp-plist req) 'mp-info)
+    (setf (getf (request-reply-plist req) 'mp-info)
       (make-mp-info :buffer (get-request-buffer)
 		    :ebuf 0		    :left len
 		    ;; keep boundary case insensitive
 		    :boundary (concatenate 'string "--" 
 					   (string-downcase boundary))
-		    :socket   (socket req)
+		    :socket   (request-socket req)
 		    ))))
 
 
@@ -953,11 +993,11 @@
   ;; return an alist holding the header info for the next request.
   ;; or nil if this is the end of the line
   
-  (let ((mp-info (getf (resp-plist req) 'mp-info)))
+  (let ((mp-info (getf (request-reply-plist req) 'mp-info)))
     
     (if* (null mp-info)
        then (start-multipart-capture req)
-	    (setq mp-info (getf (resp-plist req) 'mp-info)))
+	    (setq mp-info (getf (request-reply-plist req) 'mp-info)))
     
     (if* (null mp-info)
        then ; no headers left
@@ -1126,14 +1166,14 @@
       (t (error "get-multipart-sequence should be given a (simple-array character (*)) or (array (unsigned-byte 8) (*)), not this sequence: ~s" buffer)))
   
   
-    (setq mp-info (getf (resp-plist req) 'mp-info))
+    (setq mp-info (getf (request-reply-plist req) 'mp-info))
     (if* (null mp-info)
        then ; haven't grabbed the header yet, do that and toss it, and
 	    ; start the flow of information
 	    (if* (null (get-multipart-header req))
 	       then ; no data to read
 		    (return-from get-multipart-sequence nil))
-	    (setq mp-info (getf (resp-plist req) 'mp-info)))
+	    (setq mp-info (getf (request-reply-plist req) 'mp-info)))
   
     (if* (null (mp-info-leftoff mp-info))
        then (case (get-multipart-line mp-info)
@@ -1264,17 +1304,20 @@
       
 		      
 				  
-
-(defmethod url-argument-alist ((req http-request))
+(defmethod request-query ((req http-request))
   ;; decode if necessary and return the alist holding the
-  ;; args to this url
-  (let ((alist (url-argument-alist-cache req)))
-    (if* alist
-       thenret
+  ;; args to this url.  In the alist items the value is the 
+  ;; cdr of the alist item.
+  (let ((alist (request-query-alist req)))
+    (if* (not (eq alist :empty))
+       then alist
        else (let ((arg (uri-query (request-uri req))))
 	      (if* arg
-		 then (setf (url-argument-alist-cache req)
+		 then (setf (request-query-alist req)
 			(decode-form-urlencoded arg)))))))
+
+
+
 	
 
 (defun header-decode-integer (val)

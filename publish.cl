@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: publish.cl,v 1.22 2000/01/25 22:54:37 jkf Exp $
+;; $Id: publish.cl,v 1.23 2000/01/28 19:44:29 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -586,17 +586,17 @@
 	    ; for now we'll send it all
 	    (with-http-response (req ent
 				     :content-type (content-type ent))
-	      (setf (resp-content-length req) (length contents))
+	      (setf (request-reply-content-length req) (length contents))
 	      (push (cons "Last-Modified"
 			  (universal-time-to-date 
-			   (min (resp-date req) 
+			   (min (request-reply-date req) 
 				(last-modified ent))))
-		    (resp-headers req))
+		    (request-reply-headers req))
 	      
 	      (with-http-body (req ent :format :binary)
 		;; at this point the header are out and we have a stream
 		;; to write to 
-		(write-sequence contents (resp-stream req))
+		(write-sequence contents (request-reply-stream req))
 		))
        else ; the non-preloaded case
 	    (let (p)
@@ -609,7 +609,7 @@
 					:element-type '(unsigned-byte 8)))))
 		 then ; file not readable
 		      (with-http-response (req ent)
-			(setf (resp-code req) *response-not-found*)
+			(setf (request-reply-code req) *response-not-found*)
 			(with-http-body (req ent)))
 		      (return-from process-entity nil))
 	      
@@ -625,11 +625,11 @@
 		      (setf (last-modified ent) lastmod)
 		      (with-http-response (req ent)
 
-			(setf (resp-content-length req) size)
+			(setf (request-reply-content-length req) size)
 			(push (cons "Last-Modified"
 				    (universal-time-to-date 
-				     (min (resp-date req) lastmod)))
-			      (resp-headers req))
+				     (min (request-reply-date req) lastmod)))
+			      (request-reply-headers req))
 			
 			
 			(with-http-body (req ent :format :binary)
@@ -639,7 +639,7 @@
 						      p :end 
 						      (min size 1024))))
 			      (if* (<= got 0) then (return))
-			      (write-sequence buffer (resp-stream req)
+			      (write-sequence buffer (request-reply-stream req)
 					      :end got)
 			      (decf size got)))))))
 		      
@@ -736,7 +736,7 @@
 	       then ; send back a message that it is already
 		    ; up to date
 		    (debug-format 10 "entity is up to date~%")
-		    (setf (resp-code req) *response-not-modified*)
+		    (setf (request-reply-code req) *response-not-modified*)
 		    (with-http-body (req ent)
 		      ;; force out the header
 		      )
@@ -763,7 +763,7 @@
 	    
      elseif (and  ;; assert: get command
 	     (wserver-enable-chunking *wserver*)
-	     (eq (protocol req) :http/1.1)
+	     (eq (request-protocol req) :http/1.1)
 	     (null (content-length ent)))
        then (setq strategy '(:chunked :use-socket-stream))
        else ; can't chunk, let's see if keep alive is requested
@@ -795,7 +795,7 @@
     ;;  save it
 
     (debug-format 10 "strategy is ~s~%" strategy)
-    (setf (resp-strategy req) strategy)
+    (setf (request-reply-strategy req) strategy)
     
     ))
 			     
@@ -817,7 +817,7 @@
        else (setq strategy (call-next-method)))
     
     (debug-format 10 "file strategy is ~s~%" strategy)
-    (setf (resp-strategy req) strategy)))
+    (setf (request-reply-strategy req) strategy)))
 
 	    
 	    
@@ -841,14 +841,14 @@
   ;;
     
   (mp:with-timeout (60 (logmess "timeout during header send")
-		       (setf (resp-keep-alive req) nil)
+		       ;;(setf (request-reply-keep-alive req) nil)
 		       (throw 'with-http-response nil))
-    (let* ((sock (socket req))
-	   (strategy (resp-strategy req))
+    (let* ((sock (request-socket req))
+	   (strategy (request-reply-strategy req))
 	   (post-headers (member :post-headers strategy :test #'eq))
 	   (content)
 	   (chunked-p (member :chunked strategy :test #'eq))
-	   (code (resp-code req))
+	   (code (request-reply-code req))
 	   (send-headers
 	    (if* post-headers
 	       then (eq time :post)
@@ -859,7 +859,7 @@
       
       (if* send-headers
 	 then (dformat sock "~a ~d  ~a~a"
-		       (protocol-string req)
+		       (request-protocol-string req)
 		       (response-number code)
 		       (response-desc   code)
 		       *crlf*))
@@ -869,14 +869,14 @@
 		(member :string-output-stream strategy :test #'eq))
 	 then ; must get data to send from the string output stream
 	      (setq content (get-output-stream-string 
-			     (resp-stream req)))
-	      (setf (resp-content-length req) (length content)))
+			     (request-reply-stream req)))
+	      (setf (request-reply-content-length req) (length content)))
       	
       (if* (and send-headers
-		(not (eq (protocol req) :http/0.9)))
+		(not (eq (request-protocol req) :http/0.9)))
 	 then ; can put out headers
 	      (dformat sock "Date: ~a~a" 
-		       (universal-time-to-date (resp-date req))
+		       (universal-time-to-date (request-reply-date req))
 		       *crlf*)
 
 	      (if* (member :keep-alive strategy :test #'eq)
@@ -888,9 +888,9 @@
       
 	      (dformat sock "Server: neo/0.1~a" *crlf*)
       
-	      (if* (resp-content-type req)
+	      (if* (request-reply-content-type req)
 		 then (dformat sock "Content-Type: ~a~a" 
-			       (resp-content-type req)
+			       (request-reply-content-type req)
 			       *crlf*))
 
 	      (if* chunked-p
@@ -898,15 +898,15 @@
 			       *crlf*))
 	      
 	      (if* (and (not chunked-p)
-			(resp-content-length req))
+			(request-reply-content-length req))
 		 then (dformat sock "Content-Length: ~d~a"
-			       (resp-content-length req)      
+			       (request-reply-content-length req)      
 			       *crlf*)
 		      (debug-format 10 
 				       "~d ~s - ~d bytes" 
 				       (response-number code)
 				       (response-desc   code)
-				       (resp-content-length req))
+				       (request-reply-content-length req))
 	       elseif chunked-p
 		 then (debug-format 10 nil 
 				       "~d ~s - chunked" 
@@ -919,7 +919,7 @@
 				       (response-desc   code)
 				       ))
 	      
-	      (dolist (head (resp-headers req))
+	      (dolist (head (request-reply-headers req))
 		(dformat sock "~a: ~a~a"
 			 (car head)
 			 (cdr head)
@@ -947,13 +947,13 @@
 (defmethod compute-response-stream ((req http-request) (ent file-entity))
   ;; send directly to the socket since we already know the length
   ;;
-  (setf (resp-stream req) (socket req)))
+  (setf (request-reply-stream req) (request-socket req)))
 
 (defmethod compute-response-stream ((req http-request) (ent computed-entity))
   ;; may have to build a string-output-stream
-  (if* (member :string-output-stream (resp-strategy req) :test #'eq)
-     then (setf (resp-stream req) (make-string-output-stream))
-     else (setf (resp-stream req) (socket req))))
+  (if* (member :string-output-stream (request-reply-strategy req) :test #'eq)
+     then (setf (request-reply-stream req) (make-string-output-stream))
+     else (setf (request-reply-stream req) (request-socket req))))
 
 
 
@@ -1008,7 +1008,7 @@
 			res
 			"; secure")))
     
-    (push `("Set-Cookie" . ,res) (resp-headers req))
+    (push `("Set-Cookie" . ,res) (request-reply-headers req))
     res))
 
 
@@ -1045,7 +1045,7 @@
   ;; return a response to a web server indicating that it is taking
   ;; too long for us to respond
   ;;
-  (setf (resp-code req) *response-internal-server-error*)
+  (setf (request-reply-code req) *response-internal-server-error*)
   (with-http-body (req ent)
     (html (:title "Internal Server Error")
 	  (:body "500 - The server has taken too long to respond to the request"))))
