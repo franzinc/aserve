@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.49 2000/08/01 01:19:01 jkf Exp $
+;; $Id: main.cl,v 1.50 2000/08/01 01:20:16 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1295,7 +1295,7 @@
     (if* (null mp-info)
        then (start-multipart-capture req)
 	    ; satisify normal requests for the body with an empty string
-	    (setf (request-body req) "") 
+	    (setf (request-request-body req) "") 
 	    (setq mp-info (getf (request-reply-plist req) 'mp-info)))
     
     (if* (null mp-info)
