@@ -506,7 +506,7 @@ specify headers and values to be sent with a reply.</p>
 the alist is a cons where the car is a string giving the name of the argument and the cdr
 is a string giving the value of the argument.</p>
 
-<p>The query string is in one or both of two places:
+<p>The query string is in one or both of two places: 
 
 <ul>
   <li>it begins at the first question mark in the uri and continues until the end of the uri
@@ -1256,7 +1256,25 @@ keep-alive headers proxy)</font></strong></p>
     <td width="62%">If the method is <strong>:put</strong> or<strong> :post</strong> then the
     request should include something to be sent to the web server.&nbsp;&nbsp; The value of
     this argument is either a string or a vector of type (unsigned-byte 8) which will be sent
-    to the web server.</td>
+    to the web server.&nbsp; See the <strong>query</strong> argument for a more convenient way
+    to <strong>:post</strong> data to a form.</td>
+  </tr>
+  <tr>
+    <td width="22%">content-type</td>
+    <td width="16%">nil</td>
+    <td width="62%">A string which is to be the value of the Content-Type header field,
+    describing the format of the value of the <strong>content</strong> argument. &nbsp;&nbsp;
+    This is only needed for <strong>:put</strong> and <strong>:post</strong> requests.</td>
+  </tr>
+  <tr>
+    <td width="22%">query</td>
+    <td width="16%">nil</td>
+    <td width="62%">This is a query alist of the form suitable for <strong>query-to-form-urlencoded</strong>.
+    &nbsp; If the method is a <strong>:get</strong> then the value of&nbsp; this argument is <strong>urlencoded</strong>
+    and made the query string of the uri being accessed.&nbsp; If the method is <strong>:post</strong>
+    then the query string is <strong>urlencoded</strong> and made the <strong>content</strong>
+    of the request.&nbsp; Also the <strong>content-type</strong> is set to <strong>application/x-www-form-urlencoded.</strong>
+    </td>
   </tr>
   <tr>
     <td width="22%">format</td>
@@ -1327,8 +1345,23 @@ keep-alive headers proxy)</font></strong></p>
 
 <pre>&quot;</pre>
 
-<pre>
-        </pre>
+<p>&nbsp;</p>
+
+<p>It's easy to use <strong>do-http-request</strong> to fill in form objects on a page.
+&nbsp; If the form has input elements named&nbsp; <strong>width</strong> and <strong>height</strong>
+then you can send a request that specifies that information in this way:</p>
+
+<pre><font face="Courier New">(do-http-request <a href="http://www.foo.com/myform.html">&quot;http://www.foo.com/myform.html&quot;</a> 
+                 :query '((&quot;width&quot; . 23) (&quot;height&quot; . 45)))</font></pre>
+
+<p>The above assumes that the method on the form is &quot;GET&quot;.&nbsp;&nbsp; If the
+method is &quot;POST&quot; then a similar call will work:</p>
+
+<pre><font face="Courier New">(do-http-request <a href="http://www.foo.com/myform.html">&quot;http://www.foo.com/myform.html&quot;</a>  <strong>:method :post</strong>
+                 :query '((&quot;width&quot; . 23) (&quot;height&quot; . 45)))</font></pre>
+
+<p><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </p>
 
 <p>&nbsp;</p>
 
@@ -1468,9 +1501,9 @@ uri &amp;key method protocol keep-alive<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 accept cookies headers proxy<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-basic-authorization<br>
+basic-authorization query<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-content content-length)</font></strong></p>
+content content-type content-length)</font></strong></p>
 
 <p>This function connects to the web server indicated by the <strong>uri</strong> and
 sends the request.&nbsp;&nbsp; The arguments are the same as those for <strong>do-http-request</strong>
