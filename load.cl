@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.35 2000/08/17 14:03:35 jkf Exp $
+;; $Id: load.cl,v 1.36 2000/08/20 19:13:23 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -17,6 +17,7 @@
       "authorize"
       "log" 
       "client"
+      "proxy"
       ))
 
 (defparameter *aserve-other-files*

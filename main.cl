@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.57 2000/08/17 21:38:30 jkf Exp $
+;; $Id: main.cl,v 1.58 2000/08/20 19:13:23 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -46,6 +46,7 @@
    ; #:debug-off		
    ; #:debug-on			
    #:denied-request
+   #:enable-proxy
    #:failed-request
    #:form-urlencoded-to-query
    #:get-basic-authorization
@@ -130,7 +131,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 1 25))
+(defparameter *aserve-version* '(1 1 26))
 
 
 (provide :aserve)

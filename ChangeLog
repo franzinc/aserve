@@ -1,3 +1,11 @@
+2000-08-20  jkf  <jkf@main.verada.com>
+1.1.26
+	*  Added a proxy capability.  enable-proxy will turn it on.
+	   Currently it acts an http/1.0 client and server since that
+	   makes it easier to debug. However this does cause 12 test
+	   set errors to be reported since it expects to see http/1.1
+	   responses. 
+
 2000-08-17  jkf  <jkf@main.verada.com>
 
 	*  implement generalized cons-free header parsing and use it

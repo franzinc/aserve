@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.3 2000/08/19 14:30:35 jkf Exp $
+;; $Id: headers.cl,v 1.4 2000/08/20 19:13:23 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -101,7 +101,7 @@
 	("Content-Md5" :p :p)
 	("Content-Range" :p :p)
 	("Content-Type" :p :p)
-	("Cookie" :nf :p)
+	("Cookie" :p :p)
 	("Date" :p :p)
 	("Etag" :p :p)
 	("Expect" :np :nf)
@@ -632,18 +632,18 @@
 	    (setq header val)))
   (let ((name (svref *header-name-array* header)))
     (dotimes (j (length name))
-      (setf (aref tobuf end) (char-code (schar name j)))
+      (setf (aref buff end) (char-code (schar name j)))
       (incf end))
-    (setf (aref tobuf end) #.(char-code #\:))
+    (setf (aref buff end) #.(char-code #\:))
     (incf end)
-    (setf (aref tobuf end) #.(char-code #\space))
+    (setf (aref buff end) #.(char-code #\space))
     (incf end)
     (dotimes (j (length value))
-      (setf (aref tobuf end) (char-code (schar frombuf j)))
+      (setf (aref buff end) (char-code (schar value j)))
       (incf end))
-    (setf (aref tobuf end) #.(char-code #\return))
+    (setf (aref buff end) #.(char-code #\return))
     (incf end)
-    (setf (aref tobuf end) #.(char-code #\linefeed))
+    (setf (aref buff end) #.(char-code #\linefeed))
     (incf end))
   
   end)
@@ -652,9 +652,9 @@
 
 (defun insert-end-of-headers (buff end)
   ;; put in the final crlf
-  (setf (aref tobuf end) #.(char-code #\return))
+  (setf (aref buff end) #.(char-code #\return))
   (incf end)
-  (setf (aref tobuf end) #.(char-code #\linefeed))
+  (setf (aref buff end) #.(char-code #\linefeed))
   (incf end)
   end)
 	    
