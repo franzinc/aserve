@@ -620,3 +620,37 @@ Content-Type: image/gif
 ---------------------- end resp1
 
 
+
+
+========================
+handling multipart/form-data input
+
+
+if you see that the content-type is multipart/form-data then 
+you should grab it this way:
+
+(start-multipart-capture req)  ; sets things up for the grab
+
+
+(get-multipart-header req) 
+    -returns nil if no more data or else an assoc list
+(("headername" . "value") ....)
+  for the headers that preceed the data
+  the value parts can be parsed with the standard header value parser
+
+
+
+(get-multipart-sequence req buffer length &key start end)
+ 
+    effectively do a read-sequence from the stream into the buffer
+    given by the user.
+
+    return the index of the first character not written in the buffer.
+    
+    return nil on eof.
+
+    the buffer can be binary (unsigned-byte 8) or text (array of character)
+
+
+
+

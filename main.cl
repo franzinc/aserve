@@ -16,6 +16,7 @@
    #:with-http-response
    #:with-http-body
    #:wserver
+   #:*neo-version*
    #:*response-ok*
    #:*response-created*
    #:*response-accepted*
@@ -29,6 +30,7 @@
 (in-package :neo)
 
 
+(defparameter *neo-version* '(1 0 1))
 
 ;;;;;;;  debug support 
 
@@ -334,6 +336,11 @@
    (resp-strategy  ;; list of strategy objects
     :initform nil
     :accessor resp-strategy)
+   
+   (resp-plist    ;; general stuff in a property list form
+    :initform nil
+    :accessor resp-plist)
+   
    )
   
   
@@ -775,7 +782,7 @@
 
 (defmethod get-request-body ((req http-request))
   ;; return a string that holds the body of the http-request
-  ;;
+  ;; 
   (multiple-value-bind (length believe-it)
       (header-slot-value-integer req "content-length")
       (if* believe-it
@@ -798,6 +805,153 @@
 					 (setq ch (read-char sock nil :eof)))
 				   then (return  ans)
 				   else (vector-push-extend ans ch)))))))))
+
+
+
+;; multipart code
+;; used when enctype=multipart/form-data is used
+
+(defstruct mp-info 
+  ;; multipart information
+  buffer 	; string buffer
+  ebuf		; index after last valid char in buffer
+  left		; bytes left after buffer exhausted
+  boundary	; boundary string
+  socket	; socket stream connected to browser
+  )
+
+
+#+ignore  
+(defmethod start-multipart-capture ((req http-request))
+  ;; begin the grab of the body
+  (let* ((ctype (header-slot-value req "content-type"))
+	 (parsed (and ctype (parse-header-value ctype)))
+	 (boundary (and (equalp "multipart/form-data" (cadr parsed))
+			(cdr (assoc "boundary" (cdr parse) #'equal))))
+	 (len (header-slot-value-integer req "content-length")))
+    
+    (if* (null boundary)
+       then ; not in the right form, give up
+	    (return-from start-multipart-capture nil))
+    
+    
+    (setf (getf (resp-plist req) 'mp-info)
+      (make-mp-info :buffer (get-request-buffer)
+		    :ebuf 0
+		    :left len
+		    :boundary boundary
+		    :socket   (socket req)
+		    ))))
+
+
+    
+#+ignore    
+(defmethod get-multipart-header ((req http-request))
+  ;; return an alist holding the header info for the next request.
+  ;; or nil if this is the end of the line
+  
+  (let ((mp-info (getf (resp-plist req) 'mp-info)))
+    
+    (if* (null mp-info)
+       then (start-multipart-capture req)
+	    (setq mp-info (getf (resp-plist req) 'mp-info)))
+    
+    (if* (null mp-info)
+       then ; no headers left
+	    (return-from get-multipart-header nil))
+    
+    (let ((boundary (mp-info-boundary mp-info))
+	  (len  (length boundary)))
+      (loop
+	(if* (null (get-multipart-line mp-info))
+	   then ; no more left, leave
+		(return-from get-multipart-header nil))
+      
+      
+	; see if it amtches the boundary
+	(if* (>= (mp-info-end mp-info) len)
+	   then ; it's big enough
+		(let ((buffer (mp-info-buffer mp-info)))
+		  (if* (dotimes (i len t)
+			 (if* (not (eq (schar buffer i)
+				       (schar boundary i)))
+			    then (return nil)))
+		     then ; match
+			  (return)
+		     else ; 
+			  (setf (mp-info-end mp-info) 0))))
+	)
+    
+      ; get here if we've matched the separator
+      ; see if the following char is a hypen in which case we're
+      ; at the end of all headers
+      (if* (eq (schar buffer len) #\-)
+	 then (return-from get-multipart-header nil))
+    
+      ; read header lines
+      (let ((headers)(heads))
+	(tagbody again
+	  (loop
+	    (case (get-multipart-line mp-info)
+	      (:eof (return-from get-multipart-header nil))
+	      (:boundary (go again))
+	      (:boundary-end (return-from get-multipart-header nil))
+	      (:data (if* (eq (mp-info-end mp-info) 0)
+			then (return) ; end of headers
+			else (if* (member (schar buffer 0) '(#\space 
+							     #\tab))
+				then ; header contintuation
+				     (if* headers
+					then (setf (car headers)
+					       (concatenate 'string
+						 (car headers)
+						 " "
+						 (buffer-substr buffer 
+								0 
+								(mp-info-end mp-info)))))
+				else ; new header
+				     (push (buffer-substr buffer 
+							  0 
+							  (mp-info-end mp-info))
+					   headers)))))))
+      
+	; now parse headers
+	(dolist (head headers)
+	  (let ((colonpos (find-it #\: head 0 (length head))))
+	    (if* colonpos
+	       then (let ((name (buffer-substr buffer 0 colonpos))
+			  (value (buffer-substr buffer (1+ colonpos)
+						(length head))))
+		      (push (cons name
+				  (parse-header-value value))
+			    heads)))))
+	heads))))
+	  
+      
+      
+
+    
+		      
+	      
+      
+      
+      
+    
+    
+    
+    
+    
+	  
+  
+    
+  
+
+
+
+;; end multipart code
+
+
+
 		      
 	      
 (defun read-sequence-with-timeout (string length sock timeout)
@@ -805,14 +959,13 @@
   ;; seconds
   ;; return nil if things go wrong.
   (mp:with-timeout (timeout nil)
-    (loop
-      (let ((got 0))
+    (let ((got 0))
+      (loop
 	(let ((this (read-sequence string sock :start got)))
 	  (if* (<= this 0)
 	     then (return nil) ; eof too early
-	     else (decf length this)
-		  (incf got    this)
-		  (if* (<= length 0) then (return string))))))))
+	     else (setq  got    this)
+		  (if* (>= got length ) then (return string))))))))
 		
     
       

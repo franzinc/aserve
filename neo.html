@@ -63,10 +63,10 @@ running.</p>
 <p><strong><font face="Courier New">(start &amp;key port listeners chunking keep-alive
 server debug)</font></strong></p>
 
-<p>If no arguments are given then this just starts a multi-threaded web server on port 80,
-which is the standard web server port.&nbsp;&nbsp;&nbsp; If you are running this on Unix
-then you can only allocate port 80 if you are logged in as root or have made Lisp a
-set-user-id root program.</p>
+<p>If no arguments are given then <strong>start</strong>&nbsp; starts a multi-threaded web
+server on port 80, which is the standard web server port.&nbsp;&nbsp;&nbsp; If you are
+running this on Unix then you can only allocate port 80 if you are logged in as root or
+have made Lisp a set-user-id root program.</p>
 
 <p>The&nbsp; are quite a few keyword arguments to <strong>start</strong>, but in practice
 you only need be concerned with <strong>:port</strong> and <strong>:listeners.
@@ -75,16 +75,15 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
 <ul>
   <li>port -- the port on which to open the web server.&nbsp; 80 is the default.</li>
   <li>listeners -- the number of threads to process http requests.&nbsp;&nbsp;&nbsp;&nbsp; If
-    a value isn't given for the <strong>:listeners</strong> argument then 5 is assumed.
-    &nbsp; If&nbsp; the value is <strong>nil </strong>or <strong>0 </strong>then the server
-    runs in <em>simple server mode<strong> </strong></em>in which the <strong>start</strong>
-    function doesn't return - instead it processes the request itself, one at a time.&nbsp; If
-    a positive number is given as the value of <strong>:listeners</strong> then the server
-    runs in <em>threaded server mode<strong>.</em> </strong>&nbsp; In this mode separate lisp
-    lightweight processes are started to handle requests from clients, the number of request
-    handing threads equal to the value of the <strong>:listeners</strong> keyword
-    argument.&nbsp; In this mode the <strong>start </strong>function returns after starting
-    the other threads.</li>
+    a value isn't given for the <strong>:listeners</strong> argument then 5 is assumed. &nbsp;
+    If&nbsp; the value is <strong>nil </strong>or <strong>0 </strong>then the server runs in <em>simple
+    server mode<strong> </strong></em>in which the <strong>start</strong> function doesn't
+    return - instead it processes the requests itself, one at a time.&nbsp; If a positive
+    number is given as the value of <strong>:listeners</strong> then the server runs in <em>threaded
+    server mode<strong>.</em> </strong>&nbsp; In this mode separate lisp lightweight processes
+    are started to handle requests from clients, the number of request handing threads equal
+    to the value of the <strong>:listeners</strong> keyword argument.&nbsp; In this mode the <strong>start
+    </strong>function returns after starting the other threads.</li>
   <li>chunking -- if true then the server will using the chunked transfer encoding when it's
     possible to do so.&nbsp; This is an optimization and should be left enabled unless you
     suspect that it is the cause of some sort of error.&nbsp;&nbsp; The default is true.</li>
@@ -124,14 +123,15 @@ determine which entity will handle the request are
   <li>the name part of the url minus any arguments.&nbsp;&nbsp; The arguments are the
     characters beginning with the first '?' and extending to the end of the url.&nbsp; For
     example in the url&nbsp; <a href="http://bar.com:8030/files/foo?xx=3&amp;yy=4">http://bar.com:8030/files/foo?xx=3&amp;yy=4</a>
-    the part we're referring to in this item is just <strong>/files/foo.</strong></li>
+    the part we call the name is just <strong>/files/foo.</strong></li>
   <li>the host to which the request is directed.&nbsp;&nbsp; This is not necessarily the host
     that is receiving the request due to virtual hosts and proxy servers.&nbsp; This value
     comes from the <strong>Host:</strong> header line, if one is given.&nbsp; If the <strong>Host:</strong>
-    header line isn't given then this value is unspecified for this request.</li>
+    header line isn't given then this value is <em>unspecified</em> for this request.</li>
   <li>the port to which the request was directed.&nbsp; Again, this information comes from <strong>Host:</strong>
     header line, if it is present in the request.&nbsp; If it is not present then this value
-    is unspecified.</li>
+    is <em>unspecified</em>.<font color="#FF0000"> [[this seems wrong.... it should probably
+    default to the actual port number on which neo is listening]]</font></li>
 </ul>
 
 <p>&nbsp;</p>
@@ -142,7 +142,7 @@ any way it sees fit.</p>
 
 <p>&nbsp;</p>
 
-<p>The following functions create entities and specify which request they will handle:</p>
+<p>The following functions create entities and specify which requests they will handle:</p>
 
 <p>&nbsp;</p>
 
@@ -174,7 +174,7 @@ optional too in the future).&nbsp; The arguments have these meanings:
   <li><strong>class</strong> -- a Clos class name or class object to be used to hold this
     entity.&nbsp; The class must be a subclass of&nbsp; <strong>file-entity</strong>.
     &nbsp;&nbsp; </li>
-  <li><strong>preload</strong> --if true it instructions <strong>neo</strong> to read the
+  <li><strong>preload</strong> --if true it instructs <strong>neo</strong> to read the
     contents of the file in immediately and store it in a lisp object.&nbsp; This will speed
     up the reponse to this request.</li>
   <li><strong>server</strong> -- if this entity should only be served by a particular server,
@@ -242,8 +242,8 @@ the response is only that the request wasn't found.</p>
 
 <p>There are a variety of ways that a response can been sent back to the http client
 depending on whether keep-alive is being done, chunking is possible, whether the response
-is text or binary, whether the client already has the most recently data, and whether the
-size of the body of the reesponse is known before the headers are sent.&nbsp; Neo deals
+is text or binary, whether the client already has the most recent data, and whether the
+size of the body of the response is known before the headers are sent.&nbsp; Neo deals
 with complexity of determing the optimal response strategy and the user need only use a
 few specific macros in the computation of the response in order ot take advantage of Neo's
 strategy computation</p>
@@ -264,7 +264,7 @@ the browser window:</p>
 HTTP/0.9 browser or a modern HTTP/1.1 browser.&nbsp; It may or may not send the response
 back with Chunked transfer encoding and it may or may not keep the connection alive after
 sending back the response.&nbsp;&nbsp; The user code doesn't have to deal with those
-options, it just uses <strong>with-http-response</strong> and <strong>with-http-body</strong>
+possibilities, it just uses <strong>with-http-response</strong> and <strong>with-http-body</strong>
 and the rest is automatic.&nbsp; The <strong>html</strong> macro is part of the htmlgen
 package that accompanies Neo.&nbsp;&nbsp; In the case above we are being lazy and not
 putting out the html directives that should be found on every page of html since most
@@ -312,9 +312,9 @@ and the <strong>body </strong>of this macro will not be run.&nbsp;&nbsp; <strong
 an object contaning the code and description of the http response we wish to return.
 &nbsp; The default value is the value of <strong>*response-ok*</strong> (which has a code
 of 200 and a string descriptor &quot;OK&quot;).&nbsp;&nbsp; <strong>content-type </strong>is
-a string describing the body (if any) sent after the headers.&nbsp; It has a form like
-&quot;text/html&quot;.&nbsp;&nbsp; If <strong>content-type</strong> isn't given here then
-the content-type value in the entity (which is set in the call to <strong>publish)</strong>
+a string describing the MIME type of the body (if any) sent after the headers.&nbsp; It
+has a form like &quot;text/html&quot;.&nbsp;&nbsp; If <strong>content-type</strong> isn't
+given here then the content-type value in the entity (which is set in the call to <strong>publish)</strong>
 will be used.</p>
 
 <p align="left">&nbsp;</p>
@@ -340,7 +340,8 @@ itself will send out everything except the body of the response.&nbsp; That is t
 responsibility of the code supplied as the <strong>body </strong>form of the macro.
 &nbsp;&nbsp; In cases where there is no body to the response being sent it is still
 necessary to call <strong>with-http-body </strong>so that the other parts of the response
-are sent out, e.g.<font face="Courier New"> (with-http-body (req ent))</font></p>
+are sent out, e.g.<font face="Courier New"> </font>at a minimum you should put<font
+face="Courier New"> (with-http-body (req ent)) </font>in the body of an with-http-response</p>
 
 <p align="left">The <strong>format</strong> argument specifies whether the code in the <strong>body</strong>
 will want to write <strong>:text</strong> (e.g. <strong>write-char</strong>) or <strong>:binary</strong>
@@ -354,7 +355,7 @@ called to create the entity.</p>
 is the header name (a string) and the cdr is the header value.&nbsp; These headers are
 added to the headers sent as part of this response.</p>
 
-<p align="left">Within the <strong>body </strong>forms the code call <strong>(resp-stream
+<p align="left">Within the <strong>body </strong>forms the code calls <strong>(resp-stream
 req)</strong> to obtain a stream to which it can write to supply the body of the response.</p>
 
 <hr>

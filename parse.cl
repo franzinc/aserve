@@ -201,7 +201,7 @@
 		 then (setf (cdr last-value-assoc)
 			(concatenate 'string
 			  (cdr last-value-assoc) (buffer-substr buffer 0 end)))
-		 else ; continuation with nothing to contine
+		 else ; continuation with nothing to continue
 		      (return-from read-request-headers nil))
 	 else ; see if this is one of the special header lines
 	    
