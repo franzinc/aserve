@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.98 2001/03/22 17:30:52 jkf Exp $
+;; $Id: main.cl,v 1.99 2001/03/22 17:47:40 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -971,6 +971,7 @@ by keyword symbols and not by strings"
     (setf (wserver-enable-chunking server) chunking)
     (setf (wserver-enable-keep-alive server) keep-alive)
 
+    #+unix
     (if* os-processes
        then ; create a number of processes, letting only the main
 	    ; one keep access to the tty
