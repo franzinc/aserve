@@ -30,7 +30,7 @@ v2: aserve version 1.2.27, various fixes from 1.2.25."
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: packages.cl,v 1.1.4.5 2003/07/08 22:22:27 layer Exp $
+;; $Id: packages.cl,v 1.1.4.6 2003/07/08 22:24:15 layer Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe
@@ -195,4 +195,4 @@ v2: aserve version 1.2.27, various fixes from 1.2.25."
 
 ;; required so old versions of the patch can be loaded.
 (when (fboundp 'get-request-body)
-  (makfunbound 'get-request-body))
+  (fmakunbound 'get-request-body))
