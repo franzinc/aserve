@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.116 2001/10/16 16:58:20 jkf Exp $
+;; $Id: main.cl,v 1.116.4.1 2001/10/18 17:51:10 jhoward Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1220,6 +1220,7 @@ by keyword symbols and not by strings"
       (format nil "w~d" *thread-index*))
     ))
 
+(defvar .http-worker-thread-error-handler. nil)
 
 (defun http-worker-thread ()
   ;; made runnable when there is an socket on which work is to be done
@@ -1237,18 +1238,27 @@ by keyword symbols and not by strings"
 	    (if* (not (member :notrap *debug-current* :test #'eq))
 	       then (handler-case (process-connection sock)
 		      (error (cond)
-			(logmess 
-			 (format nil "~agot error ~a~%" 
-				 (if* *worker-request*
-				    then (format 
-					  nil 
-					  "while processing command ~s~%"
-					  (request-raw-request 
-					   *worker-request*))
-				    else "")
-				 cond
-				 ))))
-	       else (process-connection sock))
+			(if* .http-worker-thread-error-handler.
+			   then (funcall .http-worker-thread-error-handler.
+					 *worker-request*)
+			   else (logmess 
+				 (format nil "~agot error ~a~%" 
+					 (if* *worker-request*
+					    then (format 
+						  nil 
+						  "while processing command ~s~%"
+						  (request-raw-request 
+						   *worker-request*))
+					    else "")
+					 cond
+					 )))))
+	       else ;; this is probably not a good solution  for anyone,
+		    ;;  but maybe us.  Ignoring socket disconnect errors.
+		    (handler-case (process-connection sock)
+		      (socket-error (cond)
+			(if* (= (slot-value cond 'excl::code) 104)
+			   thenret ;; do nothing
+			   else (error cond)))))
 	  (abandon ()
 	      :report "Abandon this request and wait for the next one"
 	    nil))
@@ -2408,9 +2418,8 @@ in get-multipart-sequence"))
     (#\S 9) ; sept
     ))
     
-     
-
-(defun maybe-universal-time-to-date (ut-or-string &optional (time-zone 0))
+(defun maybe-universal-time-to-date (ut-or-string &optional
+						      (time-zone 0))
   ;; given a ut or a string, only do the conversion on the string
   (if* (stringp ut-or-string) 
      then ut-or-string
@@ -2419,7 +2428,7 @@ in get-multipart-sequence"))
 (defparameter *saved-ut-to-date* nil)
 
 (defun universal-time-to-date (ut &optional (time-zone 0))
-  ;; convert a lisp universal time to rfc 1123 date
+  ;; convert a lisp universal time to apache log style date
   ;;
   (let ((cval *saved-ut-to-date*))
     (if* (and (eql ut (caar cval))
@@ -2431,13 +2440,13 @@ in get-multipart-sequence"))
 	      (multiple-value-bind
 		  (sec min hour date month year day-of-week dsp tz)
 		  (decode-universal-time ut time-zone)
-		(declare (ignore tz dsp))
+		(declare (ignore tz day-of-week))
 		(let ((ans
 		       (format
 			nil
-			"~a, ~2,'0d ~a ~d ~2,'0d:~2,'0d:~2,'0d~@[ GMT~]"
-			(svref '#("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun")
-			       day-of-week)
+			"~2,'0d/~a/~d:~2,'0d:~2,'0d:~2,'0d ~A"
+			#+ignore(svref '#("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun")
+				       day-of-week)
 			date
 			(svref '#(nil "Jan" "Feb" "Mar" "Apr" "May" "Jun"
 				  "Jul" "Aug" "Sep" "Oct" "Nov" "Dec")
@@ -2446,10 +2455,13 @@ in get-multipart-sequence"))
 			hour
 			min
 			sec
-			(= 0 time-zone))))
+			;;; This should be made automatic,
+			;;;      or at least configurable.
+			(if dsp
+			    "-0800"
+			  "-0700"))))
 		  (setf *saved-ut-to-date* (cons (cons ut time-zone) ans))
 		  ans))))))
-
 
 
 ;; ----- simple resource

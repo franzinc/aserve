@@ -1,3 +1,14 @@
+2001-10-18  Jon Howard  <jhoward@cobweb>
+
+	* log.cl: added facility for dynamically binding vhost log stream;
+	changed logging to emulate apache logging.
+	* main.cl: ignoring socket reset by peer errorno 104; more apache
+	log emulation.
+
+2001-10-16  Kevin Layer  <layer@crikey>
+
+	* main.cl: add hook for handling error in http-worker-thread
+
 2001-10-17  John Foderaro  <jkf@tiger.franz.com>
 
 	* cgi.cl: redo cgi so that it doesn't buffer data... also  
