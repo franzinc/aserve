@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.24 2001/11/27 15:29:25 jkf Exp $
+;; $Id: examples.cl,v 1.25 2001/11/28 17:52:03 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -566,6 +566,7 @@
 		   ; we can get the filename from the header if 
 		   ; it was an <input type="file"> item.  If there is
 		   ; no filename, we just create one.
+		   (pprint h)
 		   (let ((cd (assoc :content-disposition h :test #'eq))
 			 (filename)
 			 (sep))

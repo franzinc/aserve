@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.128 2001/11/27 15:29:25 jkf Exp $
+;; $Id: main.cl,v 1.129 2001/11/28 17:52:03 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -811,7 +811,7 @@ by keyword symbols and not by strings"
    
    (method  ;; keyword giving the command in this request :get .. etc.
     :initarg :method
-    :reader request-method)
+    :accessor request-method)
    
    (uri  ;; uri object holding the current request with the scheme, host
          ;; and port filled in.

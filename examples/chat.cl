@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.13 2001/11/05 22:01:25 jkf Exp $
+;; $Id: chat.cl,v 1.14 2001/11/28 17:52:03 jkf Exp $
 
 ;; Description:
 ;;   aserve chat program
@@ -496,6 +496,7 @@
   (publish :path "/chattop" :function 'chattop)
 
   (publish :path "/chatenter" :function 'chatenter)
+  (publish :path "/chatenter-pic" :function 'chatenter-pic)
 
   (publish :path "/chatcontrol" :function 'chatcontrol)
   
@@ -1373,7 +1374,13 @@
 			    ((:input :name "send"
 				     :tabindex 2
 				     :value "Send"
-				     :type "submit")))))
+				     :type "submit"))
+			    (if* user
+			       then (html " "
+					  ((:a :href (format nil "chatenter-pic?~a&pp=~a" 
+							     qstring pp))
+					   "upload picture")))
+			    )))
 			 (:tr
 			  (:td 
 			   ((:textarea :name "body"
@@ -1415,7 +1422,197 @@
 	      
 	     ))))))))
 
+(defun chatenter-pic (req ent)
+  ;;
+  ;; this is the window where you enter the post and your handle.
+  ;; this version is for when you post a picture
+  ;
+  (let* ((chat (chat-from-req req))
+	 (user (user-from-req req))
+	 (pp (or (request-query-value "pp" req) "*")) ; who to send to
+	 (ppp (request-query-value "ppp" req)) ; add a user to the dest
+	 (to-users (users-from-ustring pp))
+	 (qstring))
+    (if* (or (null chat) (null user))
+       then (return-from chatenter-pic
+	      (ancient-link-error req ent)))
+    
+    (if* (eq (request-method req) :post)
+       then (process-incoming-file chat req user to-users)
+	    (setf (request-method req) :get)
+	    (return-from chatenter-pic (chatenter req ent)))
+    
+    (let* ()		    
+	   
+      (setq qstring 
+	(add-secret req
+		    (add-user req
+			      (chat-query-string chat))))
+      
 
+      ;; user must be true
+      (setf (user-time user) (get-universal-time))
+	      
+      (if* ppp
+	 then ; add this user
+		      
+	      (setq pp (setf (user-to-users user)
+			 (concatenate 'string
+			   (or (user-to-users user) "")
+			   ","
+			   ppp)))
+	      (setq to-users (users-from-ustring pp))
+       elseif (equal pp "*")
+	 then (setf (user-to-users user) nil)
+	 else (setf (user-to-users user) pp))
+
+
+      ; now the logged in or not logged in check
+      (if* (redir-check req ent chat nil)
+	 then (return-from chatenter-pic))
+
+	      
+      
+      (with-http-response (req ent)
+	(with-http-body (req ent)
+	  (html
+	   (:html
+	    ((:body :bgcolor 
+		    (if* to-users 
+		       then *bottom-frames-private*
+		       else *bottom-frames-bgcolor*))
+	     ((:form :action (concatenate 'string
+			       "chatenter-pic?"
+			       (format nil "~a&pp=~a" qstring pp))
+		     :method "POST"
+		     :enctype "multipart/form-data"
+		     )
+	      (:center
+	       
+	       (html
+		(:table
+		 (:tr
+		  (:td
+		   (:center
+		    ((:input :name "send"
+			     :value "Send"
+			     :type "submit"))
+		    " "
+		    
+		    (html 
+		     (if* to-users
+			then (html 
+			      "Private msg from: ")
+			else (html "From: "))
+		     (:b 
+		      (:princ-safe
+		       (user-handle user)))
+		     " to "
+		     (:b
+		      (if* to-users
+			 then (dolist (to-user to-users)
+				(html
+				 (:princ-safe
+				  (user-handle
+				   to-user))
+				 " "
+				 ))
+			 else (html "all"))))
+		    " -- " 
+		    ((:a :href (format nil "chatlogin?~a" qstring)
+			 :target "_top")
+		     "Login")
+		    " -- &nbsp;&nbsp;&nbsp;"
+			    
+		    ((:input :name "send"
+			     :tabindex 2
+			     :value "Send"
+			     :type "submit")))))
+		 (:tr
+		  (:td
+		   ((:input :type "file"
+			    :name "thefile"
+			    :size 40
+			    :value "*.jpg")))
+		  (:tr
+		   (:td 
+		    ((:textarea :name "comments"
+				:tabindex 1
+				:cols 50
+				:rows 3)))))))))))))))))
+
+
+
+(defparameter *pic-counter* 0)
+
+(defun process-incoming-file (chat req user to-users)
+  ;; read the multipart file, publish it
+  ;; create the message referencing it, and then add that to the chat.
+  (let (file content-type comment)
+    (loop (let ((h (get-multipart-header req)))
+	    (if* (null h) then (return))
+	    (pprint h)(force-output)
+	    (let ((name (cdr
+			 (assoc "name" 
+			       (cddr (assoc :param
+					    (cdr (assoc :content-disposition h :test #'eq))
+					    :test #'eq))
+			       :test #'equal))))
+	      (if* (equal name "thefile")
+		 then ; the file we're uploading
+		      (setq content-type (cadr (assoc :content-type h :test #'eq)))
+		      (setq file (read-multipart-guts req))
+		      
+	       elseif (equal name "comments")
+		 then ; read the comments
+		      (setq comment (octets-to-string (read-multipart-guts req)))
+		 else (read-multipart-guts req)))))
+    
+    ;; now we may have a picture
+    (if* (and file content-type)
+       then ; we have guts
+	    (let ((picname (format nil "/chatpix/~d~d" 
+				   (get-universal-time) (incf *pic-counter*))))
+	      (publish-multi :path picname
+			     :content-type content-type
+			     :items (list (list :binary file)))
+	      
+	      (setq comment
+		(format nil "{<<img src=\"~a\">>}~%~a" picname (or comment "")))))
+    
+    (if* (and comment (> (length comment) 0))
+       then (add-chat-data chat req nil comment user to-users nil))
+    
+	      
+    ))
+			
+		      
+			
+(defun read-multipart-guts (req)			
+  (let ((buffer (make-array 40000 :element-type '(unsigned-byte 8)))
+	(buffs)
+	(total-size 0))
+    (loop (let ((count (get-multipart-sequence req buffer)))
+	    (if* count
+	       then (incf total-size count)
+		    (push (subseq buffer 0 count) buffs)
+	       else (return))))
+			
+    (setq buffer (make-array total-size :element-type '(unsigned-byte 8)))
+    (let ((count  0))
+      (dolist (buf (nreverse buffs))
+	(replace buffer buf :start1 count)
+	(incf count (length buf))))
+    buffer))
+			  
+		      
+	      
+	      
+      
+      
+    
+  
+			      
 (defun do-idle-timedout (req ent goback)
   (with-http-response (req ent)
     (with-http-body (req ent)

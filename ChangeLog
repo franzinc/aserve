@@ -1,3 +1,8 @@
+2001-11-28    <jkf@main.verada.com>
+
+	* add :binary type to publish-multi
+	* chat.cl - add the ability to upload pictures
+
 2001-11-26  John Foderaro  <jkf@tiger.franz.com>
 1.2.18
 	* decode.cl - handle character set decoding inside uri queries

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.68 2001/11/27 15:29:25 jkf Exp $
+;; $Id: publish.cl,v 1.69 2001/11/28 17:52:03 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -806,7 +806,14 @@
 					    :cache (string-to-octets
 						    (cadr it)
 						    :null-terminate nil))
-					    
+				    elseif (and (consp it)
+						(eq :binary (car it))
+						(typep (cadr it) 
+						       '(simple-array (unsigned-byte 8) (*))))
+				      then (make-multi-item
+					    :kind :binary
+					    :data (cadr it)
+					    :cache (cadr it))
 				    elseif (or (stringp it) (pathnamep it))
 				      then (make-multi-item
 					    :kind :file
@@ -1764,7 +1771,7 @@
 	      then (setf max-fwd (max max-fwd (multi-item-last-modified item))))
 	   (incf total-size (length (or new-value "")))
 	   ))
-	(:string
+	((:string :binary)
 	 ; a constant thing
 	 (incf total-size (length (multi-item-cache item))))
 	))
