@@ -2,7 +2,7 @@
 (defpackage :neoe ;; neo example
   (:use :common-lisp :excl :htmlgen :neo))
 
-(in-package :neo)
+(in-package :neoe)
 
 (unpublish :all t)
 
@@ -68,20 +68,21 @@
 	      :content-type "text/html")
 
 
-
-
+;;
+;; here's a form using the 'post' method
+;;
 (publish :url "/tform" 
 	 :content-type "text/html"
 	 :function
 	 (let ((name "unknown"))
 	   #'(lambda (req ent)
-	       (setq *rr* req)
-	       (let ((gotname (assoc "username"
-				     (decode-form-urlencoded 
-				      (neo::args req))
-				     :test #'equal)))
-		 (if* gotname
-		    then (setq name (cdr gotname))))
+	       (let ((body (get-request-body req)))
+		 (format t "got body ~s~%" body)
+		 (let ((gotname (assoc "username"
+				       (decode-form-urlencoded body)
+					:test #'equal)))
+		   (if* gotname
+		      then (setq name (cdr gotname)))))
 		 
 	       (with-http-response (req ent)
 		 (with-http-body (req ent)
@@ -89,7 +90,7 @@
 			 (:body "Hello " (:princ-safe name) ", "
 				"Enter your name: "
 				((:form :action "/tform"
-					:method "get")
+					:method "post")
 				 ((:input :type "text"
 					  :maxlength 10
 					  :size 10
@@ -98,15 +99,14 @@
 			      
 				    
 
+;; example of a form that uses that 'get' method
+;;
 (publish 
  :url "/apropos"
  :content-type "text/html"
  :function
  #'(lambda (req ent)
-     (let ((lookup (assoc "symbol"
-			  (decode-form-urlencoded
-			   (neo::args req))
-			  :test #'equal)))
+     (let ((lookup (assoc "symbol" (url-argument-alist req) :test #'equal)))
        (with-http-response (req ent)
 	 (with-http-body (req ent)
 	   (html (:head (:title "Allegro Apropos"))
@@ -173,17 +173,43 @@
 	      :content-type "text/plain"
 	      :preload nil)
 
-
+(publish :url "/secret"
+	 :content-type "text/html"
+	 :function
+	 #'(lambda (req ent)
+	     (let ((auth-val (neo::header-slot-value "authorization" req)))
+	       (if* (and (stringp auth-val)
+			 (equal auth-val "foo:bar"))
+		  then (with-http-response (req ent)
+			 (with-http-body (req ent)
+			   (html (:head "Secret page")
+				 (:body "You made it to the secret page"))))
+		  else
+		       (with-http-response (req ent :response *response-unauthorized*)
+			 (with-http-body (req ent
+					      :headers 
+					      '(("WWW-Authenticate" 
+						 . "Basic realm=\"secretserver\"")))))))))
 
 ;; the franz home page
 #+ignore (publish-directory :prefix "/"
 		   :destination "/net/tanya/home/httpd/html/"
 		   )
 
+#+ignore 
 (publish-directory :prefix "/"
 		   :destination "/net/tanya/www/internal/htdocs/")
 
+(publish-directory :prefix "/"
+		   :destination "/home/alphapro/public_html/alphapro/")
 
 
 
-;;;;;;; examples of where I'd like neo to go
+;; a separate world:
+
+(defparameter *server2* (make-instance 'wserver))
+
+(publish-directory :server *server2*
+		   :prefix "/"
+		   :destination "/home/httpd/html/")
+

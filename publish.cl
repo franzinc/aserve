@@ -1,7 +1,7 @@
 ;; neo
 ;; url publishing
 ;;
-;; $Id: publish.cl,v 1.8 1999/07/21 15:17:11 jkf Exp $
+;; $Id: publish.cl,v 1.9 1999/07/22 05:53:12 jkf Exp $
 ;;
 
 
@@ -78,8 +78,6 @@
 ; we can specify either an exact url or one that handles all
 ; urls with a common prefix.
 ;
-(defvar *exact-url* (make-hash-table :test #'equal))
-(defvar *prefix-url* nil)
 
 (defvar *mime-types* (make-hash-table :test #'equal))
 (setf (gethash "html" *mime-types*) "text/html")
@@ -91,8 +89,8 @@
 
 (defun unpublish (&key all)
   (if* all
-     then (clrhash *exact-url*)
-	  (setq *prefix-url* nil)
+     then (clrhash (wserver-exact-url *wserver*))
+	  (setf (wserver-prefix-url *wserver*) nil)
      else (error "not done yet")))
 
   
@@ -135,7 +133,8 @@
 ;; url exporting
 
 (defun publish (&key host port url function class format
-		     content-type)
+		     content-type
+		     (server *wserver*))
   ;; publish the given url
   ;; if file is given then it specifies a file to return
   ;; 
@@ -146,11 +145,12 @@
 	       :function function
 	       :format format
 	       :content-type content-type)))
-    (setf (gethash url *exact-url*) ent))
+    (setf (gethash url (wserver-exact-url server)) ent))
   )
 	     
 
-(defun publish-file (&key host port url file content-type class preload)
+(defun publish-file (&key (server *wserver*)
+			  host port url file content-type class preload)
   ;; return the given file as the value of the url
   ;; for the given host.
   ;; If host is nil then return for any host
@@ -183,7 +183,7 @@
 			:file file
 			:content-type content-type)))
   
-    (setf (gethash url *exact-url*) ent)))
+    (setf (gethash url (wserver-exact-url server)) ent)))
 
 
 
@@ -191,6 +191,8 @@
 
 (defun publish-directory (&key prefix 
 			       destination
+			       (server *wserver*)
+			       
 			       )
   
   ;; make a whole directory available
@@ -198,7 +200,7 @@
 		       :directory destination
 		       :prefix prefix
 		       ))
-	  *prefix-url*))
+	  (wserver-prefix-url server)))
 
 
 			   
@@ -212,7 +214,7 @@
   ;; do the server response to the given request
   
   ; look for an exact match
-  (let ((entity (gethash (url req) *exact-url*)))
+  (let ((entity (gethash (url req) (wserver-exact-url *wserver*))))
     (if* entity
        then (let ((entity-host (host entity)))
 	      (if* entity-host
@@ -233,7 +235,7 @@
   (let* ((url (url req))
 	 (len-url (length url)))
 	     
-    (dolist (entpair *prefix-url*)
+    (dolist (entpair (wserver-prefix-url *wserver*))
       (if* (and (>= len-url (length (car entpair)))
 		(buffer-match url 0 (car entpair)))
 	 then ; we may already be a weiner
@@ -243,7 +245,7 @@
   
 
   ; no match, it failed
-  (let ((ent (gethash nil *exact-url*)))
+  (let ((ent (gethash nil (wserver-exact-url *wserver*))))
     (if* (null ent)
        then ; no  global handler, create one
 	    (setq ent (publish 
@@ -257,7 +259,7 @@
 					       " was not found on this server."))))
 				     
 		       :content-type "text/html"))
-	    (setf (gethash nil *exact-url*) ent)
+	    (setf (gethash nil (wserver-exact-url *wserver*)) ent)
 	    )
     (process-entity req ent)))
 	  
@@ -454,18 +456,20 @@
 	    (setq strategy '(:use-socket-stream
 			     :omit-body))
 	    
-	    (if* (and *enable-keep-alive*
+	    (if* (and (wserver-enable-keep-alive *wserver*)
+		      (>= (wserver-free-workers *wserver*) 2)
 		      (equalp "keep-alive" 
 			      (header-slot-value "connection" req)))
 	       then (push :keep-alive strategy))
 	    
      elseif (and  ;; assert: get command
-	     *enable-chunking* 
+	     (wserver-enable-chunking *wserver*)
 	     (eq (protocol req) :http/1.1)
 	     (null (content-length ent)))
        then (setq strategy '(:chunked :use-socket-stream))
        else ; can't chunk, let's see if keep alive is requested
-	    (if* (and *enable-keep-alive*
+	    (if* (and (wserver-enable-keep-alive *wserver*)
+		      (>= (wserver-free-workers *wserver*) 2)
 		      (equalp "keep-alive" 
 			      (header-slot-value "connection" req)))
 	       then ; a keep alive is requested..
@@ -501,14 +505,15 @@
   ;; for files we can always use the socket stream and keep alive
   ;; since we konw the file length ahead of time
   
-  (let ((keep-alive (and *enable-keep-alive*
-		      (equalp "keep-alive" 
-			      (header-slot-value "connection" req))))
+  (let ((keep-alive (and (wserver-enable-keep-alive *wserver*)
+			 (>= (wserver-free-workers *wserver*) 2)
+			 (equalp "keep-alive" 
+				 (header-slot-value "connection" req))))
 	(strategy))
     
     (if*  (eq (command req) :get)
        then (setq strategy (if* keep-alive
-	       then '(:use-socket-stream :keep-alive)
+			      then '(:use-socket-stream :keep-alive)
 			      else '(:use-socket-stream)))
        else (setq strategy (call-next-method)))
     
@@ -600,18 +605,18 @@
 			       (resp-content-length req)      
 			       *crlf*)
 		      (logmess (format nil 
-				       "~d ~s - ~d bytes~%" 
+				       "~d ~s - ~d bytes" 
 				       (response-number code)
 				       (response-desc   code)
 				       (resp-content-length req)))
 	       elseif chunked-p
 		 then (logmess (format nil 
-				       "~d ~s - chunked~%" 
+				       "~d ~s - chunked" 
 				       (response-number code)
 				       (response-desc   code)
 				       ))
 		 else (logmess (format nil 
-				       "~d ~s - unknown length~%" 
+				       "~d ~s - unknown length" 
 				       (response-number code)
 				       (response-desc   code)
 				       )))

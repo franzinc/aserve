@@ -1,15 +1,29 @@
 (defpackage :neo
   (:use :common-lisp :excl :htmlgen)
   (:export
+   #:base64-decode
    #:decode-form-urlencoded
+   #:get-request-body
+   #:header-slot-value
    #:publish
    #:publish-file
    #:publish-directory
+   #:start
    #:unpublish
+   #:url-argument
+   #:url-argument-alist
    #:with-http-response
+   #:with-http-body
+   #:wserver
    #:*response-ok*
-	  )
-  )
+   #:*response-created*
+   #:*response-accepted*
+   #:*response-not-modified*
+   #:*response-bad-request*
+   #:*response-unauthorized*
+   #:*response-not-found*
+   #:*response-internal-server-error*
+   #:*wserver*))
 
 (in-package :neo)
 
@@ -17,21 +31,23 @@
 
 ;;;;;;;  debug support 
 
-(defvar *ndebug* 200)         ; print debugging stuff
+(defvar *ndebug* 0)         ; level for printing debugging info
 (defvar *dformat-level* 20)  ; debug level at which this stuff prints
 
 (defmacro debug-format (level &rest args)
   ;; do the format to *debug-io* if the level of this error
   ;; is matched by the value of *ndebug*
   `(if* (>= *ndebug* ,level)
-      then (format *debug-io* "d> ") 
+      then (format *debug-io* "~a: d> " (mp:process-name sys:*current-process*))
 	   (format *debug-io* ,@args)))
 
 (defmacro dformat (&rest args)
   ;; do the format and then send to *debug-io*
   `(progn (format ,@args)
 	  (if* (>= *ndebug* *dformat-level*)
-	     then (format *debug-io* ,@(cdr args)))))
+	     then (format *debug-io* "~a: " 
+			  (mp:process-name sys:*current-process*))
+		  (format *debug-io* ,@(cdr args)))))
 
 (defmacro if-debug-action (&rest body)
   ;; only do if the debug value is high enough
@@ -43,17 +59,58 @@
 
 
 
-;;;; speical vars 
-
-(defvar *enable-keep-alive* t)  ; do keep alives if possible
-
-(defvar *enable-chunking* t) ; doing chunking if possible
-
 
 ;;;;;;;;;;;;;  end special vars
 
 
+(defclass wserver ()
+  ;; all the information contained in a web server
+    ((socket 		;; listening socket 
+      :initarg :socket
+      :accessor wserver-socket)
+     
+     (enable-keep-alive ;; do keep alive if it's possible
+      :initform t
+      :initarg :enable-keep-alive
+      :accessor wserver-enable-keep-alive)
+     
+     (enable-chunking  ;; do chunking if it's possible
+      :initform t
+      :initarg :enable-chunking
+      :accessor wserver-enable-chunking)
+     
+     (terminal-io  ;; stream active when we started server
+      :initform *terminal-io*
+      :initarg  :terminal-io
+      :accessor wserver-terminal-io)
+     
+     (worker-threads  ;; list of threads that can handle http requests
+      :initform nil
+      :accessor wserver-worker-threads)
+     
+     (free-workers    ;; estimate of the number of workers that are idle
+      :initform 0
+      :accessor wserver-free-workers)
+     
+     (accept-thread   ;; thread accepting connetions and dispatching
+      :initform nil
+      :accessor wserver-accept-thread)
+     
+     (exact-url 
+      :initform (make-hash-table :test #'equal)
+      :accessor wserver-exact-url)
+     
+     (prefix-url
+      :initform nil
+      :accessor wserver-prefix-url)
+     
+     ))
 
+
+     
+     
+     
+     
 
 
 ;;;;;; macros 
@@ -94,24 +151,41 @@
 	   )))))
 
 
-(defmacro with-http-body ((req ent &key format)
+(defmacro with-http-body ((req ent &key format headers)
 			  &rest body)
   (let ((g-req (gensym))
 	(g-ent (gensym))
-	(g-format (gensym)))
+	(g-format (gensym))
+	(g-headers (gensym))
+	)
     `(let ((,g-req ,req)
 	   (,g-ent ,ent)
-	   (,g-format ,format))
+	   (,g-format ,format)
+	   (,g-headers ,headers)
+	   )
        (declare (ignore-if-unused ,g-req ,g-ent ,g-format))
        ,(if* body 
 	   then `(compute-response-stream ,g-req ,g-ent))
+       (if* ,g-headers
+	  then (setf (resp-headers ,g-req)
+		 (append ,g-headers (resp-headers ,g-req))))
        (send-response-headers ,g-req ,g-ent :pre)
        (if* (not (member :omit-body (resp-strategy ,g-req)))
 	  then (let ((htmlgen:*html-stream* (resp-stream ,g-req)))
 		 (progn ,@body)))
        (send-response-headers ,g-req ,g-ent :post))))
 			  
-	 
+
+
+; safe versions during multiprocessing
+
+(defmacro atomic-incf (var)
+  `(mp:without-scheduling (incf ,var)))
+
+(defmacro atomic-decf (var)
+  `(mp:without-scheduling (decf ,var)))
+
+
 ;;;;;;;;; end macros
 
 	       
@@ -163,7 +237,13 @@
 		    then (push (setq ,genvar (cons ,name nil))
 			       (alist ,nobj)))
 		 (setf (cdr ,genvar) ,newval))))))
-		    
+
+(defmacro header-slot-value-integer (name obj)
+  ;; if the header value exists and has an integer value
+  ;; return two values: the value of the integer and t
+  ;; else return nil
+  
+  `(header-decode-integer (header-slot-value ,name ,obj)))
 
 
 
@@ -202,9 +282,12 @@
    (url ;; string - the argument to the command
     :initarg :url
     :reader url)
-   (args  ;; alist of arguments if there were any after a ? on the url
-    :initarg :args
-    :reader args)
+   (url-argument  ;; alist of arguments if there were any after a ? on the url
+    :initarg :url-argument
+    :reader url-argument)
+   (url-argument-alist-cache
+    :initform nil
+    :accessor url-argument-alist-cache)
    (protocol ;; symbol naming the http protocol 
     :initarg :protocol
     :reader protocol)
@@ -277,32 +360,194 @@
 			   '(#\return #\linefeed)))
 
 (defvar *read-request-timeout* 20)
+(defvar *read-request-body-timeout* 60)
 
+(defvar *thread-index*  0)      ; globalcounter to gen process names
 
+(defvar *wserver*  (make-instance 'wserver))   ; set to last server created
 
-       
 				    
 			      
-(defun start (&key (port 80))
+(defun start (&key (port 80) 
+		   listeners
+		   (chunking t)
+		   (keep-alive t)
+		   (server *wserver*)
+		   debug      ; set debug level
+		   )
+  ;; -exported-
+  ;;
   ;; start the web server
+  ;; return the server object
   
-  (let ((main-socket (socket:make-socket :connect :passive
-					 :local-port port
-					 :reuse-address t
-					 :format :bivalent)))
 
-    ;; for the simple case we turn off keep alives since
-    ;; browsers tend to overlap their requests and without
-    ;; a listener we get stuck
-    (let ((*enable-keep-alive* nil))
-      (unwind-protect
-	  (loop
-	    (restart-case
-		(process-connection (socket:accept-connection main-socket))
-	      (:loop ()  ; abort out of error without closing socket
-		nil)))
-	(close main-socket)))))
+  (if* (eq server :new)
+     then (setq server (make-instance 'wserver)))
+  
+  
+  (if* (and debug (numberp debug))
+     then (setq *ndebug* debug))
+  
+  
+  ; first kill off old processes if any
+  (let ((proc (wserver-accept-thread server)))
+    (if* proc
+       then ; we want this thread gone and the socket closed 
+	    ; so that we can reopen it if we want to.
+	    (mp:process-kill proc)
+	    (mp:process-allow-schedule)
+	    (let ((oldsock (wserver-socket server)))
+	      (if* oldsock then (ignore-errors (close oldsock))))
+	    (setf (wserver-accept-thread server) nil)))
+  
+  (dolist (th (wserver-worker-threads server))
+    (mp:process-kill th)
+    (mp:process-allow-schedule))
+  
+  (setf (wserver-worker-threads server) nil)
+  
+    
+  
+  (let* ((main-socket (socket:make-socket :connect :passive
+					  :local-port port
+					  :reuse-address t
+					  :format :bivalent)))
+    
+    (setf (wserver-socket server) main-socket)
+    (setf (wserver-terminal-io server) *terminal-io*)
+    (setf (wserver-enable-chunking server) chunking)
+    (setf (wserver-enable-keep-alive server) keep-alive)
+    
+    
+    (let ((*wserver* server)) ; bind it too for privacy
+      (if* (null listeners)
+	 then (start-simple-server)
+       elseif (and (fixnump listeners) (> listeners 0))
+	 then (start-lisp-thread-server listeners)
+	 else (error "listeners should be nil or a positive fixnum, not ~s"
+		     listeners)))
+    
+    server
+    ))
 
+
+(defun start-simple-server ()
+  ;; do all the serving on the main thread so it's easier to
+  ;; debug problems
+  (let ((main-socket (wserver-socket *wserver*)))
+    (unwind-protect
+	(loop
+	  (restart-case
+	      (process-connection (socket:accept-connection main-socket))
+	    (:loop ()  ; abort out of error without closing socket
+	      nil)))
+      (close main-socket))))
+
+	
+(defun start-lisp-thread-server (listeners)
+  ;; start a server that consists of a set of lisp threads for
+  ;; doing work and a lisp thread for accepting connections
+  ;; and farming out the work
+  
+  ; create worker threads
+  (setf (wserver-free-workers *wserver*) 0)
+  (dotimes (i listeners) (make-worker-thread))
+  
+  
+  ; create accept thread
+  (setf (wserver-accept-thread *wserver*)
+    (mp:process-run-function 
+     (list :name (format nil "neo-accept-~d" (incf *thread-index*))
+	   :initial-bindings
+	   `((*wserver*  . ',*wserver*)
+	     (*debug-io* . ',(wserver-terminal-io *wserver*))
+	     ,@excl:*cl-default-special-bindings*))
+     #'http-accept-thread)))
+
+(defun make-worker-thread ()
+  (let* ((name (format nil "ht~d" (incf *thread-index*)))
+	 (proc (mp:make-process :name name
+				:initial-bindings
+				`((*wserver*  . ',*wserver*)
+				  (*debug-io* . ',(wserver-terminal-io 
+						   *wserver*))
+				  ,@excl:*cl-default-special-bindings*)
+				)))
+    (mp:process-preset proc #'http-worker-thread)
+    (push proc (wserver-worker-threads *wserver*))
+    (atomic-incf (wserver-free-workers *wserver*))
+    ))
+
+
+(defun http-worker-thread ()
+  ;; made runnable when there is an socket on whcih work is to be done
+  (loop
+    
+    (let ((sock (car (mp:process-run-reasons sys:*current-process*))))
+      (handler-case (process-connection sock)
+	(error (cond)
+	  (logmess (format nil "~s: got error ~a~%" 
+			   (mp:process-name sys:*current-process*)
+			   cond))))
+      (atomic-incf (wserver-free-workers *wserver*))
+      (mp:process-revoke-run-reason sys:*current-process* sock))))
+
+(defun http-accept-thread ()
+  ;; loop doing accepts and processing them
+  ;; ignore sporatic errors but stop if we get a few consecutive ones
+  ;; since that means things probably aren't going to get better.
+  (let* ((error-count 0)
+	 (workers nil)
+	 (server *wserver*)
+	 (main-socket (wserver-socket server)))
+    (unwind-protect
+
+	(loop
+	  (handler-case
+	      (let ((sock (socket:accept-connection main-socket)))
+		(setq error-count 0) ; reset count
+	
+		; find a worker thread
+		; keep track of the number of times around the loop looking
+		; for one so we can handle cases where the workers are all busy
+		(let ((looped 0))
+		  (loop
+		    (if* (null workers) 
+		       then (case looped
+			      (0 nil)
+			      ((1 2 3) (logmess "all threads busy, pause")
+				       (sleep 1))
+			     
+			      (4 (logmess "forced to create new thread")
+				 (make-worker-thread))
+		    
+			      (5 (logmess "can't even create new thread, quitting")
+				 (return-from http-accept-thread nil)))
+			   
+			    (setq workers (wserver-worker-threads server))
+			    (incf looped))
+		    (if* (null (mp:process-run-reasons (car workers)))
+		       then (atomic-decf (wserver-free-workers server))
+			    (mp:process-add-run-reason (car workers) sock)
+			    (pop workers)
+			    (return) ; satisfied
+			    )
+		    (pop workers))))
+	  
+	    (error (cond)
+	      (logmess (format nil "accept: error on accept ~s" cond))
+	      (if* (> (incf error-count) 4)
+		 then (logmess "accept: too many errors, bailing")
+		      (return-from http-accept-thread nil)))))
+      (ignore-errors (progn
+		       (mp:without-scheduling
+			 (if* (eql (wserver-socket server) main-socket)
+			    then (setf (wserver-socket server) nil)))
+		       (close main-socket))))))
+      
+  
+    
+    
 
 (defun start-cmd ()
   ;; start using the command line arguments
@@ -322,25 +567,29 @@
     (dotimes (i 20)
       (handler-case (start :port port)
 	(error (cond)
-	  (format t " got error ~s~%" cond)
+	  (format t " got error ~a~%" cond)
 	  (format t "restarting~%"))))))
 
 
 (defun process-connection (sock)
+  ;; read an http request from the socket and process
+  ;; it.
+  ;; If the response indicates 'keep alive' then loop around for
+  ;; another request.
+  ;; When this function returns the given socket has been closed.
+  ;;
   (unwind-protect
       (let ((req))
 	;; get first command
-	(tagbody  again
+	(loop
 	  (mp:with-timeout (*read-request-timeout* 
 			    (debug-format 5 "request timed out on read~%")
 			    (log-timed-out-request-read sock)
 			    (return-from process-connection nil))
 	    (setq req (read-http-request sock)))
 	  (if* (null req)
-	     then ; failed command
-		  (logmess
-		   (format nil "non http request from ~a"
-			   (socket::ipaddr-to-dotted (socket::remote-host sock))))
+	     then ; end of file, means do nothing
+		  (logmess "eof when reading request")
 		  ; end this connection by closing socket
 		  (return-from process-connection nil)
 	     else ;; got a request
@@ -353,7 +602,7 @@
 		       then ; continue to use it
 			    (debug-format 10 "request over, keep socket alive~%")
 			    (force-output sock)
-			    (go again))))))
+		       else (return))))))
     (ignore-errors (close sock))))
 
 
@@ -403,7 +652,7 @@
 	      (setq req (make-instance 'http-request
 			  :command cmd
 			  :url newurl
-			  :args args
+			  :url-argument args
 			  :host host
 			  :protocol protocol
 			  :protocol-string (case protocol
@@ -521,7 +770,48 @@
 
 	    
 
-
+(defmethod get-request-body ((req http-request))
+  ;; return a string that holds the body of the http-request
+  ;;
+  (multiple-value-bind (length believe-it)
+      (header-slot-value-integer "content-length" req)
+      (if* believe-it
+	 then ; we know the length
+	      (let ((ret (make-string length)))
+		(read-sequence-with-timeout ret length (socket req)
+					    *read-request-body-timeout*))
+	 else ; no content length given
+	      (if* (equalp "keep-alive" 
+			   (header-slot-value "connection" req))
+		 then ; must be no body
+		      ""
+		 else ; read until the end of file
+		      (mp:with-timeout (*read-request-body-timeout* nil)
+			(let ((ans (make-array 2048 :element-type 'character
+					       :fill-pointer 0))
+			      (sock (socket req))
+			      (ch))
+			  (loop (if* (eq :eof 
+					 (setq ch (read-char sock nil :eof)))
+				   then (return  ans)
+				   else (vector-push-extend ans ch)))))))))
+		      
+	      
+(defun read-sequence-with-timeout (string length sock timeout)
+  ;; read length bytes into sequence, timing out after timeout
+  ;; seconds
+  ;; return nil if things go wrong.
+  (mp:with-timeout (timeout nil)
+    (loop
+      (let ((got 0))
+	(let ((this (read-sequence string sock :start got)))
+	  (if* (<= this 0)
+	     then (return nil) ; eof too early
+	     else (decf length this)
+		  (incf got    this)
+		  (if* (<= length 0) then (return string))))))))
+		
+    
       
 
 (defun read-sock-line (sock buffer start)
@@ -536,7 +826,8 @@
     (loop
       (let ((ch (read-char sock nil :eof)))
 	(if* (eq ch :eof)
-	   then (free-request-buffer buffer)
+	   then (debug-format 20 "eof on socket~%")
+		(free-request-buffer buffer)
 		(return-from read-sock-line nil))
       
 	(if* (eq ch #\linefeed)
@@ -546,12 +837,11 @@
 		(setf (schar buffer start) #\null) ; null terminate
 		
 		; debug output
-		(if* (>= *ndebug* 100)
-		   then ; dump out buffer
-			(format *debug-io* "d> read on socket: ")
-			(dotimes (i start)
-			  (write-char (schar buffer i) *debug-io*))
-			(terpri *debug-io*))
+		; dump out buffer
+		(debug-format *dformat-level* "read on socket: ")
+		(if-debug-action (dotimes (i start)
+				   (write-char (schar buffer i) *debug-io*))
+				 (terpri *debug-io*))
 		;; end debug
 			
 		(return-from read-sock-line (values buffer start))
@@ -578,7 +868,28 @@
       
 		      
 				  
-				
+
+(defmethod url-argument-alist ((req http-request))
+  ;; decode if necessary and return the alist holding the
+  ;; args to this url
+  (let ((alist (url-argument-alist-cache req)))
+    (if* alist
+       thenret
+       else (let ((arg (url-argument req)))
+	      (if* arg
+		 then (setf (url-argument-alist-cache req)
+			(decode-form-urlencoded arg)))))))
+	
+
+(defun header-decode-integer (val)
+  ;; if val is a string holding an integer return its value
+  ;; and t,
+  ;; else nil
+  (if* val 
+     then (let (ans)
+	    (ignore-errors (setq ans (read-from-string val)))
+	    (if* (integerp ans)
+	       then (values ans t)))))
 
 
 (defun date-to-universal-time (date)

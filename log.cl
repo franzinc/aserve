@@ -5,7 +5,8 @@
   (multiple-value-bind (csec cmin chour cday cmonth)
       (decode-universal-time (get-universal-time))
     
-    (format t "~2,'0d/~2,'0d/99 - ~2,'0d:~2,'0d:~2,'0d - ~a~%"
+    (format t "~a: ~2,'0d/~2,'0d/99 - ~2,'0d:~2,'0d:~2,'0d - ~a~%"
+	    (mp:process-name sys:*current-process*)
 	    cmonth cday chour cmin csec
 	    message)))
 
