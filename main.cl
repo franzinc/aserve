@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.137 2002/04/10 16:06:50 jkf Exp $
+;; $Id: main.cl,v 1.138 2002/04/10 21:19:17 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1001,6 +1001,7 @@ by keyword symbols and not by strings"
 		   debug-stream  ; stream to which to send debug messages
 		   accept-hook
 		   ssl		 ; enable ssl
+		   ssl-password ; for ssl: pswd to decode priv key in cert
 		   os-processes  ; to fork and run multiple instances
 		   (external-format nil efp); to set external format
 		   )
@@ -1034,7 +1035,9 @@ by keyword symbols and not by strings"
 	  (setq accept-hook 
 	    #'(lambda (socket)
 		(funcall 'socket::make-ssl-server-stream socket
-			 :certificate ssl)))
+			 :certificate ssl
+			 #+(version>= 6 2 beta) :certificate-password 
+			 #+(version>= 6 2 beta) ssl-password)))
 	  (setq chunking nil) ; doesn't work well through ssl
 	  (if* (not port-p)
 	     then ; ssl defaults to port 443

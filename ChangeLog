@@ -4,6 +4,12 @@
 	  in an International Lisp with multibyte character input.
 	  In certain rare cases it could get stuck decoding the last
 	  bits of a buffer.
+	  
+	  - add :ssl-password argument to net.aserve:start to 
+	   specify the password for decrypting the private key
+	   in the file with the ssl certificate. [requires
+	   acl feature introduced in acl 6.2]
+
 	* client.cl - if the content passed to do-http-request
 	   is a list of vectors, each vector in the list will
 	   be sent to the server.
