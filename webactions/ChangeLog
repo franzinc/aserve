@@ -2,6 +2,14 @@
 1.7
 	* clwebact.cl:  move request-variable-value to allegroserve
 
+2004-03-02  John Foderaro  <jkf@tiger.franz.com>
+	* webact.cl - fix another case of the bug fixed on 2004-02-12.
+
+2004-02-12  John Foderaro  <jkf@tiger.franz.com>
+
+	* when :redirect t is used in the webaction map we will
+	  add the cookie value to url to which the redirection is done.
+	
 2004-01-23  John Foderaro  <jkf@tiger.franz.com>
 1.6
 	* add clp_neq and clp_nequal for completeness

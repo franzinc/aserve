@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: webact.cl,v 1.6 2004/03/04 01:57:33 jkf Exp $
+;; $Id: webact.cl,v 1.7 2004/03/04 02:00:35 jkf Exp $
 
 
 
@@ -357,9 +357,20 @@
 			  
 			(loop
 			  (if* (stringp (car actions))
-			     then (modify-request-path req 
-						       (webaction-project-prefix wa)
-						       (car actions))
+			     then (if* redirect
+				     then  ; redir so client will send
+					  ; new request meaning we have to
+					  ; pass the cookie value in
+					  (modify-request-path 
+					   req 
+					   (webaction-project-prefix wa)
+					   (locate-action-path
+					    wa (car actions) websession))
+					   
+				     else (modify-request-path 
+					   req 
+					   (webaction-project-prefix wa)
+					   (car actions)))
 				  (return)
 				  
 			   elseif (symbolp (car actions))
@@ -385,7 +396,8 @@
 				   elseif (stringp following)
 				     then (modify-request-path 
 					   req (webaction-project-prefix wa)
-					   following)
+					   (locate-action-path
+					    wa following websession))
 					  (return)
 					  
 				     else ; bogus ret from action fcn
