@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.35 2001/01/12 16:27:54 jkf Exp $
+;; $Id: proxy.cl,v 1.36 2001/01/17 16:30:35 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -1493,7 +1493,7 @@ cached connection = ~s~%" cond cached-connection))
 	      ; result looks good
 	      (progn
 		(dlogmess (format nil "not in cache, proxy it level ~d" level))
-		(if* (zerop level)
+		(if* (eql *browser-level* level)
 		   then (incf (pcache-r-miss pcache))
 			(log-proxy rendered-uri level :mi nil)
 		   else (incf (pcache-r-cache-fill pcache))
