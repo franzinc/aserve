@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.10.6.8.2.3 2003/04/29 17:00:25 layer Exp $
+;; $Id: examples.cl,v 1.10.6.8.2.4 2003/07/07 21:20:03 layer Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -55,6 +55,7 @@
 	 :content-type "text/html"
 	 :function
 	 #'(lambda (req ent)
+	     ;(print (net.aserve::compute-request-headers req))
 	     (with-http-response (req ent)
 	       (with-http-body (req ent)
 		 (html
@@ -668,7 +669,6 @@
 	 :content-type "text/html; charset=utf-8"
 	 :function
 	 #'(lambda (req ent)
-	     
 	     (with-http-response (req ent)
 	       (let ((files-written)
 		     (text-strings)

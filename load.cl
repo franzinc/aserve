@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.31.10.6.14.3 2003/04/29 17:00:25 layer Exp $
+;; $Id: load.cl,v 1.31.10.6.14.4 2003/07/07 21:20:03 layer Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -37,6 +37,7 @@
       "examples/prfile9.jpg"
       "examples/tutorial.cl"
       "examples/aservelogo.gif"
+      "examples/aservepowered.gif"
       "examples/chat.cl"
       "examples/file2000.txt"
       "examples/puzzle.cl"

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.48.2.10.2.3 2003/04/29 17:00:25 layer Exp $
+;; $Id: main.cl,v 1.48.2.10.2.4 2003/07/07 21:20:03 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -37,7 +37,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 26))
+(defparameter *aserve-version* '(1 2 27))
 
 (eval-when (eval load)
     (require :sock)
@@ -369,6 +369,11 @@
     ;; when the server shuts down
     :initform nil
     :accessor wserver-shutdown-hooks)
+   
+   (ssl
+    :initform nil
+    :initarg :ssl
+    :accessor wserver-ssl)
    ))
 
 
@@ -1000,6 +1005,7 @@ by keyword symbols and not by strings"
     (setf (wserver-terminal-io server) *terminal-io*)
     (setf (wserver-enable-chunking server) chunking)
     (setf (wserver-enable-keep-alive server) keep-alive)
+    (setf (wserver-ssl server) ssl)
 
     #+unix
     (if* os-processes
@@ -1441,10 +1447,12 @@ by keyword symbols and not by strings"
 
 	    (if* (null (net.uri:uri-path uri))
 	       then (setf (net.uri:uri-path uri) "/"))
+
 	    
 	    (setq req (make-instance 'http-request
 			:method cmd
 			:uri (net.uri:copy-uri uri)
+								 
 			:raw-uri uri
 			:decoded-uri-path
 			(uridecode-string (net.uri:uri-path uri))
@@ -1486,7 +1494,10 @@ by keyword symbols and not by strings"
 				(if* port
 				   then (setf (uri-port uri) port)))
 			
-			(setf (uri-scheme uri) :http)  ; always http
+			(setf (uri-scheme uri) 
+			  (if* (wserver-ssl *wserver*)
+						  then :https
+						  else :http))
 			
 			;; set virtual host in the request
 			(let ((vhost 

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.5.4.6.14.2 2003/01/10 16:21:36 layer Exp $
+;; $Id: headers.cl,v 1.5.4.6.14.3 2003/07/07 21:20:02 layer Exp $
 
 ;; Description:
 ;;   header parsing
@@ -1052,7 +1052,19 @@
 		(format str "'")
 		(terpri str))))))
 
-
+(defun compute-request-headers (req)
+  ;; compute an alist of all headers from the request
+  ;; This is slow so it's meant to be used during debugging only.
+  ;; 
+  (let (res)
+    (dotimes (i *header-count*)
+      (let ((val (header-buffer-req-header-value req i)))
+	(if* val 
+	   then (push (cons (aref *header-keyword-array* i)
+			    val)
+		      res))))
+    (nreverse res)))
+  
 	      
 			
 	      

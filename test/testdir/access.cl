@@ -1,5 +1,6 @@
 ;; access file
 (:subdirectories :deny "subc")
+(:subdirectories :deny "CVS")
 (:subdirectories :deny "subd" :inherit t)
 
 (:mime :types (("foo/bar" "foo" "foo2") ("foo/baz" "baz")))

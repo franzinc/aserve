@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.1.2.8.2.2 2003/01/10 16:21:36 layer Exp $
+;; $Id: chat.cl,v 1.1.2.8.2.3 2003/07/07 21:20:03 layer Exp $
 
 ;; Description:
 ;;   aserve chat program
@@ -310,10 +310,12 @@
 (defstruct user 
   handle	; official handle of the user
   password	; password string
-  ustring		; unique string of this user
-  level      ; nil - novice, 1 - higher privs
+  ustring	; unique string of this user
+  pstring	; unique string, this one denotes user as a send target
+  cookie	; cookie stored under achat name
+  level         ; nil - novice, 1 - higher privs
   (time	0)	;  time of last user activity
-  to-users     ; string holding comma sep list of users to send to (nil=all)
+  to-users      ; string holding comma sep list of users to send to (nil=all)
   )
 
 
@@ -446,7 +448,13 @@
   
   (if* (not restart)
      then (load-existing-chat *chat-home*)
-	  )
+	  (let (did-fixup)
+	    ;; temp to add cookies to old chat
+	    (dolist (user (users *master-controller*))
+	      (if* (null (user-cookie user))
+		 then (setf (user-cookie user) (make-unique-string))
+		      (setq did-fixup t)))
+	    (if* did-fixup then (dump-existing-chat *chat-home*))))
   
   (if* *master-controller*
      then ; we have an existing chat setup
@@ -591,7 +599,10 @@
        then (with-standard-io-syntax
 	      (load master-file)
 	      (if* (boundp 'user::value1)
-		 then (setq *master-controller* user::value1))
+		 then (setq *master-controller* user::value1)
+		      ; ensure users have cookies
+		      )
+	      
 	      ;; now read in chat data
 	      (dolist (controller (controllers *master-controller*))
 		(dolist (chat (chats controller))
@@ -989,13 +1000,13 @@
     ; randomize things
     (dotimes (i (logand time #xf)) (random 10))
     (dotimes (i (logand time #x1f)) (random 10))
-    (setq time (logxor time (random 11881376)))
+    (setq time (logxor time (random 4342211881376)))
     (setq time (logxor time (random
 			     (load-time-value
 			      (get-universal-time)))))
-    ; make sure it's at least 5 digits base 26
-    (if* (< time #.(expt 26 5))
-       then (incf time #.(expt 26 5)))
+    ; make sure it's at least 8 digits base 26
+    (if* (< time #.(expt 26 8))
+       then (incf time #.(expt 26 8)))
     ;
     (string-downcase (format nil "~26r" time))))
 
@@ -1058,7 +1069,11 @@
   ;; find the user object from this request
   (let ((val (request-query-value "x" req)))
     (if* val
-       then (user-from-ustring val))))
+       then (let ((user (user-from-ustring val)))
+	      (if* (and user (equal (user-cookie user) 
+				    (get-chat-cookie req)))
+		 then user)))))
+
 
 
 
@@ -1066,6 +1081,11 @@
   ;; find user object based on unique string
   (find ustring (users *master-controller*)
 	:key #'user-ustring :test #'equal))
+
+(defun user-from-pstring (ustring)
+  ;; find user object based on unique string
+  (find ustring (users *master-controller*)
+	:key #'user-pstring :test #'equal))
 
 (defun users-from-ustring (ustring)
   ;; ustring may be a comma separated value
@@ -1075,6 +1095,14 @@
 	(if* u then (pushnew u res :test #'eq))))
     (nreverse res)))
 
+
+(defun users-from-pstring (ustring)
+  ;; ustring may be a comma separated value
+  (let (res)
+    (dolist (usr (net.aserve::split-on-character ustring #\,))
+      (let ((u (user-from-pstring usr)))
+	(if* u then (pushnew u res :test #'eq))))
+    (nreverse res)))
 
 (defun user-from-handle (handle)
   ;; locate the user object given the handle
@@ -1101,6 +1129,16 @@
 
 
 
+
+(defun get-chat-cookie (req)
+  (cdr (assoc "aschat" (get-cookie-values req) :test #'equal)))
+
+(defun set-chat-cookie (req cookie)
+  (set-cookie-header req :name "aschat"
+		     :value cookie
+		     :expires :never))
+
+		     
 ; chat frames:
 ;
 ;  chattop 
@@ -1265,7 +1303,7 @@
 		       (request-query-value "secs" req))
 		      0)))
       
-      (if* (null (request-query-value "z" req))
+      (if* (not (equal "385" (request-query-value "z" req)))
 	 then (track-viewer chat user req))
 
       (if* user
@@ -1362,7 +1400,7 @@
 	 (ppp (request-query-value "ppp" req)) ; add a user to the dest
 	 (purl (request-query-value "purl" req))
 	 (kind :multiline)
-	 (to-users (users-from-ustring pp))
+	 (to-users (users-from-pstring pp))
 	 (qstring))
     (if* (null chat)
        then (return-from chatenter 
@@ -1388,7 +1426,7 @@
 				   (or (user-to-users user) "")
 				   ","
 				   ppp)))
-		      (setq to-users (users-from-ustring pp))
+		      (setq to-users (users-from-pstring pp))
 	       elseif (equal pp "*")
 		 then (setf (user-to-users user) nil)
 		 else (setf (user-to-users user) pp)))
@@ -1538,7 +1576,7 @@ function sf(){document.f.body.focus();}
 	 (user (user-from-req req))
 	 (pp (or (request-query-value "pp" req) "*")) ; who to send to
 	 (ppp (request-query-value "ppp" req)) ; add a user to the dest
-	 (to-users (users-from-ustring pp))
+	 (to-users (users-from-pstring pp))
 	 (qstring))
     (if* (or (null chat) (null user))
        then (return-from chatenter-pic
@@ -1568,7 +1606,7 @@ function sf(){document.f.body.focus();}
 			   (or (user-to-users user) "")
 			   ","
 			   ppp)))
-	      (setq to-users (users-from-ustring pp))
+	      (setq to-users (users-from-pstring pp))
        elseif (equal pp "*")
 	 then (setf (user-to-users user) nil)
 	 else (setf (user-to-users user) pp))
@@ -2355,6 +2393,7 @@ function sf(){document.f.body.focus();}
 		   (add-secret req 
 			       (chat-query-string chat))
 		   (user-ustring user)))
+	(set-chat-cookie req (user-cookie user))
 	(with-http-body (req ent)
 	  (html "redirect"))))))
 
@@ -2391,19 +2430,23 @@ function sf(){document.f.body.focus();}
 		(do-chat-login req ent qstring "That user name exists"))))
     
     ; add new user
-    (let (new-ustring)
+    (let (new-ustring new-pstring new-cookie)
       (mp:with-process-lock ((master-lock *master-controller*))
 	(loop 
 	  (setq new-ustring (make-unique-string))
+	  (setq new-pstring (make-unique-string))
 	  (if* (dolist (user (users *master-controller*) t)
-		 (if* (equal new-ustring (user-ustring user))
+		 (if* (or  (equal new-ustring (user-ustring user))
+			   (equal new-ustring (user-pstring user)))
 		    then ; already in use
 			 (return nil)))
 	     then (return)))
 	; leave the loop with new-ustring being unique among users
 	(push (make-user :handle handle
 			 :password password
-			 :ustring new-ustring)
+			 :ustring new-ustring
+			 :pstring new-pstring
+			 :cookie (setq new-cookie (make-unique-string)))
 	      (users *master-controller*))
 	(dump-existing-chat *chat-home*))
       
@@ -2413,6 +2456,7 @@ function sf(){document.f.body.focus();}
 	(setf (reply-header-slot-value req :location)
 	  (format nil "chat?~a&x=~a" 
 		  (add-secret req qstring) new-ustring))
+	(set-chat-cookie req new-cookie)
 	(with-http-body (req ent) 
 	  "move to the chat")))))
 							   
@@ -3138,7 +3182,7 @@ function sf(){document.f.body.focus();}
 					  ((:a :href
 					       (format nil
 						       "chatenter?ppp=~a&~a"
-						       (user-ustring vuser)
+						       (user-pstring vuser)
 						       qstring)
 					       :target "chatenter")
 					   "(+)")
@@ -3150,7 +3194,7 @@ function sf(){document.f.body.focus();}
 					  ((:a :href 
 					       (format nil
 						       "chatenter?pp=~a&~a"
-						       (user-ustring vuser)
+						       (user-pstring vuser)
 						       qstring)
 					       :target "chatenter"
 					       )
@@ -3308,3 +3352,15 @@ function sf(){document.f.body.focus();}
 	(sleep delay))))))
       
 	  
+;;; fix up old chats
+
+(defun fixupchat ()
+  (setf (users *master-controller*) (nreverse (users *master-controller*)))
+  (dolist (user (users *master-controller*))
+    (setf (user-ustring user) (make-unique-string))
+    (setf (user-pstring user) (make-unique-string)))
+  (dump-existing-chat *chat-home*)
+  )
+
+  
+    
