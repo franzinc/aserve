@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.17 2000/03/22 22:32:16 jkf Exp $
+;; $Id: parse.cl,v 1.18 2000/03/27 14:59:05 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -95,37 +95,7 @@
 
 
 
-(defun parse-url (url)
-  ;; look for http://blah/........  and remove the http://blah  part
-  ;; look for /...?a=b&c=d  and split out part after the ?
-  ;;
-  ;; return  values host, url, args
-  (let ((urlstart 0)
-	(host)
-	(args))
-    (multiple-value-bind (match whole hostx urlx)
-	(match-regexp "^http://\\(.*\\)\\(/\\)" url :shortest t 
-		      :return :index)
-      (declare (ignore whole))
-      (if* match
-	 then ; start past the http thing
-	      (setq host (buffer-substr url (car hostx) (cdr hostx)))
-	      (setq urlstart (car urlx))))
-    
 
-    ; look for args
-    (multiple-value-bind (match argsx)
-	(match-regexp "?.*" url :start urlstart :return :index)
-    
-      (if* match
-	 then (setq args (buffer-substr url (1+ (car argsx)) (cdr argsx))
-		    url  (buffer-substr url urlstart (car argsx)))
-	 else ; may still have a partial url
-	      (if* (> urlstart 0)
-		 then (setq url (buffer-substr url urlstart (length url))))
-	      ))
-  
-    (values host url args)))
 
 
 
