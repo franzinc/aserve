@@ -384,13 +384,16 @@ with<strong> prefix</strong> to files stored in the directory specified by the <
 The <strong>host</strong>, <strong>port, remove, authorizer </strong>and <strong>server</strong>
 arguments are as described above for <strong>publish.</strong> &nbsp;&nbsp;&nbsp;&nbsp;
 The <strong>timeout</strong> argument defaults as described in <strong>publish-file</strong>.
-When a request comes in for which there isn't an entity that matches it exactly,&nbsp;
-AllegroServe checks to see if a prefix of the request has been registered.&nbsp; If so,
-and if the resulting entity is a <strong>directory-entity</strong> as created by this
-function, then it strips the prefix off the given request and appends the remaining part
-of the request to the destination string.&nbsp; It then publishes that (normally using <strong>publish-file</strong>
-and computing the content-type from the file type). &nbsp;&nbsp; Next that <strong>file-entity
-</strong>is made to handle the request in the normal manner.</p>
+&nbsp; The <strong>access-file</strong> argument names the <a
+href="#directory-access-files">access file</a> name which will be used in this directory
+tree. When a request comes in for which there isn't an entity that matches it
+exactly,&nbsp; AllegroServe checks to see if a prefix of the request has been
+registered.&nbsp; If so, and if the resulting entity is a <strong>directory-entity</strong>
+as created by this function, then it strips the prefix off the given request and appends
+the remaining part of the request to the destination string.&nbsp; It then publishes that
+(normally using <strong>publish-file</strong> and computing the content-type from the file
+type). &nbsp;&nbsp; Next that <strong>file-entity </strong>is made to handle the request
+in the normal manner.</p>
 
 <p>If a request comes that maps to a directory rather than a file then AllegroServe tries
 to locate an index file for that directory.&nbsp; The <strong>indexes</strong> argument
@@ -402,7 +405,7 @@ filenames &quot;index.html&quot; and &quot;index.htm&quot;.</p>
 and <strong>ent</strong> are the request and entity objects that describe the current
 client request. &nbsp;&nbsp;&nbsp; <strong>filename</strong> is the name of a known file
 on the current machine which&nbsp; is being requested by the current request.&nbsp; <strong>info</strong>
-is the list of access information for this file.</p>
+is the list of <a href="#directory-access-files">access information</a> for this file.</p>
 
 <p>If the filter returns <strong>nil</strong> then the normal operation&nbsp; is done by
 the directory-entity handler: the selected file is published and then the request to
@@ -423,13 +426,14 @@ is done to add that file.&nbsp; You may want to publish some other kind of entit
 represent that file.&nbsp; The <strong>publisher</strong> argument, if non-nil, must be a
 function of&nbsp; four arguments:&nbsp; <strong>req ent filename</strong> <strong>info</strong>.&nbsp;
 The filename is a string naming the file that's been matched with the request.&nbsp;&nbsp;
-<strong>info</strong> is the list of access information for this file.&nbsp; The <strong>publisher</strong>
-function must return an entity to be processed to send back a response.&nbsp;&nbsp; The <strong>publisher</strong>
-function may wish to publish that entity but it need not do so.</p>
+<strong>info</strong> is the list of <a href="#directory-access-files">access information</a>
+for this file.&nbsp; The <strong>publisher</strong> function must return an entity to be
+processed to send back a response.&nbsp;&nbsp; The <strong>publisher</strong> function may
+wish to publish that entity but it need not do so.</p>
 
 <p>&nbsp;</p>
 
-<h3>Directory Access Files</h3>
+<h3><a name="directory-access-files"></a>Directory Access Files</h3>
 
 <p>When files are accessed and automatically published you may with to set some of the
 parameters of the entity that is published. As mentioned above you can defined a <strong>publisher</strong>
@@ -499,18 +503,19 @@ then this means that this information will not apply to files found in subdirect
     <td width="15%"><strong>:ip</strong></td>
     <td width="17%"><strong>:patterns <br>
     :inherit</strong></td>
-    <td width="68%">specifies a location-authorizer restriction on which machines can see
-    published files.&nbsp; The value of the <strong>:patterns</strong> argument has the same
-    form as the <strong>:patterns</strong> slot of a location-authorizer.</td>
+    <td width="68%">specifies a<a href="#c-location-authorizer"> location-authorizer</a>
+    restriction on which machines can see published files.&nbsp; The value of the <strong>:patterns</strong>
+    argument has the same form as the <strong>:patterns</strong> slot of a
+    location-authorizer.</td>
   </tr>
   <tr>
     <td width="15%"><strong>:password</strong></td>
     <td width="17%"><strong>:realm<br>
     :allowed<br>
     :inherit</strong></td>
-    <td width="68%">specifies a password-authorizer restriction on access to published files.
-    &nbsp; See the password-authorizer documentation for a description of the <strong>:realm</strong>
-    and <strong>:allowed</strong> arguments</td>
+    <td width="68%">specifies a <a href="#c-password-authorizer">password-authorizer</a>
+    restriction on access to published files. &nbsp; See the password-authorizer documentation
+    for a description of the <strong>:realm</strong> and <strong>:allowed</strong> arguments</td>
   </tr>
   <tr>
     <td width="15%"><strong>:files</strong></td>
@@ -542,8 +547,8 @@ files<br>
 (:password :realm &quot;mysite&quot; <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :allowed ((&quot;joe&quot; .
 &quot;mypassword&quot;)<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (&quot;sam&quot;
-. &quot;secret&quot;)) <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+(&quot;sam&quot; . &quot;secret&quot;)) <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :inherit nil) ; doesn't apply
 to subdirectories<br>
 ; publish html and cgi files, but not those beginning with a period<br>
