@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.6.6.5 2001/06/01 21:22:39 layer Exp $
+;; $Id: t-aserve.cl,v 1.6.6.6 2001/10/22 16:12:57 layer Exp $
 
 ;; Description:
 ;;   test iserve
@@ -70,11 +70,13 @@
       (unwind-protect 
 	  (flet ((do-tests ()
 		   (test-publish-file port)
+		   (test-publish-directory port)
 		   (test-publish-computed port)
 		   (test-authorization port)
 		   (test-encoding)
 		   (test-forms port)
 		   (test-client port)
+		   (test-cgi port)
 		   ))
 	    (format t "~%~%===== test direct ~%~%")
 	    (do-tests)
@@ -214,28 +216,35 @@
     ;; the result will be the same since given that we know the
     ;; length of the file, chunking won't be needed
     ;; 
-    (publish-file :path "/frob" :file dummy-1-name
-		  :content-type "text/plain")
+    (let ((ent (publish-file :path "/frob" :file dummy-1-name
+			     :content-type "text/plain"
+			     :cache-p t
+			     )))
+      (test nil (net.aserve::contents ent)) ; nothing cached yet
 
-    ;; 
-    (dolist (cur-prefix (list prefix-local prefix-dns))
-      (dolist (keep-alive '(nil t))
-	(dolist (protocol '(:http/1.0 :http/1.1))
-	  (format t "test 1 - ~s~%" (list keep-alive protocol))
-	  (multiple-value-bind (body code headers)
-	      (x-do-http-request (format nil "~a/frob" cur-prefix)
-		:protocol protocol
-		:keep-alive keep-alive)
-	    (test 200 code)
-	    (test (format nil "text/plain" port)
-		  (cdr (assoc :content-type headers :test #'eq))
-		  :test #'equal)
-	    #+ignore (if* (eq protocol :http/1.1)
-			then (test "chunked"
-				   (cdr (assoc :transfer-encoding headers 
-					       :test #'eq))
-				   :test #'equalp))
-	    (test dummy-1-contents body :test #'equal)))))
+      ;; 
+      (dolist (cur-prefix (list prefix-local prefix-dns))
+	(dolist (keep-alive '(nil t))
+	  (dolist (protocol '(:http/1.0 :http/1.1))
+	    (format t "test 1 - ~s~%" (list keep-alive protocol))
+	    (multiple-value-bind (body code headers)
+		(x-do-http-request (format nil "~a/frob" cur-prefix)
+				   :protocol protocol
+				   :keep-alive keep-alive)
+	      (test 200 code)
+	      (test (format nil "text/plain" port)
+		    (cdr (assoc :content-type headers :test #'eq))
+		    :test #'equal)
+	      #+ignore (if* (eq protocol :http/1.1)
+			  then (test "chunked"
+				     (cdr (assoc :transfer-encoding headers 
+						 :test #'eq))
+				     :test #'equalp))
+	      (test dummy-1-contents body :test #'equal)))))
+      
+      ;; stuff should be cached by now
+      (test t (not (null (net.aserve::contents ent))))
+      )
 
 
     (setq dummy-2-contents (build-dummy-file 8055 65 dummy-2-name))
@@ -260,8 +269,8 @@
 	  (format t "test 2 - ~s~%" (list keep-alive protocol))
 	  (multiple-value-bind (body code headers)
 	      (x-do-http-request (format nil "~a/frob2" cur-prefix)
-		:protocol protocol
-		:keep-alive keep-alive)
+				 :protocol protocol
+				 :keep-alive keep-alive)
 	    (test 200 code)
 	    (test (format nil "text/plain" port)
 		  (cdr (assoc :content-type headers :test #'eq))
@@ -279,6 +288,10 @@
     ; verify it's still there
     (test 200 (values2 (x-do-http-request (format nil "~a/frob" prefix-local))))
     (test 200 (values2 (x-do-http-request (format nil "~a/frob" prefix-dns))))
+    
+    ; check that skip-body works
+    (test nil (values (x-do-http-request (format nil "~a/frob" prefix-local)
+					 :skip-body t)))
     
     ; remove it
     (publish-file :path "/frob" :remove t)
@@ -334,7 +347,7 @@
 		  :remove t)
     ; verify it's gone:
     (test 404 (values2 (x-do-http-request (format nil "~a/checkit" 
-					       prefix-local))))
+						  prefix-local))))
     ; but the the dns one is still there
     (test 200 (values2 (x-do-http-request (format nil "~a/checkit" prefix-dns))))
     
@@ -345,10 +358,46 @@
     
     ; verify it's gone too
     (test 404 (values2 (x-do-http-request (format nil "~a/checkit" 
-					       prefix-dns))))
+						  prefix-dns))))
 
     
     
+
+    (setq dummy-1-contents (build-dummy-file 432 23 dummy-1-name))
+    
+    ; test caching and auto uncaching and recaching
+    (let ((ent (publish-file :path "/check-uncache"
+			     :file dummy-1-name
+			     :cache-p t)))
+
+      ; verify nothing cached right now
+      (test nil (and :second (net.aserve::contents ent)))
+      
+      (let ((body2 (x-do-http-request (format nil "~a/check-uncache" 
+					      prefix-local))))
+	
+	; verify result was correct
+	(test dummy-1-contents body2 :test #'equal)
+
+	; verify that something's cached.
+	(test t (not (null (and :second (net.aserve::contents ent)))))
+
+	; overwrite dummy file with new contents
+	(sleep 2) ; pause to get file write date to noticably advance
+	(setq dummy-1-contents (build-dummy-file 555 44 dummy-1-name))
+	
+	; verify that the contents are in fact different
+	(test nil (equal dummy-1-contents body2))
+
+	; now do the same request.. but we should get new things back
+	; since the last modified time of the file
+	(setq body2
+	  (x-do-http-request (format nil "~a/check-uncache" prefix-local)))
+	; verify that we did get the new stuff back.
+	
+	(test t (equal dummy-1-contents body2))))
+    
+    ; rewrite file with different contents
     
     
     
@@ -1057,8 +1106,103 @@
 
     
     
-    
+; publish-directory tests
 
+(defun test-publish-directory (port)
+  (let ((prefix-local (format nil "http://localhost:~a" port))
+	(step 0))
+    (multiple-value-bind (ok whole dir)
+	(match-regexp "\\(.*[/\\]\\).*" (namestring *load-truename*))
+      (declare (ignore whole))
+      (if* (not ok) 
+	 then (error "can't find the server.pem directory"))
+      
+	
+      (publish-directory :prefix "/test-pd/"
+			 :destination dir
+			 :filter #'(lambda (req ent filename)
+				     (declare (ignore ent))
+				     (test t
+					   (values 
+					    (match-regexp "server.pem"
+							  filename))
+					   :test #'equal)
+				     (case step
+				       (0 (failed-request req)
+					  t)
+				       (1 nil))))
+      
+      ; in step 0 we have the filter return a 404 code
+      (test 404 (values2 
+		 (x-do-http-request (format nil "~a/test-pd/server.pem" 
+					    prefix-local))))
+      
+      ; in step 1 we have it return the actual file
+      (setq step 1)
+      (test 200 (values2
+		 (x-do-http-request (format nil "~a/test-pd/server.pem"
+					    prefix-local))))
+      
+      ; remove entry so subsequent tests won't see it
+      (publish-file :path "/test-pd/server.pem" :remove t)
+      )))
+
+			 
+		       
+(defun test-cgi (port)
+  ;; currently we only have a test program on unix since
+  ;; that where our shell script works
+  ;;
+  #+(and unix (version>= 6 1))
+  (let ((prefix-local (format nil "http://localhost:~a" port)))
+    (publish :path "/cgi-0"
+	    :function #'(lambda (req ent)
+			  (net.aserve:run-cgi-program 
+			   req ent "aserve/examples/cgitest.sh")))
+    (publish :path "/cgi-1"
+	    :function #'(lambda (req ent)
+			  (net.aserve:run-cgi-program 
+			   req ent "aserve/examples/cgitest.sh 1")))
+    (publish :path "/cgi-2"
+	    :function #'(lambda (req ent)
+			  (net.aserve:run-cgi-program 
+			   req ent "aserve/examples/cgitest.sh 2")))
+    (publish :path "/cgi-3"
+	    :function #'(lambda (req ent)
+			  (net.aserve:run-cgi-program 
+			   req ent "aserve/examples/cgitest.sh 3")))
+    
+    ;; verify that the various headers work
+    (test 200 (values2 
+	       (x-do-http-request (format nil "~a/cgi-0"
+					  prefix-local))))
+    
+    (test 200 (values2 
+	       (x-do-http-request (format nil "~a/cgi-1"
+					  prefix-local))))
+    
+    ; verify that a redirect is requested
+    (multiple-value-bind (body code headers)
+	       (x-do-http-request (format nil "~a/cgi-2"
+					  prefix-local)
+				  :redirect nil)
+      (test "go to franz" body :test #'equal)
+      (test 301 code)
+      (test "http://www.franz.com" (cdr (assoc :location headers))
+	    :test #'equal)
+      (test "123hellomac" (cdr (assoc :etag headers))
+	    :test #'equal)
+      )
+
+    ; verify that the unauthorized response is made
+    (test 401 (values2 
+	       (x-do-http-request (format nil "~a/cgi-3"
+					  prefix-local))))))
+   
+	    
+	
+	
+  
 
 
     

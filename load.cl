@@ -1,11 +1,13 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.31.10.4 2001/06/01 21:22:35 layer Exp $
+;; $Id: load.cl,v 1.31.10.5 2001/10/22 16:12:57 layer Exp $
+;;
 
 (defvar *loadswitch* :compile-if-needed)
 (defparameter *aserve-root* (directory-namestring *load-truename*))
 
 (defparameter *aserve-files* 
+    ;; this list is in cl/src/sys/make.cl as well... keep in sync
     '("htmlgen/htmlgen"
       "macs"
       "main"
@@ -17,6 +19,7 @@
       "log" 
       "client"
       "proxy"
+      "cgi"
       ))
 
 (defparameter *aserve-other-files*
@@ -40,6 +43,7 @@
       "load.cl"
       "test/t-aserve.cl"
       "test/server.pem"
+      "examples/cgitest.sh"
       "doc/aserve.html"
       "doc/tutorial.html"
       "doc/htmlgen.html"
@@ -156,7 +160,8 @@
 		  "examples/examples.fasl"
 		  "examples/foo.txt"
 		  "examples/fresh.jpg"
-		  "examples/prfile9.jpg"))
+		  "examples/prfile9.jpg"
+		  "examples/cgitest.sh"))
     (copy-files-to (list file)
 		   (format nil "aserve-dist/~a" file)
 		   :root *aserve-root*)))
@@ -174,7 +179,7 @@
 ;; 7. (ftp-publish-src)
 ;; 8. (publish-docs)   ;  to put latest docs on aserve web page
 ;; 9. on spot run /fi/sa/bin/aserve-sync
-;; 10. ftp download.sourceforge.net and put the tar file in the
+;; 10. ftp upload.sourceforge.net and put the tar file in the
 ;;     incoming directory, then go to the aserve sourceforge web page and 
 ;;     select the file manager and publish it.
 ;; 11. cd /www/opensource/devel/www/aserve 
@@ -194,7 +199,7 @@
 
 
 
-(defun make-src-distribution ()
+(defun make-src-distribution (&optional (dist-name aserve-version-name))
   ;; make a source distribution of aserve
   ;;
     
@@ -206,22 +211,22 @@
 	   *aserve-root*
 	   
 	   *aserve-root*
-	   aserve-version-name
+	   dist-name
 	   
 	   *aserve-root*
-	   aserve-version-name
+	   dist-name
 	   ))
   
   (run-shell-command 
    (format nil "mkdir ~aaserve-src/~a/doc ~aaserve-src/~a/examples ~aaserve-src/~a/test"
 	   *aserve-root*
-	   aserve-version-name
+	   dist-name
 	   
 	   *aserve-root*
-	   aserve-version-name
+	   dist-name
 	   
 	   *aserve-root*
-	   aserve-version-name
+	   dist-name
 	   
 	   ))
 	   
@@ -230,7 +235,7 @@
 			*aserve-other-files*))
     (copy-files-to
      (list file)
-     (format nil "aserve-src/~a/~a" aserve-version-name file)
+     (format nil "aserve-src/~a/~a" dist-name file)
      :root *aserve-root*)))
 
 

@@ -25,13 +25,6 @@ case $1 in
         echo 'this request unauthorized'
         ;;
 
-    4) # send back an ok response and something on the error stream
-        echo 'Content-Type: text/plain'
-        echo ''
-        echo "okay"
-        echo stuff-on-error-stream 1>&2
-	;;
-        
     *) # normal crlf headers
         echo 'Content-Type: text/plain'
         echo ''

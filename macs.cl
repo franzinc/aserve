@@ -22,7 +22,9 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-;; $Id: macs.cl,v 1.10.8.2 2001/06/01 21:22:35 layer Exp $
+
+;;
+;; $Id: macs.cl,v 1.10.8.3 2001/10/22 16:12:57 layer Exp $
 
 ;; Description:
 ;;   useful internal macros

@@ -7,9 +7,9 @@
 
 <body>
 
-<h1 align="center">AllegroServe</h1>
+<h1 align="center">AllegroServe - A Web Application Server</h1>
 
-<p align="left"><strong><small>copyright(c) 2000. Franz Inc</small></strong></p>
+<p align="left"><strong><small>copyright(c) 2000-2001. Franz Inc</small></strong></p>
 
 <h2 align="left">Table of Contents</h2>
 
@@ -45,7 +45,9 @@
 &nbsp; <a href="#f-request-reply-plist">request-reply-plist</a><br>
 &nbsp; <a href="#f-request-reply-strategy">request-reply-strategy</a><br>
 &nbsp; <a href="#f-request-reply-stream">request-reply-stream</a></font><br>
-<a href="#form-processing">Form Processing</a><br>
+<a href="#cgi-program">CGI Program Execution</a><br>
+<font face="Courier New">&nbsp; <a href="#f-run-cgi-program">run-cgi-program</a><br>
+</font><a href="#form-processing">Form Processing</a><br>
 <font face="Courier New">&nbsp; <a href="#f-get-multipart-header">get-multipart-header</a><br>
 &nbsp; <a href="#f-get-multipart-sequence">get-multipart-sequence</a></font> <br>
 &nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-form-urlencoded-">form-urlencoded-to-query</a><br>
@@ -58,6 +60,11 @@
 <a href="#cookies">Cookies</a><br>
 <font face="Courier New">&nbsp; <a href="#f-set-cookie-header">set-cookie-header</a><br>
 &nbsp; <a href="#f-get-cookie-values">get-cookie-values</a></font><br>
+<a href="#varaibles">Variables</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#v-aserve-version">*aserve-version*</a><br>
+&nbsp; <a href="#v-default-aserve-external-format">*default-aserve-external-format*</a><br>
+&nbsp; <a href="#v-http-response-timeout">*http-response-timeout*</a><br>
+&nbsp; <a href="#v-mime-types">*mime-types*</a></font><br>
 <a href="#iseve-request-proc">AllegroServe Request Processing Protocol<br>
 </a><font face="Courier New">&nbsp; <a href="#f-handle-request">handle-request</a><br>
 &nbsp; <a href="#f-standard-locator">standard-locator</a><br>
@@ -73,7 +80,8 @@
 &nbsp; <a href="#f-make-http-client-request">make-http-client-request</a><br>
 &nbsp; <a href="#f-read-client-response">read-client-response-headers</a><br>
 &nbsp; <a href="#f-client-request-read-sequence">client-request-read-sequence</a><br>
-&nbsp; <a href="#f-client-request-read-close">client-request-close</a></font><br>
+&nbsp; <a href="#f-client-request-read-close">client-request-close</a><br>
+&nbsp; <a href="#f-uriencode-string">uriencode-string</a></font><br>
 <a href="#proxy">Proxy</a><br>
 <a href="#cache">Cache</a><br>
 <a href="#filters">Request Filters</a><br>
@@ -138,15 +146,15 @@ server running.</p>
 <p><strong><font face="Courier New"><a name="f-start"></a>(start &amp;key port listeners
 chunking keep-alive server setuid setgid <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; debug proxy proxy-proxy
-cache restore-cache accept-hook ssl os-processes)</font></strong></p>
+cache restore-cache accept-hook ssl os-processes external-format)</font></strong></p>
 
 <p>If no arguments are given then <strong>start</strong>&nbsp; starts a multi-threaded web
 server on port 80, which is the standard web server port.&nbsp;&nbsp;&nbsp; If you are
 running this on Unix then you can only allocate port 80 if you are logged in as root or
 have made Lisp a set-user-id root program.</p>
 
-<p>The&nbsp; are quite a few keyword arguments to <strong>start</strong>, but in practice
-you only need be concerned with <strong>:port</strong> and <strong>:listeners.
+<p>There are quite a few keyword arguments to <strong>start</strong>, but in practice you
+only need be concerned with <strong>:port</strong> and <strong>:listeners.
 &nbsp;&nbsp;&nbsp; </strong>The arguments have the following meanings: 
 
 <ul>
@@ -158,10 +166,10 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
     return - instead it processes the requests itself, one at a time.&nbsp; If a positive
     number is given as the value of <strong>:listeners</strong> then the server runs in <em>threaded
     server mode<strong>.</em> </strong>&nbsp; In this mode separate lisp lightweight processes
-    are started to handle requests from clients, the number of request handing threads equal
-    to the value of the <strong>:listeners</strong> keyword argument.&nbsp; In this mode the <strong>start
-    </strong>function returns after starting the other threads.</li>
-  <li>chunking -- if true then the server will using the chunked transfer encoding when it's
+    are started to handle requests from clients, the number of request handing threads is
+    equal to the value of the <strong>:listeners</strong> keyword argument.&nbsp; In this mode
+    the <strong>start </strong>function returns after starting the other threads.</li>
+  <li>chunking -- if true then the server will use the chunked transfer encoding when it's
     possible to do so.&nbsp; This is an optimization and should be left enabled unless you
     suspect that it is the cause of some sort of error.&nbsp;&nbsp; The default is true.</li>
   <li>keep-alive -- if true then the server will keep connections alive if requested by the
@@ -188,11 +196,11 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
     requests to other servers.</li>
   <li>proxy-proxy -- if <strong>proxy</strong> is also given a true value, then this argument
     determines where the proxy will forward&nbsp; requests.&nbsp; If proxy-proxy is nil then
-    the requests go directly to the server sgiven in the request.&nbsp; If proxy-proxy is
+    the requests go directly to the server given in the request.&nbsp; If proxy-proxy is
     given&nbsp; a value of a host and an optional port then the request is forwarded to the
     proxy server at that address.&nbsp;&nbsp; Valid values for proxy-proxy look like
     &quot;proxy.myfirm.com&quot; and &quot;localhost:8000&quot;.&nbsp;&nbsp; If no port is not
-    specified, 80 is assumed.</li>
+    specified, port 80 is assumed.</li>
   <li>cache -- if true (and if proxy is true as well) cache locally the work done by the proxy
     server.&nbsp; The value of this variable specifies the size of the caches, both memory and
     disk.&nbsp; See the section on caches for more details on the format of the argument.</li>
@@ -217,6 +225,9 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
     which to run AllegroServe.&nbsp; This is available on Unix only at the moment.&nbsp; The
     AllegroServes in different processes do <strong>not</strong> share a common Lisp heap..
     &nbsp; </li>
+  <li>external-format - If given it should name the value to which
+    *default-aserve-external-format* should be bound to when requests are processed.&nbsp; The
+    default value is<strong> :latin1-base</strong></li>
 </ul>
 
 <p>&nbsp;</p>
@@ -288,7 +299,7 @@ an entity assigned, the old entity is replaced by the new entity.</p>
 <p>&nbsp;</p>
 
 <p><a name="f-publish-file"></a><strong><font face="Courier New">(publish-file &amp;key
-path host port&nbsp; file content-type class preload remove server)</font></strong></p>
+path host port&nbsp; file content-type class preload cache-p remove server)</font></strong></p>
 
 <p>This creates an entity that will return the contents of a file on the disk in response
 to a request.&nbsp;&nbsp; The <strong>url</strong> and <strong>file</strong>&nbsp; must be
@@ -300,7 +311,8 @@ given, the rest of the arguments are optional..&nbsp; The arguments have these m
   <li><strong>host -- </strong>a string that must match (in a case insensitive manner) the
     host part of the request.&nbsp;&nbsp; If this argument is not given then it will match the
     host part of any request.&nbsp; If this argument is given and the request does not have a
-    host part specified, then it will not match.</li>
+    host part specified, then it will not match.&nbsp; The host can also be a list of strings
+    to specify a list of hosts for this entity.</li>
   <li><strong>port</strong> -- this argument is currently unused and will likely be removed in
     future versions.</li>
   <li><strong>file </strong>-- the name of the file to return when a request to this entity is
@@ -317,9 +329,15 @@ given, the rest of the arguments are optional..&nbsp; The arguments have these m
     &nbsp;&nbsp; </li>
   <li><strong>preload</strong> --if true it instructs <strong>AllegroServe</strong> to read
     the contents of the file in immediately and store it in a lisp object.&nbsp; This will
-    speed up the response to this request.&nbsp; However note that if the file changes on the
-    disk after it has been preloaded, this change will <strong>not </strong>be seen until<strong>
-    &nbsp; publish-file </strong>is called again<strong>.</strong></li>
+    speed up the response to this request.&nbsp; If the file on disk is updated AllegroServe
+    will ignore the preloaded content and will access the content from disk.&nbsp;&nbsp; If <strong>preload</strong>
+    is true then you most likely want to specify <strong>cache-p</strong> true as well.</li>
+  <li><strong>cache-p</strong> -- if true then <strong>AllegroServe</strong> will cache the
+    last value read for this file.&nbsp; When asked for this file <strong>AllegroServe</strong>
+    will check to see if the file has changed on disk (using the last modified time as a
+    measure).&nbsp; If the file hasn't changed AllegroServe will returned the cached value,
+    otherwise <strong>AllegroServe</strong> will read in and cache the new contents of the
+    file and will return that as a response.</li>
   <li><strong>remove </strong>-- instead of adding an entity, remove the entities that match
     the given <strong>path</strong> and <strong>host. </strong>This removes all entities, not
     just file entities.&nbsp; If a <strong>host</strong> value is not passed in an argument,
@@ -344,7 +362,9 @@ header lines and thus minimizes network traffic. </p>
 <p>&nbsp;</p>
 
 <p><a name="f-publish-directory"></a><strong><font face="Courier New">(publish-directory
-&amp;key prefix host port destination remove server)</font></strong></p>
+&amp;key prefix host port destination remove server <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+indexes filter)</font></strong></p>
 
 <p>This creates a mapping from all urls whose name begins with<strong> prefix</strong> to
 files stored in the directory specified by the destination.&nbsp;&nbsp; The <strong>host</strong>,
@@ -358,9 +378,28 @@ the remaining part of the request to the destination string.&nbsp; It then publi
 &nbsp;&nbsp; Next that <strong>file-entity </strong>is made to handle the request in the
 normal manner.</p>
 
-<p>We plan to make a number of refinements to <strong>publish-directory</strong> including
-the ability to specify how deep in the directory structure it will look and also
-&nbsp;&nbsp; restricting what kinds of files it will match.</p>
+<p>If a request comes that maps to a directory rather than a file then AllegroServe tries
+to locate an index file for that directory.&nbsp; The <strong>indexes</strong> argument
+specifies a list of index files to search for.&nbsp; By default the list consists of two
+filenames &quot;index.html&quot; and &quot;index.htm&quot;.</p>
+
+<p>The valueof the <strong>filter </strong>argument is a function of three values: <strong>req</strong>
+<strong>ent</strong> and&nbsp; <strong>filename</strong>.&nbsp; <strong>req</strong> and <strong>ent</strong>
+are the request and entity objects that describe the current client request.
+&nbsp;&nbsp;&nbsp; <strong>filename</strong> is the name of a known file on the current
+machine which&nbsp; is being requested by the current request.</p>
+
+<p>If the filter returns <strong>nil</strong> then the normal operation&nbsp; is done by
+the directory-entity handler: the selected file is published and then the request to
+access it processed (and subsequent access using that url will just return the file and
+never go through the filter again).</p>
+
+<p>If the filter chooses to handle the request for the file itself&nbsp; it must generate
+a response to the request and then return a non-nil value.&nbsp; To avoid subsequent calls
+to the filter for this file the filter may choose to publish a handler for this url.
+&nbsp; If the filter wants to forbid access to this file a handy way to to call <font
+face="Courier New">(failed-request req)</font> and the standard &quot;404 Not found&quot;
+will be sent back to the client.</p>
 
 <p>&nbsp;</p>
 
@@ -394,7 +433,7 @@ depending on whether keep-alive is being done, chunking is possible, whether the
 is text or binary, whether the client already has the most recent data, and whether the
 size of the body of the response is known before the headers are sent.&nbsp; AllegroServe
 handles the complexity of determining the optimal response strategy and the user need only
-use a few specific macros in the computation of the response in order ot take advantage of
+use a few specific macros in the computation of the response in order to take advantage of
 AllegroServe's strategy computation</p>
 
 <p>Here's a very simple computed response.&nbsp; It just puts &quot;Hello World!&quot; in
@@ -476,9 +515,9 @@ by headers (unless it's the HTTP/0.9 protocol in which case there are no headers
 &nbsp;&nbsp; and then followed by the body (if any) of the response.&nbsp;&nbsp; <strong>with-http-response</strong>
 doesn't normally send anything to the client.&nbsp; It only does so when it determines
 that the <strong>if-modified-since</strong> predicate doesn't hold and that it must send
-back a <strong>not-modified</strong> response.&nbsp;&nbsp;&nbsp; Thus in the normal case
-it isn't enough, even if there no body to send, to just call <strong>with-http-response</strong>.
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; This is where the <strong>with-http-body </strong>is used.</p>
+back a <strong>not-modified</strong> response.&nbsp;&nbsp;&nbsp; Thus&nbsp; is not enough
+to just call <strong>with-http-response</strong> in your response function.&nbsp; You must
+always call <strong>with-http-body </strong>inside the call to <strong>with-http-response</strong>.</p>
 
 <p align="left">&nbsp;</p>
 
@@ -510,10 +549,11 @@ are added to the headers sent as part of this response.</p>
 <p align="left">Within the <strong>body </strong>forms the code calls <strong>(request-reply-stream
 req)</strong> to obtain a stream to which it can write to supply the body of the response.
 &nbsp; The external-format of this stream is set to the value of the <strong>external-format</strong>
-argument (which defaults to <strong>:latin1-base</strong>).&nbsp;&nbsp; The variable <strong>*html-stream*</strong>
-is bound to the value of <strong>(request-reply-stream req)</strong> before the <strong>body</strong>
-is evaluated.&nbsp;&nbsp; This is done to for the convenience of users of the <strong>html</strong>
-macro.</p>
+argument (which defaults to the value of <strong>*default-aserve-external-format*</strong>).&nbsp;&nbsp;
+The variable <strong>*html-stream*</strong> is bound to the value of <strong>(request-reply-stream
+req)</strong> before the <strong>body</strong> is evaluated.&nbsp;&nbsp; This makes it
+easy&nbsp; to use the <strong>html</strong> macro to generate html as part of the
+response. </p>
 
 <hr>
 
@@ -576,7 +616,7 @@ value) then the query string in the uri is checked.&nbsp; If <strong>post</stron
 form will be decoded for query values.</p>
 
 <p>The <strong>external-format</strong> is used in the conversion of bytes in the form to
-characters.</p>
+characters.&nbsp; It defaults to the value of <strong>*default-aserve-external-format*</strong>.</p>
 
 <p>A query is normally a set of names and values.&nbsp; <br>
 <strong>http://foo.com/bar?a=3&amp;b=4 </strong>yields a query alist <strong>((&quot;a&quot;
@@ -678,8 +718,8 @@ circumstances.</p>
 
 <p><a name="f-request-reply-plist"></a><strong><font face="Courier New">(request-reply-plist
 request)</font></strong> &nbsp;&nbsp;&nbsp;&nbsp; - accessor -&nbsp; this slot holds a
-property list on which AllegroServe uses to stores some lesser used information.&nbsp; The
-user program can use it as well.</p>
+property list on which AllegroServe uses to store&nbsp; less important information.&nbsp;
+The user program can use it as well.</p>
 
 <p><a name="f-request-reply-strategy"></a><font face="Courier New"><strong>(request-reply-strategy
 request)</strong></font>&nbsp;&nbsp; - accessor - the strategy is a list of symbols which
@@ -693,11 +733,51 @@ This stream must&nbsp; be used instead of the value of <strong>request-socket</s
 
 <p>&nbsp;</p>
 
-<p>&nbsp;</p>
+<hr>
+
+<h2><a name="cgi-program"></a>CGI Program Execution</h2>
+
+<p>The <a href="http://hoohoo.ncsa.uiuc.edu/cgi/interface.html">Common Gateway Interface</a>
+(CGI) specification allows web servers to run programs in response to http requests and to
+send the results of&nbsp; the execution of those programs back the web client.
+&nbsp;&nbsp; The CGI programs finds information about the request in its environment
+variables and, in the case of a <strong>put</strong> or <strong>post</strong> request, the
+body of the request is sent to standard input of the program.</p>
+
+<p>CGI is a clumy and slow protocol for extending the behavior or a web server and is
+falling out of favor.&nbsp; However there are legacy CGI applications you may need to call
+from AllegroServe.&nbsp;&nbsp; You invoke an external program using the CGI protocol with
+the <strong>run-cgi-program</strong> function.</p>
+
+<p><a name="f-run-cgi-program"></a><font face="Courier New"><strong>(run-cgi-program req
+ent program &amp;key path-info path-translated<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+script-name query-string auth-type timeout)</strong></font></p>
+
+<p>In response to an http request, this runs <strong>program</strong> which must be a
+string naming an exectuable program or script followed optionally by command line
+arguments to pass to that program.&nbsp; Before the <strong>program </strong>is run the
+environment variables are set according the the CGI protocol.&nbsp; The <strong>timeout</strong>
+argument is how long AllegroServe should wait for a response from the <strong>program </strong>before
+giving up.&nbsp;&nbsp; The default is 200 seconds.&nbsp;&nbsp; The other keyword arguments
+allow the caller to specify values for the CGI environment variables that can't be
+computed automatically.&nbsp; <strong>path-info</strong> specifies the PATH_INFO
+environment variable, and similarly for<strong> path-translated, script-name, query-string</strong>
+and <strong>auth-type.</strong>&nbsp;&nbsp; If <strong>query-string</strong> is <em>not</em>
+given and the <strong>uri</strong> that invoked this request contains a query part then
+that query part is passed in the QUERY_STRING environment variable.</p>
 
 <p>&nbsp;</p>
 
-<p>&nbsp;</p>
+<p>A typical way of publishing a CGI page is this:</p>
+
+<pre>(publish :path &quot;/cgi/myprog&quot;
+         :function #'(lambda (req ent) 
+                        (run-cgi-program req ent &quot;/server/cgi-bin/myprog&quot;)))</pre>
+
+<p><strong>Note: </strong>The ability to run CGI programs from AllegroServe was due to
+features added in Allegro Common Lisp version 6.1.&nbsp;&nbsp; This will not work in
+earlier versions of Allegro CL.</p>
 
 <hr>
 
@@ -803,7 +883,7 @@ at which to begin storing the data.&nbsp; If <strong>end</strong> is given then 
 specifies the index just after the last index in which to store data.</p>
 
 <p>The return value is <strong>nil </strong>if there is no more data to return, otherwise
-it is the index one after the last last index filled with data in <strong>buffer.</strong></p>
+it is the index one after the last&nbsp; index filled with data in <strong>buffer.</strong></p>
 
 <p>The buffer can be a one dimensional array of <strong>character</strong> or of <strong>(unsigned-byte
 8)</strong>.&nbsp; For the most efficient transfer of data from the browser to
@@ -811,10 +891,10 @@ AllegroServe, the program should use a 4096 byte (unsigned-byte 8) array.</p>
 
 <p>If the buffer is&nbsp; a character array then the data is converted from
 get-multipart-sequence's (unsigned-byte 8) array to characters using the given<strong>
-external-format </strong>(which defaults to<strong> :latin1-base</strong>)<strong>.</strong></p>
+external-format </strong>(which defaults to<strong> </strong>the value of <strong>*default-aserve-external-format*</strong>)<strong>.</strong></p>
 
 <p><strong>get-multipart-sequence</strong> may return before filling up the whole buffer,
-so program should be sure to make use of the index returned by <strong>get-multipart-sequence</strong>.</p>
+so the program should be sure to make use of the index returned by <strong>get-multipart-sequence</strong>.</p>
 
 <p>&nbsp;</p>
 
@@ -836,7 +916,7 @@ following functions to convert between the encoding and the query list:</p>
 string &amp;key external-format)</strong></font></p>
 
 <p>Decodes the string and returns the query list.&nbsp;&nbsp; The default value for <strong>external-format</strong>
-is <strong>:latin1-base</strong>.</p>
+is the value of <strong>*default-aserve-external-format*</strong>.</p>
 
 <p>&nbsp;</p>
 
@@ -844,7 +924,7 @@ is <strong>:latin1-base</strong>.</p>
 query &amp;key external-format)</strong></font></p>
 
 <p>Encodes the query and returns a string.&nbsp;&nbsp; The default value for <strong>external-format</strong>
-is <strong>:latin1-base</strong></p>
+is the value of <strong>*default-aserve-external-format*.</strong></p>
 
 <p>&nbsp;</p>
 
@@ -1145,7 +1225,7 @@ then this cookie will expire when the user quits their web browser.<br>
 <strong>secure</strong> should be true or false.&nbsp; Any non-nil value is interpreted as
 true. The default value is false.<br>
 The <strong>external-format</strong> is used to convert bytes to characters. &nbsp; It
-defaults to <strong>:latin1-base</strong>. </p>
+defaults to the value of <strong>*default-aserve-external-format*</strong>. </p>
 
 <p>&nbsp;</p>
 
@@ -1158,7 +1238,38 @@ will be in a cons whose <strong>car</strong> is the <strong>name</strong> and wh
 is the <strong>value</strong>.&nbsp;&nbsp; The names and values will be decoded (in other
 words the decoding done by <strong>set-cookie-header</strong> will be undone).
 &nbsp;&nbsp; The <strong>external-format</strong> is used to convert bytes to characters.
-&nbsp; It defaults to <strong>:latin1-base</strong>. </p>
+&nbsp; It defaults to the value of <strong>*default-aserve-external-format*</strong>. </p>
+
+<p>&nbsp;</p>
+
+<hr>
+
+<h2><a name="varaibles"></a>Variables</h2>
+
+<p>These special variables contain&nbsp; information about AllegroServe or help control
+AllegroServe:</p>
+
+<p><a name="v-aserve-version"></a><strong><font face="Courier New">*aserve-version*</font></strong>
+- a list of three values: (major-version minor-version sub-minor-version) which is usually
+printed with periods separating the values (i.e. X.Y.Z).</p>
+
+<p><a name="v-default-aserve-external-format"></a><strong><font face="Courier New">*default-aserve-external-format*</font></strong>
+- a symbol or external format object which is the default value for those AllegroServe
+functions that take an external-format argument.&nbsp;&nbsp; http requests are normally
+run in separate lisp threads and those threads bind *default-aserve-external-format* to
+the value of the external-format argument to the start function.&nbsp;&nbsp; Thus changing
+the value of *default-aserve-external-format* in one thread will not affect its value in
+other threads.&nbsp;&nbsp; You should decide the default external format before you start
+AllegroServe running.</p>
+
+<p><a name="v-http-response-timeout"></a><strong><font face="Courier New">*http-response-timeout*</font></strong>
+- the default value for the timeout argument to with-http-response.&nbsp;&nbsp; [in future
+versions of AllegroServe we'll treat this value like *default-aserve-external-format* and
+bind it in each worker thread]</p>
+
+<p><a name="v-mime-types"></a><strong><font face="Courier New">*mime-types*</font></strong>
+- a hash table where the keys are the file types (e.g. &quot;jpg&quot;) and the values are
+the MIME types (e.g. &quot;image/jpeg&quot;).</p>
 
 <p>&nbsp;</p>
 
@@ -1311,7 +1422,9 @@ content content-type query format cookies <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 redirect redirect-methods basic-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-keep-alive headers proxy user-agent external-format ssl)</font></strong></p>
+keep-alive headers proxy user-agent external-format ssl<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+skip-body)</font></strong></p>
 
 <p>Sends a request to <strong>uri</strong> and returns four values: 
 
@@ -1357,8 +1470,10 @@ keep-alive headers proxy user-agent external-format ssl)</font></strong></p>
   <tr>
     <td width="22%">accept</td>
     <td width="16%">&quot;*/*&quot;</td>
-    <td width="62%">A list of MIME types that are acceptable as a response to this request.
-    &nbsp; The default is to accept anything.</td>
+    <td width="62%">A string listing of MIME types that are acceptable as a response to this
+    request.&nbsp; The type listed can be simple such as &quot;text/html&quot; or more complex
+    like &quot;text/html, audio/*&quot;&nbsp; The default is to accept anything which is
+    expressed &quot;*/*&quot;.</td>
   </tr>
   <tr>
     <td width="22%">content</td>
@@ -1407,8 +1522,8 @@ keep-alive headers proxy user-agent external-format ssl)</font></strong></p>
     given by the value of <strong>redirect-methods </strong>then if this argument is true
     (and, if an integer, positive), <strong>do-http-request</strong> will call itself to
     access the page to which the redirection is pointed.&nbsp; If <strong>redirect</strong> is
-    an integer then in the recursiive call the valued passed for <strong>redirect</strong>
-    will be one less than the current value.&nbsp; This prevents infinite recursion due to
+    an integer then in the recursive call the value passed for <strong>redirect</strong> will
+    be one less than the current value.&nbsp; This prevents infinite recursion due to
     redirection loops.</td>
   </tr>
   <tr>
@@ -1451,7 +1566,7 @@ keep-alive headers proxy user-agent external-format ssl)</font></strong></p>
   <tr>
     <td width="22%">user-agent</td>
     <td width="16%">nil</td>
-    <td width="62%">If given it specfies the value of the User-Agent header to be sent with
+    <td width="62%">If given it specifies the value of the User-Agent header to be sent with
     the request.&nbsp; Some sites respond differently based on the user-agent they believe has
     made the request.&nbsp; The lack of a User-Agent header may cause a server to ignore a
     request since it believes that it is being probed by a robot.&nbsp; The value of
@@ -1460,7 +1575,7 @@ keep-alive headers proxy user-agent external-format ssl)</font></strong></p>
   </tr>
   <tr>
     <td width="22%">external-format</td>
-    <td width="16%">:latin1-base</td>
+    <td width="16%">the value of <strong>*default-aserve-external-format*</strong></td>
     <td width="62%">This determines the socket stream's external format.</td>
   </tr>
   <tr>
@@ -1469,6 +1584,17 @@ keep-alive headers proxy user-agent external-format ssl)</font></strong></p>
     <td width="62%">If true then the connection is made using the Secure Sockets Layer
     protocol.&nbsp;&nbsp;&nbsp; If the uri uses the <strong>https</strong> scheme then <strong>ssl</strong>
     is assumed to be true and the <strong>ssl </strong>argument need not be specified.</td>
+  </tr>
+  <tr>
+    <td width="22%">skip-body</td>
+    <td width="16%">nil</td>
+    <td width="62%">If the value is a fucntion (satisifies <strong>functionp</strong>) then
+    the value is funcalled passing the <strong>client-request </strong>object as an argument.
+    &nbsp; At this point the client-request object contains the information on the headers of
+    the response.&nbsp;&nbsp; The function should return true if the body of the response
+    should be skipped and <strong>nil</strong> returned as the first value from
+    do-http-request.&nbsp; If skip-body is not a function then if its value is true then
+    reading the body is skipped and <strong>nil</strong> returned in its place.</td>
   </tr>
 </table>
 
@@ -1676,6 +1802,8 @@ is called on it to close the socket and reclaim that resource.</p>
 of the request (if any), and then it will call <strong>read-client-response-headers</strong>
 to partially read the web server's response to the request.</p>
 
+<p>The default value for <strong>external-format</strong> is the value of <strong>*default-aserve-external-format*</strong></p>
+
 <p>&nbsp;</p>
 
 <p>&nbsp;</p>
@@ -1717,6 +1845,16 @@ client-request)</strong></font></p>
 returns the resources used by this connection to the operating system.&nbsp; </p>
 
 <p>&nbsp;</p>
+
+<p><a name="f-uriencode-string"></a>(<strong><font face="Courier New">uriencode-string&nbsp;
+string &amp;key external-format)</font></strong></p>
+
+<p>Convert the string into a format that would be save to use as a component of a url.
+&nbsp;&nbsp;&nbsp; In this conversion most printing characters are not changed
+&nbsp;&nbsp; All non printing characters and printing characters that could be confused
+with characters that separate fields in a url are encoded a %xy where xy is the
+hexadecimal representation of the char-code of the character.&nbsp;&nbsp; <br>
+external-format defaults to the value of <strong>*default-aserve-external-format*</strong>.</p>
 
 <hr>
 
@@ -1777,10 +1915,10 @@ the item stays in the disk cache).</p>
 the size you specified but the memory cache can exceed the specified size for a short
 time.&nbsp; A background thread moves items from the memory cache to the disk caches and
 we will allow you to control how often that thread wakes up and ensures that the memory
-cache is within the desired contstaints.</p>
+cache is within the desired constraints.</p>
 
 <p>When <strong>net.aserve:start</strong> is called you specify if you want caching and if
-so what sizes caches you want.&nbsp;&nbsp; A sample argument pair passed to <strong>net.aserve:start</strong>
+so what size caches you want.&nbsp;&nbsp; A sample argument pair passed to <strong>net.aserve:start</strong>
 is</p>
 
 <pre>:cache '(:memory 10000000 :disk (&quot;/tmp/mycache&quot; 30000000) :disk (nil 20000000))</pre>
@@ -1816,8 +1954,8 @@ The two pages are&nbsp; <strong>/cache-stats</strong>&nbsp; and&nbsp; <strong>/c
 
 <h2><a name="filters"></a>Request Filters</h2>
 
-<p>After aserve reads a request and before it checks the locators to find an entity to
-handle the request, aserve runs the request through a set of filters. </p>
+<p>After AllegroServe reads a request and before it checks the locators to find an entity
+to handle the request, AllegroServe runs the request through a set of filters. </p>
 
 <p>A filter is a function of one argument: the http-request object. The filter examines
 and possibily alters the request object. The idea is that filters can do large scale and
@@ -1897,10 +2035,10 @@ with proxying enabled).</p>
 separate lisp thread.&nbsp; Also AllegroServe catches errors in entity handler functions,
 thus preventing you from interactively diagnosing the problem.</p>
 
-<p>You can put aServe in a mode that makes debugging easier with the <font
+<p>You can put AllegroServe in a mode that makes debugging easier with the <font
 face="Courier New">net.aserve::debug-on</font> function.&nbsp;&nbsp; Note that this is not
 an exported function to emphasize the fact that you are working with the internals of
-aServe.</p>
+AllegroServe.</p>
 
 <p>&nbsp;</p>
 
@@ -1926,23 +2064,23 @@ enabled.</p>
 <table border="1" width="100%">
   <tr>
     <td width="18%"><strong>:info</strong></td>
-    <td width="82%">aServe prints information at certain places while doing its processing.
-    &nbsp; </td>
+    <td width="82%">AllegroServe prints information at certain places while doing its
+    processing. &nbsp; </td>
   </tr>
   <tr>
     <td width="18%"><strong>:xmit</strong></td>
-    <td width="82%">aServe prints what it receives from and sends to the client.&nbsp; In some
-    cases the body of a request or response will not be printed.</td>
+    <td width="82%">AllegroServe prints what it receives from and sends to the client.&nbsp;
+    In some cases the body of a request or response will not be printed.</td>
   </tr>
   <tr>
     <td width="18%"><strong>:notrap</strong></td>
-    <td width="82%">When enabled, this prevents aServe from catching errors in entity handler
-    functions.&nbsp; If an error occurs and you're running in an evironment where background
-    processes automatically create new windows (such as the emacs-lisp interface) then you'll
-    be given a chance to :zoom the stack and diagnose the problem.&nbsp; Note that if a
-    timeout has been established to limit the amount of time that a certain step is allowed
-    (and this is done by default) then the interactive debugging session will be aborted when
-    the timeout is reached.</td>
+    <td width="82%">When enabled, this prevents AllegroServe from catching errors in entity
+    handler functions.&nbsp; If an error occurs and you're running in an evironment where
+    background processes automatically create new windows (such as the emacs-lisp interface)
+    then you'll be given a chance to :zoom the stack and diagnose the problem.&nbsp; Note that
+    if a timeout has been established to limit the amount of time that a certain step is
+    allowed (and this is done by default) then the interactive debugging session will be
+    aborted when the timeout is reached.</td>
   </tr>
 </table>
 

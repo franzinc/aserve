@@ -22,7 +22,8 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-;; $Id: publish.cl,v 1.33.6.4 2001/06/26 21:21:08 layer Exp $
+;;
+;; $Id: publish.cl,v 1.33.6.5 2001/10/22 16:12:57 layer Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -84,7 +85,7 @@
   ;; a file to be published
   (
    (file  :initarg :file :reader file)
-   (contents :initarg :contents :reader contents
+   (contents :initarg :contents :accessor contents
 	     :initform nil)
    (cache-p 
     ;; true if the contents should be cached when accessed
@@ -92,21 +93,7 @@
     :initform nil
     :accessor cache-p)
      
-   (ssi
-    ;; true if we should look for server side includes when
-    ;; accessing this file
-    :initarg :ssi
-    :initform nil
-    :accessor ssi)
-     
-   (dependencies 
-    ;; list of (filename . lastmodifiedtime) 
-    ;; for each of the files that this file includes
-    :initarg :dependencies
-    :initform nil
-    :accessor dependencies)
-     
-   )) 
+   ))
 
 
 (defclass computed-entity (entity)
@@ -132,17 +119,31 @@
     :initarg :cache-p
     :initform nil
     :accessor cache-p)   
+   
+   ; list of name of files that can be used to index this directory
+   (indexes   :initarg :indexes
+	      :initform nil
+	      :accessor directory-entity-indexes)
+   
+   ; filter is nil or a function of   req ent filename
+   ; which can process the request or return nil
+   (filter    :initarg :filter
+	      :initform nil
+	      :accessor directory-entity-filter)
     
-   (ssi
-    ;; settting for file entities created:
-    ;; true if we should look for server side includes when
-    ;; accessing this file
-    :initarg :ssi
-    :initform nil
-    :accessor ssi)
+   
    )
   )
 
+
+(defclass special-entity (entity)
+  ;; used to hold a certain body we want to always return
+  ;; nil means we'll return no body
+  ((content :initform nil
+	    :initarg :content
+	    :reader special-entity-content)))
+
+(setq *not-modified-entity* (make-instance 'special-entity))
 
 
 
@@ -353,12 +354,12 @@
 (build-mime-types-table)  ;; build the table now
 
 
-(defun unpublish (&key all)
+
+(defun unpublish (&key all (server *wserver*))
   (if* all
-     then (dolist (locator (wserver-locators *wserver*))
+     then (dolist (locator (wserver-locators server))
 	    (unpublish-locator locator))
      else (error "not done yet")))
-
   
 ;; methods on entity objects
 
@@ -378,6 +379,12 @@
 	    nil)))
 
 
+(defmethod content-length ((ent special-entity))
+  (let ((body (special-entity-content ent)))
+    (if* body 
+       then (length body) 
+       else 0)))
+  
 
 ;- transfer-mode - will the body be sent in :text or :binary mode.
 ;  use :binary if you're not sure
@@ -444,7 +451,7 @@
 			  (host nil host-p) 
 			  port path
 			  file content-type class preload
-			  cache-p ssi 
+			  cache-p
 			  remove
 			  authorizer)
   ;; return the given file as the value of the url
@@ -494,7 +501,6 @@
 			    :last-modified-string (universal-time-to-date lastmod)
 			    
 			    :cache-p cache-p
-			    :ssi     ssi
 			    :authorizer authorizer
 			    ))))
        else (setq ent (make-instance (or class 'file-entity)
@@ -507,7 +513,6 @@
 			:file file
 			:content-type c-type
 			:cache-p cache-p
-			:ssi ssi
 			:authorizer authorizer
 			)))
 
@@ -527,6 +532,8 @@
 			       locator
 			       remove
 			       authorizer
+			       (indexes '("index.html" "index.htm"))
+			       filter
 			       )
   
   ;; make a whole directory available
@@ -543,6 +550,8 @@
 		       :host host
 		       :port port
 		       :authorizer authorizer
+		       :indexes indexes
+		       :filter filter
 		       )))
     
   (dolist (entpair (locator-info locator))
@@ -697,6 +706,12 @@
 				
 
 (defmethod handle-request ((req http-request))
+  
+  (dolist (filter (wserver-filters *wserver*))
+    ;; run all filters.  a return value of :done means don't
+    ;; run any further filters
+    (if* (eq :done (funcall filter req)) then (return)))
+    
   (dolist (locator (wserver-locators *wserver*))
     (let ((ent (standard-locator req locator)))
       (if* ent
@@ -875,89 +890,115 @@
   
 (defmethod process-entity ((req http-request) (ent file-entity))
     
-  (let ((contents (contents ent)))
-    (if* contents
-       then ;(preloaded)
-	    ; set the response code and 
-	    ; and header fields then dump the value
+  (tagbody 
+   retry 
+    (let ((contents (contents ent)))
+      (if* contents
+	 then ;(preloaded)
+	      ; ensure that the cached file matches the 
+	      ; actual file
+	      (if* (not (eql (last-modified ent)
+			     (file-write-date (file ent))))
+		 then ; uncache it
+		      (setf (contents ent) nil
+			    (last-modified ent) nil)
+		      (go retry))
 	      
-	    ; * should check for range here
-	    ; for now we'll send it all
-	    (with-http-response (req ent
-				     :content-type (content-type ent))
-	      (setf (request-reply-content-length req) (length contents))
-	      (push (cons "Last-Modified" (last-modified-string ent))
-		    (request-reply-headers req))
+	      ; set the response code and 
+	      ; and header fields then dump the value
 	      
-	      (with-http-body (req ent :format :binary)
-		;; at this point the header are out and we have a stream
-		;; to write to 
-		(write-sequence contents (request-reply-stream req))
-		))
-       else ; the non-preloaded case
-	    (let (p)
+	      ; * should check for range here
+	      ; for now we'll send it all
+	      (with-http-response (req ent
+				       :content-type (content-type ent))
+		(setf (request-reply-content-length req) (length contents))
+		(setf (reply-header-slot-value req :last-modified)
+		  (last-modified-string ent))
 	      
-	      (setf (last-modified ent) nil) ; forget previous cached value
 	      
-	      (if* (null (errorset 
-			  (setq p (open (file ent) 
-					:direction :input
-					:element-type '(unsigned-byte 8)))))
-		 then ; file not readable
+		(with-http-body (req ent :format :binary)
+		  ;; at this point the header are out and we have a stream
+		  ;; to write to 
+		  (write-sequence contents (request-reply-stream req))
+		  ))
+       
+	    
+	    
+	 else ; the non-preloaded case
+	      (let (p)
+	      
+		(setf (last-modified ent) nil) ; forget previous cached value
+	      
+		(if* (null (errorset 
+			    (setq p (open (file ent) 
+					  :direction :input
+					  :element-type '(unsigned-byte 8)))))
+		   then ; file not readable
 		      
-		      (return-from process-entity nil))
+			(return-from process-entity nil))
 	      
-	      (unwind-protect 
-		  (progn
-		    (let ((size (excl::filesys-size (stream-input-fn p)))
-			  (lastmod (excl::filesys-write-date 
-				    (stream-input-fn p)))
-			  (buffer (make-array 1024 
-					      :element-type '(unsigned-byte 8))))
-		      (declare (dynamic-extent buffer))
+		(unwind-protect 
+		    (progn
+		      (let ((size (excl::filesys-size (stream-input-fn p)))
+			    (lastmod (excl::filesys-write-date 
+				      (stream-input-fn p)))
+			    (buffer (make-array 1024 
+						:element-type '(unsigned-byte 8))))
+			(declare (dynamic-extent buffer))
 		      
-		      (setf (last-modified ent) lastmod
-			    (last-modified-string ent)
-			    (universal-time-to-date lastmod))
+			(setf (last-modified ent) lastmod
+			      (last-modified-string ent)
+			      (universal-time-to-date lastmod))
 		      
+			(if* (cache-p ent)
+			   then ; we should read and cache the contents
+				; and then do the cached thing
+				(let ((wholebuf 
+				       (make-array
+					size
+					:element-type '(unsigned-byte 8))))
+				  (read-sequence wholebuf p)
+				  (setf (contents ent) wholebuf))
+				(go retry))
+			      
+				
+			      
 		      
-		      (with-http-response (req ent)
+			(with-http-response (req ent)
 
-			;; control will not reach here if the request
-			;; included an if-modified-since line and if
-			;; the lastmod value we just calculated shows
-			;; that the file hasn't changed since the browser
-			;; last grabbed it.
+			  ;; control will not reach here if the request
+			  ;; included an if-modified-since line and if
+			  ;; the lastmod value we just calculated shows
+			  ;; that the file hasn't changed since the browser
+			  ;; last grabbed it.
 			
-			(setf (request-reply-content-length req) size)
-			(push (cons "Last-Modified"
-				    (last-modified-string ent))
-			      (request-reply-headers req))
+			  (setf (request-reply-content-length req) size)
+			  (setf (reply-header-slot-value req :last-modified)
+			    (last-modified-string ent))
 			
 			
-			(with-http-body (req ent :format :binary)
-			  (loop
-			    (if* (<= size 0) then (return))
-			    (let ((got (read-sequence buffer 
-						      p :end 
-						      (min size 1024))))
-			      (if* (<= got 0) then (return))
-			      (write-sequence buffer (request-reply-stream req)
-					      :end got)
-			      (decf size got)))))))
+			
+			  (with-http-body (req ent :format :binary)
+			    (loop
+			      (if* (<= size 0) then (return))
+			      (let ((got (read-sequence buffer 
+							p :end 
+							(min size 1024))))
+				(if* (<= got 0) then (return))
+				(write-sequence buffer (request-reply-stream req)
+						:end got)
+				(decf size got)))))))
 		      
 		      
 		
-		(close p))))
+		  (close p))))))
     
-    t	; we've handled it
-    ))
+  t	; we've handled it
+  )
 
-	      
-		
 (defmethod process-entity ((req http-request) (ent directory-entity))
   ;; search for a file in the directory and then create a file
-  ;; entity for it so we can track last modified and stu
+  ;; entity for it so we can track last modified.
   
   ; remove the prefix and tack and append to the given directory
   
@@ -986,18 +1027,19 @@
 	 then ; not present
 	      (return-from process-entity nil)
        elseif (eq :directory type)
-	 then ; we have to try index.html and index.htm
+	 then ; Try the indexes (index.html, index.htm, or user-defined).
+	      ; tack on a trailing slash if there isn't one already.
 	      (if* (not (eq #\/ (schar realname (1- (length realname)))))
 		 then (setq realname (concatenate 'string realname "/")))
+
+	      (setf redir-to 
+		(dolist (index (directory-entity-indexes ent) 
+			  ; no match to index file, give up
+			  (return-from process-entity nil))
+		  (if* (eq :file (excl::filesys-type
+				  (concatenate 'string realname index)))
+		     then (return index))))
 	      
-	      (if* (eq :file (excl::filesys-type
-			      (concatenate 'string realname "index.html")))
-		 then (setq redir-to "index.html")
-	       elseif (eq :file (excl::filesys-type
-				 (concatenate 'string realname "index.htm")))
-		 then (setq redir-to "index.htm")
-		 else ; failure
-		      (return-from process-entity nil))
        elseif (not (eq :file type))
 	 then  ; bizarre object
 	      (return-from process-entity nil)))
@@ -1018,12 +1060,16 @@
 			       redir-to))
 			     
 		(with-http-body (req ent))))
+     elseif (and (directory-entity-filter ent)
+		 (funcall (directory-entity-filter ent) req ent realname))
+       thenret ; processed by the filter
        else ;; ok realname is a file.
 	    ;; create an entity object for it, publish it, and dispatch on it
       
 	    (process-entity req 
 			    (publish-file :path (uri-path 
 						 (request-uri req))
+					  :host (host ent)
 					  :file realname
 					  :authorizer (entity-authorizer ent))))
     t))
@@ -1064,13 +1110,18 @@
 		      (<= (last-modified ent) if-modified-since))
 	       then ; send back a message that it is already
 		    ; up to date
-		    (debug-format :info "entity is up to date~%")
-		    (setf (request-reply-code req) *response-not-modified*)
-		    (with-http-body (req ent)
-		      ;; force out the header
-		      )
-		    (throw 'with-http-response nil) ; and quick exit
-		    ))))
+		    (let ((nm-ent *not-modified-entity*))
+		      (debug-format :info "entity is up to date~%")
+		      ; recompute strategy based on simple 0 length
+		      ; thing to return
+		      (compute-strategy req nm-ent)
+		      
+		      (setf (request-reply-code req) *response-not-modified*)
+		      (with-http-body (req nm-ent)
+			;; force out the header
+			)
+		      (throw 'with-http-response nil) ; and quick exit
+		      )))))
 
     
 
@@ -1081,9 +1132,9 @@
   (let ((strategy nil)
 	(keep-alive-possible
 	 (and (wserver-enable-keep-alive *wserver*)
-		      (>= (wserver-free-workers *wserver*) 2)
-		      (header-value-member "keep-alive" 
-			      (header-slot-value req :connection )))))
+	      (>= (wserver-free-workers *wserver*) 2)
+	      (header-value-member "keep-alive" 
+				   (header-slot-value req :connection )))))
     (if* (eq (request-method req) :head)
        then ; head commands are particularly easy to reply to
 	    (setq strategy '(:use-socket-stream
@@ -1109,11 +1160,15 @@
 		    
 		    (if* (eq (transfer-mode ent) :binary)
 		       then ; can't create binary stream string
-			    ; must not keep alive
-			    (setq strategy
-			      '(:use-socket-stream
-				; no keep alive
-				))
+			    ; see if we know the content length ahead of time
+			    (if* (content-length ent)
+			       then (setq strategy
+				      '(:keep-alive :use-socket-stream))
+			       else ; must not keep alive
+				    (setq strategy
+				      '(:use-socket-stream
+					; no keep alive
+					)))
 		       else ; can build string stream
 			    (setq strategy
 			      '(:string-output-stream
@@ -1199,10 +1254,15 @@
       
       (if* (and post-headers
 		(eq time :post)
-		(member :string-output-stream strategy :test #'eq))
+		(member :string-output-stream strategy :test #'eq)
+		)
 	 then ; must get data to send from the string output stream
-	      (setq content (get-output-stream-string 
-			     (request-reply-stream req)))
+	      (setq content 
+		(if* (request-reply-stream req)
+			then (get-output-stream-string 
+			      (request-reply-stream req))
+		   else ; no stream created since no body given
+			""))
 	      (setf (request-reply-content-length req) (length content)))
       	
       (if* (and send-headers
@@ -1299,7 +1359,7 @@
   ;;
   (setf (request-reply-stream req) (request-socket req)))
 
-(defmethod compute-response-stream ((req http-request) (ent computed-entity))
+(defmethod compute-response-stream ((req http-request) (ent entity))
   ;; may have to build a string-output-stream
   (if* (member :string-output-stream (request-reply-strategy req) :test #'eq)
      then (setf (request-reply-stream req) (make-string-output-stream))
@@ -1314,7 +1374,8 @@
 			      &key name value expires domain 
 				   (path "/")
 				   secure
-				   (external-format :latin1-base))
+				   (external-format 
+				    *default-aserve-external-format*))
   ;; put a set cookie header in the list of header to be sent as
   ;; a response to this request.
   ;; name and value are required, they should be strings
@@ -1365,7 +1426,8 @@
     res))
 
 
-(defun get-cookie-values (req &key (external-format :latin1-base))
+(defun get-cookie-values (req &key (external-format 
+				    *default-aserve-external-format*))
   ;; return the set of cookie name value pairs from the current
   ;; request as conses  (name . value) 
   ;;

@@ -23,7 +23,9 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-;; $Id: parse.cl,v 1.22.10.4 2001/06/01 21:22:36 layer Exp $
+
+;;
+;; $Id: parse.cl,v 1.22.10.5 2001/10/22 16:12:57 layer Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -338,7 +340,15 @@
 	   then (format *debug-stream* "early eof reading response after ~d bytes~%" i)
 		(return nil) ; eof - failure
 		)
-	(if* echo then (write-char (code-char ch) *debug-stream*))
+	
+	; enable this if things are really messed
+	; up and you need to see characters as they come in
+	#+ignore
+	(if* echo 
+	   then (write-char (code-char ch) *debug-stream*)
+		(force-output *debug-stream*))
+	
+	
 	(setf (aref buff i) ch)
 	(incf i)
 	(case state
@@ -374,7 +384,10 @@
 			(if* (not (eq (aref buff i) #.(char-code #\return)))
 			   then (incf i)))
 		; i points to the [cr] lf
-		
+		(if* echo 
+		   then (write-sequence buff *debug-stream*
+					:start 0
+					:end i))
 		(return i))))))
 
 	  
@@ -660,6 +673,24 @@
 			(if* (>= start end)
 			   then (add-to-parseobj po st start)
 				(return))
+		 elseif (eq ch #\")
+		   then ; double quoted value.. skip over this
+			(loop
+			  (incf start)
+			  (if* (>= start end)
+			     then (return)
+			     else (setq ch (schar str start))
+				  (if* (eq ch #\")
+				     then (return)
+				   elseif (eq ch #\\)
+				     then ; single char quote
+					  (incf start)
+					  (if* (>= start end)
+					     then (return)))))
+			(if* (>= start end)
+			   then (add-to-parseobj po st start)
+				(return)
+			   else (incf start))
 		   else (incf start)))))
     po))
 

@@ -1,28 +1,164 @@
 *******************************************************************************
-merge from trunk to acl6 branch (for 6.1.beta)
-command: ../../join.sh trunk trunk_to_acl6_merge5 trunk_to_acl6_merge6 aserve
+merge from acl61 to acl6 branch
+cmd: ../../join.sh acl61 acl61 acl61_to_acl6_merge1 aserve
 *******************************************************************************
-merge from trunk to acl6 branch (for 6.1.beta)
-command: ../../join.sh trunk trunk_to_acl6_merge4 trunk_to_acl6_merge5 aserve
+merge from trunk to acl61 branch
+cmd: ../../join.sh trunk trunk_to_acl61_merge9 trunk_to_acl61_merge10 aserve
 *******************************************************************************
-merge from trunk to acl6 branch (for 6.1.pre-beta)
-command: ../../join.sh trunk trunk_to_acl6_merge3 trunk_to_acl6_merge4 aserve
+merge from trunk to acl61 branch
+command: ../../join.sh trunk trunk_to_acl61_merge8 trunk_to_acl61_merge9 aserve
 *******************************************************************************
-merge from trunk to acl6 branch (for 6.0.final.0)
-command: ../../join.sh trunk trunk_to_acl6_merge2 trunk_to_acl6_merge3 aserve
+merge from trunk to acl61 branch
+command: ../../join.sh trunk trunk_to_acl61_merge7 trunk_to_acl61_merge8 aserve
 *******************************************************************************
-merge from trunk to acl6 branch (for 6.0.pre-final.something)
-command: ../../join.sh trunk trunk_to_acl6_merge1 trunk_to_acl6_merge2 aserve
+merge from trunk to acl61 branch
+command: ../../join.sh trunk trunk_to_acl61_merge6 trunk_to_acl61_merge7 aserve
 *******************************************************************************
-merge from trunk to acl6 branch
-command: ../../join.sh trunk acl6 trunk_to_acl6_merge1 aserve
+merge from trunk to acl61 branch
+command: ../../join.sh trunk trunk_to_acl61_merge5 trunk_to_acl61_merge6 aserve
 *******************************************************************************
-join from layer6 to acl6 branch
+merge from trunk to acl61 branch
+command: ../../join.sh trunk trunk_to_acl61_merge4 trunk_to_acl61_merge5 aserve
 *******************************************************************************
-join from trunk to layer6 branch
-command:
-  ../../join.sh trunk acl6_branch_point trunk_to_layer6_merge1 aserve
+merge from trunk to acl61 branch
+command: ../../join.sh trunk trunk_to_acl61_merge3 trunk_to_acl61_merge4 aserve
 *******************************************************************************
+merge from trunk to acl61 branch
+command: ../../join.sh trunk trunk_to_acl61_merge2 trunk_to_acl61_merge3 aserve
+*******************************************************************************
+merge from trunk to acl61 branch
+command: ../../join.sh trunk trunk_to_acl61_merge1 trunk_to_acl61_merge2 aserve
+*******************************************************************************
+merge from trunk to acl61 branch
+command: ../../join.sh trunk acl61 trunk_to_acl61_merge1 aserve
+*******************************************************************************
+
+2001-10-08  John Foderaro  <jkf@tiger.franz.com>
+
+	* publish.cl - publish-directory must pass on host info
+		to the publish-files that it does.
+	            - unpublish takes a :server argument
+
+2001-09-29  John Foderaro  <jkf@tiger.franz.com>
+
+	* cgi.cl - fix bug where content-length was specified wrong
+
+2001-09-21  John Foderaro  <jkf@tiger.franz.com>
+1.2.10
+	* added ability to run cgi programs
+	  new file cgi.cl
+
+2001-09-20  John Foderaro  <jkf@tiger.franz.com>
+
+	* examples/examples.cl - add commentary to some of the links
+	to make them clearer
+
+2001-09-20  Kevin Layer  <layer@crikey>
+
+	* makefile: split `clean' into `clean' and `cleanall', the latter
+	which removes aserve-src.
+	* makefile (clean): add `r' to `rm'
+
+2001-09-18  Kevin Layer  <layer@crikey>
+1.2.9
+
+	* makefile: add build and srcdist rules; have make clean remove
+	aserve-src
+	* load.cl: parameterize make-src-distributions's directory name
+
+2001-09-12  John Foderaro  <jkf@tiger.franz.com>
+1.2.8
+	* client.cl: add :skip-body to do-http-request. add test for this.
+	* decode.cl: fix form-urlencoded-to-query so that it can
+		handle a non simple string (which can be returned under
+	        certain circumstances from get-request-body)
+
+2001-08-28  John Foderaro  <jkf@tiger.franz.com>
+1.2.7
+	* take the default value for the external-format
+	  argument from *default-aserve-external-format*.  
+	  net.aserve:start sets the value of *default-aserve-external-foramt*
+	  in worker threads.
+
+	* parse.cl (split-string): don't get confused by commas inside
+		a double quoted header parameter value.
+
+2001-08-24  John Foderaro  <jkf@tiger.franz.com>
+
+	*  when an error occurs in the worker thread  print the command line
+	   for the request that got the error.
+
+2001-08-16  John Foderaro  <jkf@tiger.franz.com>
+1.2.6
+	* main.cl - try harder to prevent debug output from multiple
+	    threads from getting jumbled up on the console
+	* publish.cl - do a keep-alive connection if the data is a binary
+	    stream as long as we know the content length.
+	    Add a new internal entity type so that returns of 
+	    "304 - Not Modified" can do keep alives too.
+
+2001-08-15  John Foderaro  <jkf@tiger.franz.com>
+1.2.5
+	* main.cl - incf version number for new release
+
+2001-08-09  John Foderaro  <jkf@tiger.franz.com>
+
+	*  publish.cl - added :filter functionality to publish-directory
+	*  test/t-aserve.cl - test filters in publish-directory
+
+2001-08-08  John Foderaro  <jkf@tiger.franz.com>
+
+	*  publish.cl - allow list of index files to be specified in
+		for each directory-entity.
+	    - specify a catch-all compute-response-stream method so 
+	      users adding new entity type don't have to do so.
+
+2001-08-08  jkf  <jkf@main.verada.com>
+
+	* publish.cl - fix for when no body is given with-http-body
+		and thus a string-output-stream is not created.
+
+2001-07-30    <jkf@DEEDEE>
+1.2.4
+	* main.cl: fix get-multipart-* to correspond to rfc2046
+		and thus it will work with the Opera browser which 
+		generates legal (but unusual) kinds of boundary markers
+
+2001-07-19  John Foderaro  <jkf@tiger.franz.com>
+1.2.3
+	* publish.cl 
+	  - If publish-file file is changed then invalidate
+	    the cached information on it.
+	  - remove extraneous slots in classes.
+	    
+         * test/t-aserve.cl
+	    test cache invaldation in publish-file
+
+2001-07-18    <jkf@CROW>
+
+	* doc/publish.html - update publish-file doc for preload and
+	        cache-p args
+	* doc/htmlgen.html - make first example clearer
+	* doc/tutorial.html - add note to help Windows users
+
+2001-07-18  jkf  <jkf@main.verada.com>
+
+	* publish.cl - add cache-p argument to publish-file which will
+	    cache the file contents on first use
+	* chat.cl - add support for removing selective private messages
+	    after a certain amount of time.
+	* test/t-aserve.cl - test cache-p argument to publish-file
+
+2001-07-09  John Foderaro  <jkf@tiger.franz.com>
+
+	* example/chat.cl - add chat transcript feature
+
+
+2001-06-27  jkf  <jkf@main.verada.com>
+1.2.2
+	* added the ability to filter requests before they get 
+	  processed.  see Request-Filters in aserve.html
+
 2001-06-26  John Foderaro  <jkf@tiger.franz.com>
 1.2.1
 	* main.cl - don't get blocked on a force-output that will

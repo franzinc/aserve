@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.8.6.3 2001/06/01 21:22:39 layer Exp $
+;; $Id: htmlgen.cl,v 1.8.6.4 2001/10/22 16:12:57 layer Exp $
 
 ;; Description:
 ;;   html generator

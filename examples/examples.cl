@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.10.6.5 2001/06/11 20:14:23 layer Exp $
+;; $Id: examples.cl,v 1.10.6.6 2001/10/22 16:12:57 layer Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -72,7 +72,8 @@
 			 :p
 			 (:b "Sample pages") :br
 			 ((:a :href "gc") "Garbage Collector Stats") :br
-			 ((:a :href "apropos") "Apropos") :br
+			 ((:a :href "apropos") "Apropos")
+			 :br
 			 ((:a :href "pic") "Sample jpeg") :br
 			 ((:a :href "pic-redirect") "Redirect to previous picture") :br
 			 ((:a :href "pic-gen") "generated jpeg") "- hit reload to switch images" :br
@@ -93,6 +94,7 @@
 			  "Like the preceding but uses authorizer objects")
 			 :br
 			 ((:a :href "timeout") "Test timeout")
+			 "  this will take a while to time out."
 			 :br
 			 ((:a :href "getfile") "Client to server file transfer")
 			 :br
@@ -101,8 +103,18 @@
 			 
 			 :br
 			 #+unix
-			 ((:a :href "long-slow") "long, slow cpu bound")
-			  " action to demo multiple process actions"
+			 (html
+			  ((:a :href "long-slow") "long, slow, cpu-bound")
+			  " action to demonstrate how AllegroServe "
+			  "in multiple Unix process mode can be responsive"
+			  " even if one AllegroServe process is wedged."
+			  " You probably do "
+			  (:b "not")
+			  " want to click on this link if you are running"
+			  " AllegroServe is its normal single Unix process"
+			  " mode.")
+			  
+			 
 			 :br
 			 ;; run only in an international lisp.
 			 ;; test at runtime since we may switch back
@@ -126,7 +138,16 @@
 				  ((:a :href "urian")
 				   "International Web Page Character Finder")))
 			 
-		  
+			 #+(and unix (version>= 6 1))
+			 (html
+			  "cgi tests: " 
+			  ((:a :href "cgi0") "show environment")
+			  ", "
+			  ((:a :href "cgi1") "handle unix-style headers")
+			  ", "
+			  ((:a :href "cgi2") "redirect")
+			  ", "
+			  ((:a :href "cgi3") "set status to unauthorized request"))
 			 ))))))
 			     
 
@@ -307,6 +328,8 @@
 			    :maxlength 40
 			    :size 20
 			    :name "symbol")))
+		  #+allegro
+		  " The apropos function in ACL is case sensitive."
 		  :p
 			
 		  (if* lookup
@@ -669,6 +692,30 @@
 	     (with-http-response (req ent)
 	       (with-http-body (req ent)
 		 (html "done")))))
+
+
+
+;; cgi publishing, we publish a shell script that only works
+;; on Unix shells:
+#+unix
+(publish :path "/cgi0" :function
+	 #'(lambda (req ent)
+	     (net.aserve::run-cgi-program req ent "aserve/examples/cgitest.sh")))
+
+#+unix
+(publish :path "/cgi1" :function
+	 #'(lambda (req ent)
+	     (net.aserve::run-cgi-program req ent "aserve/examples/cgitest.sh 1")))
+
+#+unix
+(publish :path "/cgi2" :function
+	 #'(lambda (req ent)
+	     (net.aserve::run-cgi-program req ent "aserve/examples/cgitest.sh 2")))
+
+#+unix
+(publish :path "/cgi3" :function
+	 #'(lambda (req ent)
+	     (net.aserve::run-cgi-program req ent "aserve/examples/cgitest.sh 3")))
 
 
 ;;;;;;  directory publishing.  These will only work on a particular
