@@ -1,5 +1,8 @@
 *******************************************************************************
 merge from trunk to acl61 branch
+command: ../../join.sh trunk trunk_to_acl61_merge7 trunk_to_acl61_merge8 aserve
+*******************************************************************************
+merge from trunk to acl61 branch
 command: ../../join.sh trunk trunk_to_acl61_merge6 trunk_to_acl61_merge7 aserve
 *******************************************************************************
 merge from trunk to acl61 branch

@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.31.10.4.4.3 2001/09/21 21:49:14 layer Exp $
+;; $Id: load.cl,v 1.31.10.4.4.4 2001/09/24 03:01:43 layer Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -42,7 +42,7 @@
       "load.cl"
       "test/t-aserve.cl"
       "test/server.pem"
-      "test/cgitest.sh"
+      "examples/cgitest.sh"
       "doc/aserve.html"
       "doc/tutorial.html"
       "doc/htmlgen.html"
