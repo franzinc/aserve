@@ -132,7 +132,9 @@ and after you start the server.</p>
 server running.</p>
 
 <p><strong><font face="Courier New"><a name="f-start"></a>(start &amp;key port listeners
-chunking keep-alive server setuid setgid debug proxy)</font></strong></p>
+chunking keep-alive<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; server setuid setgid
+debug proxy cache accept-hook)</font></strong></p>
 
 <p>If no arguments are given then <strong>start</strong>&nbsp; starts a multi-threaded web
 server on port 80, which is the standard web server port.&nbsp;&nbsp;&nbsp; If you are
@@ -180,6 +182,12 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
     removed in future versions.</li>
   <li>proxy -- if true then this server will also act as a proxy server and will forward http
     requests to other servers.</li>
+  <li>cache -- if true (and if proxy is true as well) cache locally the work done by the proxy
+    server.&nbsp; This facility is still being developed.</li>
+  <li>accept-hook -- this should be a function of one argument, the socket which was created
+    when a http request was accepted by AllegroServe.&nbsp; The function should return a
+    socket for AllegroServe to use.&nbsp; This hook is normally used to turn a regular socket
+    into an SSL socket.</li>
 </ul>
 
 <p>&nbsp;</p>
@@ -1074,7 +1082,7 @@ site that depends on cookies to work.</p>
 <p>&nbsp;</p>
 
 <p><a name="f-set-cookie-header"></a><strong><font face="Courier New">(set-cookie-header
-request &amp;key name value expires domain path secure)</font></strong></p>
+request &amp;key name value expires domain path secure external-format)</font></strong></p>
 
 <p>This function should be called between the calls to <strong>with-http-response </strong>and
 <strong>with-http-body</strong>.&nbsp;&nbsp; It can be called more than once.&nbsp; Each
@@ -1099,7 +1107,9 @@ least two periods in it (i.e.&nbsp; &quot;.foo.com&quot;).<br>
 meaning this should never expire.&nbsp; If <strong>expiration </strong>isn't given or is <strong>nil</strong>
 then this cookie will expire when the user quits their web browser.<br>
 <strong>secure</strong> should be true or false.&nbsp; Any non-nil value is interpreted as
-true. The default value is false.</p>
+true. The default value is false.<br>
+The <strong>external-format</strong> is used to convert bytes to characters. &nbsp; It
+defaults to <strong>:latin1-base</strong>. </p>
 
 <p>&nbsp;</p>
 
@@ -1591,7 +1601,8 @@ accept cookies headers proxy<br>
 basic-authorization query<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 content content-type content-length<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; external-format)</font></strong></p>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+external-format)</font></strong></p>
 
 <p>This function connects to the web server indicated by the <strong>uri</strong> and
 sends the request.&nbsp;&nbsp; The arguments are the same as those for <strong>do-http-request</strong>
