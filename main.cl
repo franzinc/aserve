@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.116 2001/10/16 16:58:20 jkf Exp $
+;; $Id: main.cl,v 1.116.2.1 2001/10/16 20:09:44 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1220,6 +1220,7 @@ by keyword symbols and not by strings"
       (format nil "w~d" *thread-index*))
     ))
 
+(defvar .http-worker-thread-error-handler. nil)
 
 (defun http-worker-thread ()
   ;; made runnable when there is an socket on which work is to be done
@@ -1237,17 +1238,20 @@ by keyword symbols and not by strings"
 	    (if* (not (member :notrap *debug-current* :test #'eq))
 	       then (handler-case (process-connection sock)
 		      (error (cond)
-			(logmess 
-			 (format nil "~agot error ~a~%" 
-				 (if* *worker-request*
-				    then (format 
-					  nil 
-					  "while processing command ~s~%"
-					  (request-raw-request 
-					   *worker-request*))
-				    else "")
-				 cond
-				 ))))
+			(if* .http-worker-thread-error-handler.
+			   then (funcall .http-worker-thread-error-handler.
+					 *worker-request*)
+			   else (logmess 
+				 (format nil "~agot error ~a~%" 
+					 (if* *worker-request*
+					    then (format 
+						  nil 
+						  "while processing command ~s~%"
+						  (request-raw-request 
+						   *worker-request*))
+					    else "")
+					 cond
+					 )))))
 	       else (process-connection sock))
 	  (abandon ()
 	      :report "Abandon this request and wait for the next one"

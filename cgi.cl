@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: cgi.cl,v 1.4 2001/10/12 21:51:29 jkf Exp $
+;; $Id: cgi.cl,v 1.4.2.1 2001/10/16 20:09:44 layer Exp $
 
 ;; Description:
 ;;   common gateway interface (running external programs)
@@ -318,7 +318,7 @@
 			headers))
 		
 	  ; send back response
-	  (with-http-response (req ent :response resp)
+	  (with-http-response (req ent :response resp :format :binary)
 	    ;; can't allow string output stream here since
 	    ;; we're writing binary.  since we speicied content
 	    ;; length we shouldn't get a string output stream

@@ -1,3 +1,9 @@
+2001-10-16  Kevin Layer  <layer@crikey>
+
+	* cgi.cl: use :format :binary in with-http-response in
+	successful-script-response
+	* main.cl: add hook for handling error in http-worker-thread
+
 2001-10-16  John Foderaro  <jkf@tiger.franz.com>
 1.2.12
 	
