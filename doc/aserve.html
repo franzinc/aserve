@@ -1210,11 +1210,11 @@ keep-alive headers proxy)</font></strong></p>
 <p>Sends a request to <strong>uri</strong> and returns three values: 
 
 <ol>
+  <li>The body of the response.&nbsp; If there is no body the empty string is returned.</li>
   <li>the response code (for example, 200, meaning that the request succeeded)</li>
   <li>an alist of headers where the <strong>car</strong> of each entry is a lowercase string
     with the header name and the <strong>cdr</strong> is a string with the value of that
     header item.</li>
-  <li>The body of the response.&nbsp; If there is no body the empty string is returned.</li>
 </ol>
 
 <p>The <strong>uri</strong> can be a uri object or a string.&nbsp;&nbsp; The scheme of the
