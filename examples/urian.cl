@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: urian.cl,v 1.2 2001/05/11 21:43:53 jkf Exp $
+;; $Id: urian.cl,v 1.3 2001/12/01 00:20:35 jkf Exp $
 
 ;; Description:
 ;;   urian example
@@ -47,8 +47,8 @@
 (in-package :urian)
 
 (eval-when (compile load eval)
-  (unless (featurep '(:version>= 6 0 :final 0))
-    (error "This file not supported in Allegro CL releases earlier than 6.0")))
+  (if* (not (featurep '(:version>= 6 0)))
+    then (error "This file not supported in Allegro CL releases earlier than 6.0")))
 
 (eval-when (compile load eval)
   (require :aserve)

@@ -95,6 +95,7 @@
 <a href="#miscellaneous">Miscellaneous</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-map-entities"><font face="Courier New">map-entities</font></a><br>
 <a href="#asaservice">Running AllegroServe as a Service on Windows NT</a><br>
+<a href="#international-chars-aserve">Using International Characters in AllegroServe</a><br>
 <a href="#debugging">Debugging</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-debug-on">net.aserve::debug-on</a><br>
 &nbsp; <a href="#f-debug-off">net.aserve::debug-off</a></font><br>
@@ -928,7 +929,7 @@ string.&nbsp;<br>
 <p>.&nbsp;&nbsp; </p>
 
 <p><a name="f-request-query-value"></a><font face="Courier New"><strong>(request-query-value
-key request &amp;key uri post test)</strong></font></p>
+key request &amp;key uri post external-format test)</strong></font></p>
 
 <p>This combines a call to <strong>request-query</strong> to retrieve the alist of query
 keys and values, with a call to <strong>assoc</strong> to search for the specific key, and
@@ -2327,18 +2328,19 @@ The two pages are&nbsp; <strong>/cache-stats</strong>&nbsp; and&nbsp; <strong>/c
 <p>After AllegroServe reads a request and before it checks the locators to find an entity
 to handle the request, AllegroServe runs the request through a set of filters. </p>
 
-<p>A filter is a function of one argument: the http-request object. The filter examines
-and possibily alters the request object. The idea is that filters can do large scale and
-simple url rewriting, such as changing all requests for one machine to another machine.
-The filtering occurs before the test to see if this is a proxy request so a filter can
-change a proxy request to a non proxy request or vice versa. </p>
-
-<p align="left">The currently active filters are found in two places.&nbsp; First the <strong>vhost-filters</strong>
-function of the applicable <strong>vhost</strong> returns a set of <strong>vhost</strong>
-specific filters.&nbsp;&nbsp; Next the <strong>wserver-filters</strong> function on the
-current <strong>wserver</strong> object returns a set of server global filters.
-&nbsp;&nbsp;&nbsp; Both of these functions are <strong>setf</strong>'able to change the
-set of filters.</p>
+<blockquote>
+  <p>A filter is a function of one argument: the http-request object. The filter examines
+  and possibily alters the request object. The idea is that filters can do large scale and
+  simple url rewriting, such as changing all requests for one machine to another machine.
+  The filtering occurs before the test to see if this is a proxy request so a filter can
+  change a proxy request to a non proxy request or vice versa. </p>
+  <p align="left">The currently active filters are found in two places.&nbsp; First the <strong>vhost-filters</strong>
+  function of the applicable <strong>vhost</strong> returns a set of <strong>vhost</strong>
+  specific filters.&nbsp;&nbsp; Next the <strong>wserver-filters</strong> function on the
+  current <strong>wserver</strong> object returns a set of server global filters.
+  &nbsp;&nbsp;&nbsp; Both of these functions are <strong>setf</strong>'able to change the
+  set of filters.</p>
+</blockquote>
 
 <p>&nbsp;</p>
 
@@ -2676,14 +2678,133 @@ like this:</p>
 <p>Note that I use &quot;<font face="Courier New">--</font>&quot; before the &quot;<font
 face="Courier New">/service</font>&quot;.&nbsp; This is <em>very </em>important.
 &nbsp;&nbsp; The &quot;<font face="Courier New">--</font>&quot; separates the arguments
-used to start up the program from the arguments passed to the program itself.
-&nbsp;&nbsp; The call to <strong>ntservice:create-service</strong> is done only once and
-need not be done from within your application.&nbsp; </p>
+used to start up the program from the arguments passed to the program itself. &nbsp;&nbsp;
+The call to <strong>ntservice:create-service</strong> is done only once and need not be
+done from within your application.&nbsp; </p>
 
 <p>Once an application is registered as a service you can start it by going to the Control
 Panel, selecting Administrative Tools and then Services.&nbsp;&nbsp; Locate the service
 you just added, right click on it and select <strong>start</strong>.&nbsp;&nbsp; You can
 stop the service with a a right click as well. </p>
+
+<p>&nbsp;</p>
+
+<hr>
+
+<h2><a name="international-chars-aserve"></a>Using International Characters in
+AllegroServe</h2>
+
+<p>A <em>character set</em> is a collection of characters and a rule to encode them as a
+sequence of octets.&nbsp;&nbsp; The default character set for web protocols is Latin1
+(also known as ISO 8859-1).&nbsp;&nbsp; The Latin1 character set represents nearly every
+character and punctuation needed for western European languages (which includes English).
+&nbsp;&nbsp; </p>
+
+<p>If you want to work with characters outside the Latin1 set you'll want to use the <a
+href="http://www.franz.com/support/documentation/6.1/doc/iacl.htm">International version
+of Allegro CL</a> which represents characters internally by their 16-bit <a
+href="http://www.unicode.org">Unicode</a> value.&nbsp;&nbsp;&nbsp; In this section we'll
+assume that you're using International Allegro CL.</p>
+
+<p>What the web protocols refer to as <strong>charset</strong> (character set) Allegro CL
+refers to as an <strong>external-format</strong>.&nbsp; Allegro CL uses a different term
+since it always uses 16-bit Unicode to represent characters internally.&nbsp; 16 bit
+unicode can represent nearly all characters on the planet.&nbsp; It's only when those
+characters are read from or written to devices outside of Lisp that the actual encoding of
+those characters into octets matters.&nbsp;&nbsp;&nbsp; Thus the <strong>external-format</strong>
+specifies how characters are encoded and specifies which Unicode characters are part of
+the character set that the external-format defines.&nbsp; Attempts to write a Unicode
+character that's not part of the character set results in a question mark being written.</p>
+
+<p>External-formats are also used in Allegro CL to do certain character to character
+transformations.&nbsp; In particular on the Windows platform external formats are used to
+convert the lisp end of line (a single #\newline character) to the #\return #\linefeed
+character that is standard on Windows.&nbsp;&nbsp; Thus an external format such as <strong>:utf-8</strong>
+&nbsp; has a different effect on Windows than on Unix, and this is not desireable for web
+applications.&nbsp;&nbsp; The function call <font face="Courier New">(crlf-base-ef&nbsp;:utf-8)</font>
+returns an external format on Windows and on Unix that simply does the character encoding
+part of the external format, and thus this is the external format you would want to use in
+a web application.</p>
+
+<h3>server to client (browser) character transfer</h3>
+
+<p>When a web server returns a response to a client it sends back a response line, a
+header and optionally a body.&nbsp;&nbsp; The response line and header are always sent
+using a subset of the Latin1 character set (the subset corresponding the the US ASCII
+character set).&nbsp;&nbsp; The body is sent using the full Latin1 character set, unless
+otherwise specified.&nbsp; To specify the character set of the body you add an extra
+parameter to the Content-Type header.&nbsp;&nbsp; Instead of specifying a content type of
+&quot;text/html&quot; you might specify &quot;text/html;&nbsp;charset=iso-8859-2&quot;.
+&nbsp;&nbsp; This alerts the http client that it must interpret the octets comprising the
+body of the response according to the iso-8859-2 character set.&nbsp;&nbsp; This however
+is <em>not<strong> </strong></em>enough to make AllegroServe encode the Unicode characters
+it's sending to the client using the approrpriate external format.&nbsp; You would have to
+do this:</p>
+
+<pre>(with-http-response (req ent)
+  (with-http-body (req ent :external-format (crlf-base-ef :iso8859-2))
+     ... generate and write page here..
+))</pre>
+
+<p>Note that the charset names and external format name are similar but not identical.
+&nbsp; Check <a href="http://www.iana.org/assignments/character-sets">here</a> for the
+charset names and check <a
+href="http://www.franz.com/support/documentation/6.1/doc/iacl.htm#external-formats-1">here</a>
+for the Allegro CL external format names.</p>
+
+<p>In order to make it easier to specify external formats in AllegroServe you can specify
+a default external format when you start the server (with the <strong>:external-format</strong>
+argument to the <strong>start</strong> function).&nbsp;&nbsp; The variable <strong>*default-aserve-external-format*
+</strong>will then be bound to this external format in each of the threads that processes
+http requests.&nbsp;&nbsp; It's the value of <strong>*default-aserve-external-format*</strong>
+that is used as the default argument to the :external-format argument to <strong>with-http-body</strong>.</p>
+
+<p>The default value of the <strong>:external-forma</strong>t argument to the <strong>start</strong>
+function, and thus the default value of *<strong>default-aserve-external-format*</strong>,
+is <strong>(crlf-base-ef :latin1-base</strong>).&nbsp;&nbsp; This means that regardless of
+the locale in which you run AllegroServe, AllegroServe will by default using the Latin1
+character set, which is what is expected by web clients..</p>
+
+<p>A very useful character set is <strong>utf-8</strong> which is the whole Unicode
+character set and thus comprises all of the characters you can store inside Lisp.
+&nbsp;&nbsp; The corresponding Allegro CL external format is the value of <font
+face="Courier New"><strong>(crlf-base-ef :utf-8)</strong></font>.&nbsp;&nbsp; Specifying
+this character set allows you to write web pages that can characters from nearly every
+language in the world (whether the web browser can find the glyphs to display all those
+characters is another matter). </p>
+
+<h3>client (browser) to server character transfer</h3>
+
+<p>The brower sends characters to the web server when the user enters data into a form and
+submits the form.&nbsp;&nbsp; The important thing to remember is that the browser will
+encode characters using the character set that was specified for the web page containing
+the form.&nbsp; If you fail to specify a <strong>charset</strong> when the page was given
+to the web browser then the web browser will decide on its own how to encode characters
+that aren't part of the default character set ( which is of course Latin1). &nbsp;&nbsp;
+The browser will <em>not</em> tell you which encoding it chose. &nbsp; Therefore if you
+ever plan on allowing&nbsp; non-Latin1 characters to be specified in your forms you'll
+want to specify a <strong>charset</strong> for the page containing the form. </p>
+
+<p>You can specify the charset in the Content-Type field of the header that's sent with
+the page (as we described above) or you can put it in the page itself using a meta tag:</p>
+
+<pre>&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=utf-8&quot;&gt;</pre>
+
+<p>Retrieving form data in AllegroServe is done with the <strong>request-query</strong>
+function and that function takes an <strong>:external-format</strong> argument so you can
+specify how the form data can be decoded.&nbsp;&nbsp; If your form sends multipart data
+then you can use the <strong>:external-format</strong> argument to <strong>get-multipart-sequence</strong>
+to retrieve the form data and decode the data.</p>
+
+<h3>examples</h3>
+
+<p>The AllegroServe test page has links to a few pages that show how international
+characters work with AllegroServe.&nbsp; One of these is the the International Character
+Display page.&nbsp; This page&nbsp; shows what happens when the <strong>charset</strong>
+and <strong>external-format</strong> are set to different values and a page containing
+international characters is displayed.&nbsp; It demonstrates how it important is is that
+those two character set specifications be kept in sync, and it shows that <strong>utf-8</strong>
+is most likely the best choice for a character set for your web pages.</p>
 
 <p>&nbsp;</p>
 

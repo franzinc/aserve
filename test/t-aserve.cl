@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.39 2001/11/27 15:29:25 jkf Exp $
+;; $Id: t-aserve.cl,v 1.40 2001/12/01 00:20:35 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -1403,6 +1403,7 @@
   ;; currently we only have a test program on unix since
   ;; that where our shell script works
   ;;
+  (declare (ignorable port))
   #+(and unix (version>= 6 1))
   (let ((prefix-local (format nil "http://localhost:~a" port))
 	(error-buffer))

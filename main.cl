@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.129 2001/11/28 17:52:03 jkf Exp $
+;; $Id: main.cl,v 1.130 2001/12/01 00:20:35 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -2312,11 +2312,15 @@ in get-multipart-sequence"))
       (setf (request-query-alist req) res))))
 			
 
-(defun request-query-value (key req &key (post t) (uri t) (test #'equal))
+(defun request-query-value (key req &key (post t) (uri t) (test #'equal)
+					 (external-format 
+						   *default-aserve-external-format*))
   ;; access the value of the given key in the request's 
   ;; request query.  We do this so often that it's useful
   ;; to make this a function
-  (cdr (assoc key (request-query req :post post :uri uri) :test test)))
+  (cdr (assoc key (request-query req :post post :uri uri
+				 :external-format external-format)
+	      :test test)))
 
 
 	

@@ -1,3 +1,10 @@
+2001-11-30    <jkf@CROW>
+
+	* doc/aserve.html - add documentation on using AllegroServe as 
+	  an NT service,  and a description of how to write
+	  web pages that handle international characters
+	* main.cl - add :external-format argument to request-query-value
+
 2001-11-28  John Foderaro  <jkf@tiger.franz.com>
 
 	* log.cl - use locking around writes to the log if the

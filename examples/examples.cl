@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.25 2001/11/28 17:52:03 jkf Exp $
+;; $Id: examples.cl,v 1.26 2001/12/01 00:20:35 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -878,7 +878,7 @@ The \"anyone can be provincial!\" page"))))
      (with-http-response (req ent)
        (with-http-body (req ent)
 	 (princ #.(format nil "~
-This page available only with International Allegro CL post 6.0 beta")
+This page available only with International Allegro CL post 6.0")
 		*html-stream*))))
 
  ;; Need pre-final.1's :try-variant change to find-external-format
