@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: decode.cl,v 1.8.10.5 2002/01/21 21:58:52 layer Exp $
+;; $Id: decode.cl,v 1.8.10.5.14.1 2002/06/17 18:29:03 layer Exp $
 
 ;; Description:
 ;;   decode/encode code

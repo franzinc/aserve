@@ -161,7 +161,9 @@ server running.</p>
 <p><strong><font face="Courier New"><a name="f-start"></a>(start &amp;key port host
 listeners chunking keep-alive server setuid setgid <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; debug proxy proxy-proxy
-cache restore-cache accept-hook ssl os-processes external-format)</font></strong></p>
+cache restore-cache accept-hook ssl ssl-password<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; os-processes
+external-format)</font></strong></p>
 
 <p>If no arguments are given then <strong>start</strong>&nbsp; starts a multi-threaded web
 server on port 80, which is the standard web server port.&nbsp;&nbsp;&nbsp; If you are
@@ -242,6 +244,8 @@ only need be concerned with <strong>:port</strong> and <strong>:listeners.
     than 80).&nbsp; This makes use of the <strong>accept-hook</strong> argument so if <strong>ssl</strong>
     is specified then <strong>accept-hook</strong> should not be specified.&nbsp;&nbsp; ssl is
     supported only in certain versions of Allegro CL.</li>
+  <li>ssl-password - if the private key in the PEM encoded file referenced by the <strong>ssl</strong>
+    argument is encrypted, then this is the key to decrypt it.</li>
   <li>os-processes - if given it should be an integer number of operating system processes in
     which to run AllegroServe.&nbsp; This is available on Unix only at the moment.&nbsp; The
     AllegroServes in different processes do <strong>not</strong> share a common Lisp heap..
@@ -404,8 +408,8 @@ created and published.&nbsp; </p>
 <p><strong>publish-directory</strong> creates a mapping from all urls whose name begins
 with<strong> prefix</strong> to files stored in the directory specified by the <strong>destination</strong>.&nbsp;&nbsp;
 The <strong>host</strong>, <strong>port, remove, authorizer, plist </strong>and <strong>server</strong>
-arguments are as described above for <strong>publish.</strong> &nbsp;&nbsp;&nbsp;&nbsp;
-The <strong>timeout</strong> argument defaults as described in <strong>publish-file</strong>.
+arguments are as described above for <strong>publish-file.</strong>
+&nbsp;&nbsp;&nbsp;&nbsp; The <strong>timeout</strong> argument defaults as described in <strong>publish-file</strong>.
 &nbsp; The <strong>access-file</strong> argument names the <a
 href="#directory-access-files">access file</a> name which will be used in this directory
 tree. When a request comes in for which there isn't an entity that matches it
@@ -1706,8 +1710,8 @@ which this request was sent.&nbsp; If you wish to specify this you are only allo
 specify a subsequence of the host to which this request was sent (i.e the name of the
 machine running the webserver).&nbsp;&nbsp; The <strong>domain</strong> should have at
 least two periods in it (i.e.&nbsp; &quot;.foo.com&quot;).<br>
-<strong>expiration</strong> can be a lisp universal time or it can be the symbol <strong>:never</strong>
-meaning this should never expire.&nbsp; If <strong>expiration </strong>isn't given or is <strong>nil</strong>
+<strong>expires</strong> can be a lisp universal time or it can be the symbol <strong>:never</strong>
+meaning this should never expire.&nbsp; If <strong>expires </strong>isn't given or is <strong>nil</strong>
 then this cookie will expire when the user quits their web browser.<br>
 <strong>secure</strong> should be true or false.&nbsp; Any non-nil value is interpreted as
 true. The default value is false.<br>
@@ -1968,8 +1972,8 @@ skip-body)</font></strong></p>
     <td width="62%">If the method is <strong>:put</strong> or<strong> :post</strong> then the
     request should include something to be sent to the web server.&nbsp;&nbsp; The value of
     this argument is either a string or a vector of type (unsigned-byte 8) which will be sent
-    to the web server.&nbsp; See the <strong>query</strong> argument for a more convenient way
-    to <strong>:post</strong> data to a form.</td>
+    to the web server.&nbsp;&nbsp; It may also be a list of strings or vectors. See the <strong>query</strong>
+    argument for a more convenient way to <strong>:post</strong> data to a form.</td>
   </tr>
   <tr>
     <td width="22%">content-type</td>

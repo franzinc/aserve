@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: log.cl,v 1.11.6.5 2002/01/21 21:58:52 layer Exp $
+;; $Id: log.cl,v 1.11.6.5.14.1 2002/06/17 18:29:03 layer Exp $
 
 ;; Description:
 ;;   iserve's logging

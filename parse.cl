@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.22.10.6 2002/01/21 21:58:52 layer Exp $
+;; $Id: parse.cl,v 1.22.10.6.14.1 2002/06/17 18:29:03 layer Exp $
 
 ;; Description:
 ;;   parsing and encoding code  

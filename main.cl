@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.48.2.10 2002/03/07 16:13:55 layer Exp $
+;; $Id: main.cl,v 1.48.2.10.2.1 2002/06/17 18:29:03 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1001,6 +1001,7 @@ by keyword symbols and not by strings"
 		   debug-stream  ; stream to which to send debug messages
 		   accept-hook
 		   ssl		 ; enable ssl
+		   ssl-password ; for ssl: pswd to decode priv key in cert
 		   os-processes  ; to fork and run multiple instances
 		   (external-format nil efp); to set external format
 		   )
@@ -1034,7 +1035,9 @@ by keyword symbols and not by strings"
 	  (setq accept-hook 
 	    #'(lambda (socket)
 		(funcall 'socket::make-ssl-server-stream socket
-			 :certificate ssl)))
+			 :certificate ssl
+			 #+(version>= 6 2 beta) :certificate-password 
+			 #+(version>= 6 2 beta) ssl-password)))
 	  (setq chunking nil) ; doesn't work well through ssl
 	  (if* (not port-p)
 	     then ; ssl defaults to port 443
@@ -2089,7 +2092,6 @@ by keyword symbols and not by strings"
 		     
 
 
-
 (defmethod get-multipart-sequence ((req http-request)
 				   buffer
 				   &key (start 0)
@@ -2119,6 +2121,7 @@ in get-multipart-sequence"))
 	 text-mode
 	 after)
 
+    
     (typecase buffer
       ((array (unsigned-byte 8) (*))
        )
@@ -2150,6 +2153,7 @@ in get-multipart-sequence"))
 		 (setf (mp-info-after mp-info) after)
 		 (setq cur (mp-info-cur mp-info)) ; scan-forward can change
 		 )
+	 
 	 (if* (> pos cur)
 	    then ; got something to return
 		 (let* ((tocopy (min (- end start) (- pos cur)))
@@ -2164,7 +2168,7 @@ in get-multipart-sequence"))
 			      mpbuffer
 			      :string buffer
 			      :start cur
-			      :end (+ cur tocopy)
+			      :end pos 
 			      :string-start start
 			      :string-end (length buffer)
 			      :external-format external-format
@@ -2177,8 +2181,16 @@ in get-multipart-sequence"))
 			   (dotimes (i tocopy)
 			     (setf (aref buffer (+ start i))
 			       (aref mpbuffer (+ cur i)))))
-		   (setf (mp-info-cur mp-info) (+ cur tocopy))
-		   (return-from get-multipart-sequence (+ start items)))
+		   (if* (zerop items)
+		      then ; didn't find enough bytes to make 
+			   ; a character
+			   (if* (null (shift-buffer-up-and-read mp-info))
+			      then ; no more bytes available
+				   (return-from get-multipart-sequence nil))
+			   ; loop around
+		      else (setf (mp-info-cur mp-info) (+ cur tocopy))
+			   (return-from get-multipart-sequence 
+			     (+ start items))))
 	  elseif (eq kind :partial)
 	    then  ; may be a boundary, can't tell
 		 (if* (null (shift-buffer-up-and-read mp-info))

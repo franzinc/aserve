@@ -1,45 +1,26 @@
 *******************************************************************************
-Thu Mar  7 08:13:09 PST 2002
-merge from trunk to acl6 branch
-cmd: join.sh trunk trunk_to_acl6_merge7 trunk_to_acl6_merge8 aserve
+Mon Jun 17 11:27:39 PDT 2002
+merge from trunk to acl62 branch
+cmd: join.sh trunk acl62 trunk_to_acl62_merge1 aserve
 *******************************************************************************
-Mon Jan 21 13:58:24 PST 2002
-merge from trunk to acl6 branch
-cmd: join.sh trunk trunk_to_acl6_merge6 trunk_to_acl6_merge7 aserve
-*******************************************************************************
-merge from acl61 to acl6 branch
-cmd: ../../join.sh acl61 acl61 acl61_to_acl6_merge1 aserve
-*******************************************************************************
-merge from trunk to acl61 branch
-cmd: ../../join.sh trunk trunk_to_acl61_merge9 trunk_to_acl61_merge10 aserve
-*******************************************************************************
-merge from trunk to acl61 branch
-command: ../../join.sh trunk trunk_to_acl61_merge8 trunk_to_acl61_merge9 aserve
-*******************************************************************************
-merge from trunk to acl61 branch
-command: ../../join.sh trunk trunk_to_acl61_merge7 trunk_to_acl61_merge8 aserve
-*******************************************************************************
-merge from trunk to acl61 branch
-command: ../../join.sh trunk trunk_to_acl61_merge6 trunk_to_acl61_merge7 aserve
-*******************************************************************************
-merge from trunk to acl61 branch
-command: ../../join.sh trunk trunk_to_acl61_merge5 trunk_to_acl61_merge6 aserve
-*******************************************************************************
-merge from trunk to acl61 branch
-command: ../../join.sh trunk trunk_to_acl61_merge4 trunk_to_acl61_merge5 aserve
-*******************************************************************************
-merge from trunk to acl61 branch
-command: ../../join.sh trunk trunk_to_acl61_merge3 trunk_to_acl61_merge4 aserve
-*******************************************************************************
-merge from trunk to acl61 branch
-command: ../../join.sh trunk trunk_to_acl61_merge2 trunk_to_acl61_merge3 aserve
-*******************************************************************************
-merge from trunk to acl61 branch
-command: ../../join.sh trunk trunk_to_acl61_merge1 trunk_to_acl61_merge2 aserve
-*******************************************************************************
-merge from trunk to acl61 branch
-command: ../../join.sh trunk acl61 trunk_to_acl61_merge1 aserve
-*******************************************************************************
+
+2002-04-10  John Foderaro  <jkf@tiger.franz.com>
+
+	* main.cl - fix bug in get-multipart-sequence when used
+	  in an International Lisp with multibyte character input.
+	  In certain rare cases it could get stuck decoding the last
+	  bits of a buffer.
+	  
+	  - add :ssl-password argument to net.aserve:start to 
+	   specify the password for decrypting the private key
+	   in the file with the ssl certificate. [requires
+	   acl feature introduced in acl 6.2]
+
+	* client.cl - if the content passed to do-http-request
+	   is a list of vectors, each vector in the list will
+	   be sent to the server.
+	  
+
 2002-02-28  John Foderaro  <jkf@tiger.franz.com>
 1.2.23
 >>>	*  incompatible change:

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: authorize.cl,v 1.4.10.2 2002/03/07 16:13:55 layer Exp $
+;; $Id: authorize.cl,v 1.4.10.2.2.1 2002/06/17 18:29:02 layer Exp $
 
 ;; Description:
 ;;   classes and functions for authorizing access to entities
