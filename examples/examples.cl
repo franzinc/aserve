@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: examples.cl,v 1.1.2.2 2000/02/18 18:13:49 jkf Exp $
+;; $Id: examples.cl,v 1.1.2.3 2000/02/24 23:01:08 jkf Exp $
 
 ;; Description:
 ;;   neo examples
@@ -54,19 +54,19 @@
 		    (:princ-safe (header-slot-value req "host")))
 		   :p
 		   (:b "Sample pages") :br
-			 ((:a :href "/gc") "Garbage Collector Stats") :br
-			 ((:a :href "/apropos") "Apropos") :br
-			 ((:a :href "/pic") "Sample jpeg") :br
-			 ((:a :href "/pic-gen") "generated jpeg") "- hit reload to switch images" :br
-			 ((:a :href "/cookietest") "test cookies") :br
-			 ((:a :href "/secret") "Test authorization")
+			 ((:a :href "gc") "Garbage Collector Stats") :br
+			 ((:a :href "apropos") "Apropos") :br
+			 ((:a :href "pic") "Sample jpeg") :br
+			 ((:a :href "pic-gen") "generated jpeg") "- hit reload to switch images" :br
+			 ((:a :href "cookietest") "test cookies") :br
+			 ((:a :href "secret") "Test authorization")
  			 " (name: " (:b "foo") ", password: " (:b "bar") ")"
 			 :br
-			 ((:a :href "/timeout") "Test timeout")
+			 ((:a :href "timeout") "Test timeout")
 			 :br
-			 ((:a :href "/getfile") "Client to server file transfer")
+			 ((:a :href "getfile") "Client to server file transfer")
 			 :br
-			 ((:a :href "/missing-link") "Missing Link")
+			 ((:a :href "missing-link") "Missing Link")
 			 " should get an error when clicked"
 			 )
 		  
@@ -216,9 +216,9 @@
        (with-http-response (req ent)
 	 (with-http-body (req ent)
 	   (html (:head (:title "Allegro Apropos"))
-		 ((:body :background "/neoweb/fresh.jpg")
+		 ((:body :background "neoweb/fresh.jpg")
 		  "New Apropos of "
-		  ((:form :action "/apropos"
+		  ((:form :action "apropos"
 			  :method "get")
 		   ((:input :type "text"
 			    :maxlength 40
@@ -325,7 +325,7 @@
 		       (:body
 			((:form :enctype "multipart/form-data"
 				:method "post"
-				:action "/getfile-got")
+				:action "getfile-got")
 			 "Let me know what file to grab"
 			 :br
 			 ((:input :type "file" 
@@ -441,7 +441,7 @@
 		 (html (:head (:title "Cookie Test"))
 		       (:body "you should have a cookie now."
 			      " Go "
-			      ((:a :href "/cookieverify") "here")
+			      ((:a :href "cookieverify") "here")
 			      " to see if they were saved"))))))
 
 (publish :path "/cookieverify"

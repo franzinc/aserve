@@ -676,5 +676,65 @@ words the decoding done by <strong>set-cookie-header</strong> will be undone).</
 <hr>
 
 <p>&nbsp;</p>
+
+<h2>Working with the Apache web server</h2>
+
+<p>There may be reasons, practical or political, where you would like to use another web
+server to handle the bulk of pages on your site and only use Iserve for dynamic pages.
+&nbsp;&nbsp; This is easy to do if the other web server has the ability to act as a <em>proxy</em>.
+&nbsp;&nbsp; The newest versions of the Apache web server have the proxy capability.
+&nbsp;&nbsp; In this section we'll describe what you have to do to configure Apache and to
+generate proxy-friendly html.&nbsp;&nbsp; The Apache notes apply to version 1.3.9 of
+&nbsp; Apache and are likely apply to other versions as well (but it would be useful to
+read the document on the proxy module just in case).</p>
+
+<p>The proxy support for Apache is found in the Proxy Module rather than being built into
+the server.&nbsp;&nbsp; First you must make sure that the proxy module is loaded into
+Apache by looking for references to it in the main Apache configuration file (httpd.conf),
+and ensuring that those references are no commented out.</p>
+
+<p>Then you should ensure that proxying is turned on with this line in httpd.conf:</p>
+
+<p><font face="Courier New">ProxyRequests on</font></p>
+
+<p>Next you have to decide which urls on the Apache server should be sent to Iserve to be
+processed.&nbsp; Suppose we say that all urls that begin /iserve/ should be sent to
+Iserve, and that Iserve will run on the same machine as Apache but will listen on port
+8080.&nbsp;&nbsp; We state this by adding this line to httpd.conf:</p>
+
+<p><font face="Courier New">ProxyPass /iserve/ http://localhost:8080/<br>
+ProxyPassReverse /iserve/ http://localhost:8080/</font></p>
+
+<p>The second line is to ensure that redirects get translated back to a form that the
+client can understand.</p>
+
+<p>After these changes are made Apache must be restarted in order for them to take effect.</p>
+
+<p>Now if a web browser asks for <a href="http://yourmachine.com/iserve/">http://yourmachine.com/iserve/</a>
+&nbsp; it will see the result of&nbsp; Apache asking for <a href="http://localhost:8080/">http://localhost:8080/</a>
+.&nbsp;&nbsp; What you would like is that if links are followed on the web page returned,
+that the illusion is maintained that pages in the <a href="http://localhost:8080/">http://localhost:8080/</a>
+tree are found below <a href="http://yourmachine.com/iserve/">http://yourmachine.com/iserve/</a>.
+&nbsp; In order for this to work, the web pages must use <em>relative<strong> </strong></em>links
+to name pages in the same tree.&nbsp; For example if you used absolute links as in </p>
+
+<p><font face="Courier New">((:a :href&nbsp; &quot;/foo&quot;) &quot;click on me and I'll
+fail&quot;)</font></p>
+
+<p>then when the user clicked on this the web browser would ask for <a
+href="http://yourmachine.com/foo">http://yourmachine.com/foo</a> which would not be sent
+to Iserve&nbsp; to return the correct page.j</p>
+
+<p>However if the path to the url was written without the leading slash, and thus were
+relative, then clicking on this link:</p>
+
+<p><font face="Courier New">((:a :href &quot;foo&quot;) &quot;click on me and it will
+work&quot;)</font></p>
+
+<p>will cause a request for&nbsp; <a href="http://yourmachine.com/iserve/foo">http://yourmachine.com/iserve/foo</a>
+which will be sent to Iserve as <a href="http://localhost:8080/foo">http://localhost:8080/foo</a>
+which will return the correct page (the page published with a path of &quot;/foo&quot;).</p>
+
+<p>&nbsp;</p>
 </body>
 </html>
