@@ -1,3 +1,8 @@
+2000-07-01  John Foderaro  <jkf@tiger.franz.com>
+
+	* client side - handle the "100 continue" response we seem to 
+	 get from IIS whenever we do a post.
+
 2000-06-25  jkf  <jkf@main.verada.com>
 
 	* keep track all of all ip addresses by which the server

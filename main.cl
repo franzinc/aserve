@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.46 2000/06/26 04:51:34 jkf Exp $
+;; $Id: main.cl,v 1.47 2000/07/01 17:07:44 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -115,6 +115,7 @@
    #:*mime-types*
    #:*response-accepted*
    #:*response-bad-request*
+   #:*response-continue*
    #:*response-created*
    #:*response-found*
    #:*response-internal-server-error*
@@ -665,6 +666,7 @@
   number
   desc)
 
+(defparameter *response-continue* (make-resp 100 "Continue"))
 (defparameter *response-ok* (make-resp 200 "OK"))
 (defparameter *response-created* (make-resp 201 "Created"))
 (defparameter *response-accepted* (make-resp 202 "Accepted"))
@@ -684,7 +686,8 @@
 (defparameter *response-not-implemented* (make-resp 501 "Not Implemented"))
 
 (defparameter *responses*
-    (list *response-ok*
+    (list *response-continue*
+	  *response-ok*
 	  *response-created*
 	  *response-accepted*
 	  *response-moved-permanently*
