@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: puzzle.cl,v 1.1 2000/10/19 16:37:47 jkf Exp $
+;; $Id: puzzle.cl,v 1.1.2.1 2000/10/21 15:09:16 layer Exp $
 
 ;; Description:
 ;;   Allegro Serve puzzle example

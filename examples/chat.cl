@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.1.2.2 2000/10/12 05:11:03 layer Exp $
+;; $Id: chat.cl,v 1.1.2.3 2000/10/21 15:09:15 layer Exp $
 
 ;; Description:
 ;;   aserve chat program
@@ -410,22 +410,23 @@
   
   (let ((master-file (concatenate 'string home "/cmaster.cl")))
     (if* (probe-file master-file)
-       then (load master-file)
-	    (if* (boundp 'user::value1)
-	       then (setq *master-controller* user::value1))
-	    ;; now read in chat data
-	    (dolist (controller (controllers *master-controller*))
-	      (dolist (chat (chats controller))
-		(with-open-file (p (archive-filename chat)
-				 :direction :input)
-		  (do ((message (read p nil :eof) (read p nil :eof)))
-		      ((eq message :eof)
-		       ; use everything is archived we've read
-		       (setf (chat-message-archive chat) 
-			 (chat-message-number chat))
-		       )
-		    (if* message
-		       then (add-chat-message chat message)))))))))
+       then (with-standard-io-syntax
+	      (load master-file)
+	      (if* (boundp 'user::value1)
+		 then (setq *master-controller* user::value1))
+	      ;; now read in chat data
+	      (dolist (controller (controllers *master-controller*))
+		(dolist (chat (chats controller))
+		  (with-open-file (p (archive-filename chat)
+				   :direction :input)
+		    (do ((message (read p nil :eof) (read p nil :eof)))
+			((eq message :eof)
+			 ; use everything is archived we've read
+			 (setf (chat-message-archive chat) 
+			   (chat-message-number chat))
+			 )
+		      (if* message
+			 then (add-chat-message chat message))))))))))
     
 (defun dump-existing-chat (home)
   (mp:with-process-lock ((master-lock *master-controller*))
@@ -477,11 +478,12 @@
 	(with-open-file (p new-master-file 
 			 :direction :output
 			 :if-exists :supersede)
-	  (let ((*package* (find-package *chat-home-package*)))
-	    (format p ";;Automatically generated, do not edit~%")
-	    (print `(in-package ,*chat-home-package*) p)
-	    (pprint value p)
-	    (terpri p)))
+	  (with-standard-io-syntax 
+	    (let ((*package* (find-package *chat-home-package*)))
+	      (format p ";;Automatically generated, do not edit~%")
+	      (print `(in-package ,*chat-home-package*) p)
+	      (pprint value p)
+	      (terpri p))))
     
 	; success, so make it the official one
 	(ignore-errors (delete-file master-file))
@@ -1033,6 +1035,7 @@
 		     :vlink *top-frame-vlink-color*
 		     :alink *top-frame-alink-color*
 		     )
+	      
 	      (show-chat-info chat count 
 			      (not (equal "1" (request-query-value
 					       "rv"
@@ -1377,7 +1380,7 @@
 	(message-increment)
 	)
     (if* (zerop message-next)
-       then (html (:b "There are no messsages in this chat"))
+       then (html (:b "There are no messages in this chat"))
      elseif (<= count 0)
        thenret ; nothing to show
        else ; starting at the end find the counth message
@@ -1507,15 +1510,15 @@
 		 :target "_top"
 		 :method "POST")
 	  ((:input :type "text" :size "15" :name "handle")) "Your Handle" :br
-	  ((:input :type "text" :size "15" :name "password")) "Your password" :br
+	  ((:input :type "password" :size "15" :name "password")) "Your password" :br
 	  ((:input :type "submit" :name "submit" :value "login")))
 	 :hr
 	 (:h1 "Create a new account and login")
 	 ((:form :action (format nil "chatloginnew?~a" qstring)
 		 :method "POST")
 	  ((:input :type "text" :size "15" :name "handle")) "Your Handle" :br
-	  ((:input :type "text" :size "15" :name "password")) "Your password" :br
-	  ((:input :type "text" :size "15" :name "password2")) "Type your password again" :br
+	  ((:input :type "password" :size "15" :name "password")) "Your password" :br
+	  ((:input :type "password" :size "15" :name "password2")) "Type your password again" :br
 	  ((:input :type "submit" :name "submit" :value "New Account")))))))))
 
 

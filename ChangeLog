@@ -1,5 +1,8 @@
 *******************************************************************************
-merge from trunk to acl6 branch (final for 6.0)
+merge from trunk to acl6 branch (for 6.0.final.0)
+command: ../../join.sh trunk trunk_to_acl6_merge2 trunk_to_acl6_merge3 aserve
+*******************************************************************************
+merge from trunk to acl6 branch (for 6.0.pre-final.something)
 command: ../../join.sh trunk trunk_to_acl6_merge1 trunk_to_acl6_merge2 aserve
 *******************************************************************************
 merge from trunk to acl6 branch
@@ -11,6 +14,21 @@ join from trunk to layer6 branch
 command:
   ../../join.sh trunk acl6_branch_point trunk_to_layer6_merge1 aserve
 *******************************************************************************
+2000-10-19  John Foderaro  <jkf@tiger.franz.com>
+1.1.32
+	* add ssl arguments to net.aserve.start and
+	  net.aserve.client:do-http-request so that a secure server
+	  can be started and secure http requests can be made.
+	  Make the aserve test suite test run though the tests using ssl.
+	  Note: the ssl module is only present in certain acl6 distributoins.
+	
+	* add examples/puzzle.cl  - a demo featuring the use of international
+	  characters in acl6.
+	
+2000-10-15  John Foderaro  <jkf@tiger.franz.com>
+1.1.31
+	* support caching requests with cookies
+
 2000-10-12  John Foderaro  <jkf@tiger.franz.com>
 1.1.30
 	*  proxy and cache facilty added.

@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.22.10.2 2000/10/12 05:11:01 layer Exp $
+;; $Id: parse.cl,v 1.22.10.3 2000/10/21 15:09:14 layer Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -371,9 +371,10 @@
 	(if* (eql state 4)
 	   then ; all done
 		; back up over [cr] lf
-		(decf i 2)  ; i points at cr if there is one
-		(if* (not (eq (aref buff i) #.(char-code #\return)))
-		   then (incf i))
+		(if* (>= i 2)
+		   then (decf i 2)  ; i points at cr if there is one
+			(if* (not (eq (aref buff i) #.(char-code #\return)))
+			   then (incf i)))
 		; i points to the [cr] lf
 		
 		(return i))))))

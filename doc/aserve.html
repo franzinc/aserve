@@ -136,7 +136,7 @@ server running.</p>
 <p><strong><font face="Courier New"><a name="f-start"></a>(start &amp;key port listeners
 chunking keep-alive<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; server setuid setgid
-debug proxy cache accept-hook)</font></strong></p>
+debug proxy cache accept-hook ssl)</font></strong></p>
 
 <p>If no arguments are given then <strong>start</strong>&nbsp; starts a multi-threaded web
 server on port 80, which is the standard web server port.&nbsp;&nbsp;&nbsp; If you are
@@ -191,6 +191,12 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
     when a http request was accepted by AllegroServe.&nbsp; The function should return a
     socket for AllegroServe to use.&nbsp; This hook is normally used to turn a regular socket
     into an SSL socket.</li>
+  <li>ssl - if true then it should be the name of PEM encoded file containing the server
+    certificate and the associated private key.&nbsp; This causes the server to listen for SSL
+    connections only.&nbsp; The default value of <strong>port</strong> is made 443 (rather
+    than 80).&nbsp; This makes use of the <strong>accept-hook</strong> argument so if <strong>ssl</strong>
+    is specified then <strong>accept-hook</strong> should not be specified.&nbsp;&nbsp; ssl is
+    supported only in certain versions of Allegro CL.</li>
 </ul>
 
 <p>&nbsp;</p>
@@ -1278,7 +1284,7 @@ content content-type query format cookies <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 redirect basic-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-keep-alive headers proxy user-agent external-format)</font></strong></p>
+keep-alive headers proxy user-agent external-format ssl)</font></strong></p>
 
 <p>Sends a request to <strong>uri</strong> and returns four values: 
 
@@ -1422,6 +1428,13 @@ keep-alive headers proxy user-agent external-format)</font></strong></p>
     <td width="22%">external-format</td>
     <td width="16%">:latin1-base</td>
     <td width="62%">This determines the socket stream's external format.</td>
+  </tr>
+  <tr>
+    <td width="22%">ssl</td>
+    <td width="16%">nil</td>
+    <td width="62%">If true then the connection is made using the Secure Sockets Layer
+    protocol.&nbsp;&nbsp;&nbsp; If the uri uses the <strong>https</strong> scheme then <strong>ssl</strong>
+    is assumed to be true and the <strong>ssl </strong>argument need not be specified.</td>
   </tr>
 </table>
 

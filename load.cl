@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.31.10.2 2000/10/12 05:10:58 layer Exp $
+;; $Id: load.cl,v 1.31.10.3 2000/10/21 15:09:13 layer Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -36,8 +36,10 @@
       "examples/aservelogo.gif"
       "examples/chat.cl"
       "examples/file2000.txt"
+      "examples/puzzle.cl"
       "load.cl"
       "test/t-aserve.cl"
+      "test/server.pem"
       "doc/aserve.html"
       "doc/tutorial.html"
       "doc/htmlgen.html"
@@ -45,8 +47,12 @@
 
 (defparameter *aserve-examples*
     '("examples/examples"
+      "examples/puzzle"
       ))
 
+(defparameter *aserve-international-only*
+    ;; files that should only be loaded into a international lisp
+    '("examples/puzzle"))
 
 
 ;; end experimental
@@ -69,17 +75,19 @@
       (gc t) ; must compact to keep under the heap limit
       )
     #-allegro-cl-lite
-    (progn (case *loadswitch*
-	     (:compile-if-needed (compile-file-if-needed 
-				  (merge-pathnames (format nil "~a.cl" file)
-						   *load-truename*)))
-	     (:compile (compile-file 
-			(merge-pathnames (format nil "~a.cl" file)
-					 *load-truename*)))
-	     (:load nil))
-	   (load (merge-pathnames 
-		  (format nil "~a.fasl" file)
-		  *load-truename*)))))
+    (if* (or  (member :ics *features* :test #'eq)
+	      (not (member file *aserve-international-only* :test #'equal)))
+       then (progn (case *loadswitch*
+		     (:compile-if-needed (compile-file-if-needed 
+					  (merge-pathnames (format nil "~a.cl" file)
+							   *load-truename*)))
+		     (:compile (compile-file 
+				(merge-pathnames (format nil "~a.cl" file)
+						 *load-truename*)))
+		     (:load nil))
+		   (load (merge-pathnames 
+			  (format nil "~a.fasl" file)
+			  *load-truename*))))))
 
 
 

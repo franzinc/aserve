@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.6.6.3 2000/10/12 19:14:55 layer Exp $
+;; $Id: t-aserve.cl,v 1.6.6.4 2000/10/21 15:09:17 layer Exp $
 
 ;; Description:
 ;;   test iserve
@@ -45,10 +45,16 @@
 ; set to nil before loading the test to prevent the test from auto-running
 (defvar user::*do-aserve-test* t)
 (defvar *x-proxy* nil) ; when true x-do-http-request will go through a proxy
+(defvar *x-ssl*   nil) ; true when we want to do ssl client calls
 (defvar *proxy-wserver* nil)
 
 
 (defun test-aserve ()
+  ;; run the allegroserve tests three ways:
+  ;;  1. normally
+  ;   2. through an allegroserve proxy to test the proxy
+  ;;  3. through ssl (if ssl module present)
+  ;;
   ;; tests are run on a variety of threads, so we have to 
   ;; account for those other thread errors separately.
   (setq util.test::*test-errors* 0
@@ -73,7 +79,18 @@
 	    (format t "~%~%===== test through proxy ~%~%")
 	    (start-proxy-running)
 	    (do-tests)
-	    )
+	    
+	    (format t "~%>> checking to see if ssl is present~%~%")
+	    (if* (errorset (require :ssl))
+	       then ; we have ssl capability, run tests through ssl
+		    (stop-proxy-running)
+		    (stop-aserve-running)
+		    (format t "~%~%===== test through ssl ~%~%")
+		    (setq port (start-aserve-running 
+				(merge-pathnames 
+				 "server.pem" *load-truename*)))
+		    (do-tests)
+	       else (format t "~%>> it isn't so ssl tests skipped~%~%")))
 	; cleanup forms:
 	(stop-aserve-running)
 	(stop-proxy-running)
@@ -89,11 +106,12 @@
     
 
 
-(defun start-aserve-running ()
+(defun start-aserve-running (&optional ssl)
   ;; start aserve, return the port on which we've started aserve
-  (let ((wserver (start :port nil :server :new))); let the system pick a port
+  (let ((wserver (start :port nil :server :new :ssl ssl))); let the system pick a port
     (setq *wserver* wserver)
     (unpublish :all t) ; flush anything published
+    (setq *x-ssl* ssl)
     (socket::local-port (net.aserve::wserver-socket wserver))
     ))
 
@@ -122,7 +140,7 @@
 
 (defun x-do-http-request (uri &rest args)
   ;; add a proxy arg
-  (apply #'do-http-request uri :proxy *x-proxy* args))
+  (apply #'do-http-request uri :proxy *x-proxy* :ssl *x-ssl* args))
 
 
 
@@ -369,7 +387,9 @@
 		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
 	    (if* (and (eq protocol :http/1.1)
-		      (null *x-proxy*))
+		      (null *x-proxy*)
+		      (null *x-ssl*)
+		      )
 	       then (test "chunked"
 			  (cdr (assoc :transfer-encoding headers 
 				      :test #'eq))
@@ -686,7 +706,7 @@
     
     
     
-    
+
     ;; send query only on post
     (x-do-http-request (format nil "~a/form-tester-both" 
 			     prefix-local)

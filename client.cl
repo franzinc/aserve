@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.21.2.2 2000/10/12 05:10:56 layer Exp $
+;; $Id: client.cl,v 1.21.2.3 2000/10/21 15:09:13 layer Exp $
 
 ;; Description:
 ;;   http client code.
@@ -194,6 +194,7 @@
 			proxy	    ; naming proxy server to access through
 			user-agent
 			(external-format :latin1-base)
+			ssl	; do an ssl connection
 			)
   
   ;; send an http request and return the result as four values:
@@ -213,6 +214,7 @@
 	       :proxy proxy
 	       :user-agent user-agent
 	       :external-format external-format
+	       :ssl ssl
 	       )))
 
     (unwind-protect
@@ -337,6 +339,7 @@
 				     user-agent
 				     ;; :utf8-base might be better
 				     (external-format :latin1-base)
+				     ssl
 				     )
   
 
@@ -349,15 +352,20 @@
 		  fresh-uri t))
     
     ; make sure it's an http uri
-    (if* (not (eq :http (or (net.uri:uri-scheme uri) :http)))
-       then (error "Can only do client access of http uri's, not ~s" uri))
+    (case (or (net.uri:uri-scheme uri) :http)
+      (:http nil)
+      (:https (setq ssl t))
+      (t (error "Can only do client access of http or https uri's, not ~s" uri)))
   
     ; make sure that there's a host
     (if* (null (setq host (net.uri:uri-host uri)))
        then (error "need a host in the client request: ~s" uri))
 
     ; default the port to 80
-    (setq port (or (net.uri:uri-port uri) 80))
+    (setq port (or (net.uri:uri-port uri) 
+		   (case (or (net.uri:uri-scheme uri) :http)
+		     (:http 80)
+		     (:https 443))))
     
     (if* proxy
        then ; sent request through a proxy server
@@ -387,7 +395,11 @@
 				  :type 
 				  net.aserve::*socket-stream-type*
 					     
-				  )))
+				  ))
+	    (if* ssl
+	       then (setq sock
+		      (funcall 'socket::make-ssl-client-stream sock)))
+	    )
 
     #+(and allegro (version>= 6 0))
     (let ((ef (find-external-format external-format)))
@@ -499,7 +511,12 @@
     ; going to block doing the write we start another process do the
     ; the write.  
     (if* content
-       then (write-sequence content sock))
+       then (net.aserve::if-debug-action 
+	     :xmit
+	     (format net.aserve::*debug-stream*
+		     "client sending content of ~d bytes"
+		     (length content)))
+	    (write-sequence content sock))
     
     
     (force-output sock)
