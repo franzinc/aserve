@@ -6,7 +6,7 @@
 (defparameter *neo-files* 
     '("../htmlgen/htmlgen"
       "macs"
-      "neo"
+      "main"
       "parse"
       "publish"
       "log" ))
@@ -55,7 +55,7 @@
   ;; make a distributable version of neo
   (run-shell-command "rm -fr neo-dist")
   (run-shell-command "mkdir neo-dist")
-  (copy-files-to *neo-files* "neodist.fasl")
+  (copy-files-to *neo-files* "neo.fasl")
   (copy-files-to '("../htmlgen/htmlgen.html")
 		 "neo-dist/htmlgen.fasl")
   (dolist (file '("neodist.fasl"

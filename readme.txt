@@ -9,7 +9,7 @@ people can see what directions we are taking in our design.
 
 == The files in this distribution:
 
-neodist.fasl -- This includes the neo web server and htmlgen html generation
+neo.fasl -- This includes the neo web server and htmlgen html generation
     code.
 
 neo.html -- documentation on the web server
