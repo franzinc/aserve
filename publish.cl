@@ -1,7 +1,7 @@
 ;; neo
 ;; url publishing
 ;;
-;; $Id: publish.cl,v 1.16 1999/12/14 19:39:26 jkf Exp $
+;; $Id: publish.cl,v 1.17 1999/12/15 21:50:37 jkf Exp $
 ;;
 
 
@@ -833,9 +833,13 @@
 
 
 
+(defvar *far-in-the-future*
+    (encode-universal-time 12 32 12 11 8 2020 0))
 
 (defmethod set-cookie-header ((req http-request)
-			  &key name value expires domain path secure)
+			      &key name value expires domain 
+				   (path "/")
+				   secure)
   ;; put a set cookie header in the list of header to be sent as
   ;; a response to this request.
   ;; name and value are required, they should be strings
@@ -849,11 +853,75 @@
   ;; than "franz.com".... as netscape why this is important
   ;; secure is either true or false
   ;;
+  (let ((res (concatenate 'string 
+	       (uriencode-string (string name))
+	       "="
+	       (uriencode-string (string value)))))
+    (if* expires
+       then (if* (eq expires :never)
+	       then (setq expires *far-in-the-future*))
+	    (if* (integerp expires)
+	       then (setq res (concatenate 'string
+				res
+				"; expires="
+				(universal-time-to-date expires)))
+	       else (error "bad expiration date: ~s" expires)))
+    
+    (if* domain
+       then (setq res (concatenate 'string
+			res
+			"; domain="
+			(string domain))))
+    
+    (if* path
+       then (setq res (concatenate 'string
+			res
+			"; path="
+			(string path))))
+    
+    (if* secure
+       then (setq res (concatenate 'string
+			res
+			"; secure")))
+    
+    (push `("Set-Cookie" . ,res) (resp-headers req))
+    res))
+
+
+(defun get-cookie-values (req)
+  ;; return the set of cookie name value pairs from the current
+  ;; request as conses  (name . value) 
+  ;;
+  (let ((cookie-string (header-slot-value req "cookie")))
+    (if* cookie-string
+       then ; form is  cookie: name=val; name2=val2; name2=val3
+	    ; which is not exactly the format we want to see it in
+	    ; to parse it.  we want   
+	    ;     cookie: foo; name=val; name=val
+	    ; we we'll dummy up something that we want to see. 
+	    ; maybe later we'll have a parser for this form too
+	    ;
+	    (let ((res (parse-header-value
+			(concatenate 'string "foo; " cookie-string))))
+	      ; res should be: ((:param "foo" ("baz" . "bof")))
+	      (if* (and (consp res)
+			(consp (car res))
+			(eq :param (caar res)))
+		 then ; the correct format, must decode pieces
+		      (mapcar #'(lambda (ent)
+				  (cons 
+				   (uridecode-string (car ent))
+				   (uridecode-string (cdr ent))))
+			      (cddr (car res))))))))
+			
+
+
+
   
   
   
 
-)
+
   
   
 

@@ -1,3 +1,7 @@
+1999-12-15  John Foderaro  <jkf@tiger.franz.com>
+1.0.6
+	* cookie support added and documented
+
 1999-12-14  jkf  <jkf@main.verada.com>
 
 	*  added new file decode.cl to hold all decode/encode functions

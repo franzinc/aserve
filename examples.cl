@@ -24,6 +24,7 @@
 			 ((:a :href "/gc") "Garbage Collector Stats") :br
 			 ((:a :href "/apropos") "Apropos") :br
 			 ((:a :href "/pic") "Sample jpeg") :br
+			 ((:a :href "/cookietest") "test cookies") :br
 			 ((:a :href "/secret") "Test authorization")
  			 " (name: " (:b "foo") ", password: " (:b "bar") ")")
 			 )))))
@@ -337,7 +338,50 @@
 					       (:b (:prin1-safe file))))))))))))
 
 	     
-	     
+
+(publish :url "/cookietest"
+	 :content-type "text/html"
+	 :function
+	 #'(lambda (req ent)
+	     (with-http-response (req ent)
+	       (set-cookie-header req 
+				  :name "froba" 
+				  :value "vala"
+				  :path "/"
+				  :expires :never)
+	       (set-cookie-header req
+				  :name "the time"
+				  :value (neo::universal-time-to-date
+					  (get-universal-time))
+				  :path "/cookieverify"
+				  :expires (+ (get-universal-time)
+					      (* 20 60) ; 20 mins
+					      )
+				  )
+				  
+	       (with-http-body (req ent)
+		 (html (:head (:title "Cookie Test"))
+		       (:body "you should have a cookie now."
+			      " Go "
+			      ((:a :href "/cookieverify") "here")
+			      " to see if they were saved"))))))
+
+(publish :url "/cookieverify"
+	 :content-type "text/html"
+	 :function
+	 #'(lambda (req ent)
+	     (let ((cookie-info (get-cookie-values req)))
+	       (with-http-response (req ent)
+		 (with-http-body (req ent)
+		   (html (:head (:title "Cookie results"))
+			 (:body
+			  "The following cookies were returned: " 
+			  (:prin1-safe cookie-info))))))))
+	 
+
+
+
+
 ;;;;;;  directory publishing.  These will only work on a particular
 ;; set of machines so you'll have to modify them to point to an
 ;; existing tree of pages on your machine if you want to see this work.

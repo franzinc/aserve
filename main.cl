@@ -10,6 +10,7 @@
    #:base64-decode
    #:base64-encode
    #:decode-form-urlencoded
+   #:get-cookie-values
    #:get-multipart-header
    #:get-multipart-sequence
    #:get-request-body
@@ -17,9 +18,12 @@
    #:publish
    #:publish-file
    #:publish-directory
+   #:set-cookie-header
    #:shutdown
    #:split-into-words
    #:start
+   #:uridecode-string
+   #:uriencode-string
    #:unpublish
    #:url-argument
    #:url-argument-alist
@@ -40,7 +44,7 @@
 (in-package :neo)
 
 
-(defparameter *neo-version* '(1 0 5))
+(defparameter *neo-version* '(1 0 6))
 
 ;;;;;;;  debug support 
 
