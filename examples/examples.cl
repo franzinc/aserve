@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.17 2001/03/22 17:30:53 jkf Exp $
+;; $Id: examples.cl,v 1.18 2001/06/05 17:45:38 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -65,7 +65,7 @@
 			 (:i "This server's host name is "
 			     (:princ-safe (header-slot-value req :host)))
 			 #+unix
-			 (:i ", the running on process "
+			 (:i ", the process id is "
 			     (:princ (net.aserve::getpid)))
 			 :br
 			 (:princ (incf *hit-counter*)) " hits"
