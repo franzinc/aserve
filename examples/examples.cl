@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.9 2000/06/11 14:48:49 jkf Exp $
+;; $Id: examples.cl,v 1.10 2000/06/11 15:24:19 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -331,7 +331,7 @@
 	      :preload nil)
 
 
-;; for benchmarking
+;; some entries for benchmarking
 (publish-file :path "/file2000"
 	      :file (example-file "file2000.txt")
 	      :content-type "text/plain"
@@ -342,6 +342,12 @@
 	      :content-type "text/plain"
 	      :preload t)
 
+(publish :path "/dynamic-page"
+	 :content-type "text/plain"
+	 :function #'(lambda (req ent)
+		       (with-http-response (req ent)
+			 (with-http-body (req ent)
+			   (html "This is a dynamic page")))))
 
 ;; an example which causes the web browser to put up the
 ;; name/password box and if you enter the name "foo" and password "bar"
@@ -583,7 +589,7 @@
 ;; set of machines so you'll have to modify them to point to an
 ;; existing tree of pages on your machine if you want to see this work.
 
-;; the franz home pagey
+;; the franz home page
 #+ignore (publish-directory :prefix "/"
 		   :destination "/net/tanya/home/httpd/html/"
 		   )
