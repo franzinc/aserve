@@ -1,3 +1,7 @@
+2000-03-27  John Foderaro  <jkf@tiger.franz.com>
+1.1.9
+	* mainly documentation fixes
+
 2000-03-22  John Foderaro  <jkf@tiger.franz.com>
 1.1.8
 	* fix http/0.9 processing
