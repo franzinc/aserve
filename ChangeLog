@@ -1,3 +1,15 @@
+2000-05-16  jkf  <jkf@main.verada.com>
+
+	* client.cl
+	  - increase header reading buffer size - but we should
+	    make this growable.
+	  - handle cookies with = signs embedded
+	* decode.cl 
+	  - in query-to-form-urlencoded all the values to
+	    be non-strings and in that case use ~a format to stringify them
+        * parse.cl 
+	  - add arg to utility function
+	
 2000-05-04  John Foderaro  <jkf@tiger.franz.com>
 1.1.16
 	* request-query can now read from uri and/or post'ed body

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.14 2000/04/23 23:52:11 jkf Exp $
+;; $Id: client.cl,v 1.15 2000/05/16 13:43:32 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -726,7 +726,7 @@
       (setq buff (pop *response-header-buffers*)))
     (if* buff
        thenret
-       else (make-array 200 :element-type 'character))))
+       else (make-array 400 :element-type 'character))))
 
 (defun put-header-line-buffer (buff &optional buff2)
   ;; put back up to two buffers
@@ -787,7 +787,8 @@
 	    (return-from save-cookie nil))
     
     ;; namevalue has the form name=value
-    (setq namevalue (net.aserve::split-on-character namevalue #\=))
+    (setq namevalue (net.aserve::split-on-character namevalue #\=
+						    :count 1))
     
     ;; compute path
     (setq path (cdr (net.aserve::assoc-paramval "path" others)))

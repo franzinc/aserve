@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.20 2000/04/17 21:34:25 jkf Exp $
+;; $Id: parse.cl,v 1.21 2000/05/16 13:43:32 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -557,7 +557,7 @@
     po))
 
 
-(defun split-on-character (str char)
+(defun split-on-character (str char &key count)
   ;; given a string return a list of the strings between occurances
   ;; of the given character.
   ;; If the character isn't present then the list will contain just
@@ -572,8 +572,10 @@
 	    (loop
 	      (push (subseq str start loc) res)
 	      (setq start (1+ loc))
+	      (if* count then (decf count))
 	      (setq loc (position char str :start start))
-	      (if* (null loc)
+	      (if* (or (null loc)
+		       (eql 0 count))
 		 then (if* (< start (length str))
 			 then (push (subseq str start) res)
 			 else (push "" res))

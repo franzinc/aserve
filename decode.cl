@@ -23,7 +23,7 @@
 ;;
 
 ;;
-;; $Id: decode.cl,v 1.6 2000/04/26 18:11:48 jkf Exp $
+;; $Id: decode.cl,v 1.7 2000/05/16 13:43:32 jkf Exp $
 
 ;; Description:
 ;;   decode/encode code
@@ -231,7 +231,9 @@
   
   ; first compute if encoding has to be done and what it will
   ; cost in space
-  (assert (stringp str))
+  
+  (if* (not (stringp str))
+     then (setq str (format nil "~a" str)))
   
   (let (extra)
     (dotimes (i (length str))
