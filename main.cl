@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.63 2000/08/24 23:26:52 jkf Exp $
+;; $Id: main.cl,v 1.64 2000/08/25 00:34:35 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -233,20 +233,13 @@
   `(progn (if* (member ,kind *debug-current* :test #'eq)
 	     then ,@body)))
 
-(defparameter *fins* nil)
 (defun check-for-open-socket-before-gc (socket)
-  (push socket *fins*)
   (if* (open-stream-p socket)
      then (logmess 
 	   (format nil 
 		   "socket ~s is open yet is about to be gc'ed. It will be closed" 
 		   socket))
-	  (ignore-errors (close socket))
-     else (logmess 
-	   (format nil 
-		   "socket ~s is closed as it should be" 
-		   socket))
-	  ))
+	  (ignore-errors (close socket))))
 
 
 ;;;;;;;;;;; end debug support ;;;;;;;;;;;;
@@ -1065,7 +1058,9 @@ by keyword symbols and not by strings"
 			    (debug-format :info "request over, keep socket alive~%")
 			    (force-output sock)
 		       else (return))))))
-    (ignore-errors (close sock))))
+    ;; do it in two stages to get around bug in acl6.0beta
+    (ignore-errors (force-output sock))
+    (ignore-errors (close sock :abort t))))
 
 
 (defun read-http-request (sock)
