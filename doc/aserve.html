@@ -46,7 +46,9 @@
 &nbsp; <a href="#f-request-reply-stream">request-reply-stream</a></font><br>
 <a href="#form-processing">Form Processing</a><br>
 <font face="Courier New">&nbsp; <a href="#f-get-multipart-header">get-multipart-header</a><br>
-&nbsp; <a href="#f-get-multipart-sequence">get-multipart-sequence</a></font><br>
+&nbsp; <a href="#f-get-multipart-sequence">get-multipart-sequence</a></font> <br>
+&nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-form-urlencoded-">form-urlencoded-to-query</a><br>
+&nbsp; <a href="#f-query-to">query-to-form-urlencoded</a></font><br>
 <a href="#authorization">Authorization</a><br>
 <font face="Courier New">&nbsp; <a href="#f-get-basic-authorization">get-basic-authorization</a><br>
 &nbsp; <a href="#f-set-basic-authorization">set-basic-authorization</a><br>
@@ -623,9 +625,11 @@ defines the form
     size of urls is limited.&nbsp; Also the data is visible to everyone seeing the url and
     that may not be desirable.&nbsp; </li>
   <li><strong>&lt;form method=&quot;post&quot;&gt; - </strong>The data is send in the body of
-    the request.&nbsp;&nbsp;&nbsp; The AllegroServe url handler code calls <strong>(get-request-body
-    req)</strong> to retrieve the body from the web browser and then <strong>(form-urlencoded-to-query
-    body) </strong>to turn it into an alist that associates form field names with values.</li>
+    the request.&nbsp;&nbsp;&nbsp; The&nbsp; AllegroServe url handler should call <strong>(rqeuest-query</strong>
+    <strong>req)</strong> to retrieve and decode the data posted.&nbsp;&nbsp;&nbsp; In this
+    case&nbsp; <strong>request-query</strong> calls <strong>(get-request-body req)</strong> to
+    retrieve the body from the web browser and then <strong>(form-urlencoded-to-query body) </strong>to
+    turn it into an alist that associates form field names with values.</li>
   <li><strong>&lt;form method=&quot;post&quot; enctype=&quot;multipart/form-data&quot;&gt; - </strong>The
     data is sent in the body of the request in MIME format, with each field in its own
     separate MIME entity.&nbsp;&nbsp;&nbsp; This method is only necessary when one of the
@@ -719,6 +723,44 @@ format for line separation in Lisp strings).</p>
 so program should be sure to make use of the index returned by <strong>get-multipart-sequence</strong>.</p>
 
 <p>&nbsp;</p>
+
+<hr>
+
+<p>&nbsp;</p>
+
+<p>In AllegroServe the information sent to the web server as a result of filling out a
+form&nbsp; is called a <strong>query</strong>.&nbsp; We store a query as a list of <strong>cons</strong>es,
+where the <strong>car</strong> of the <strong>cons </strong> is the name (a string) and
+the <strong>cdr</strong> of the cons is the value (another string).&nbsp;&nbsp;&nbsp; When
+a query is transmitted by the web browser to AllegroServe it is sent as string using the
+encoding <strong>application/x-www-form-urlencoded.&nbsp; </strong>We provide the
+following functions to convert between the encoding and the query list:</p>
+
+<p><font face="Courier New"><strong>&nbsp;</strong></font></p>
+
+<p><a name="f-form-urlencoded-"></a><font face="Courier New"><strong>(form-urlencoded-to-query
+string)</strong></font></p>
+
+<p>Decodes the string and returns the query list.</p>
+
+<p>&nbsp;</p>
+
+<p><a name="f-query-to"></a><font face="Courier New"><strong>(query-to-form-urlencoded
+query)</strong></font></p>
+
+<p>Encodes the query and returns a string.</p>
+
+<p>&nbsp;</p>
+
+<p>Examples:</p>
+
+<pre>user(4): <strong>(query-to-form-urlencoded '((&quot;first name&quot; . &quot;joe&quot;) 
+                                     (&quot;last name&quot; . &quot;smith&quot;)))</strong>
+&quot;first+name=joe&amp;last+name=smith&quot;
+
+user(5): <strong>(form-urlencoded-to-query &quot;first+name=joe&amp;last+name=smith&quot;)</strong>
+((&quot;first name&quot; . &quot;joe&quot;) (&quot;last name&quot; . &quot;smith&quot;))
+ </pre>
 
 <p>&nbsp;</p>
 
