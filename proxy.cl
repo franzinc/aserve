@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.20 2000/10/12 05:01:18 jkf Exp $
+;; $Id: proxy.cl,v 1.21 2000/10/12 17:14:26 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -41,8 +41,11 @@
   ;; proxy cache
   table		; hash table mapping to pcache-ent objects
   disk-caches   ; list of pcache-disk items
-  
 
+  cleaner	; process doing housecleaning
+  (cleaner-lock  (mp:make-process-lock :name "cache cleaner")) 
+
+  size		; specified size of the cache (in blocks)
   high-water    ; when blocks in cache gets above this start flushing to disk
   low-water     ; when blocks in cache get below this stop flushing
   
@@ -90,6 +93,7 @@
   ;; for each disk file on which we are caching
   filename
   stream
+  blocks	; total blocks in cache
   free-blocks   ; number of blocks remaining
   free-list ; list of (start . end) blocks that are free
 
@@ -701,46 +705,32 @@
 
 
   
-(defun create-proxy-cache (&key (server *wserver*))
+(defun create-proxy-cache (&key (server *wserver*) (size #.(* 10 1024 1024)))
   ;; create a cache for the proxy
   (let (pcache)
     (setf (wserver-pcache server)
       (setq pcache (make-pcache 
 		    :table (make-hash-table :test #'equal)
-		    :queueobj (make-and-init-queueobj)
-		    :high-water (truncate 30000 *header-block-size*)
-		    :low-water  (truncate 10000 *header-block-size*)
-		    )))
+		    :queueobj (make-and-init-queueobj))))
     
+    (configure-memory-cache :server server :size size)
     
-    ; create a sample 10mb cache disk for testing
-    ; purposes
-    (let ((pdisk (make-pcache-disk
-		  :filename "aserve-cache.asv"
-		  :queueobj (make-and-init-queueobj)
-		  :high-water (truncate 9000000 *header-block-size*)
-		  :low-water  (truncate 9500000 *header-block-size*)
-		  )))
-      (push pdisk (pcache-disk-caches pcache))
-      (setf (pcache-disk-stream pdisk)
-	(open "aserve-cache.asv" ; need unique names
-	      :if-exists :supersede
-	      :if-does-not-exist :create
-	      :direction :io
-	      #-(and allegro version>= 6)
-	      :element-type
-	      #-(and allegro version>= 6)
-	      '(unsigned-byte 8)))
-      
-      ; 10mb 
-      (setf (pcache-disk-free-blocks pdisk)
-	(/ #.(* 10 1024 1024) *header-block-size*))
-      
-      (setf (pcache-disk-free-list pdisk)
-	(list (cons 0 (1- (pcache-disk-free-blocks pdisk)))))
-      
-      )
-      
+
+    (let ((name (format nil "~d-cache-cleaner" (incf *thread-index*))))
+      (setf (pcache-cleaner pcache)
+	(mp:process-run-function 
+	 name
+	 #'(lambda (server)
+	     (let ((*wserver* server)
+		   (pcache (wserver-pcache server)))
+	       (loop
+		 (mp:with-process-lock ((pcache-cleaner-lock pcache))
+		   (if* (null (pcache-cleaner pcache))
+		      then ; indication that we should exit
+			   (return))
+		   (ignore-errors (cache-housekeeping)))
+		 (sleep 30))))
+	 server)))
   
     (publish :path "/cache-stats"
 	     :function
@@ -751,7 +741,86 @@
 	     #'(lambda (req ent)
 		 (display-proxy-cache-entries req ent pcache)))
     ))
-				
+
+
+(defun kill-proxy-cache (&key (server *wserver*))
+  ;; kill off the cache and return all resources to the pool
+  
+  (let ((pcache (wserver-pcache server)))
+    
+    (if* (null pcache) then (return-from kill-proxy-cache))
+    
+    (mp:with-process-lock ((pcache-cleaner-lock pcache))
+      ;; now we know that the other thread cleaning out
+      ;; the cache won't call cache-housekeeping while we're
+      ;; busy doing out business.
+      
+      ; this will signal the cache cleaner process to exit
+      (setf (pcache-cleaner pcache) nil)
+      
+      ; clean out and remove the disk caches first
+      (dolist (pcache-disk (pcache-disk-caches pcache))
+	(flush-disk-cache pcache pcache-disk 0)
+	(ignore-errors (delete-file (pcache-disk-filename pcache-disk))))
+      
+      (setf (pcache-disk-caches pcache) nil)
+      
+      ; now clean the memory cache
+      (flush-memory-cache pcache 0)
+      
+      ; and now return all the blocks on dead list
+      (flush-dead-entries pcache))))
+
+
+
+(defun configure-memory-cache (&key (server *wserver*)
+				    size)
+  ;; specify the desired size of the memory cache
+  (let ((pcache (wserver-pcache server)))
+    (if* (null pcache)
+       then (error "There is no memory cache to size"))
+    
+    ; store it in blocks
+    (setf (pcache-size pcache) (truncate size *header-block-size*))
+    
+    (setf (pcache-high-water pcache) (truncate (* .90 (pcache-size pcache))))
+    (setf (pcache-low-water pcache) (truncate (* .80 (pcache-size pcache))))))
+
+(defun add-disk-cache (&key (server *wserver*) 
+			    filename 
+			    (size #.(* 10 1024 1024)))
+  (if* (null filename)
+     then ; create a filename
+	  (loop
+	    (let ((name (format nil "acache-~x.acf" (random 34567))))
+	      (if* (not (probe-file name))
+		 then (setq filename name) 
+		      (return)))))
+  (let* ((blocks (truncate size *header-block-size*))
+	 (pcache-disk (make-pcache-disk
+		       :filename filename
+		       :queueobj (make-and-init-queueobj)
+		       :high-water (truncate (* .90 blocks))
+		       :low-water  (truncate (* .80 blocks))
+		       :blocks blocks
+		       :free-blocks blocks
+		       :free-list (list (cons 0 (1- blocks)))
+		       :stream (open filename
+				     :if-exists :supersede
+				     :if-does-not-exist :create
+				     :direction :io
+				     #-(and allegro version>= 6)
+				     :element-type
+				     #-(and allegro version>= 6)
+				     '(unsigned-byte 8)))))
+    (push pcache-disk (pcache-disk-caches 
+		       (wserver-pcache server)))
+    filename))
+	  
+		      
+  
+    
+    
 
 (defun make-and-init-queueobj ()
   ; make a queue object with the dummy mru,lru entries
@@ -772,8 +841,12 @@
 	(dead-blocks 0))
     (do ((ent (pcache-dead-ent pcache) (pcache-ent-next ent)))
 	((null ent))
-      (incf dead-bytes (pcache-ent-data-length ent))
-      (incf dead-blocks (pcache-ent-blocks ent)))
+      (let ((this-data-length (pcache-ent-data-length ent))
+	    (this-dead-blocks (pcache-ent-blocks ent)))
+	(if* this-data-length
+	   then (incf dead-bytes this-data-length))
+	(if* this-dead-blocks
+	   then (incf dead-blocks this-dead-blocks))))
       
     
     (with-http-response (req ent)
@@ -837,13 +910,15 @@
 	    ((:table :border 2)
 	     (:tr
 	      (:th "items")
-	      (:th "blocks")
+	      (:th "used-blocks/total-blocks")
 	      (:th "bytes")
 	      )
 	     (let ((queueobj (pcache-queueobj pcache)))
 	       (html (:tr 
 		      (:td (:princ-safe (queueobj-items queueobj)))
-		      (:td (:princ-safe (queueobj-blocks queueobj)))
+		      (:td (:princ-safe (queueobj-blocks queueobj))
+			   "/"
+			   (:princ-safe (pcache-size pcache)))
 		      (:td (:princ-safe (queueobj-bytes queueobj)))))))
 	    :br
 	    :br
@@ -1401,7 +1476,8 @@
   
   ; first clean out disk caches so we can put more memory stuff in them
   (dolist (pcache-disk (pcache-disk-caches pcache))
-    (if* (< (pcache-disk-free-blocks pcache-disk)
+    (if* (> (- (pcache-disk-blocks pcache-disk)
+	       (pcache-disk-free-blocks pcache-disk))
 	    (pcache-disk-high-water  pcache-disk))
        then ; must flush it
 	    (flush-disk-cache pcache
@@ -1421,7 +1497,9 @@
 (defun flush-disk-cache (pcache pcache-disk goal)
   ;; flush entries from the disk cache until the number of blocks
   ;; is less than or equal to the goal
-  (let* ((needed (- goal (pcache-disk-free-blocks pcache-disk)))
+  (let* ((needed (- (- (pcache-disk-blocks pcache-disk) 
+		       (pcache-disk-free-blocks pcache-disk))
+		    goal))
 	 (queueobj (pcache-disk-queueobj pcache-disk))
 	 (mru-head (queueobj-mru queueobj))
 	 (lru-head (queueobj-lru queueobj)))
@@ -1444,6 +1522,10 @@
 
 (defun flush-memory-cache (pcache goal)
   ;; move memory cache items to a disk cache if possible
+  
+  (if* (null pcache)
+     then (setq pcache (wserver-pcache *wserver*)))
+  
   (let* ((needed (- (queueobj-blocks (pcache-queueobj pcache))
 		    goal))
 	 (queueobj (pcache-queueobj pcache))
@@ -1459,7 +1541,9 @@
 	  (let ((lru lru-head))
 	    (loop
 	      (setq lru (pcache-ent-prev lru))
-	      (if* (eq lru mru-head) then (return))
+	      (if* (eq lru mru-head) 
+		 then (setq needed 0) 
+		      (return-from main))
 	      (if* (lock-pcache-ent lru)
 		 then (dolist (dc disk-caches)
 			(if* (move-ent-to-disk lru dc)
@@ -1467,7 +1551,11 @@
 				(decf needed (pcache-ent-blocks lru))
 				(unlock-pcache-ent lru)
 				(return-from main)))
-		      (unlock-pcache-ent lru)))))))))
+		      ; couldn't get it into a disk cache.. just kill it
+		      (kill-pcache-ent lru pcache)
+		      (unlock-pcache-ent lru)
+		      (setq lru lru-head)
+		      ))))))))
 
 		  
 (defun flush-dead-entries (pcache)
@@ -1510,48 +1598,7 @@
     
   
 
-(defun clean-memory-cache (&optional pcache)
-  ; clear out the dead entries
-  ; swap least recently used entries to disk
-  ;
-  
-  (let ((pcache (or pcache (wserver-pcache *wserver*))))
-    (let (ent)
-      (excl::atomically
-       (excl::fast
-	(setf ent (pcache-dead-ent pcache)
-	      (pcache-dead-ent pcache) nil)))
-    
-      ; now we have an exclusive link to the dead entries
-      ; which we can free at our leisure
-      (let ((count 0))
-	(loop
-	  (if* (null ent) then (return))
-	  (incf count)
-	  (free-header-blocks (pcache-ent-data ent))
-	  (let ((diskloc (pcache-ent-disk-location ent)))
-	    ; if stored on the disk, free those blocks
-	    (return-free-blocks (pcache-ent-pcache-disk ent) diskloc))
-	  (setq ent (pcache-ent-next ent)))
-	(excl::atomically 
-	 (excl::fast 
-	  (decf (the fixnum (pcache-dead-items pcache)) 
-		(the fixnum count)))))
-      
-      ; now as a test move all entries in the cache to the disk
-      (let (res)
-	(let ((ent (pcache-ent-next  (queueobj-mru
-				      (pcache-queueobj pcache)))))
-	  (loop
-	    (if* (and ent (pcache-ent-key ent))
-	       then (push ent res)
-		    (setf ent (pcache-ent-next ent))
-	       else (return)))
-	  (dolist (ent res)
-	    (if* (lock-pcache-ent ent)
-	       then (move-ent-to-disk ent 
-				      (car (pcache-disk-caches pcache)))
-		    (unlock-pcache-ent ent))))))))
+
 	    
 	    
 
@@ -1573,9 +1620,7 @@
   (let ((to-store-list (get-disk-cache-blocks 
 			pcache-disk (pcache-ent-blocks pcache-ent)))
 	(buffs))
-    (logmess (format nil "needed ~d blocks, got ~s~%" 
-		     (pcache-ent-blocks pcache-ent)
-		     to-store-list))
+    
     (if* to-store-list
        then (logmess (format nil "store ~s on disk at ~s~%"
 			     (pcache-ent-key pcache-ent)

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.75 2000/10/12 05:01:18 jkf Exp $
+;; $Id: main.cl,v 1.76 2000/10/12 17:14:26 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -854,7 +854,34 @@ by keyword symbols and not by strings"
      then (enable-proxy :server server))
   
   (if* cache
-     then (create-proxy-cache :server server))
+     then ; cache argument can have many forms
+	  (let ((memory-size #.(* 10 1024 1024)) ; default 10mb
+		(disk-caches nil))
+	    (if* (atom cache)
+	       then (if* (integerp cache)
+		       then (setq memory-size cache))
+	       else (do ((info cache (cddr info)))
+			((null info))
+		      (case (car info)
+			(:memory (setq memory-size (cadr info)))
+			(:disk (let ((dsize (cadr info)))
+				 (if* (atom dsize)
+				    then (if* (not (integerp dsize))
+					    then (setq dsize 
+						   #.(* 10 1024 1024)))
+					 
+					 (push (cons nil dsize) disk-caches)
+							     
+				    else (push dsize disk-caches))))
+			(t (error "unknown disk cache info specifier: ~s"
+				  (car info))))))
+		    
+	    (create-proxy-cache :server server :size memory-size)
+	    (dolist (disk-cache disk-caches)
+	      (add-disk-cache :server server
+			      :filename (car disk-cache)
+			      :size (cadr disk-cache)))))
+	    
   
 
   
@@ -908,6 +935,8 @@ by keyword symbols and not by strings"
     (mp:process-allow-schedule))
   
   (setf (wserver-worker-threads server) nil)
+  
+  (kill-proxy-cache :server server)
   )
 
 
