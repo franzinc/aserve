@@ -739,7 +739,7 @@ send the results of&nbsp; the execution of those programs back the web client.
 variables and, in the case of a <strong>put</strong> or <strong>post</strong> request, the
 body of the request is sent to standard input of the program.</p>
 
-<p>CGI is a clumy and slow protocol for extending the behavior or a web server and is
+<p>CGI is a clumsy and slow protocol for extending the behavior or a web server and is
 falling out of favor.&nbsp; However there are legacy CGI applications you may need to call
 from AllegroServe.&nbsp;&nbsp; You invoke an external program using the CGI protocol with
 the <strong>run-cgi-program</strong> function.</p>
@@ -2126,7 +2126,7 @@ accessed by <strong>request-vhost</strong> function.</p>
 
 <p>We now are in a position to describe what values the <strong>:host</strong> argument to
 the publish functions can take on.&nbsp;&nbsp; The <strong>:host</strong> argument can be <strong>nil</strong>
-or one of:
+or one of: 
 
 <ol>
   <li>a string naming a virtual host.&nbsp; If there is no virtual host with this name a new
@@ -2142,7 +2142,7 @@ value is assumed to be <strong>:wild</strong>.</p>
 <p>The value of the <strong>:host </strong>argument is converted into a list of one or
 more vhost objects and/or the symbol <strong>:wild.</strong>&nbsp;&nbsp;&nbsp; The meaning
 of a vhost is clear: it means that this entity will be visible on this virtual host.
-&nbsp; The meaning of <strong>:wild </strong> is that this entity will be visible on <em>all</em>
+&nbsp; The meaning of <strong>:wild </strong>is that this entity will be visible on <em>all</em>
 virtual hosts, except it can be shadowed by a entity specified for a particular virtual
 host.&nbsp; Thus you could publish an entity for<strong> :path &quot;/&quot; </strong>and <strong>:host
 :wild</strong> and it will be used for all virtual hosts that don't specify a entity for <strong>:path
