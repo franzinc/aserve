@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: main.cl,v 1.15 2000/01/24 20:34:06 jkf Exp $
+;; $Id: main.cl,v 1.16 2000/01/25 16:26:39 jkf Exp $
 
 ;; Description:
 ;;   neo's main loop
@@ -335,7 +335,20 @@
   ((command  ;; keyword giving the command in this request
     :initarg :command
     :reader command)
-   (url ;; string - the argument to the command
+   
+   (uri  ;; uri object holding the current request
+    :initarg :uri
+    :reader request-uri)
+   
+   (path 
+    ;; the path value from the uri object encoded as a string
+    ;; we need this slot to cache the transformation of path to string
+    ;* we may eliminate the need for this in the future if the uri
+    ;  module caches the path as a string for us.
+    :initarg :path
+    :reader request-path)
+   
+   #+replaced (url ;; string - the argument to the command
     :initarg :url
     :reader url)
    (url-argument  ;; alist of arguments if there were any after a ? on the url
@@ -353,7 +366,7 @@
    (alist ;; alist of headers not stored in slots
     :initform nil
     :accessor alist)
-   (socket ;; the socket we're communicating throgh
+   (socket ;; the socket we're communicating through
     :initarg :socket
     :reader socket)
    (client-ipaddr  ;; who is connecting to us
@@ -702,26 +715,23 @@
 	       then (return) ; out of loop
 		    ))
 	  
-	  (multiple-value-bind (cmd url protocol)
+	  (multiple-value-bind (cmd uri protocol)
 	      (parse-http-command buffer end)
 	    (if* (or (null cmd) (null protocol))
 	       then ; no valid command found
 		    (return-from read-http-request nil))
-	    (multiple-value-bind (host newurl args)
-		(parse-url url)
 	      
-	      (setq req (make-instance 'http-request
-			  :command cmd
-			  :url newurl
-			  :url-argument args
-			  :host host
-			  :protocol protocol
-			  :protocol-string (case protocol
-					     (:http/1.0 "HTTP/1.0")
-					     (:http/1.1 "HTTP/1.1")
-					     (:http/0.9 "HTTP/0.9"))
-			  :socket sock
-			  :client-ipaddr (socket:remote-host sock))))
+	    (setq req (make-instance 'http-request
+			:command cmd
+			:uri uri
+			:path (uri-path-to-string uri)
+			:protocol protocol
+			:protocol-string (case protocol
+					   (:http/1.0 "HTTP/1.0")
+					   (:http/1.1 "HTTP/1.1")
+					   (:http/0.9 "HTTP/0.9"))
+			:socket sock
+			:client-ipaddr (socket:remote-host sock)))
 	    
 	    
 	    (if* (and (not (eq protocol :http/0.9))
@@ -1225,7 +1235,7 @@
   (let ((alist (url-argument-alist-cache req)))
     (if* alist
        thenret
-       else (let ((arg (url-argument req)))
+       else (let ((arg (uri-query (request-uri req))))
 	      (if* arg
 		 then (setf (url-argument-alist-cache req)
 			(decode-form-urlencoded arg)))))))

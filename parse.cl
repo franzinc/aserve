@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: parse.cl,v 1.12 2000/01/07 22:40:35 jkf Exp $
+;; $Id: parse.cl,v 1.13 2000/01/25 16:26:39 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -130,7 +130,7 @@
   ;; buffer is a string buffer, with 'end' bytes in it.  
   ;; return 3 values
   ;;	command  (kwd naming it or nil if bogus)
-  ;;    url      string
+  ;;    url      uri object
   ;;    protocol  (kwd naming it or nil if bogus)
   ;;
   (let ((blankpos)
@@ -166,6 +166,11 @@
     
     (let ((url (buffer-substr buffer urlstart blankpos))
 	  (prot))
+      
+      ; parse url and if that fails get out right away
+      (if* (null (setq url (parse-uri url)))
+	 then (return-from parse-http-command nil))
+      
       (if* (buffer-match buffer (1+ blankpos) "HTTP/1.")
 	 then (if* (eq #\0 (schar buffer (+ 8 blankpos)))
 		 then (setq prot :http/1.0)

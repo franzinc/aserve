@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: publish.cl,v 1.20 2000/01/18 22:59:41 jkf Exp $
+;; $Id: publish.cl,v 1.21 2000/01/25 16:26:39 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -495,7 +495,9 @@
 					      :response *response-not-found*)
 				       (with-http-body (req ent)
 					 (html "The request for "
-					       (:princ-safe (url req))
+					       (:princ-safe 
+						(render-uri 
+						 (request-uri req)))
 					       " was not found on this server."))))
 			   :content-type "text/html"))
 	    (setf (wserver-invalid-request *wserver*) entity))
@@ -508,7 +510,8 @@
 			     (locator locator-exact))
   ;; standard function for finding an entity in an exact locator
   ;; return the entity if one is found, else return nil
-  (let ((entity (gethash (url req) (locator-info locator))))
+  (let ((entity (gethash (request-path req)
+			 (locator-info locator))))
     (if* entity
        then (let ((entity-host (host entity)))
 	      (if* entity-host
@@ -526,7 +529,7 @@
 			     (locator locator-prefix))
   ;; standard function for finding an entity in an exact locator
   ;; return the entity if one is found, else return nil
-  (let* ((url (url req))
+  (let* ((url (request-path req))
 	 (len-url (length url)))
 	     
     (dolist (entpair (wserver-prefix-url *wserver*))
@@ -553,59 +556,7 @@
 
 
 
-#+ignore
-(defmethod old-handle-request ((req http-request))
-  ;; do the server response to the given request
-  
-  ; look for an exact match
-  (let ((entity (gethash (url req) (wserver-exact-url *wserver*))))
-    (if* entity
-       then (let ((entity-host (host entity)))
-	      (if* entity-host
-		 then ; must do a host match
-		      (let ((req-host (host req)))
-			(if* req-host 
-			   then (if* (equal req-host entity-host)
-				   then (return-from handle-request
-					  (process-entity req entity)))
-			   else ; no host given, don't do it
-				nil))
-		 else ; no host specified in entity, so do it
-		      (return-from handle-request
-			(process-entity req entity))))))
-  
-  ; do a partial match
-  
-  (let* ((url (url req))
-	 (len-url (length url)))
-	     
-    (dolist (entpair (wserver-prefix-url *wserver*))
-      (if* (and (>= len-url (length (car entpair)))
-		(buffer-match url 0 (car entpair)))
-	 then ; we may already be a wiener
-	      (if* (process-entity req (cdr entpair))
-		 then ; successful
-		      (return-from handle-request nil)))))
-  
 
-  ; no match, it failed
-  (let ((ent (gethash nil (wserver-exact-url *wserver*))))
-    (if* (null ent)
-       then ; no  global handler, create one
-	    (setq ent (publish 
-		       :function #'(lambda (req ent)
-				     (with-http-response 
-					 (req ent
-					      :response *response-not-found*)
-				       (with-http-body (req ent)
-					 (html "The request for "
-					       (:princ-safe (url req))
-					       " was not found on this server."))))
-				     
-		       :content-type "text/html"))
-	    (setf (gethash nil (wserver-exact-url *wserver*)) ent)
-	    )
-    (process-entity req ent)))
 	  
 				
 
@@ -702,7 +653,7 @@
   
   (let ((realname (concatenate 'string
 		    (entity-directory ent)
-		    (subseq (url req) (length (prefix ent)))))
+		    (subseq (request-path req) (length (prefix ent)))))
 	(newname))
     (debug-format 10 "directory request for ~s~%" realname)
     
@@ -739,7 +690,7 @@
 	 then  (let ((ext (subseq realname (1+ chpos))))
 		 (setq mtype (or (gethash ext *mime-types*) mtype))))
       
-      (process-entity req (publish-file :url (url req) 
+      (process-entity req (publish-file :url (request-path req) 
 					:file realname
 					:content-type mtype)))
       
