@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.42 2001/02/12 16:53:41 jkf Exp $
+;; $Id: publish.cl,v 1.43 2001/04/04 16:00:40 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -967,7 +967,8 @@
 		     (entity-directory ent)
 		     (setq postfix (subseq (uri-path (request-uri req))
 					   (length (prefix ent))))))
-	 (newname))
+	 (redir-to)
+	 )
     (debug-format :info "directory request for ~s~%" realname)
     
     ; we can't allow the brower to specify a url with 
@@ -991,30 +992,43 @@
 		 then (setq realname (concatenate 'string realname "/")))
 	      
 	      (if* (eq :file (excl::filesys-type
-			      (setq newname
-				(concatenate 'string realname "index.html"))))
-		 then (setq realname newname)
+			      (concatenate 'string realname "index.html")))
+		 then (setq redir-to "index.html")
 	       elseif (eq :file (excl::filesys-type
-				 (setq newname
-				   (concatenate 'string realname "index.htm"))))
-		 then (setq realname newname)
+				 (concatenate 'string realname "index.htm")))
+		 then (setq redir-to "index.htm")
 		 else ; failure
 		      (return-from process-entity nil))
        elseif (not (eq :file type))
 	 then  ; bizarre object
 	      (return-from process-entity nil)))
     
-    ;; ok realname is a file.
-    ;; create an entity object for it, publish it, and dispatch on it
-    
+    (if* redir-to
+       then ; redirect to an existing index file
+	    (with-http-response (req ent
+				     :response *response-moved-permanently*)
+	      (let ((path (uri-path (request-uri req))))
+		(setf (reply-header-slot-value req :location) 
+		  (concatenate 'string path
+			       (if* (and path
+					 (> (length path) 0)
+					 (eq #\/ (aref path 
+						       (1- (length path)))))
+				  then ""
+				  else "/")
+			       redir-to))
+			     
+		(with-http-body (req ent))))
+       else ;; ok realname is a file.
+	    ;; create an entity object for it, publish it, and dispatch on it
       
-    (process-entity req (publish-file :path (uri-path 
-					     (request-uri req))
-				      :file realname
-				      :authorizer (entity-authorizer ent)
-				      ))
-      
+	    (process-entity req 
+			    (publish-file :path (uri-path 
+						 (request-uri req))
+					  :file realname
+					  :authorizer (entity-authorizer ent))))
     t))
+
     
      
       
