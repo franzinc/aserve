@@ -73,6 +73,8 @@
 &nbsp; <a href="#f-make-http-client-request">make-http-client-request</a><br>
 &nbsp; <a href="#f-read-client-response">read-client-response-headers</a><br>
 &nbsp; <a href="#f-client-request-read-sequence">client-request-read-sequence</a></font><br>
+<a href="#proxy">Proxy</a><br>
+<a href="#cache">Cache</a><br>
 <a href="#debugging">Debugging</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-debug-on">net.aserve::debug-on</a><br>
 &nbsp; <a href="#f-debug-off">net.aserve::debug-off</a></font><br>
@@ -183,7 +185,8 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
   <li>proxy -- if true then this server will also act as a proxy server and will forward http
     requests to other servers.</li>
   <li>cache -- if true (and if proxy is true as well) cache locally the work done by the proxy
-    server.&nbsp; This facility is still being developed.</li>
+    server.&nbsp; The value of this variable specifies the size of the caches, both memory and
+    disk.&nbsp; See the section on caches for more details on the format of the argument.</li>
   <li>accept-hook -- this should be a function of one argument, the socket which was created
     when a http request was accepted by AllegroServe.&nbsp; The function should return a
     socket for AllegroServe to use.&nbsp; This hook is normally used to turn a regular socket
@@ -1662,9 +1665,109 @@ caller of the function must be prepared for having the buffer only partially fil
 
 <hr>
 
+<h2><a name="proxy">Proxy</h2>
+
+<p>AllegroServe can serve as an http proxy.&nbsp;&nbsp; What this means is that web
+clients can ask AllegroServe to fetch a URL for them.&nbsp;&nbsp; The two primary uses for
+a proxy server are 
+
+<ol>
+  <li>you have web clients on a local network and you would prefer that the web clients don't
+    send messages out to the internet.&nbsp;&nbsp; You run AllegroServe on a machine that has
+    access both to the internal network and to the internet.&nbsp; You then configure the web
+    clients to proxy through AllegroServe (directions for doing this are given below).</li>
+  <li>You wish to use AllegroServe's caching facility to store copies of pages locally to
+    improve responsiveness.&nbsp; In this case you must start AllegroServe as a proxy server
+    for the web clients who will use the cache.</li>
+</ol>
+
+<p>In order to run AllegroServe as a proxy server you should specify <strong>:proxy t</strong>
+in the arguments to the <strong>net.aserve:start</strong> function.&nbsp;&nbsp; With this
+specified AllegroServe will still act as a web server for pages on the machine on which
+AllegroServe is running.&nbsp; AllegroServe will act as a proxy for requests to other
+machines.</p>
+
+<p>Each web browser has it's own way of specifying which proxy server it should use.
+&nbsp; For Netscape version 4 select the <strong>Edit</strong> menu, then <strong>Preferences..</strong>.
+and then click on the <strong>plus sign</strong> to the left of <strong>Advanced</strong>.
+&nbsp; Then select <strong>Proxies</strong> and click on&nbsp; <strong>Manual Proxy
+Configuration</strong> and the click on <strong>View</strong> and specify the name of the
+machine running AllegroServe and the port number on which AllegroServe is listening.
+&nbsp; Then click <strong>OK</strong> on all the dialog boxes.</p>
+
+<p>For Internet Explorer 5 select the <strong>Tools</strong> menu, and then <strong>Internet
+Options..</strong> and then the <strong>Connections</strong> tab, and then <strong>LAN
+Settings</strong>.&nbsp;&nbsp; Click on <strong>Use a Proxy Server </strong>and then click
+on <strong>Advanced</strong> and specify the machine name and port number for
+AllegroServe.&nbsp; Then click on <strong>OK</strong> to dismiss the dialog windows.</p>
+
 <p>&nbsp;</p>
 
-<h2><a name="debugging"></a>Debugging</h2>
+<hr>
+
+<h2></a><a name="cache">Cache</h2>
+
+<p>The AllegroServe cache is a facilty in development.&nbsp; We'll describe here the
+current status of the code. </p>
+
+<p>The cache consists of a memory cache and a set of zero or more disk caches.
+&nbsp;&nbsp;&nbsp;&nbsp; Items initially live in the memory cache and are moved to the
+disk caches when the memory cache fills up.&nbsp;&nbsp; Items enter the memory cache due
+to a page being accessed via the proxy server.&nbsp;&nbsp; Items in the disk cache move
+back to the memory cache if the data portion must be sent back to the requesting client
+(some requests can be answered without sending back the contents of the page and for these
+the item stays in the disk cache).</p>
+
+<p>You specify the sizes of each cache.&nbsp;&nbsp; The disk caches will never grow beyond
+the size you specified but the memory cache can exceed the specified size for a short
+time.&nbsp; A background thread moves items from the memory cache to the disk caches and
+we will allow you to control how often that thread wakes up and ensures that the memory
+cache is within the desired contstaints.</p>
+
+<p>When <strong>net.aserve:start</strong> is called you specify if you want caching and if
+so what sizes caches you want.&nbsp;&nbsp; A sample argument pair passed to <strong>net.aserve:start</strong>
+is</p>
+
+<pre>:cache '(:memory 10000000 :disk (&quot;/tmp/mycache&quot; 30000000) :disk (nil 20000000))</pre>
+
+<p>This says that the memory cache should be 10,000,000 bytes and that there should be two
+disk caches.&nbsp;&nbsp; One disk cache is the file &quot;/tmp/mycache&quot; and can grow
+to 30,000,000 bytes and the other cache will have a name chosen by AllegroServe and it can
+grow to 20,000,000 bytes.&nbsp;&nbsp; We should note here that one thing that
+distinguishes the AllegroServe caching facilty from that found in many other http
+proxy-caches is that AllegroServe uses a few&nbsp; large cache files rather than storing
+each cached item in a separate file in the filesystem.&nbsp;&nbsp; </p>
+
+<p>A few other ways of specifying caching at startup is:</p>
+
+<pre>:cache t</pre>
+
+<p>This will create a memory case of the default size (currently 10 megabytes) and it will
+create no disk caches.</p>
+
+<pre>:cache 20000000</pre>
+
+<p>This will create a memory cache of 20,000,000 byte and no disk caches.</p>
+
+<p>&nbsp;</p>
+
+<p>When caching is enabled we publish two links to pages showing cache information.
+&nbsp;&nbsp; This is useful during debugging and is likely to change in the future. &nbsp;
+The two pages are&nbsp; <strong>/cache-stats</strong>&nbsp; and&nbsp; <strong>/cache-entries</strong>.</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr>
+
+<p>&nbsp;</p>
+
+<h2></a><a name="debugging"></a>Debugging</h2>
 
 <p>Debugging entity handler functions is difficult since these are usually run on a
 separate lisp thread.&nbsp; Also AllegroServe catches errors in entity handler functions,
