@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: examples.cl,v 1.19 2000/01/11 18:38:55 jkf Exp $
+;; $Id: examples.cl,v 1.20 2000/01/18 22:59:41 jkf Exp $
 
 ;; Description:
 ;;   neo examples
@@ -39,7 +39,7 @@
 (unpublish :all t)
 
 
-(publish :url "/" 
+(publish :path "/" 
 	 :content-type "text/html"
 	 :function
 	 #'(lambda (req ent)
@@ -67,7 +67,7 @@
 ;; a very simple page.  This is so simple it doesn't put out the required
 ;; tags (like <html>) yet I suspect that most browsers will display it
 ;; correctly regardless.
-(publish :url "/hello"
+(publish :path "/hello"
 	 :content-type  "text/html"
 	 :function #'(lambda (req ent)
 		       (with-http-response (req ent)
@@ -76,7 +76,7 @@
 
 ;; this is the "/hello" example above modified to put out the correct
 ;; html tags around the page.
-(publish :url "/hello2"
+(publish :path "/hello2"
 	 :content-type  "text/html"
 	 :function #'(lambda (req ent)
 		       (with-http-response (req ent)
@@ -86,7 +86,7 @@
 			     (:body "Hello World!")))))))
 
 ;; display the current gc statistics.
-(publish :url "/gc"
+(publish :path "/gc"
 	 :content-type "text/html"
 	 :function
 	 #'(lambda (req ent)
@@ -122,7 +122,7 @@
 
 
 ;; display a picture from a file.
-(publish-file :url "/pic" :file "prfile9.jpg"
+(publish-file :path "/pic" :file "prfile9.jpg"
 	      :content-type "image/jpeg")
 
 
@@ -132,7 +132,7 @@
 ;;
 ;; here's a form using the 'post' method
 ;;
-(publish :url "/tform" 
+(publish :path "/tform" 
 	 :content-type "text/html"
 	 :function
 	 (let ((name "unknown"))
@@ -163,7 +163,7 @@
 ;; example of a form that uses that 'get' method
 ;;
 (publish 
- :url "/apropos"
+ :path "/apropos"
  :content-type "text/html"
  :function
  #'(lambda (req ent)
@@ -220,18 +220,18 @@
 
 
 ;; a preloaded picture file
-(publish-file :url "/neoweb/fresh.jpg"
+(publish-file :path "/neoweb/fresh.jpg"
 	      :file "fresh.jpg"
 	      :content-type "image/jpeg"
 	      :preload t)
 
 ;; a preloaded text file
-(publish-file :url "/foo"
+(publish-file :path "/foo"
 	      :file "foo.txt"
 	      :content-type "text/plain"
 	      :preload t)
 
-(publish-file :url "/foo.txt"
+(publish-file :path "/foo.txt"
 	      :file "foo.txt"
 	      :content-type "text/plain"
 	      :preload nil)
@@ -239,7 +239,7 @@
 ;; an example which causes the web browser to put up the
 ;; name/password box and if you enter the name "foo" and password "bar"
 ;; then you get access to the secret info.
-(publish :url "/secret"
+(publish :path "/secret"
 	 :content-type "text/html"
 	 :function
 	 #'(lambda (req ent)
@@ -270,7 +270,7 @@
 ;; with one url but since there's a lot of code it helps in the
 ;; presentation to separate the two.
 ;;
-(publish :url "/getfile"
+(publish :path "/getfile"
 	 :content-type "text/html"
 	 :function
 	 #'(lambda (req ent)
@@ -298,7 +298,7 @@
 			 ((:input :type "submit")))))))))
 
 ;; this called with the file from 
-(publish :url "/getfile-got"
+(publish :path "/getfile-got"
 	 :content-type "text/html"
 	 :function
 	 #'(lambda (req ent)
@@ -372,7 +372,7 @@
 
 	     
 
-(publish :url "/cookietest"
+(publish :path "/cookietest"
 	 :content-type "text/html"
 	 :function
 	 #'(lambda (req ent)
@@ -399,7 +399,7 @@
 			      ((:a :href "/cookieverify") "here")
 			      " to see if they were saved"))))))
 
-(publish :url "/cookieverify"
+(publish :path "/cookieverify"
 	 :content-type "text/html"
 	 :function
 	 #'(lambda (req ent)
@@ -413,7 +413,7 @@
 	 
 
 
-(publish :url "/timeout"
+(publish :path "/timeout"
 	 :content-type "text/html"
 	 :function
 	 #'(lambda (req ent)

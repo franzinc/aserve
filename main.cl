@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: main.cl,v 1.13 2000/01/11 18:38:55 jkf Exp $
+;; $Id: main.cl,v 1.14 2000/01/18 22:59:41 jkf Exp $
 
 ;; Description:
 ;;   neo's main loop
@@ -78,7 +78,7 @@
 (in-package :neo)
 
 
-(defparameter *neo-version* '(1 0 6))
+(defparameter *neo-version* '(1 0 7))
 
 ;;;;;;;  debug support 
 
@@ -155,6 +155,19 @@
       :initform nil
       :accessor wserver-prefix-url)
      
+     (locators
+      ;; list of locators objects in search order
+      :initform (list (make-instance 'locator-exact
+			:name :exact)
+		      (make-instance 'locator-prefix
+				     :name :prefix)) 
+      :accessor wserver-locators)
+     
+     (invalid-request
+      ;; entity to invoke given a request that can't be
+      ;; satisfied
+      :initform nil  ; will build on demand if not present
+      :accessor wserver-invalid-request)
      ))
 
 
@@ -414,7 +427,7 @@
 
 (defvar *thread-index*  0)      ; globalcounter to gen process names
 
-(defvar *wserver*  (make-instance 'wserver))   ; set to last server created
+(defvar *wserver*)   ; set to last server created
 
 				    
 			      

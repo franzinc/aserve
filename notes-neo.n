@@ -20,6 +20,8 @@ done -- 1. get complete set of mime types by one-time
 
 5. server side includes
 
+6.  in the publish functions use :path rather than :url to make
+    it clearer
 
 
 -----------------

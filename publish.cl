@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: publish.cl,v 1.19 2000/01/11 18:38:55 jkf Exp $
+;; $Id: publish.cl,v 1.20 2000/01/18 22:59:41 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -42,8 +42,8 @@
    (port :initarg :port
 	 :initform nil
 	 :reader port)
-   (url  :initarg :url
-	 :reader url)
+   (path :initarg :path
+	 :reader path)
    (location :initarg :location
 	     :reader location)
    (prefix :initarg :prefix
@@ -54,6 +54,7 @@
 		  :initform nil ; means always considered new
 		  )
    (format :initarg :format  ;; :text or :binary
+	   :initform :text
 	   :reader  entity-format)
    
    (content-type :initarg :content-type
@@ -126,6 +127,54 @@
     :accessor ssi)
    )
   )
+
+
+
+
+;;-------- locators - objects which find the entity to return
+
+(defclass locator ()
+  ((name :initform :unnamed
+	 :initarg :name
+	 :reader  locator-name)
+
+   (method :initform #'standard-locator
+	   :initarg :method
+	   :accessor locator-method)
+   
+   ; info is where the locator will likely store data related
+   ; to mapping
+   (info :initform nil
+	 :initarg :info
+	 :accessor locator-info)
+   ))
+
+
+(defclass locator-exact (locator)
+  ;; used to map specific uri paths to entities
+  ;; the table slot holds the hash table that's used
+  ()
+  (:default-initargs :info (make-hash-table :test #'equal)))
+
+
+(defclass locator-prefix (locator)
+  ;; use to map prefixes to entities
+  ()
+  )
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
 
 
 ; we can specify either an exact url or one that handles all
@@ -276,8 +325,8 @@
 
 (defun unpublish (&key all)
   (if* all
-     then (clrhash (wserver-exact-url *wserver*))
-	  (setf (wserver-prefix-url *wserver*) nil)
+     then (dolist (locator (wserver-locators *wserver*))
+	    (unpublish-locator locator))
      else (error "not done yet")))
 
   
@@ -319,29 +368,40 @@
 
 ;; url exporting
 
-(defun publish (&key host port url function class format
+(defun publish (&key host port path function class format
 		     content-type
-		     (server *wserver*))
+		     (server *wserver*)
+		     locator
+		     )
   ;; publish the given url
   ;; if file is given then it specifies a file to return
   ;; 
+  (if* (null locator) 
+     then (setq locator (find-locator :exact server)))
+  
   (let ((ent (make-instance (or class 'computed-entity)
 	       :host host
 	       :port port
-	       :url  url
+	       :path path
 	       :function function
 	       :format format
 	       :content-type content-type)))
-    (setf (gethash url (wserver-exact-url server)) ent))
+    (setf (gethash path (locator-info locator)) ent))
   )
 	     
 
 (defun publish-file (&key (server *wserver*)
-			  host port url file content-type class preload
+			  locator
+			  host port path
+			  file content-type class preload
 			  cache-p ssi)
   ;; return the given file as the value of the url
   ;; for the given host.
   ;; If host is nil then return for any host
+  
+  (if* (null locator) 
+     then (setq locator (find-locator :exact server)))
+  
   (let (ent got)
     (if* preload
        then ; keep the content in core for fast display
@@ -359,7 +419,7 @@
 		(setq ent (make-instance (or class 'file-entity)
 			    :host host
 			    :port port
-			    :url  url
+			    :path path
 			    :file file
 			    :content-type content-type
 			    :contents  guts
@@ -370,14 +430,14 @@
        else (setq ent (make-instance (or class 'file-entity)
 			:host host
 			:port port
-			:url  url
+			:path path
 			:file file
 			:content-type content-type
 			:cache-p cache-p
 			:ssi ssi
 			)))
   
-    (setf (gethash url (wserver-exact-url server)) ent)))
+    (setf (gethash path (locator-info locator)) ent)))
 
 
 
@@ -388,17 +448,21 @@
 			       port
 			       destination
 			       (server *wserver*)
-			       
+			       locator
 			       )
   
   ;; make a whole directory available
+  
+  (if* (null locator) 
+     then (setq locator (find-locator :prefix server)))
+  
   (push (cons prefix (make-instance 'directory-entity 
 		       :directory destination
 		       :prefix prefix
 		       :host host
 		       :port port
 		       ))
-	  (wserver-prefix-url server)))
+	(locator-info locator)))
 
 
 			   
@@ -406,9 +470,91 @@
 
 
 
-
-
 (defmethod handle-request ((req http-request))
+  (dolist (locator (wserver-locators *wserver*))
+    (let ((ent (funcall (locator-method locator)
+			req
+			locator)))
+      (if* ent
+	 then (return-from handle-request
+		(process-entity req ent)))))
+  
+  ; no handler
+  (failed-request req)
+		       
+  )
+
+(defmethod failed-request ((req http-request))
+  ;; generate a response to a request that we can't handle
+  (let ((entity (wserver-invalid-request *wserver*)))
+    (if* (null entity)
+       then (setq entity (make-instance 'computed-entity
+			   :function #'(lambda (req ent)
+				     (with-http-response 
+					 (req ent
+					      :response *response-not-found*)
+				       (with-http-body (req ent)
+					 (html "The request for "
+					       (:princ-safe (url req))
+					       " was not found on this server."))))
+			   :content-type "text/html"))
+	    (setf (wserver-invalid-request *wserver*) entity))
+    (process-entity req entity)))
+
+  
+
+
+(defmethod standard-locator ((req http-request)
+			     (locator locator-exact))
+  ;; standard function for finding an entity in an exact locator
+  ;; return the entity if one is found, else return nil
+  (let ((entity (gethash (url req) (locator-info locator))))
+    (if* entity
+       then (let ((entity-host (host entity)))
+	      (if* entity-host
+		 then ; must do a host match
+		      (let ((req-host (host req)))
+			(if* req-host 
+			   then (if* (equal req-host entity-host)
+				   then entity)
+			   else ; no host given, don't do it
+				nil))
+		 else ; no host specified in entity, so do it
+		      entity)))))
+
+(defmethod standard-locator ((req http-request)
+			     (locator locator-prefix))
+  ;; standard function for finding an entity in an exact locator
+  ;; return the entity if one is found, else return nil
+  (let* ((url (url req))
+	 (len-url (length url)))
+	     
+    (dolist (entpair (wserver-prefix-url *wserver*))
+      (if* (and (>= len-url (length (car entpair)))
+		(buffer-match url 0 (car entpair)))
+	 then ; we may already be a wiener
+	      (return (cdr entpair))))))
+  
+
+(defun find-locator (name wserver)
+  ;; give the locator with the given name
+  (dolist (locator (wserver-locators wserver)
+	    (error "no such locator as ~s" name))
+    (if* (eq name (locator-name locator))
+       then (return locator))))
+
+
+(defmethod unpublish-locator ((locator locator-exact))
+  (clrhash (locator-info locator)))
+
+(defmethod unpublish-locator ((locator locator-prefix))
+  (setf (locator-info locator) nil))
+
+
+
+
+#+ignore
+(defmethod old-handle-request ((req http-request))
   ;; do the server response to the given request
   
   ; look for an exact match
@@ -954,7 +1100,15 @@
   
 
 
-  
+;;;;;;;;;;;;;;; setup things
+
+(if* (not (boundp '*wserver*))
+   then ; create initial wserver object
+	(setq *wserver* (make-instance 'wserver)))
+
+
+
+
   
 
 	  
