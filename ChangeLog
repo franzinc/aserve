@@ -1,3 +1,7 @@
+2000-07-25  jkf  <jkf@main.verada.com>
+
+	*  example/chat.cl - enhanced to support logging into the chat
+
 2000-07-17  John Foderaro  <jkf@tiger.franz.com>
 1.1.22
 	
