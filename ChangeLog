@@ -1,3 +1,7 @@
+2005-03-06  John Foderaro  <jkf@max.verada.com>
+
+	* client.cl - handle single line set-cookie lines that end in a semicolon
+
 2005-02-21  John Foderaro  <jkf@max.verada.com>
 1.2.43
 	* add digest-authorization to the aserve client code

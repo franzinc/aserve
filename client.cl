@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.46 2005/02/22 14:22:56 jkf Exp $
+;; $Id: client.cl,v 1.47 2005/03/07 04:09:42 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -680,7 +680,7 @@ or \"foo.com:8000\", not ~s" proxy))
 	  (let ((jar (client-request-cookies creq)))
 	    (if* jar
 	       then ; do all set-cookie requests
-		    (let (prev)
+		    (let (prev cs)
 		      ; Netscape v3 web server bogusly splits set-cookies
 		      ; over multiple set-cookie lines, so we look for
 		      ; incomplete lines (those ending in #\;) and combine
@@ -693,11 +693,20 @@ or \"foo.com:8000\", not ~s" proxy))
 				   else (setq prev (cdr headval)))
 				
 				(if* (not (eq #\; (last-character prev)))
-				   then (save-cookie (client-request-uri creq)
-						     jar
-						     prev)
+				   then (push prev cs)
+					(setq prev nil))
 					
-					(setq prev nil)))))))
+			 elseif prev
+			   then (push prev cs)
+				(setq prev nil)))
+		      
+		      (if* prev
+			 then (push prev cs))
+		      
+		      (dolist (cc (nreverse cs))
+			(save-cookie (client-request-uri creq)
+				     jar
+				     cc)))))
 	  
 	  
 	  (if* (eq :head (client-request-method creq))
