@@ -350,7 +350,9 @@ header lines and thus minimizes network traffic. </p>
 <p>&nbsp;</p>
 
 <p><a name="f-publish-directory"></a><strong><font face="Courier New">(publish-directory
-&amp;key prefix host port destination remove server indexes)</font></strong></p>
+&amp;key prefix host port destination remove server <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; indexes
+filter)</font></strong></p>
 
 <p>This creates a mapping from all urls whose name begins with<strong> prefix</strong> to
 files stored in the directory specified by the destination.&nbsp;&nbsp; The <strong>host</strong>,
@@ -369,9 +371,23 @@ to locate an index file for that directory.&nbsp; The <strong>indexes</strong> a
 specifies a list of index files to search for.&nbsp; By default the list consists of two
 filenames &quot;index.html&quot; and &quot;index.htm&quot;.</p>
 
-<p>We plan to make a number of refinements to <strong>publish-directory</strong> including
-the ability to specify how deep in the directory structure it will look and also
-&nbsp;&nbsp; restricting what kinds of files it will match.</p>
+<p>The valueof the <strong>filter </strong>argument is a function of three values: <strong>req</strong>
+<strong>ent</strong> and&nbsp; <strong>filename</strong>.&nbsp; <strong>req</strong> and <strong>ent</strong>
+are the request and entity objects that describe the current client request.
+&nbsp;&nbsp;&nbsp; <strong>filename</strong> is the name of a known file on the current
+machine which&nbsp; is being requested by the current request.</p>
+
+<p>If the filter returns <strong>nil</strong> then the normal operation&nbsp; is done by
+the directory-entity handler: the selected file is published and then the request to
+access it processed (and subsequent access using that url will just return the file and
+never go through the filter again).</p>
+
+<p>If the filter chooses to handle the request for the file itself&nbsp; it must generate
+a response to the request and then return a non-nil value.&nbsp; To avoid subsequent calls
+to the filter for this file the filter may choose to publish a handler for this url.
+&nbsp; If the filter wants to forbid access to this file a handy way to to call <font
+face="Courier New">(failed-request req)</font> and the standard &quot;404 Not found&quot;
+will be sent back to the client.</p>
 
 <p>&nbsp;</p>
 
