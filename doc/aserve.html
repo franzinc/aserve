@@ -76,6 +76,7 @@
 &nbsp; <a href="#f-client-request-read-close">client-request-close</a></font><br>
 <a href="#proxy">Proxy</a><br>
 <a href="#cache">Cache</a><br>
+<a href="#filters">Request Filters</a><br>
 <a href="#debugging">Debugging</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp; <font face="Courier New"><a href="#f-debug-on">net.aserve::debug-on</a><br>
 &nbsp; <a href="#f-debug-off">net.aserve::debug-off</a></font><br>
@@ -1709,7 +1710,7 @@ caller of the function must be prepared for having the buffer only partially fil
 
 <p>&nbsp;</p>
 
-<p><a name="f-client-request-read-close"><font face="Courier New"><strong>(client-request-close
+<p><a name="f-client-request-read-close"></a><font face="Courier New"><strong>(client-request-close
 client-request)</strong></font></p>
 
 <p>The client-request object returned by make-http-request is closed.&nbsp;&nbsp; This
@@ -1719,7 +1720,7 @@ returns the resources used by this connection to the operating system.&nbsp; </p
 
 <hr>
 
-<h2></a><a name="proxy">Proxy</h2>
+<h2><a name="proxy"></a>Proxy</h2>
 
 <p>AllegroServe can serve as an http proxy.&nbsp;&nbsp; What this means is that web
 clients can ask AllegroServe to fetch a URL for them.&nbsp;&nbsp; The two primary uses for
@@ -1759,7 +1760,7 @@ AllegroServe.&nbsp; Then click on <strong>OK</strong> to dismiss the dialog wind
 
 <hr>
 
-<h2></a><a name="cache">Cache</h2>
+<h2><a name="cache"></a>Cache</h2>
 
 <p>The AllegroServe cache is a facilty in development.&nbsp; We'll describe here the
 current status of the code. </p>
@@ -1811,17 +1812,86 @@ The two pages are&nbsp; <strong>/cache-stats</strong>&nbsp; and&nbsp; <strong>/c
 
 <p>&nbsp;</p>
 
-<p>&nbsp;</p>
+<hr>
+
+<h2><a name="filters"></a>Request Filters</h2>
+
+<p>After aserve reads a request and before it checks the locators to find an entity to
+handle the request, aserve runs the request through a set of filters. </p>
+
+<p>A filter is a function of one argument: the http-request object. The filter examines
+and possibily alters the request object. The idea is that filters can do large scale and
+simple url rewriting, such as changing all requests for one machine to another machine.
+The filtering occurs before the test to see if this is a proxy request so a filter can
+change a proxy request to a non proxy request or vice versa. </p>
+
+<p align="left">The currently active filters are the value of a slot in the wserver object
+</p>
+<div align="left">
+
+<pre>&nbsp;(wserver-filters wserver)</pre>
+</div>
+
+<p align="left">This slot can be setf'ed to a list of functions or new filter can be
+pushed onto the list.</p>
 
 <p>&nbsp;</p>
+
+<p>A filter function returns <strong>:done</strong> if no more filters should be run after
+this one. If the filter returns anything else then subsequent filters in the list are run
+as well. </p>
+
+<p>When a filter function runs it's most likely going to be looking at two slots in the
+request object, which are accessed via these functions: 
+
+<ul>
+  <li><strong>request-raw-uri </strong>- the actual uri given in the http command </li>
+  <li><strong>request-uri</strong> - a constructed uri starting with the raw uri and adding
+    information from the Host header field. This value is used to find the entity to run thus
+    it has all the information about the request. </li>
+</ul>
+
+<p>Also the value of <font face="Courier New">(header-slot-value request :host)</font> is
+important to check and possibly change. </p>
+
+<p>If the browser is setup to access the internet directly then a request from the user
+for <br>
+&nbsp;&nbsp;&nbsp; <strong>http://foo.bar.com:23/whatever<br>
+</strong><br>
+will cause the request to be sent to the server at <strong>foo.bar.com </strong>port 23
+and the request will have: 
+
+<ol>
+  <li>the request-raw-uri is <strong>/whatever </strong></li>
+  <li>the request-uri is <strong>http://foo.bar.com:23/whatever </strong></li>
+  <li>the Host header value is <strong>&quot;foo.bar.com:23&quot; </strong></li>
+</ol>
+
+<p><br>
+<br>
+<br>
+If the browser is setup to send all requests through a proxy at <strong>proxy.blop.com</strong>
+then a request for <br>
+<strong>http://foo.bar.com:23/whatever </strong><br>
+will come to <strong>proxy.blop.com</strong> and will have a different raw uri: 
+
+<ol>
+  <li>the request-raw-uri is now <strong>http://foo.bar.com:23/whatever </strong></li>
+  <li>the request-uri is still <strong>http://foo.bar.com:23/whatever </strong></li>
+  <li>the Host header value is still <strong>&quot;foo.bar.com:23&quot; </strong></li>
+</ol>
+
+<p>If the filter wants to alter the destination of request it should ensure that the three
+values mentioned above are set appropriately for the destination. If the new destination
+is not served by the current allegroserve wserver, then the filter will have to make sure
+to turn it into a proxy request (and this will only work if this AllegroServe was started
+with proxying enabled).</p>
 
 <p>&nbsp;</p>
 
 <hr>
 
-<p>&nbsp;</p>
-
-<h2></a><a name="debugging"></a>Debugging</h2>
+<h2><a name="debugging"></a>Debugging</h2>
 
 <p>Debugging entity handler functions is difficult since these are usually run on a
 separate lisp thread.&nbsp; Also AllegroServe catches errors in entity handler functions,
