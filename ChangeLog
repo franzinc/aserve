@@ -1,8 +1,11 @@
 2000-03-27  John Foderaro  <jkf@tiger.franz.com>
+1.1.10
 	* add headers argument to do-http-request and make-http-client-request
 	  to allow you to add headers
 	* fix client requests for :head so it doesn't wait for a body
 	  to be returned
+	* fix debugging output when running inside emacs
+	* add client info to documentation.
 	
 2000-03-27  John Foderaro  <jkf@tiger.franz.com>
 1.1.9

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.3 2000/03/20 17:25:32 jkf Exp $
+;; $Id: examples.cl,v 1.4 2000/03/27 22:47:22 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -84,7 +84,7 @@
 			 "http:://localhost ... to reach this page" :
 			 :br
 			 ((:a :href "local-secret-auth") 
-			  "Like the preceeding but uses authorizer objects")
+			  "Like the preceding but uses authorizer objects")
 			  :br
 			 ((:a :href "timeout") "Test timeout")
 			 :br
