@@ -1,6 +1,7 @@
 2001-08-09  John Foderaro  <jkf@tiger.franz.com>
 
 	*  publish.cl - added :filter functionality to publish-directory
+	*  test/t-aserve.cl - test filters in publish-directory
 
 2001-08-08  John Foderaro  <jkf@tiger.franz.com>
 

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.25 2001/07/19 18:55:06 jkf Exp $
+;; $Id: t-aserve.cl,v 1.26 2001/08/09 18:02:14 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -70,6 +70,7 @@
       (unwind-protect 
 	  (flet ((do-tests ()
 		   (test-publish-file port)
+		   (test-publish-directory port)
 		   (test-publish-computed port)
 		   (test-authorization port)
 		   (test-encoding)
@@ -1100,7 +1101,43 @@
 
     
     
-    
+; publish-directory tests
+
+(defun test-publish-directory (port)
+  (let ((prefix-local (format nil "http://localhost:~a" port))
+	(step 0))
+    (multiple-value-bind (ok whole dir)
+	(match-regexp "\\(.*[/\\]\\).*" (namestring *load-truename*))
+      (if* (not ok) 
+	 then (error "can't find the server.pem directory"))
+      
+	
+      (publish-directory :prefix "/test-pd/"
+			 :destination dir
+			 :filter #'(lambda (req ent filename)
+				     (test t
+					   (values 
+					    (match-regexp "server.pem"
+							  filename))
+					   :test #'equal)
+				     (case step
+				       (0 (failed-request req)
+					  t)
+				       (1 nil))))
+      
+      ; in step 0 we have the filter return a 404 code
+      (test 404 (values2 
+		 (x-do-http-request (format nil "~a/test-pd/server.pem" 
+					    prefix-local))))
+      
+      ; in step 1 we have it return the actual file
+      (setq step 1)
+      (test 200 (values2
+		 (x-do-http-request (format nil "~a/test-pd/server.pem"
+					    prefix-local)))))))
+
+			 
+		       
 
 
 
