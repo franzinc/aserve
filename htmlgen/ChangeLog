@@ -1,3 +1,8 @@
+2002-01-25  John Foderaro  <jkf@tiger.franz.com>
+
+	* the html macro will now macroexpand forms it sees before
+	  determining if they are markup for expressions to evaluate
+
 2001-05-14  John Foderaro  <jkf@tiger.franz.com>
 
 	* add a method for specifying that an entity argument name should

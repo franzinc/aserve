@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.8 2002/01/21 22:33:42 jkf Exp $
+# $Id: makefile,v 1.9 2002/01/25 15:43:01 jkf Exp $
 #
 # On Windows, this makefile requires the use of GNU make from Redhat
 # (http://sources.redhat.com/cygwin/).
@@ -35,7 +35,7 @@ srcdist: FORCE
 clean:	FORCE
 	rm -fr *.fasl */*.fasl build.tmp
 
-distclean: clean
+cleanall distclean: clean
 	rm -fr aserve-src
 
 FORCE:
