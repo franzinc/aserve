@@ -1,4 +1,7 @@
 ;; load in neo
+;;
+;; $Id: load.cl,v 1.10 2000/01/07 22:40:35 jkf Exp $
+;;
 
 (defvar *loadswitch* :compile-if-needed)
 ;(require :defftype)
@@ -11,6 +14,15 @@
       "decode"
       "publish"
       "log" ))
+
+(defparameter *neo-other-files*
+    ;; other files that make up the neo dist
+    '("readme.txt"
+      "examples.cl"
+      "foo.txt"
+      "fresh.jpg"
+      "neo.html"
+      "prfile9.jpg"))
 
 (defparameter *neo-examples*
     '("examples"))
@@ -70,6 +82,18 @@
     (copy-files-to (list file)
 		   (format nil "neo-dist/~a" file))))
 		
+
+(defun make-src-distribution ()
+  ;; make a source distribution of neo
+  ;;
+  (run-shell-command "rm -fr neo-src")
+  (run-shell-command "mkdir neo-src neo-src/neo neo-src/htmlgen")
+  (dolist (file (append *neo-files*
+			*neo-other-files*))
+    (copy-files-to
+     (list (format nil "~a.cl" file))
+     (format nil "neo-src/neo/~a.cl" file))))
+
   
   
 
