@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.33 2000/06/26 04:51:34 jkf Exp $
+;; $Id: publish.cl,v 1.33.6.1 2000/09/05 19:03:42 layer Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -777,7 +777,7 @@
       (let ((entity-host (host entity)))
 	(if* entity-host
 	   then ; must do a host match
-		(let ((req-host (header-slot-value req "host")))
+		(let ((req-host (header-slot-value req :host)))
 		  (if* req-host 
 		     then ; name may be foo.com:8000
 			  ; need to just use the foo.com part:
@@ -799,7 +799,7 @@
   ;; return the entity if one is found, else return nil
   (let* ((url (uri-path (request-uri req)))
 	 (len-url (length url))
-	 (req-host (header-slot-value req "host")))
+	 (req-host (header-slot-value req :host)))
     
     (setq req-host (car (split-on-character req-host #\:)))
 	     
@@ -966,6 +966,8 @@
 	    ; ok, it could be valid, like foo../, but that's unlikely
 	    (return-from process-entity nil))
     
+    (if* sys:*tilde-expand-namestrings*
+       then (setq realname (excl::tilde-expand-unix-namestring realname)))
     
     (let ((type (excl::filesys-type realname)))
       (if* (null type)
@@ -1026,7 +1028,7 @@
      then ; we dont' even care
 	  (return-from up-to-date-check nil))
   
-  (let ((if-modified-since (header-slot-value req "if-modified-since")))
+  (let ((if-modified-since (header-slot-value req :if-modified-since)))
     (if* if-modified-since
        then (setq if-modified-since
 	      (date-to-universal-time if-modified-since)))
@@ -1056,7 +1058,7 @@
 	 (and (wserver-enable-keep-alive *wserver*)
 		      (>= (wserver-free-workers *wserver*) 2)
 		      (header-value-member "keep-alive" 
-			      (header-slot-value req "connection" )))))
+			      (header-slot-value req :connection )))))
     (if* (eq (request-method req) :head)
        then ; head commands are particularly easy to reply to
 	    (setq strategy '(:use-socket-stream
@@ -1111,7 +1113,7 @@
   (let ((keep-alive (and (wserver-enable-keep-alive *wserver*)
 			 (>= (wserver-free-workers *wserver*) 2)
 			 (equalp "keep-alive" 
-				 (header-slot-value req "connection"))))
+				 (header-slot-value req :connection))))
 	(strategy))
     
     (if*  (eq (request-method req) :get)
@@ -1149,6 +1151,7 @@
 		       (throw 'with-http-response nil))
     (let* ((sock (request-socket req))
 	   (strategy (request-reply-strategy req))
+	   (extra-headers (request-reply-headers req))
 	   (post-headers (member :post-headers strategy :test #'eq))
 	   (content)
 	   (chunked-p (member :chunked strategy :test #'eq))
@@ -1191,10 +1194,12 @@
 				  *read-request-timeout*
 				  *crlf*)
 		 else (format-dif :xmit sock "Connection: Close~a" *crlf*))
-      
-	      (format-dif :xmit sock "Server: AllegroServe/~a~a" 
-			  *aserve-version-string*
-			  *crlf*)
+
+	      (if* (not (assoc :server extra-headers :test #'eq))
+		 then ; put out default server info
+		      (format-dif :xmit sock "Server: AllegroServe/~a~a" 
+				  *aserve-version-string*
+				  *crlf*))
       
 	      (if* (request-reply-content-type req)
 		 then (format-dif :xmit
@@ -1204,7 +1209,7 @@
 
 	      (if* chunked-p
 		 then (format-dif :xmit
-				  sock "Transfer-Encoding: Chunked~a"
+				  sock "Transfer-Encoding: chunked~a"
 				  *crlf*))
 	      
 	      (if* (and (not chunked-p)
@@ -1317,7 +1322,7 @@
 			res
 			"; secure")))
     
-    (push `("Set-Cookie" . ,res) (request-reply-headers req))
+    (push `(:set-cookie . ,res) (request-reply-headers req))
     res))
 
 
@@ -1325,8 +1330,8 @@
   ;; return the set of cookie name value pairs from the current
   ;; request as conses  (name . value) 
   ;;
-  (let ((cookie-string (header-slot-value req "cookie")))
-    (if* cookie-string
+  (let ((cookie-string (header-slot-value req :cookie)))
+    (if* (and cookie-string (not (equal "" cookie-string)))
        then ; form is  cookie: name=val; name2=val2; name2=val3
 	    ; which is not exactly the format we want to see it in
 	    ; to parse it.  we want   

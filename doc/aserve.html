@@ -132,7 +132,7 @@ and after you start the server.</p>
 server running.</p>
 
 <p><strong><font face="Courier New"><a name="f-start"></a>(start &amp;key port listeners
-chunking keep-alive server setuid setgid debug)</font></strong></p>
+chunking keep-alive server setuid setgid debug proxy)</font></strong></p>
 
 <p>If no arguments are given then <strong>start</strong>&nbsp; starts a multi-threaded web
 server on port 80, which is the standard web server port.&nbsp;&nbsp;&nbsp; If you are
@@ -178,6 +178,8 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
   <li>debug -- if given a number this will print debugging messages whose associated codes are
     this number or less.&nbsp;&nbsp;&nbsp; This is really an internal switch and may be
     removed in future versions.</li>
+  <li>proxy -- if true then this server will also act as a proxy server and will forward http
+    requests to other servers.</li>
 </ul>
 
 <p>&nbsp;</p>
@@ -458,8 +460,8 @@ AllegroServe will create the correct kind of response stream.&nbsp;&nbsp; If <st
 was called to create the entity.</p>
 
 <p align="left">The <strong>headers</strong> argument is a list of conses, where the car
-is the header name (a string) and the cdr is the header value.&nbsp; These headers are
-added to the headers sent as part of this response.</p>
+is the header name (a keyword symbol) and the cdr is the header value.&nbsp; These headers
+are added to the headers sent as part of this response.</p>
 
 <p align="left">Within the <strong>body </strong>forms the code calls <strong>(request-reply-stream
 req)</strong> to obtain a stream to which it can write to supply the body of the response.</p>
@@ -480,11 +482,13 @@ of a form with&nbsp; a POST method.</p>
 <p><a name="f-header-slot-value"></a><strong><font face="Courier New">(header-slot-value
 request header-name)</font></strong></p>
 
-<p>Return the value given in the request for the given header-name (a string).
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The header-name string should be all lower case.&nbsp; If
-the header wasn't present in this request then nil will be returned.&nbsp;&nbsp; <strong>header-slot-value</strong>
-is a macro that will expand into a fast accessor if the <strong>header-name</strong> is a
-constant string.</p>
+<p>Return the value given in the request for the given header-name (a keyword symbol).
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If the header wasn't present in this request then nil will
+be returned.&nbsp;&nbsp; <strong>header-slot-value</strong> is a macro that will expand
+into a fast accessor if the <strong>header-name</strong> is a constant naming a known
+header slot</p>
+
+<p>I<em>n older versions of aserve the<strong> header-name</strong> was a string..</em></p>
 
 <p>&nbsp;</p>
 
@@ -522,6 +526,14 @@ value) then the query string in the uri is checked.&nbsp; If <strong>post</stron
 (and true is the default value) and if the request is a POST then the body of the post
 form will be decoded for query values.</p>
 
+<p>A query is normally a set of names and values.&nbsp; <br>
+<strong>http://foo.com/bar?a=3&amp;b=4 </strong>yields a query alist <strong>((&quot;a&quot;
+. &quot;3&quot;) (&quot;b&quot; . &quot;4&quot;)). </strong><br>
+If a name doesn't have an associated value then the value in the alist is the empty
+string.&nbsp;<br>
+<strong>http://foo.com/bar?a&amp;b=&amp;c=4</strong> &nbsp; yields a query alist <strong>((&quot;a&quot;
+. &quot;&quot;) (&quot;b&quot; . &quot;&quot;) (c . &quot;4&quot;))</strong></p>
+
 <p>.&nbsp;&nbsp; </p>
 
 <p><a name="f-request-query-value"></a><font face="Courier New"><strong>(request-query-value
@@ -532,6 +544,10 @@ keys and values, with a call to <strong>assoc</strong> to search for the specifi
 finally with a call to <strong>cdr</strong> to return just the value from the assoc list
 entry.&nbsp; The <strong>test</strong> argument is the function to be used to test the
 given key against the keys in the assoc list. It defaults to <strong>#'equal</strong>. </p>
+
+<p>If the given key is <em>not</em> present in the query <strong>nil</strong> is returned.
+&nbsp; If the given key <em>is</em> present in the query but doesn't have an associated
+value then the empty string is returned.</p>
 
 <hr>
 
@@ -595,12 +611,12 @@ request arrived.</p>
 <p><a name="f-request-reply-headers"></a><strong><font face="Courier New">(request-reply-headers
 request)</font></strong> - accessor - an alist of some of the headers to send out with the
 reply (other headers values are stored in specific slots of the request object).&nbsp;
-Each entry in the alist is a cons where the <strong>car</strong> is a string holding the
-header name and the <strong>cdr</strong> is the value (it is printed using the <strong>~a</strong>
-format directive). &nbsp;&nbsp; Typically <strong>request-reply-headers</strong> isn't
-used, instead the headers to be sent are passed as the <strong>:header</strong> argument
-to <strong>with-http-body</strong>, or <strong>(setf reply-header-slot-value)</strong> is
-called.</p>
+Each entry in the alist is a cons where the <strong>car</strong> is a keyword symbol
+holding the header name and the <strong>cdr</strong> is the value (it is printed using the
+<strong>~a</strong> format directive). &nbsp;&nbsp; Typically <strong>request-reply-headers</strong>
+isn't used, instead the headers to be sent are passed as the <strong>:header</strong>
+argument to <strong>with-http-body</strong>, or <strong>(setf reply-header-slot-value)</strong>
+is called.</p>
 
 <p><a name="f-request-reply-content-length"></a><strong><font face="Courier New">(request-reply-content-length
 request) </font></strong>&nbsp;&nbsp;&nbsp; - accessor -&nbsp; the value to send as the
@@ -727,7 +743,7 @@ operating system.</p>
 <hr>
 
 <p><a name="f-get-multipart-sequence"></a><strong><font face="Courier New">(get-multipart-sequence
-request buffer &amp;key start end raw)</font></strong></p>
+request buffer &amp;key start end)</font></strong></p>
 
 <p>This retrieves the next chunk of data for the current form field and stores it in <strong>buffer</strong>.
 &nbsp;&nbsp; If <strong>start</strong> is given then it specifies the index in the buffer
@@ -738,13 +754,11 @@ specifies the index just after the last index in which to store data.</p>
 it is the index one after the last last index filled with data in <strong>buffer.</strong></p>
 
 <p>The buffer can be a one dimensional array of <strong>character</strong> or of <strong>(unsigned-byte
-8)</strong>.&nbsp;&nbsp; If the buffer is a <strong>character</strong> buffer then <strong>raw</strong>
-defaults to <strong>nil, </strong>otherwise <strong>raw </strong>defaults to true.</p>
+8)</strong>.&nbsp; For the most efficient transfer of data from the browser to
+AllegroServe, the program should use a 4096 byte (unsigned-byte 8) array.</p>
 
-<p>If <strong>raw </strong>is true then the buffer is filled with the bytes just as they
-are sent from the web browser.&nbsp; If <strong>raw</strong> is false then the sequence of
-characters #\return #\newline is converted to just #\newline (which is the preferred
-format for line separation in Lisp strings).</p>
+<p>If the buffer is&nbsp; a character array then the data is converted from
+get-multipart-sequence's (unsigned-byte 8) array to characters using <strong>code-char. </strong></p>
 
 <p><strong>get-multipart-sequence</strong> may return before filling up the whole buffer,
 so program should be sure to make use of the index returned by <strong>get-multipart-sequence</strong>.</p>
@@ -1342,6 +1356,16 @@ keep-alive headers proxy)</font></strong></p>
     is listening on port 8000 rather than 80.&nbsp;&nbsp; Proxying web servers are often used
     when clients are behind firewalls that prevent direct access to the internet. &nbsp;
     Another use is to centralize the page cache for a group of clients.</td>
+  </tr>
+  <tr>
+    <td width="22%">user-agent</td>
+    <td width="16%">nil</td>
+    <td width="62%">If given it specfies the value of the User-Agent header to be sent with
+    the request.&nbsp; Some sites respond differently based on the user-agent they believe has
+    made the request.&nbsp; The lack of a User-Agent header may cause a server to ignore a
+    request since it believes that it is being probed by a robot.&nbsp; The value of
+    user-agent can be a string or one of the keywords <strong>:aserve</strong>, <strong>:netscape</strong>
+    or <strong>:ie</strong> in which case an appropriate user agent string is sent.</td>
   </tr>
 </table>
 

@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.22 2000/05/16 14:01:25 jkf Exp $
+;; $Id: parse.cl,v 1.22.10.1 2000/09/05 19:03:41 layer Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -158,29 +158,46 @@
       (values cmd url prot))))
 
 
-(eval-when (compile load eval)
+#+ignore (eval-when (compile load eval)
   (defun dual-caseify (str)
     ;; create a string with each characater doubled
     ;; but with upper case following the lower case
     (let ((newstr (make-string (* 2 (length str)))))
       (dotimes (i (length str))
-	(setf (schar newstr (* 2 i)) (schar str i))
+	(setf (schar newstr (* 2 i)) (char-downcase (schar str i)))
 	(setf (schar newstr (1+ (* 2 i))) (char-upcase (schar str i))))
       newstr)))
 
 
-(defparameter *header-to-slot*
+#+ignore (defparameter *header-to-slot*
     ;; headers that are stored in specific slots, we create
     ;; a list of objects to help quickly parse those slots
     '#.(let (res)
 	(dolist (head *fast-headers*)
 	  (push (cons
-		 (dual-caseify (concatenate 'string (car head) ":"))
+		 (dual-caseify (concatenate 'string (string (car head)) ":"))
 		 (third head))
 		res))
 	res))
-      
-(defun read-request-headers (req sock buffer)
+
+#+ignore (defparameter *header-to-keyword*
+    ;; headers that we've seen so far that are stored on the alist
+    ;; we use this to avoid interning.
+    ;; we should order this for fast searching
+    '(
+      ("content-type" . :content-type)
+      ("accept-encoding" . :accept-encoding) 
+      ("accept-charset" . :accept-charset) 
+      ("accept-language" . :accept-language)
+      ("pragma" . :pragma) 
+      ("referer" . :referer)
+      ("if-modified-since" . :if-modified-since) 
+      ("cookie" . :cookie)
+      ("authorization" . :authorization)
+      ))
+
+
+#+ignore (defun read-request-headers (req sock buffer)
   ;; read in the headers following the command and put the
   ;; info in the req object
   ;; if an error occurs, then return nil
@@ -250,6 +267,7 @@
 				       buffer
 				       (+ 2 colonpos)
 				       end)))
+			
 			; downcase the key
 			(dotimes (i (length key))
 			  (let ((ch (schar key i)))
@@ -257,10 +275,25 @@
 			       then (setf (schar key i) 
 				      (char-downcase ch)))))
 			
+			(let ((ent (assoc key *header-to-keyword*
+					  :test #'equal)))
+			  (if* (null ent)
+			     then (push (setq ent
+					  (cons key
+						(intern
+						 (if* (eq *current-case-mode*
+							  :case-sensitive-lower)
+						    then key
+						    else (string-upcase key))
+						 :keyword)))
+					*header-to-keyword*))
+			  (setq key (cdr ent)))
+					
+							  
 			; now add or append
 			
 			(let* ((alist (request-headers req))
-			       (ent (assoc key alist :test #'equal)))
+			       (ent (assoc key alist :test #'eq)))
 			  (if* (null ent)
 			     then (push (setq ent (cons key "")) alist)
 				  (setf (request-headers req) alist))
@@ -273,7 +306,82 @@
 			  )))))))
 
 
+(defun new-read-request-headers (req sock)
+  ;; use the new strategy to read in the request headers
+  ;;
+  ;; return nil if we don't get all the way to the crlf crlf
+  (let ((buff (get-sresource *header-block-sresource*))
+	(end))
+	       
+    (setf (request-header-block req) buff)
+    
+    ;; read in all the headers, stop at the last crlf
+    (if* (setq end (read-headers-into-buffer sock buff))
+       then (parse-header-block buff 0 end)
+	    t)))
+	 
+	 
 
+(defun read-headers-into-buffer (sock buff)
+  ;; read the header data into the buffer
+  ;; return the index of the character following the last header
+  ;; or nil if the whole header wasn't read in
+  ;;
+  (let ((len (- (length buff) 500)) ; leave space for index at end
+	(i 0)
+	(state 0)
+	(echo (member :xmit *debug-current*)))
+	
+    (loop
+      (if* (>= i len) 
+	 then (return nil)) ; failure
+      
+      (let ((ch (read-byte sock nil nil)))
+	(if* (null ch) 
+	   then (format *debug-stream* "early eof reading response~%")
+		(return nil) ; eof - failure
+		)
+	(if* echo then (write-char (code-char ch) *debug-stream*))
+	(setf (aref buff i) ch)
+	(incf i)
+	(case state
+	  (0 ; seen nothing intersting
+	   (if* (eq ch #.(char-code #\newline))
+	      then (setq state 2)
+	    elseif (eq ch #.(char-code #\return))
+	      then (setq state 1)))
+	  (1 ; seen cr
+	   (if* (eq ch #.(char-code #\newline))
+	      then (setq state 2)
+	    elseif (eq ch #.(char-code #\return))
+	      then nil ; stay in 1
+	      else (setq state 0)))
+	  (2 ; seen [cr] lf
+	   (if* (eq ch #.(char-code #\newline))
+	      then (setq state 4)
+	    elseif (eq ch #.(char-code #\return))
+	      then (setq state 3)
+	      else (setq state 0)))
+	  (3 ; seen [cr] lf cr
+	   (if* (eq ch #.(char-code #\newline))
+	      then (setq state 4)
+	    elseif (eq ch #.(char-code #\return))
+	      then (setq state 1)
+	      else (setq state 0))))
+	
+	(if* (eql state 4)
+	   then ; all done
+		; back up over [cr] lf
+		(decf i 2)  ; i points at cr if there is one
+		(if* (not (eq (aref buff i) #.(char-code #\return)))
+		   then (incf i))
+		; i points to the [cr] lf
+		
+		(return i))))))
+
+	  
+	     
+    
 			
 
 

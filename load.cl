@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.31 2000/05/16 14:01:25 jkf Exp $
+;; $Id: load.cl,v 1.31.10.1 2000/09/05 19:03:40 layer Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -10,12 +10,14 @@
     '("htmlgen/htmlgen"
       "macs"
       "main"
+      "headers"
       "parse"
       "decode"
       "publish"
       "authorize"
       "log" 
       "client"
+      "proxy"
       ))
 
 (defparameter *aserve-other-files*
@@ -32,6 +34,8 @@
       "examples/prfile9.jpg"
       "examples/tutorial.cl"
       "examples/aservelogo.gif"
+      "examples/chat.cl"
+      "examples/file2000.txt"
       "load.cl"
       "test/t-aserve.cl"
       "doc/aserve.html"
@@ -152,11 +156,11 @@
 ;; 6. (make-src-distribution)
 ;; 7. (ftp-publish-src)
 ;; 8. (publish-docs)   ;  to put latest docs on aserve web page
-;; 9. on beast run /fi/sa/bin/aserve-sync
+;; 9. on spot run /fi/sa/bin/aserve-sync
 ;; 10. ftp download.sourceforge.net and put the tar file in the
-;;     incoming directory, then go to the aserve sourceforget web page and 
+;;     incoming directory, then go to the aserve sourceforge web page and 
 ;;     select the file manager and publish it.
-;; 11. cd to /www/opensource/htdocs/aserve 
+;; 11. cd /www/opensource/htdocs/aserve 
 ;;     on cobweb and rsync the files with SourceForge
 
 
@@ -229,7 +233,7 @@
 (defun publish-docs ()
   ;; copy documentation to the external web site
   (run-shell-command
-   (format nil "cp ~adoc/htmlgen.html ~adoc/aserve.html ~adoc/tutorial.html /net/cobweb/www/opensource/htdocs/aserve"
+   (format nil "cp ~adoc/htmlgen.html ~adoc/aserve.html ~adoc/tutorial.html /net/cobweb/www/opensource/devel/www/aserve"
 	   *aserve-root*
 	   *aserve-root*
 	   *aserve-root*)))

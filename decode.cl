@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: decode.cl,v 1.8 2000/05/16 14:01:25 jkf Exp $
+;; $Id: decode.cl,v 1.8.10.1 2000/09/05 19:03:40 layer Exp $
 
 ;; Description:
 ;;   decode/encode code
@@ -332,7 +332,12 @@
 		(if* name
 		   then (push (cons name obj) res)
 			(setq name nil)
-		   else (setq name obj))))
+		 elseif (or (eq ch #\&)
+			    (eq i max-minus-1))
+		   then ; a name with no value
+			(push (cons obj "") res)
+		   else ; assert (eq ch #\=)
+			(setq name obj))))
       
       (incf i))
     

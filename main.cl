@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.48 2000/07/17 16:03:52 jkf Exp $
+;; $Id: main.cl,v 1.48.2.1 2000/09/05 19:03:41 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -46,6 +46,7 @@
    ; #:debug-off		
    ; #:debug-on			
    #:denied-request
+   #:enable-proxy
    #:failed-request
    #:form-urlencoded-to-query
    #:get-basic-authorization
@@ -130,7 +131,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 1 22))
+(defparameter *aserve-version* '(1 1 28))
 
 
 (provide :aserve)
@@ -150,6 +151,11 @@
 (defparameter *debug-current*  nil)	; current switches set
 
 (defparameter *debug-stream* *initial-terminal-io*)
+
+; set to true to automatically close sockets about to be gc'ed
+; open sockets should never be subject to gc unless there's a bug
+; in the code leading to leaks.
+(defvar *watch-for-open-sockets* t) 
 
 (defmacro define-debug-kind (name class what)
   `(progn (ecase ,class
@@ -227,6 +233,15 @@
   `(progn (if* (member ,kind *debug-current* :test #'eq)
 	     then ,@body)))
 
+(defun check-for-open-socket-before-gc (socket)
+  (if* (open-stream-p socket)
+     then (logmess 
+	   (format nil 
+		   "socket ~s is open yet is about to be gc'ed. It will be closed" 
+		   socket))
+	  (ignore-errors (close socket))))
+
+
 ;;;;;;;;;;; end debug support ;;;;;;;;;;;;
 
 
@@ -237,6 +252,15 @@
 (ff:def-foreign-call (setgid "setgid") ((x :int)) :returning :int)
 
 
+;; more specials
+(defvar *max-socket-fd* 0) ; the maximum fd returned by accept-connection
+(defvar *aserve-debug-stream* nil) ; stream to which to seen debug messages
+
+;; specials from other files
+(defvar *header-block-sresource*)
+(defvar *header-index-sresource*)
+(defvar *header-keyword-array*)
+    
 
 	
 ;;;;;;;;;;;;;  end special vars
@@ -385,9 +409,7 @@
        ,(if* body 
 	   then `(compute-response-stream ,g-req ,g-ent))
        (if* ,g-headers
-	  then (bulk-set-reply-headers ,g-req ,g-headers)
-	       (setf (request-reply-headers ,g-req)
-		 (append ,g-headers (request-reply-headers ,g-req))))
+	  then (bulk-set-reply-headers ,g-req ,g-headers))
        (send-response-headers ,g-req ,g-ent :pre)
        (if* (not (member :omit-body (request-reply-strategy ,g-req)))
 	  then (let ((*html-stream* (request-reply-stream ,g-req)))
@@ -422,14 +444,14 @@
   ;; where name is symbol naming the accessor function
   (defparameter *fast-headers*
       (let (res)
-	(dolist (name '("connection" 
-			"date" 
-			"transfer-encoding"
-			"accept"
-			"host"
-			"user-agent"
-			"content-length"))
-	  (push (list name   ;; string name
+	(dolist (name '(:connection
+			:date
+			:transfer-encoding
+			:accept
+			:host
+			:user-agent
+			:content-length))
+	  (push (list name   ;; keyword symbol name
 		      (read-from-string (format nil "reply-~a" name)) ;; symbol name
 		      ;; accessor name
 		      (read-from-string 
@@ -440,14 +462,15 @@
       ;; list of headers for the reply that at stored in slots of
       ;; the http request object
       (let (res)
-	(dolist (name '("date" 
-			"content-type"
-			"content-length"))
+	(dolist (name '(:date
+			:content-type
+			:content-length))
 	  (push (list name   ;; string name
 		      
 		      ;; symbol naming slot
 		      (read-from-string 
-		       (concatenate 'string (symbol-name :reply-) name))
+		       (concatenate 'string (symbol-name :reply-) 
+				    (string name)))
 		      
 		      ;; accessor name
 		      (read-from-string 
@@ -460,62 +483,92 @@
 	
 
 
-(defmacro header-slot-value (obj name)
-  ;; name is a string naming the header value (all lower case)
-  ;; retrive the slot's value from the http-request obj obj.
+(defmacro header-slot-value (req name)
+  ;; name is a keyword symbol naming the header value.
+  ;; retrive the slot's value from the http-request req req.
   (let (ent)
-    (if* (setq ent (assoc name *fast-headers* :test #'equal))
+    (if* (stringp name)
+       then (header-name-error name))
+    (if* (setq ent (assoc name *fast-headers* :test #'eq))
        then ; has a fast accesor
-	    `(,(third ent) ,obj)
+	    `(or (,(third ent) ,req)
+		 (setf (,(third ent) ,req)
+		   (or (header-buffer-req-header-value ,req ,name)
+		       "" ; to speed up the next search
+		       )))
        else ; must get it from the alist
-	    `(cdr (assoc ,name (request-headers ,obj) :test #'equal)))))
+	    `(header-slot-value-other ,req ,name))))
 
-(defsetf header-slot-value (obj name) (newval)
+(defun header-slot-value-other (req name)
+  ;; handle out of the the 'extra' headers
+  (let ((ent (assoc name (request-headers req) :test #'eq)))
+    (if* ent
+       then (cdr ent)
+       else (let ((ans (or (header-buffer-req-header-value req name) "")))
+	      (push (cons name ans) (request-headers req))
+	      ans))))
+      
+
+
+
+(defsetf header-slot-value (req name) (newval)
   ;; set the header value regardless of where it is stored
   (let (ent)
-    (if* (setq ent (assoc name *fast-headers* :test #'equal))
-       then `(setf (,(third ent) ,obj) ,newval)
+    (if* (stringp name)
+       then (header-name-error name))
+    (if* (setq ent (assoc name *fast-headers* :test #'eq))
+       then `(setf (,(third ent) ,req) ,newval)
        else (let ((genvar (gensym))
-		  (nobj (gensym)))
-	      `(let* ((,nobj ,obj)
-		      (,genvar (assoc ,name (request-headers ,nobj) 
-				      :test #'equal)))
+		  (nreq (gensym)))
+	      `(let* ((,nreq ,req)
+		      (,genvar (assoc ,name (request-headers ,nreq) 
+				      :test #'eq)))
 		 (if* (null ,genvar)
 		    then (push (setq ,genvar (cons ,name nil))
-			       (request-headers ,nobj)))
+			       (request-headers ,nreq)))
 		 (setf (cdr ,genvar) ,newval))))))
 
-(defmacro reply-header-slot-value (obj name)
+(defmacro reply-header-slot-value (req name)
   ;; name is a string naming the header value (all lower case)
-  ;; retrive the slot's value from the http-request obj obj.
+  ;; retrive the slot's value from the http-request req req.
   (let (ent)
-    (if* (setq ent (assoc name *fast-reply-headers* :test #'equal))
+    (if* (stringp name)
+       then (header-name-error name))
+    (if* (setq ent (assoc name *fast-reply-headers* :test #'eq))
        then ; has a fast accesor
-	    `(,(third ent) ,obj)
+	    `(,(third ent) ,req)
        else ; must get it from the alist
-	    `(cdr (assoc ,name (request-reply-headers ,obj) :test #'equal)))))
+	    `(cdr (assoc ,name (request-reply-headers ,req) :test #'eq)))))
 
-(defsetf reply-header-slot-value (obj name) (newval)
+(defsetf reply-header-slot-value (req name) (newval)
   ;; set the header value regardless of where it is stored
   (let (ent)
-    (if* (setq ent (assoc name *fast-reply-headers* :test #'equal))
-       then `(setf (,(third ent) ,obj) ,newval)
+    (if* (stringp name)
+       then (header-name-error name))
+    (if* (setq ent (assoc name *fast-reply-headers* :test #'eq))
+       then `(setf (,(third ent) ,req) ,newval)
        else (let ((genvar (gensym))
-		  (nobj (gensym)))
-	      `(let* ((,nobj ,obj)
-		      (,genvar (assoc ,name (request-reply-headers ,nobj) 
-				      :test #'equal)))
+		  (nreq (gensym)))
+	      `(let* ((,nreq ,req)
+		      (,genvar (assoc ,name (request-reply-headers ,nreq) 
+				      :test #'eq)))
 		 (if* (null ,genvar)
 		    then (push (setq ,genvar (cons ,name nil))
-			       (request-reply-headers ,nobj)))
+			       (request-reply-headers ,nreq)))
 		 (setf (cdr ,genvar) ,newval))))))
 
-(defmacro header-slot-value-integer (obj name)
+
+(defun header-name-error (name)
+  (error "You attempted to reference header ~s.  Headers are now named
+by keyword symbols and not by strings"
+	 name))
+
+(defmacro header-slot-value-integer (req name)
   ;; if the header value exists and has an integer value
   ;; return two values: the value of the integer and t
   ;; else return nil
   
-  `(header-decode-integer (header-slot-value ,obj ,name)))
+  `(header-decode-integer (header-slot-value ,req ,name)))
 
 
 
@@ -606,7 +659,11 @@
     ;  here
     :initform nil
     :accessor request-headers)
-   
+
+   (header-block  ;; *header-block-sresource* object
+    :initform nil
+    :accessor request-header-block)
+    
    (request-body 
     ;; if we've read the request body then this 
     ;; is the string holding it.
@@ -720,6 +777,8 @@
 		   debug      ; set debug level
 		   setuid
 		   setgid
+		   proxy
+		   debug-stream  ; stream to which to send debug messages
 		   )
   ;; -exported-
   ;;
@@ -730,13 +789,22 @@
   
   (declare (ignore debug))  ; for now
 
+  (if* debug-stream 
+     then (setq *aserve-debug-stream* 
+	    (if* (eq debug-stream t)
+	       then *standard-output*
+	       else debug-stream)))
+  
   (if* (eq server :new)
      then (setq server (make-instance 'wserver)))
   
   
   ; shut down existing server
   (shutdown server) 
-  
+
+  (if* proxy 
+     then (enable-proxy :server server))
+
   
   (let* ((main-socket (socket:make-socket :connect :passive
 					  :local-port port
@@ -802,7 +870,10 @@
 		   then ; new ip address by which this machine is known
 			(push localhost ipaddrs)
 			(setf (wserver-ipaddrs *wserver*) ipaddrs))
-		
+		(if* *watch-for-open-sockets*
+		   then (schedule-finalization 
+			 sock 
+			 #'check-for-open-socket-before-gc))
 		(process-connection sock))
 	    
 	    (:loop ()  ; abort out of error without closing socket
@@ -882,12 +953,27 @@
 	      (let ((sock (socket:accept-connection main-socket))
 		    (localhost))
 		
+		; optional.. useful if we find that sockets aren't being
+		; closed
+		(if* *watch-for-open-sockets*
+		   then (schedule-finalization 
+			 sock 
+			 #'check-for-open-socket-before-gc))
+		
 		; track all the ipaddrs by which we're reachable
 		(if* (not (member (setq localhost (socket:local-host sock))
 				  ipaddrs))
 		   then ; new ip address by which this machine is known
 			(push localhost ipaddrs)
 			(setf (wserver-ipaddrs *wserver*) ipaddrs))
+		
+		; another useful test to see if we're losing file
+		; descriptors
+		(let ((fd (excl::stream-input-fn sock)))
+		  (if* (> fd *max-socket-fd*)
+		     then (setq *max-socket-fd* fd)
+			  (logmess (format nil 
+					   "Maximum socket file desciptor number is now ~d" fd))))
 		
 		
 		(setq error-count 0) ; reset count
@@ -983,6 +1069,9 @@
 	     else ;; got a request
 		  (handle-request req)
 		  (log-request req)
+		  
+		  (free-req-header-block req)
+		  
 		  (let ((sock (request-socket req)))
 		    (if* (member :keep-alive
 				 (request-reply-strategy req)
@@ -991,7 +1080,10 @@
 			    (debug-format :info "request over, keep socket alive~%")
 			    (force-output sock)
 		       else (return))))))
-    (ignore-errors (close sock))))
+    ;; do it in two stages since each one could error and both have
+    ;; to be attempted
+    (ignore-errors (force-output sock))
+    (ignore-errors (close sock :abort t))))
 
 
 (defun read-http-request (sock)
@@ -1057,7 +1149,9 @@
 	    
 	    
 	    (if* (and (not (eq protocol :http/0.9))
-		      (null (read-request-headers req sock buffer)))
+		      #+ignore (null (read-request-headers req sock buffer))
+		      (null (new-read-request-headers req sock))
+		      )
 	       then (debug-format :info "no headers, ignore~%")
 		    (return-from read-http-request nil))
 	    
@@ -1114,70 +1208,6 @@
       ("CONNECT " . :connect)))
   
 
-
-    
-    
-    
-#+ignore
-(defmethod read-entity-body ((req http-request-1.1) sock)
-  ;; http/1.1 offers up the chunked transfer encoding
-  ;; we can't handle that at present...
-  (declare (ignore sock)) ; but they are passed to the next method
-  (if* (equalp "chunked" (request-header-transfer-encoding req))
-     then (with-http-response (*response-not-implemented*
-			       req "text/html" :close t)
-	    (format (response req) "chunked transfer is not supported yet"))
-	  t
-     else ; do the http/1.0 thing
-	  (call-next-method)))
-
-
-  
-	  
-	  
-	  
-			     
-#+ignore
-(defmethod read-entity-body ((req http-request-1.0) sock)
-  ;; Read the message following the request header, if any.
-  ;; Here's my heuristic
-  ;;   if Content-Length is given then it specifies the length.
-  ;;   if there is no Content-Length but there is a Connection: Keep-Alive
-  ;;      then we assume there is no entity body
-  ;;  
-  ;;   if there is no Content-Length and no Connection: Keep-Alive
-  ;;      then we read what follows and assumes that the body
-  ;;	  (this is the http/0.9 behavior).
-  ;;
-  (let ((cl (request-header-content-length req)))
-    (if* cl
-       then (let ((len (content-length-value req))
-		  (ret))
-	      (setq ret (make-string len))
-	      (let ((got-len (read-sequence ret sock)))
-		(if* (not (eql got-len len))
-		   then ; failed to get all the data
-			nil
-		   else (setf (body req) ret)
-			t)))
-       else ; no content length
-	    (if* (not (equalp (request-header-connection req) "keep-alive"))
-	       then (call-next-method) ; do the 0.9 thing
-	       else ; there is no body
-		    t))))
-
-
-#+ignore
-(defmethod read-entity-body ((req http-request-0.9) sock)
-  ;; read up to end of file, that will be the body
-  (let ((ans (make-array 2048 :element-type 'character
-			 :fill-pointer 0))
-	(ch))
-    (loop (if* (eq :eof (setq ch (read-char sock nil :eof)))
-	     then (setf (body req) ans)
-		  (return t)
-	     else (vector-push-extend ans ch)))))
-
 	    
 
 (defmethod get-request-body ((req http-request))
@@ -1187,7 +1217,7 @@
       (setf (request-request-body req)
 	(if* (member (request-method req) '(:put :post))
 	   then (multiple-value-bind (length believe-it)
-		    (header-slot-value-integer req "content-length")
+		    (header-slot-value-integer req :content-length)
 		  (if* believe-it
 		     then ; we know the length
 			  (prog1 (let ((ret (make-string length)))
@@ -1219,7 +1249,7 @@
 				      
 		     else ; no content length given
 			  (if* (equalp "keep-alive" 
-				       (header-slot-value req "connection"))
+				       (header-slot-value req :connection))
 			     then ; must be no body
 				  ""
 			     else ; read until the end of file
@@ -1245,46 +1275,72 @@
 ;; multipart code
 ;; used when enctype=multipart/form-data is used
 
-(defstruct mp-info 
-  ;; multipart information
-  buffer 	; string buffer
-  ebuf		; index after last valid char in buffer
-  eline         ; index after last valid char not crlf in buffer
-  left		; bytes left after buffer exhausted
-  leftoff	; place to start again inside this buffer
-  boundary	; boundary string
-  socket	; socket stream connected to browser
-  seen-end-of-segment	; reached the boundary
-  seen-end-of-all-segments ; reached all the boundaries
+; new version that uses binary mode to transfer data
+
+(defstruct mp-info
+  buffer	; usb8 buffer if we're active
+  left		; bytes of content-length left to read
+  state		; state where the buffer pointer is pointed
+  cur		; current buffer pointer
+  end		; index after last byte in the buffer
+  boundary	; boundary vector
+  socket	; socket we're reading from
   )
-
-
 
 (defmethod start-multipart-capture ((req http-request))
   ;; begin the grab of the body.
   ;; user doesn't have to call this, it's called automatically
-  (let* ((ctype (header-slot-value req "content-type"))
+  (let* ((ctype (header-slot-value req :content-type))
 	 (parsed (and ctype (parse-header-value ctype)))
 	 (boundary (and (equalp "multipart/form-data" (cadar parsed))
 			(cdr (assoc "boundary" (cddar parsed) :test #'equal))))
-	 (len (header-slot-value-integer req "content-length")))
+	 (len (header-slot-value-integer req :content-length))
+	 (mpbuffer))
     
     (if* (null boundary)
        then ; not in the right form, give up
 	    (return-from start-multipart-capture nil))
     
+    (setq mpbuffer (get-sresource *header-block-sresource*))
+    
+    (setf (aref mpbuffer 0) #.(char-code #\return))
+    (setf (aref mpbuffer 1) #.(char-code #\linefeed))
     
     (setf (getf (request-reply-plist req) 'mp-info)
-      (make-mp-info :buffer (get-request-buffer)
-		    :ebuf 0		    :left len
-		    ;; keep boundary case insensitive
-		    :boundary (concatenate 'string "--" 
-					   (string-downcase boundary))
-		    :socket   (request-socket req)
+      (make-mp-info :buffer mpbuffer
+		    :left  len
+		    :state :start
+		    :cur   0  ; we'll start the buffer with cr,lf
+		    :end   2  ; since the first boundary may not have it
+		    :socket (request-socket req)
+		    
+		    ;;  boundary is a case insensitive usb8 array
+		    ;; <cr><lf>--boundary-downcased
+		    ;;
+		    :boundary 
+		    (let ((array (make-array (+ 2 ; crlf
+						2 ; --
+						(length boundary))
+					     :element-type '(unsigned-byte 8))))
+		      (setf (aref array 0) #.(char-code #\return))
+		      (setf (aref array 1) #.(char-code #\linefeed))
+		      (setf (aref array 2) #.(char-code #\-))
+		      (setf (aref array 3) #.(char-code #\-))
+		      
+		      (dotimes (i (length boundary))
+			(setf (aref array (+ i 4))
+			  (char-code (char-downcase (schar boundary i)))))
+		      array)
 		    ))))
 
 
-    
+(defparameter *crlf-crlf-usb8*
+    (make-array 4 :element-type '(unsigned-byte 8)
+		:initial-contents
+		(list #.(char-code #\return)
+		      #.(char-code #\linefeed)
+		      #.(char-code #\return)
+		      #.(char-code #\linefeed))))
 
 (defmethod get-multipart-header ((req http-request))
   ;; return an alist holding the header info for the next request.
@@ -1294,227 +1350,355 @@
     
     (if* (null mp-info)
        then (start-multipart-capture req)
+	    ; satisify normal requests for the body with an empty string
+	    (setf (request-request-body req) "") 
 	    (setq mp-info (getf (request-reply-plist req) 'mp-info)))
     
     (if* (null mp-info)
        then ; no headers left
 	    (return-from get-multipart-header nil))
     
-    (if* (mp-info-seen-end-of-all-segments mp-info)
-       then ; already at eof
-	    (return-from get-multipart-header nil))
+    (loop
+      (case (mp-info-state mp-info)
+	(:header (return)) ; ok
+	((:body :start) 
+	 (loop
+	   (multiple-value-bind (pos state)
+	       (scan-forward mp-info)
+	     (if* (eq state :partial)
+		then (if* (not (shift-buffer-up-and-read mp-info))
+			then ; no more data, bogus end though
+			     (setf (mp-info-state mp-info) :last-boundary)
+			     (return))
+		else (setf (mp-info-cur mp-info) pos
+			   (mp-info-state mp-info) state)
+		     (return)))))
+	(:boundary  (scan-forward mp-info))
+	(:last-boundary ; no more space
+	 ; free up the buffer
+	 (free-sresource *header-block-sresource* (mp-info-buffer
+						   mp-info))
+	 (setf (mp-info-buffer mp-info) nil)
+	 ;;
+	 (return-from get-multipart-header nil))))
     
-    ; read header lines
-    (let ((headers)
-	  (heads)
-	  (buffer (mp-info-buffer mp-info)))
-      (tagbody again
-	(loop
-	  (setf (mp-info-seen-end-of-segment mp-info) nil)
-	  
-	  (case (get-multipart-line mp-info)
-	    ((:eof :boundary-end)
-	     (setf (mp-info-seen-end-of-all-segments mp-info) t)
-	     (return-from get-multipart-header nil))
+    ; in the header state, must find the end of the
+    ; header block <cr><lf><cr><lf>
+    (let* ((buffer (mp-info-buffer mp-info))
+	   cur  
+	   headers
+	   endhead)
+      
+      (loop
+	(setq cur (mp-info-cur mp-info))
+	(setq endhead (search-usb8 buffer 
+				   cur 
+				   (mp-info-end mp-info)
+				   *crlf-crlf-usb8*))
+	(if* (integerp endhead) 
+	   then (incf endhead 4) ; cr lf cr lf
+		(return))
+	
+	(if* (not (shift-buffer-up-and-read mp-info))
+	   then ; failed to find the end of the headers
+		(error "end of headers not found, badly formed request")))
+      
+      ; found the end of the headers.
+      (let ((ans (get-sresource *header-index-sresource*)))
+	(parse-header-block-internal buffer cur endhead ans)
+	(dotimes (i (length ans))
+	  (dolist (ent (svref ans i))
+	    (push (cons (svref *header-keyword-array* i)
+			(parse-header-value
+			 (buffer-subseq-to-string buffer (car ent) (cdr ent))))
+		  headers)))
+	(free-sresource *header-index-sresource* ans))
+      
+      (setf (mp-info-cur mp-info) endhead)
+      (setf (mp-info-state mp-info) :body) ; pointing at the body
+      
+      headers)))
+
+(defun search-usb8 (buffer start end pattern)
+  ;; look for the pattern in the buffer
+  (do* ((i start (1+ i))
+	(patlen (length pattern))
+	(realend (- end patlen -1)))
+      ((>= i realend))
+    (dotimes (j patlen (return-from search-usb8 i))
+      (if* (not (eq (aref buffer (+ i j))  (aref pattern j)))
+	 then ; no match
+	      (return nil)))))
+	      
+       
+  
+
+(defun shift-buffer-up-and-read (mp-info)
+  ;; bring bytes from cur to end to the top of the buffer.
+  ;;
+  ;; read in more bytes.
+  ;;
+  ;;
+  ;; return true if more any bytes.  nil means that there is
+  ;; no more data to read or no more space for data.
+  ;;
+  (let ((cur (mp-info-cur mp-info))
+	(mpbuffer (mp-info-buffer mp-info))
+	(left))
+    
+    (if* (zerop (setq left (mp-info-left mp-info)))
+       then nil ; nothing to do, since no more data left
+       else ; shift up buffer if needed
+	    (if* (> cur 0)
+	       then (do ((end (mp-info-end mp-info))
+			 (i cur (1+ i)))
+			((>= i end))
+		      (setf (aref mpbuffer (- i cur)) (aref mpbuffer i)))
+		    (setf (mp-info-cur mp-info) 0)
+		    (decf (mp-info-end mp-info) cur))
+    
+	    (if* (eql (mp-info-end mp-info) (length mpbuffer))
+	       then ; no room to store anything else
+		    nil
+	       else ; read as much as we acn
+		    (let* ((end (mp-info-end mp-info))
+			   (pos (read-sequence mpbuffer 
+					       (mp-info-socket mp-info)
+					       :start end
+					       :end (min
+						     (length mpbuffer)
+						     (+ end left)))))
+		      (if* (<= pos end)
+			 then ; no bytes read, eof
+			      nil
+			 else 
+			      (if-debug-action 
+			       :xmit
+			       (format t "~%multipart read ~d bytes~%" 
+				       (- pos end))
+			       (do ((i end (1+ i)))
+				   ((>= i pos))
+				 (write-char (code-char (aref mpbuffer i))))
+			       (format t "<end-of-read>~%")
+			       (force-output))
+				   
+				      
+			      (decf (mp-info-left mp-info) 
+				    (- pos end))
+			      (setf (mp-info-end mp-info) pos)
+			      t ; read something in
+			      ))))))
+
 	    
-	    (:boundary (go again))
-	    
-	    (:data (if* (eq (mp-info-eline mp-info) 0)
-		      then (return) ; end of headers
-		      else (if* (member (schar buffer 0) '(#\space 
-							   #\tab))
-			      then ; header contintuation
-				   (if* headers
-				      then (setf (car headers)
-					     (concatenate 'string
-					       (car headers)
-					       " "
-					       (buffer-substr buffer 
-							      0 
-							      (mp-info-eline
-							       mp-info)))))
-			      else ; new header
-				   (push (buffer-substr buffer 
-							0 
-							(mp-info-eline mp-info))
-					 headers)))))))
+(defun scan-forward (mp-info)
+  ;; scan forward to the next interesting thing
+  ;;
+  ;; If the current state is :boundary then we are being called 
+  ;;   to locate the next header.  If we find it we set cur to point
+  ;;   to it and set the state to :header.  If no more data is available
+  ;;   (and this will never happen if the client works correctly) twe
+  ;;   set the state to :last-boundary
+  ;;   nil is returned
+  ;;
+  ;; If the current state is :body or :start
+  ;; we look forward to find the point a which the next :boundary
+  ;; starts.  We give up at the end of the bytes read into the buffer  
+  ;; we don't change cur or the state of the mp-info
+  ;; We return two values:
+  ;;  the point at which that transition occurs to boundary
+  ;;  a symbol describing what we found
+  ;;        :body,:state   - found nothing interesting, we're still in the same
+  ;;	              state we started in (either :body or :state)
+  ;;	    :boundary - we've identified a boundary between items
+  ;;	    :last-boundary  - we've indentified the final boundary 
+  ;;	    :partial - we've identified something that could be
+  ;;		a boundary or last-boundary but don't have enough
+  ;;		data to tell.
+  (case (mp-info-state mp-info)
+    (:boundary
+     ;; skip past boundary if it's in the buffer
+     ;; this is called only in get-multipart-header
+     (loop
+       (let ((past (+ (mp-info-cur mp-info)
+		      (length (mp-info-boundary mp-info))
+		      2 ; for the crlf
+		      )))
+	 (if* (< past (mp-info-end mp-info))
+	    then ; inside the buffer
+		 (setf (mp-info-cur mp-info) past)
+		 (setf (mp-info-state mp-info) :header)
+		 (return)
+	    else (if* (not (shift-buffer-up-and-read mp-info))
+		    then ; no more data
+			 (setf (mp-info-state mp-info) :last-boundary)
+			 (return))))))
+    (:last-boundary nil)
+    
+    ((:body  :start)
+     ;; looking for a boundary or partial boundary
+     (let* ((cur (mp-info-cur mp-info))
+	    (end (mp-info-end mp-info))
+	    (boundary (mp-info-boundary mp-info))
+	    (len-boundary (length boundary))
+	    )
+       (if* (eql cur end)
+	  then (if* (not (shift-buffer-up-and-read mp-info))
+		  then ; no more data available
+		       (setf (mp-info-state mp-info) :last-boundary)
+		       (return-from scan-forward (values 0 :last-boundary))))
+       (setq cur (mp-info-cur mp-info)
+	     end (mp-info-end mp-info))
+       
+       (do* ((i cur (1+ i))
+	     (mpbuffer (mp-info-buffer mp-info)))
+	   ((>= i end)
+	    (values end (mp-info-state mp-info)))
+	 
+	 (let* ((ch (aref mpbuffer i)))
+	   (if* (eq ch #.(char-code #\return))
+	      then ; this could match
+		   (do ((j i (1+ j))
+			(ind 0 (1+ ind)))
+		       
+		       (nil)
+		     (if* (>= ind len-boundary)
+			then ; matched the whole boundary
+			     ; minus the tail... a tail of crlf 
+			     ; is a boundary and a --crlf is a last
+			     ; boundary
+				
+			     (if* (< (- end j) 2)
+				then ; can't tell yet
+				     (return-from scan-forward
+				       (values i :partial))
+			      elseif (and (eql (aref mpbuffer j) 
+					       #.(char-code #\return))
+					  (eql (aref mpbuffer (1+ j))
+					       #.(char-code #\linefeed)))
+				then ; it's a boundary match
+				     (return-from scan-forward
+				       (values i :boundary))
+			      elseif (and (eql (aref mpbuffer j) 
+					       #.(char-code #\-))
+					  (eql (aref mpbuffer (1+ j))
+					       #.(char-code #\-)))
+				then ; could be last-boundary
+				     (if* (< (- end j) 4)
+					then ; not enough to tell
+					     (return-from scan-forward
+					       (values i :partial))
+				      elseif (and (eql (aref mpbuffer (+ 2 j))
+						       #.(char-code #\return))
+						  (eql (aref mpbuffer (+ 3 j))
+						       #.(char-code #\linefeed)))
+					then ; hit the end
+					     (return-from scan-forward
+					       (values i :last-boundary))))
+			     ; if here then doesn't match boundary
+			     (return)
+		      elseif (>= j end)
+			then ; end of buffer before end of boundary
+			     (return-from scan-forward
+			       (values i :partial)))
+		     
+		     (if* (not (eq (aref mpbuffer j)
+				   (aref boundary ind)))
+			then (return))))))))))
+       
+		     
+		     
+						
+						
+					 
+					 
+	   
+	   
+	       
+		       
+	       
+  
+  
+    
 
-      (setf (mp-info-seen-end-of-segment mp-info) nil)
-      
-      ; now parse headers
-      (dolist (head headers)
-	(let ((colonpos (find-it #\: head 0 (length head))))
-	  (if* colonpos
-	     then (let ((name (buffer-substr head 0 colonpos))
-			(value (buffer-substr head (1+ colonpos)
-					      (length head))))
-		    (push (cons name
-				(parse-header-value value))
-			  heads)))))
-      heads)))
-	  
-      
-      
 
-(defun get-multipart-line (mp-info)
-  ;; read the next line into the give buffer
-  ;; return a code describing the line
-  (let* ((buffer (mp-info-buffer mp-info))
-	 (len    (mp-info-left mp-info))
-	 (i 0)
-	 (size (length buffer))
-	 (fd (mp-info-socket mp-info))
-	 (ch))
 
-    (if* (mp-info-seen-end-of-all-segments mp-info)
-       then (return-from get-multipart-line :eof))
-    
-    (if* (mp-info-seen-end-of-segment mp-info)
-       then (return-from get-multipart-line :boundary))
-    
-    (loop 
-      (if* (and len (<= len 0))
-	 then (setq ch 'eof)
-	      (return))
-    
-      (if* (>= i size)
-	 then ; no more buffer space
-	      (return))
-    
-      (setq ch (read-char fd nil :eof))
-      ;(if* (not (eq ch :eof)) then (write-char ch))
-      (if* len then (decf len))
-      (if* (eq :eof ch)
-	 then (return) ; out of the loop
-	 else (setf (schar buffer i) ch)
-	      (incf i)
-	      (if* (eq ch #\newline)
-		  then (return))))
-  
-    ; out of the loop at end of line or end of file
-    ; see if it matches the boundary
-  
-    (setf (mp-info-left mp-info) len)
-    (setf (mp-info-ebuf mp-info) i)
-    (setf (mp-info-leftoff mp-info) nil)
-  
-    (let ((eline i))
-      ; find postition before the crlf, if any
-      (if* (> eline 0)
-	 then (if* (eq (schar buffer (1- eline)) #\newline)
-		 then (decf eline)
-		      (if* (and (> eline 0)
-				(eq (schar buffer (1- eline)) #\return))
-			 then (decf eline))))
-      (setf (mp-info-eline mp-info) eline))
-		    
-		    
-  
-    (let ((boundary (mp-info-boundary mp-info)))
-      (if* (>= i (length boundary))
-	 then ; could match the boundary
-	      (if* (dotimes (i (length boundary) t)
-		     (if* (not (eq (char-downcase (schar buffer i))
-				   (schar boundary i)))
-			then (return nil)))
-		 then ; matches the boundary at least, check for
-		      ; end of boundary which is two extra hypens
-		      ; at the end
-		      (if* (>= i (+ 2 (length boundary)))
-			 then (if* (and (eq #\- (schar buffer 
-						       (length boundary)))
-					(eq #\- (schar buffer 
-						       (1+ (length boundary)))))
-				 then (setf 
-					  (mp-info-seen-end-of-all-segments 
-					   mp-info) t)
-				      :boundary-end
-				 else (setf (mp-info-seen-end-of-segment 
-					     mp-info) t)
-				      :boundary)
-			 else(setf (mp-info-seen-end-of-segment mp-info) t)
-			      :boundary)
-		 else :data)
-       elseif (and (eq i 0) (eq ch :eof))
-	 then (setf (mp-info-seen-end-of-all-segments mp-info) t)
-	      :eof
-	 else :data))))
-      
-		
-    
 (defmethod get-multipart-sequence ((req http-request)
 				   buffer
-				   &key (start 0) 
-					(end (length buffer))
-					(raw nil raw-p))
-  ;; fill the buffer with the next line of data.
+				   &key (start 0)
+					(end (length buffer)))
+  ;; fill the buffer with the chunk of data.
   ;; start at 'start' and go no farther than (1- end) in the buffer
-  ;; return the index of the first character not place in the buffer.
-  (let (mp-info text-grab)
-    
-    (typecase buffer
-      ((array character (*))
-       (setq text-grab t))
-      ((array (unsigned-byte 8) (*))
-       (setq text-grab nil 
-	     raw (if* (not raw-p) then t else raw)))
-      (t (error "get-multipart-sequence should be given a (simple-array character (*)) or (array (unsigned-byte 8) (*)), not this sequence: ~s" buffer)))
+  ;; return the index of the first character not placed in the buffer.
   
   
-    (setq mp-info (getf (request-reply-plist req) 'mp-info))
-    (if* (null mp-info)
-       then ; haven't grabbed the header yet, do that and toss it, and
-	    ; start the flow of information
-	    (if* (null (get-multipart-header req))
-	       then ; no data to read
-		    (return-from get-multipart-sequence nil))
-	    (setq mp-info (getf (request-reply-plist req) 'mp-info)))
-  
-    (if* (null (mp-info-leftoff mp-info))
-       then (case (get-multipart-line mp-info)
-	      ((:boundary :eof :boundary-end)
-	       (return-from get-multipart-sequence nil))
-	      (:data (setf (mp-info-leftoff mp-info) 0))))
-  
-    (do ((dest start (1+ dest))
-	 (leftoff (mp-info-leftoff mp-info)
-		  (1+ leftoff))
-	 (eline   (mp-info-eline mp-info))
-	 (ebuf    (mp-info-ebuf  mp-info))
-	 (s-buffer  (mp-info-buffer mp-info)))
-	((>= dest end)
-	 ; ran out of buffer
-	 (if* raw
-	    then (if* (< leftoff ebuf)
-		    then (setf (mp-info-leftoff mp-info) leftoff)
-		    else (setf (mp-info-leftoff mp-info) nil))
-	    else (if* (<= leftoff eline)
-		    then (setf (mp-info-leftoff mp-info) leftoff)
-		    else (setf (mp-info-leftoff mp-info) nil)))
-	 dest)
+  (let* ((mp-info (getf (request-reply-plist req) 'mp-info))
+	 mpbuffer 
+	 cur
+	 pos
+	 kind
+	 text-mode)
 
-      (if* raw
-	 then (if* (< leftoff ebuf)
-		 then (let ((ch (schar s-buffer leftoff)))
-			(if* text-grab 
-			   then (setf (aref buffer dest) ch)
-			   else (setf (aref buffer dest) (char-code ch))))
-		 else (setf (mp-info-leftoff mp-info) nil)
-		      (return-from get-multipart-sequence dest))
-	 else ; non raw, do eol processing
-	      
-	      (let (ch)
-		(if* (< leftoff eline)
-		   then (setq ch (schar s-buffer leftoff))
-		   else (setq ch #\newline))
-		;(format t "lo ~d  dest ~s  ch ~s~%" leftoff dest ch)
-		(if* text-grab 
-		   then (setf (aref buffer dest) ch)
-		   else (setf (aref buffer dest) (char-code ch)))
-		(if* (>= leftoff eline)
-		   then (setf (mp-info-leftoff mp-info) nil)
-			(return-from get-multipart-sequence (1+ dest))))))
-    ))
+    (typecase buffer
+      ((array (unsigned-byte 8) (*))
+       )
+      ((array character (*))
+       (setq text-mode t))
+      (t 
+       (error 
+	"This function only accepts (array (unsigned-byte 8)) or character arrays")))
+    (if* (null mp-info)
+       then (error "get-multipart-sequence called before get-mulipart-header"))
+    
+    (setq mpbuffer (mp-info-buffer mp-info)
+	  cur      (mp-info-cur mp-info))
+
+    (loop
+      (case (mp-info-state mp-info)
+	((:header :boundary :last-boundary)
+	 ; no data left
+	 (return-from get-multipart-sequence nil))
+	(:start
+	 (error "get-multipart-sequence called before get-mulipart-header"))
+	((:body :partial)
+	 (if* (eq (mp-info-state mp-info) :partial)
+	    then ; this was set below. we will return the partial
+		 ; at then end of the buffer
+		 (setf (mp-info-state mp-info) :body)
+		 (setq pos (mp-info-end mp-info))
+	    else (multiple-value-setq (pos kind) (scan-forward mp-info))
+		 (setq cur (mp-info-cur mp-info)) ; scan-forward can change
+		 )
+	 (if* (> pos cur)
+	    then ; got something to return
+		 (let ((tocopy (min (- end start) (- pos cur))))
+		   (if* text-mode
+		      then ; here is where we should do
+			   ; external format processing
+			   (dotimes (i tocopy)
+			     (setf (aref buffer (+ start i))
+			       (code-char (aref mpbuffer (+ cur i)))))
+		      else 
+			   (dotimes (i tocopy)
+			     (setf (aref buffer (+ start i))
+			       (aref mpbuffer (+ cur i)))))
+		   (setf (mp-info-cur mp-info) (+ cur tocopy))
+		   (return-from get-multipart-sequence (+ start tocopy)))
+	  elseif (eq kind :partial)
+	    then  ; may be a boundary, can't tell
+		 (if* (null (shift-buffer-up-and-read mp-info))
+		    then ; no more data, partial will never match
+			 ; so return the partial, this special
+			 ; state is recognized in this routine
+			 (setf (mp-info-state mp-info) :partial)
+			 ; loop around
+			 )
+	  elseif (or (eq kind :boundary)
+		     (eq kind :last-boundary))
+	    then ; hit a boundary, nothing more to return
+		 (setf (mp-info-state mp-info) kind
+		       (mp-info-cur   mp-info) pos)
+		 (return-from get-multipart-sequence nil)))))))
+
   
 
 
@@ -1821,41 +2005,78 @@
 	      min
 	      sec))))
 
+
+
+;; ----- simple resource
+
+(defstruct sresource
+  data	 ; list of buffers
+  create ; create new object for the buffer
+  init	 ; optional - used to init buffers taken off the free list
+  )
+
+(defun create-sresource (&key create init)
+  (make-sresource :create create :init init))
+
+(defun get-sresource (sresource &optional size)
+  ;; get a new resource. If size is given then ask for at least that
+  ;; size
+  (let (to-return)
+    (mp:without-scheduling 
+      (let ((buffers (sresource-data sresource)))
+	(if* size
+	   then ; must get one of at least a certain size
+		(dolist (buf buffers)
+		  (if* (>= (length buf) size)
+		     then (setf (sresource-data sresource)
+			    (delete buf buffers :test #'eq))
+			  (setq to-return buf)
+			  (return)))
 	    
+		; none big enough
+	      
+	   else ; just get any buffer
+		(if* buffers
+		   then (setf (sresource-data sresource) (cdr buffers))
+			(setq to-return (car buffers))))))
+  
+    (if* to-return
+       then ; found one to return, must init
+		      
+	    (let ((init (sresource-init sresource)))
+	      (if* init
+		 then (funcall init sresource to-return)))
+	    to-return
+       else ; none big enough, so get a new buffer.
+	    (funcall (sresource-create sresource)
+		     sresource
+		     size))))
+  
+(defun free-sresource (sresource buffer)
+  ;; return a resource to the pool
+  ;; we silently ignore nil being passed in as a buffer
+  (if* buffer 
+     then (mp:without-scheduling
+	    (push buffer (sresource-data sresource)))))
+
+
 
 
 ;; ----- scratch buffer resource:
- 
-(defvar *rq-buffers* nil)
-(defparameter *max-buffer-size* #.(* 5 1024)) ; no line should be this long
-    
-(defun get-request-buffer (&optional size)
-  ;; get a string buffer.
-  ;; if size is important, it is specified.
-  ;; if the size is too great, then refuse to create one and return
-  ;; nil
-  (mp:without-scheduling 
-    (if* size
-       then ; must get one of at least a certain size
-	    (if* (> size *max-buffer-size*)
-	       then (return-from get-request-buffer nil))
-	    
-	    (dolist (buf *rq-buffers*)
-	      (if* (>= (length buf) size)
-		 then (setq *rq-buffers* (delete buf *rq-buffers* :test #'eq))
-		      (return-from get-request-buffer  buf)))
-	    
-	    ; none big enough
-	    (make-array size :element-type 'character)
-       else ; just get any buffer
-	    (if* (pop *rq-buffers*)
-	       thenret
-	       else (make-array 2048 :element-type 'character)))))
 
+(defparameter *request-buffer-sresource* 
+    (create-sresource 
+     :create #'(lambda (sresource &optional size)
+			  (declare (ignore sresource))
+			  (make-array (or size 2048)
+				      :element-type 'character))))
+
+(defun get-request-buffer (&optional size)
+  (get-sresource *request-buffer-sresource* size))
 
 (defun free-request-buffer (buffer)
-  ;; return buffer to the free pool
-  (mp:without-scheduling (push buffer *rq-buffers*)))
+  (free-sresource *request-buffer-sresource* buffer))
+
 
 
 	    
@@ -1892,7 +2113,7 @@
   ;;  name
   ;;  password
   ;;
-  (let ((auth-value (header-slot-value req "authorization")))
+  (let ((auth-value (header-slot-value req :authorization)))
     (if* auth-value
        then (let ((words (split-into-words auth-value)))
 	      (if* (equalp (car words) "basic")
@@ -1907,7 +2128,7 @@
   ;; This must be called after with-http-response and before
   ;; with-http-body
   (setq realm (string realm))
-  (setf (reply-header-slot-value req "www-authenticate")
+  (setf (reply-header-slot-value req :www-authenticate)
     (format nil "Basic realm=~s" realm)))
     
 
@@ -1922,12 +2143,12 @@
     (dolist (header headers)
       (let ((this (car header))
 	    (ent))
-	(if* (setq ent (assoc this fast-headers :test #'equal))
+	(if* (setq ent (assoc this fast-headers :test #'eq))
 	   then ; a fast one
 		(setf (slot-value req (second ent)) (cdr header))
 	   else ; a slow one
 		(if* (null (setq ent (assoc this 
-					    current-headers :test #'equal)))
+					    current-headers :test #'eq)))
 		   then ; not present yet
 			(push (setq ent (cons this nil)) current-headers))
 		(setf (cdr ent) (cdr header)))))

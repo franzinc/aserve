@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.8 2000/06/26 04:51:34 jkf Exp $
+;; $Id: htmlgen.cl,v 1.8.6.1 2000/09/05 19:03:43 layer Exp $
 
 ;; Description:
 ;;   html generator
@@ -498,6 +498,7 @@
 (def-std-html :br       nil)
 (def-std-html :button   nil)
 
+(def-std-html :caption  t)
 (def-std-html :center   t)
 (def-std-html :cite     t)
 (def-std-html :code     t)

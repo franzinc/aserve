@@ -1,3 +1,103 @@
+*******************************************************************************
+join from layer6 to acl6 branch
+*******************************************************************************
+join from trunk to layer6 branch
+command:
+  ../../join.sh trunk acl6_branch_point trunk_to_layer6_merge1 aserve
+*******************************************************************************
+
+2000-08-28  John Foderaro  <jkf@tiger.franz.com>
+1.1.28
+	* client.cl - before doing a redirect close down the existing
+	    connection.
+
+2000-08-25  John Foderaro  <jkf@tiger.franz.com>
+
+	* fix bug which caused file descriptors to remain open
+	  forever if a "connection reset by peer" error occured.
+	  Added the ability to track sockets opened by aserve to
+	  ensure that they were closed before being gc'ed away.
+
+2000-08-24  John Foderaro  <jkf@tiger.franz.com>
+1.1.27
+	* rewrote the get-multipart-xxx functions to use an
+	  (unsigned-byte 8) buffer since character buffers have
+	  issues with international code.   This eliminates the
+	  extra <cr><lf> at the end problem with get-multipart-sequence.
+	  The file transfer should be faster, especially if you 
+	  pass get-multipart-sequence a 4096 byte (unsigned-byte 8) vector.
+	
+	  !! Eliminte the raw argument from get-multipart-sequence. Now
+	  transfers are all 'raw'
+	  If a character array is passed to get-multipart-sequence then
+	  we just copy into each character the code-char of the 
+	  item in the buffer (which corresponds to the latin1-base
+	  external format).  We will allow external-format select
+	  soon.
+	  
+
+2000-08-21  John Foderaro  <jkf@tiger.franz.com>
+
+	*  add :proxy arg to net.aserve:start so you can enable the proxy
+	   when you start the server.
+	*  fix test suite to report only legit errors
+
+2000-08-20  jkf  <jkf@main.verada.com>
+1.1.26
+	*  Added a proxy capability.  enable-proxy will turn it on.
+	   Currently it acts an http/1.0 client and server since that
+	   makes it easier to debug. However this does cause 12 test
+	   set errors to be reported since it expects to see http/1.1
+	   responses. 
+
+2000-08-17  jkf  <jkf@main.verada.com>
+
+	*  implement generalized cons-free header parsing and use it
+	   in both the client and server.
+
+	* change the header info returned by do-http-request to
+	  also use keywords to describe headers
+	  !! non upward compatiable change !!
+
+2000-08-15  John Foderaro  <jkf@tiger.franz.com>
+
+	*  fix bug where certain headers were sent twice
+
+2000-08-12  John Foderaro  <jkf@tiger.franz.com>
+
+	*  name headers by keyword symbols rather than strings
+	  !! this change is not upward compatible !!
+	
+    
+2000-08-10  John Foderaro  <jkf@tiger.franz.com>
+1.1.25
+	*  decode.cl: request-query will now convert items in query
+	    strings without values into ("keyname" . "") in the resulting
+	    alist.
+	*  doc/aserve.html - update doc of request-query and 
+	   request-query-value to reflect what happens with null valued
+	   query elements
+
+2000-08-09  jkf  <jkf@main.verada.com>
+
+	*  publish.cl: write the transfer encoding as all lowercase 'chunked'
+	   since a bug in Mozilla M17 means it will only understand this form.
+	*  htmlgen/htmlgen.cl - add the <caption> tag
+
+2000-08-04  jkf  <jkf@main.verada.com>
+1.1.24
+	*  examples/chat.cl - add user logins and private messages 
+	        between users.
+
+2000-07-31  jkf  <jkf@main.verada.com>
+
+	*  main.cl: if a multipart-mixed body was being sent then
+	    note that the request-body has been grabbed.
+
+2000-07-25  jkf  <jkf@main.verada.com>
+
+	*  example/chat.cl - enhanced to support logging into the chat
+
 2000-07-17  John Foderaro  <jkf@tiger.franz.com>
 1.1.22
 	
