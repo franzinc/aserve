@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.53 2001/10/24 17:39:59 jkf Exp $
+;; $Id: load.cl,v 1.54 2001/11/15 19:45:08 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -46,6 +46,9 @@
       "test/testdir/suba/subsuba/foo.html"
       "test/testdir/suba/access.cl"
       "test/testdir/suba/foo.html"
+      "test/testdir/suba/subd/ddd.html"
+      "test/testdir/subc/ccc.html"
+      "test/testdir/subd/ddee.html"
       "test/testdir/access.cl"
       "test/testdir/aaa.foo"
       "test/testdir/bbb.ign"
@@ -261,10 +264,21 @@
 	   ))
   
   (run-shell-command 
-   (format nil "mkdir ~aaserve-src/~a/test/testdir/suba/subsuba"
+   (format nil "mkdir  ~aaserve-src/~a/test/testdir/subc ~aaserve-src/~a/test/testdir/subd"
 	   *aserve-root*
 	   dist-name
 	   
+	   *aserve-root*
+	   dist-name
+	   
+	   ))
+  (run-shell-command 
+   (format nil "mkdir ~aaserve-src/~a/test/testdir/suba/subsuba ~aaserve-src/~a/test/testdir/suba/subd "
+	   *aserve-root*
+	   dist-name
+	   
+	   *aserve-root*
+	   dist-name
 	   ))
 	   
   (dolist (file (append (mapcar #'(lambda (file) (format nil "~a.cl" file))
