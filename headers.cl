@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.8 2000/09/15 01:04:15 jkf Exp $
+;; $Id: headers.cl,v 1.9 2000/09/19 16:08:38 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -253,7 +253,32 @@
 	       (dotimes (i (length buffer))
 		 (setf (svref buffer i) nil)))))
 
-    
+
+
+;; parsed header blocks
+;;  We have to work with headers and to reduce consing we work with
+;;  them in place in a structure called a parsed header block
+;;  This is stored in a 4096 byte usb8 vector.
+;;  The layout is:
+;;  headers and values .. empty .. data-block header-index-block size
+;;
+;;  The headers and values are exactly what's read from the web client/server.
+;;  they end in a crlf after the last value.
+;;  
+;;  The size is a 2 byte value specifying the index after the last 
+;;  header value.  It says where we can add new headers if we want.
+;;  All values greater than 2 bytes are stored in big endian form.
+;;
+;;  The header-index-block is 2 bytes per entry and specifies in index
+;;  into the data-block where a descriptor for the value associated with
+;;  this header are located.  This file lists the headers we know about
+;;  and each is given an index.  The header-index-block is stored
+;;  so that index 0 is closest to the end of the array
+;;  The data blocks have the format 
+;;      count(1) start1(2) end1(2) ... ... startN(2) endN(2)
+;;  which describes how many header values there are and where they
+;;  are.  end is one byte beyond the header value.
+
       
 
 
@@ -405,7 +430,7 @@
 		 `(the fixnum (logand #xff (ash (the fixnum ,x) -8))))
 	       (lopart (x) 
 		 `(the fixnum (logand #xff (the fixnum ,x)))))
-      (let* ((table-index (length buff))
+      (let* ((table-index (- (length buff) 2))
 	     (data-index (- table-index
 			    (the fixnum (ash (the fixnum (length ans)) 1)))))
 	(dotimes (i (length ans))
@@ -433,6 +458,9 @@
 	       else ; nothing there, zero it out
 		    (setf (aref buff table-index) 0)
 		    (setf (aref buff (1+ table-index)) 0))))
+	(let ((size-index (- (length buff) 2)))
+	  (setf (aref buff size-index) (hipart end))
+	  (setf (aref buff (1+ size-index)) (lopart end)))
     
 	(if* (> end data-index)
 	   then (error "header is too large"))))
@@ -470,7 +498,7 @@
     
 	    
     (let ((table-index (- (length buff)
-			  2
+			  4  ; 2 for size, then 2 for first value
 			  (ash header-index 1) ; *2 
 			  ))
 	  (data-index))
@@ -604,6 +632,8 @@
 (defun copy-headers (frombuf tobuf header-array)
   ;; copy the headers denoted as :p (pass) in header array 
   ;; in frombuf to the tobuf
+  ;;
+  ;; return the index after the last header stored.
   (let ((toi 0))
     (dotimes (i (length header-array))
       (if* (eq :p (svref header-array i))
