@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.38 2000/09/07 19:48:04 jkf Exp $
+;; $Id: publish.cl,v 1.39 2000/09/13 23:58:43 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -1238,7 +1238,14 @@
 			    (car head)
 			    (cdr head)
 			    *crlf*))
-	      (format-dif :xmit sock "~a" *crlf*))
+	      (format-dif :xmit sock "~a" *crlf*)
+	      
+	      (force-output sock)
+	      ; clear bytes written count so we can count data bytes
+	      ; transferred
+	      #+hiper-socket
+	      (setf (excl::hiper-bytes-written sock) 0) 
+	      )
       
       (if* (and send-headers chunked-p (eq time :pre))
 	 then (force-output sock)
@@ -1253,7 +1260,11 @@
       ;; if we're chunking then shut that off
       (if* (and chunked-p (eq time :post))
 	 then (socket:socket-control sock :output-chunking-eof t)
-	      (write-sequence *crlf* sock))
+	      ; in acl5.0.1 the output chunking eof didn't send 
+	      ; the final crlf, so we do it here
+	      #+(and allegro (not hiper-socket))
+	      (write-sequence *crlf* sock)
+	      )
       )))
 
       	

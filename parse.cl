@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.25 2000/08/20 19:13:23 jkf Exp $
+;; $Id: parse.cl,v 1.26 2000/09/13 23:58:43 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -345,7 +345,7 @@
 	(setf (aref buff i) ch)
 	(incf i)
 	(case state
-	  (0 ; seen nothing intersting
+	  (0 ; seen nothing interesting
 	   (if* (eq ch #.(char-code #\newline))
 	      then (setq state 2)
 	    elseif (eq ch #.(char-code #\return))

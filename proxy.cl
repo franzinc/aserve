@@ -115,7 +115,7 @@
 	    ;; now insert new headers
     
 	    ; content-length is inserted iff this is put or post method
-	    (if* (member method '(:put :post))
+	    (if* (member method '(:put :post) :test #'eq)
 	       then (setq outend (insert-header outbuf outend :content-length
 						(format nil "~d"
 							(if* request-body
@@ -153,7 +153,10 @@
 	    ; time to make a call to the server
 	    (setq sock (socket:make-socket :remote-host host
 					   :remote-port (or port 80)
-					   :format :bivalent))
+					   :format :bivalent
+					   :type 
+					   #+hiper-socket :hiper
+					   #-hiper-socket :stream))
 
 	    (if* *watch-for-open-sockets*
 	       then (schedule-finalization 
@@ -447,10 +450,57 @@
 	     "The proxy could not find the requested uri")))))
 
   
-      
-      
-		       
+
+
+;;;--------------------- proxy cache ------------------      
+
+
+(defstruct pcache 
+  ;; proxy cache
+  table		; hash table mapping to pcache-ent objects
+  file		; file in which to store the cache info
+  )
+
+(defstruct pcache-ent
+  last-modified ; last modified date of entity (in universal-time format)
+  data		; data blocks (first is the header block)
+  )
+
+
+  
+(defun create-proxy-cache (&key (wserver *wserver*))
+  ;; create a cache for the proxy
+  (setf (wserver-pcache wserver)
+    (make-pcache 
+     :table (make-hash-table :test #'equal))))
+
+
+(defun proxy-cache-request (req ent)
+  ;; if we've got a proxy cache then retrieve it from there
+  ;; else just proxy the request
+  
+  (let ((pcache (wserver-pcache *wserver*))
+	(pcache-ent))
     
+    (if* (or (null pcache)
+	     (not (eq (request-method req) :get)))
+       then (return-from proxy-cache-request
+	      (proxy-request req ent)))
+    
+    (setq pcache-ent
+      (gethash (net.uri:render-uri (request-raw-uri req) nil) 
+	       (pcache-table pcache)))
+    
+    (if* pcache-ent
+       then ; see if this applies
+	    nil
+	    )))
+
+	    
+    
+   
+    
+
 		  
 	
     

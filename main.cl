@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.68 2000/09/07 19:48:04 jkf Exp $
+;; $Id: main.cl,v 1.69 2000/09/13 23:58:42 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -347,7 +347,14 @@
     ;; list of the ip addresses by which this wserver has been contacted
     :initform nil
     :accessor wserver-ipaddrs
-   )))
+    )
+   
+   (pcache
+    ;; proxy cache
+    :initform nil
+    :accessor wserver-pcache)
+    
+   ))
 
 
      
@@ -831,7 +838,12 @@ by keyword symbols and not by strings"
   (let* ((main-socket (socket:make-socket :connect :passive
 					  :local-port port
 					  :reuse-address t
-					  :format :bivalent)))
+					  :format :bivalent
+					  
+					  :type 
+					  #+hiper-socket :hiper
+					  #-hiper-socket :stream
+					  )))
 
     #+unix
     (progn
@@ -1090,6 +1102,8 @@ by keyword symbols and not by strings"
 		  (return-from process-connection nil)
 	     else ;; got a request
 		  (handle-request req)
+		  (force-output (request-socket req))
+		  
 		  (log-request req)
 		  
 		  (free-req-header-block req)

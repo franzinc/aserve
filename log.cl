@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: log.cl,v 1.12 2000/08/25 17:21:26 jkf Exp $
+;; $Id: log.cl,v 1.13 2000/09/13 23:58:42 jkf Exp $
 
 ;; Description:
 ;;   iserve's logging
@@ -67,7 +67,10 @@
 			  (if* obj
 			     then (response-number obj)
 			     else 999)))
-		(length  (request-reply-content-length req))
+		(length  (or (request-reply-content-length req)
+			     #+hiper-socket
+			     (excl::hiper-bytes-written 
+			      (request-socket req))))
 	
 		(stream (wserver-log-stream
 			 (request-wserver req))))

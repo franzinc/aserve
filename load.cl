@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.37 2000/08/29 01:51:09 jkf Exp $
+;; $Id: load.cl,v 1.38 2000/09/13 23:58:42 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -46,6 +46,14 @@
 (defparameter *aserve-examples*
     '("examples/examples"
       ))
+
+
+;; experimental!!
+; In acl6.0 (post beta) we have hiper streams, we compile to use
+; them if this feature is set.  
+; #+(and allegro (version>= 6 0)) (pushnew :hiper-socket *features*)
+
+;; end experimental
 
 
 (with-compilation-unit  nil

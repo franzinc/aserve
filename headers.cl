@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.6 2000/09/07 19:48:04 jkf Exp $
+;; $Id: headers.cl,v 1.7 2000/09/13 23:58:42 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -75,64 +75,70 @@
 
 (eval-when (compile eval)
   ;; the headers from the http spec
-  ;; Following the header name we specify how to transfer client
-  ;; request headers and server response headers
-  ;; (header-name client  server)
-  ;; client/server
-  ;;	:p  - pass this header on
-  ;;    :np - don't pass this header on verbatim
-  ;;	:nf - this header won't be found
+  ;; Following the header name we specify how to 
+  ;; 1.  transfer client  request headers and 
+  ;; 2  server response headers
+  ;;     (header-name client  server)
+  ;;    client/server
+  ;;		:p  - pass this header on
+  ;;    	:np - don't pass this header on verbatim
+  ;;		:nf - this header won't be found
+  ;; 3.  how the proxy-cache compares a new request-header against
+  ;;	 the request header stored with a cached response. 
+  ;;     :mx - need exact match 
+  ;;	 :mp - either exact match or no value for new request-header
+  ;;     nil - no match needed
   ;;
   (defparameter *http-headers* 
-      '(("Accept" :p :nf) 
-	("Accept-Charset" :p :nf)
-	("Accept-Encoding" :p :nf)
-	("Accept-Language" :p :nf)
-	("Accept-Ranges" :p :nf)
-	("Age" :nf :p)
-	("Allow" :nf :p)
-	("Authorization" :p :nf)
-	("Cache-control" :p :p)
-	("Connection" :np :np)
-	("Content-Disposition" :nf :nf) ; in multipart/form-data bodies
-	("Content-Encoding" :p :p)
-	("Content-Language" :p :p)
-	("Content-Length" :np :np)
-	("Content-Location" :p :p)
-	("Content-Md5" :p :p)
-	("Content-Range" :p :p)
-	("Content-Type" :p :p)
-	("Cookie" :p :p)
-	("Date" :p :p)
-	("Etag" :p :p)
-	("Expect" :np :nf)
-	("Expires"             :nf   :p)
-	("From"                :p    :nf)
-	("Host"                :p    :nf)
-	("If-Match"            :p    :nf)
-	("If-Modified-Since"   :p    :nf)
-	("If-None-Match"       :p    :nf)
-	("If-Range"            :p    :nf)
-	("If-Unmodified-Since" :p    :nf)
-	("Last-Modified"       :nf   :p)
-	("Location" 	       :nf   :p)
-	("Max-Forwards"        :np   :nf)  
-	("Pragma"              :p    :p)
-	("Proxy-Authenticate"  :nf   :p)
-	("Proxy-Authorization" :p    :nf)
-	("Range" :p :nf)
-	("Referer" :p :nf)
-	("Retry-After" :nf :p)
-	("Server" :nf :p)
-	("TE" :p :nf)
-	("Trailer" :np :np)
-	("Transfer-Encoding" :np :np)
-	("Upgrade" :np :nf)
-	("User-Agent" :p :nf)
-	("Vary" :nf :p)
-	("Via" :np :np)  ; modified by proxy both dierctions
-	("Warning" :p :p)
-	("WWW-Authenticate" :nf :p)
+      '(("Accept" :p :nf :mp) 
+	("Accept-Charset" :p :nf :mp)
+	("Accept-Encoding" :p :nf :mp)
+	("Accept-Language" :p :nf :mp)
+	("Accept-Ranges" :p :nf   :mx)
+	("Age" :nf :p nil)
+	("Allow" :nf :p nil)
+	("Authorization" :p :nf :mx)
+	("Cache-control" :p :p  :mp)
+	("Connection" :np :np nil)
+	("Content-Disposition" :nf :nf nil) ; in multipart/form-data bodies
+	("Content-Encoding" :p :p :mx)
+	("Content-Language" :p :p :mx)
+	("Content-Length" :np :np nil)
+	("Content-Location" :p :p :mx)
+	("Content-Md5" :p :p :mx)
+	("Content-Range" :p :p :mx)
+	("Content-Type" :p :p :mx)
+	("Cookie" :p :p :mx)
+	("Date" :p :p nil)
+	("Etag" :nf :p nil)
+	("Expect" :p :nf :mx)
+	("Expires"             :nf   :p  nil)
+	("From"                :p    :nf :mp)  ; mp?
+	("Host"                :p    :nf :mx)
+	("If-Match"            :p    :nf :mx)
+	("If-Modified-Since"   :p    :n   nil)
+	("If-None-Match"       :p    :nf :mx)
+	("If-Range"            :p    :nf :mx)
+	("If-Unmodified-Since" :p    :nf nil)
+	("Last-Modified"       :nf   :p  nil)
+	("Location" 	       :nf   :p  nil)
+	("Max-Forwards"        :np   :nf nil)  
+	("Pragma"              :p    :p  :mx)
+	("Proxy-Authenticate"  :nf   :p   nil)
+	("Proxy-Authorization" :p    :nf :mx)
+	("Range" :p :nf :mx)
+	("Referer" :p :nf nil)  ; should we match? who cares..
+	("Retry-After" :nf :p nil )
+	("Server" :nf :p nil)
+	("TE" :p :nf   :mx)
+	("Trailer" :np :np nil)
+	("Transfer-Encoding" :np :np nil)
+	("Upgrade" :np :nf nil)
+	("User-Agent" :p :nf :mp)
+	("Vary" :nf :p nil)
+	("Via" :np :np  nil)  ; modified by proxy both dierctions
+	("Warning" :p :p :mx)
+	("WWW-Authenticate" :nf :p nil)
 	)))
 
 (eval-when (compile eval)
