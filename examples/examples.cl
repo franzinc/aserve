@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.30 2002/02/13 22:35:44 jkf Exp $
+;; $Id: examples.cl,v 1.31 2002/04/10 21:36:29 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -151,6 +151,8 @@
 			  ((:a :href "cgi2") "redirect")
 			  ", "
 			  ((:a :href "cgi3") "set status to unauthorized request"))
+			 :hr
+			 ((:img :src "aservepowered.gif")) " <-- feel free to use this image on your AllegroServe web site"
 			 ))))))
 			     
 
@@ -219,6 +221,9 @@
 
 
 (publish-file :path "/aservelogo.gif" :file (example-file "aservelogo.gif")
+	      :content-type "image/gif")
+
+(publish-file :path "/aservepowered.gif" :file (example-file "aservepowered.gif")
 	      :content-type "image/gif")
 
 ;; this is a demonstration of how you can return a jpeg 
