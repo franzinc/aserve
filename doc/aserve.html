@@ -300,7 +300,7 @@ an entity assigned, the old entity is replaced by the new entity.</p>
 <p>&nbsp;</p>
 
 <p><a name="f-publish-file"></a><strong><font face="Courier New">(publish-file &amp;key
-path host port&nbsp; file content-type class preload cache-p remove server)</font></strong></p>
+path host port&nbsp; file content-type class preload cache-p remove server timeout)</font></strong></p>
 
 <p>This creates an entity that will return the contents of a file on the disk in response
 to a request.&nbsp;&nbsp; The <strong>url</strong> and <strong>file</strong>&nbsp; must be
@@ -344,6 +344,13 @@ given, the rest of the arguments are optional..&nbsp; The arguments have these m
   <li><strong>server</strong> -- if this entity should only be served by a particular server,
     then this specifies which server.&nbsp;&nbsp; See the section (to be written) on running
     multiple servers in the same Lisp process.</li>
+  <li><strong>timeout</strong> - specifies the number of seconds AllegroServe has to return
+    this file to the http client.&nbsp; If AllegroServe is running in a lisp that supports
+    timeouts on each I/O operation (e.g. Acl 6.1 or newer) then the default value for this
+    argument is a huge number, meaning in effect that there will be no time limit on the
+    transfer.&nbsp;&nbsp; If I/O timeouts are not supported then the default value of this
+    argument is <strong>nil</strong> meaning ignore this value and use the timeout value held
+    in the server object and retrieved with<strong> wserver-response-timeout</strong>..</li>
 </ul>
 
 <p>The function that handles requests for files will respond correctly to <strong>If-Modified-Since</strong>
@@ -362,19 +369,20 @@ header lines and thus minimizes network traffic. </p>
 <p><a name="f-publish-directory"></a><strong><font face="Courier New">(publish-directory
 &amp;key prefix host port destination remove server <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-indexes filter)</font></strong></p>
+indexes filter timeout publisher)</font></strong></p>
 
 <p>This creates a mapping from all urls whose name begins with<strong> prefix</strong> to
 files stored in the directory specified by the destination.&nbsp;&nbsp; The <strong>host</strong>,
 <strong>port, remove </strong>and <strong>server</strong> arguments are as described above
-for <strong>publish.</strong> &nbsp;&nbsp;&nbsp;&nbsp; When a request comes in for which
-there isn't an entity that matches it exactly,&nbsp; AllegroServe checks to see if a
-prefix of the request matches the request.&nbsp; If so, and if the resulting entity is a <strong>directory-entity</strong>
-as created by this function, then it strips the prefix off the given request and appends
-the remaining part of the request to the destination string.&nbsp; It then publishes that
-(using <strong>publish-file</strong> and computing the content-type from the file type).
-&nbsp;&nbsp; Next that <strong>file-entity </strong>is made to handle the request in the
-normal manner.</p>
+for <strong>publish.</strong> &nbsp;&nbsp;&nbsp;&nbsp; The <strong>timeout</strong>
+argument defaults as described in <strong>publish-file</strong>. When a request comes in
+for which there isn't an entity that matches it exactly,&nbsp; AllegroServe checks to see
+if a prefix of the request matches the request.&nbsp; If so, and if the resulting entity
+is a <strong>directory-entity</strong> as created by this function, then it strips the
+prefix off the given request and appends the remaining part of the request to the
+destination string.&nbsp; It then publishes that (using <strong>publish-file</strong> and
+computing the content-type from the file type). &nbsp;&nbsp; Next that <strong>file-entity
+</strong>is made to handle the request in the normal manner.</p>
 
 <p>If a request comes that maps to a directory rather than a file then AllegroServe tries
 to locate an index file for that directory.&nbsp; The <strong>indexes</strong> argument
@@ -399,17 +407,40 @@ to the filter for this file the filter may choose to publish a handler for this 
 face="Courier New">(failed-request req)</font> and the standard &quot;404 Not found&quot;
 will be sent back to the client.</p>
 
+<p>The <strong>publisher</strong> argument can be used to specify exactly what happens
+when a request comes that's handled by the <strong>directory-entity </strong>and a file is
+located on the disk that matches the incoming <strong>url</strong>.&nbsp;&nbsp; Nomally a <strong>publish-file</strong>
+is done to add that file.&nbsp; You may want to publish some other kind of entity to
+represent that file.&nbsp; The <strong>publisher</strong> argument, if non-nil, must be a
+function of three arguments:&nbsp; <strong>req ent filename</strong>.&nbsp; The filename
+is a string naming the file that's been matched with the request.&nbsp;&nbsp; The <strong>publisher</strong>
+function must return an entity to be processed to send back a response.&nbsp;&nbsp; The <strong>publisher</strong>
+function may wish to publish that entity but it need not do so.&nbsp; The default <strong>publisher</strong>
+function is:</p>
+
+<pre>(defun standard-directory-entity-publisher (req ent realname)
+  ;; the default publisher used when directory entity finds
+  ;; a file it needs to publish
+  (publish-file :path (uri-path (request-uri req))
+		:host (host ent)
+		:file realname
+		:authorizer (entity-authorizer ent)
+		:timeout (entity-timeout ent)))
+      
+		      </pre>
+
 <p>&nbsp;</p>
 
 <p>&nbsp;</p>
 
 <p><a name="f-publish"></a><strong><font face="Courier New">(publish &amp;key path host
-port content-type function class format remove server)</font></strong></p>
+port content-type function class format remove server timeout)</font></strong></p>
 
 <p>This creates a mapping from a url to a <strong>computed-entity</strong>, that is an
 entity that computes its response every time a request comes in.&nbsp; The <strong>path</strong>,
 <strong>host</strong>, <strong>port</strong>, <strong>remove, server</strong> and <strong>class</strong>
-arguments are as in the other publish functions.&nbsp;&nbsp; The <strong>content-type</strong>
+arguments are as in the other publish functions.&nbsp;&nbsp;The <strong>timeout</strong>
+argument defaults to <strong>nil </strong> always.&nbsp;&nbsp; The <strong>content-type</strong>
 sets a default value for the response to the request but this can be overridden.&nbsp; The
 <strong>format</strong> argument is either <strong>:text </strong>(the default) or <strong>:binary</strong>
 and it specifies the kind of value that will be sent back (after the response headers,
@@ -491,19 +522,21 @@ and then&nbsp; runs the code in the <strong>body</strong> which will actually se
 response.&nbsp; <strong>req</strong> and <strong>ent</strong> are the request and entity
 objects passed into the function designated to compute the response for the request.
 &nbsp;&nbsp;&nbsp; <strong>timeout </strong>sets a time limit for the computation of the
-response.&nbsp;&nbsp; The default is the value of the variable <strong>*http-response-timeout*</strong>
-(which is initially 120 meaning 120 seconds).&nbsp;&nbsp; If <strong>check-modified </strong>is
-true (the default) then the <strong>last-modified </strong>time stored in the entity
-object will be compared against the <strong>if-modified-since </strong>time of the request
-and if that indicates that the client already has the latest copy of this entity then a <strong>not-modified</strong>
-response will be automatically returned to the client and the <strong>body </strong>of
-this macro will not be run.&nbsp;&nbsp; <strong>response </strong>is an object containing
-the code and description of the http response we wish to return. &nbsp;&nbsp; The default
-value is the value of <strong>*response-ok*</strong> (which has a code of 200 and a string
-descriptor &quot;OK&quot;).&nbsp;&nbsp; <strong>content-type </strong>is a string
-describing the MIME type of the body (if any) sent after the headers.&nbsp; It has a form
-like &quot;text/html&quot;.&nbsp;&nbsp; If <strong>content-type</strong> isn't given here
-then the content-type value in the entity (which is set in the call to <strong>publish)</strong>
+response.&nbsp;&nbsp; If <strong>timeout</strong> is nil then the entity <strong>ent</strong>
+is checked for a timeout value.&nbsp; If that value is also nil then the timeout value is
+retreived from the current <strong>wserver</strong> object using <strong>wserver-response-timeout</strong>.
+&nbsp; If <strong>check-modified </strong>is true (the default) then the <strong>last-modified
+</strong>time stored in the entity object will be compared against the <strong>if-modified-since
+</strong>time of the request and if that indicates that the client already has the latest
+copy of this entity then a <strong>not-modified</strong> response will be automatically
+returned to the client and the <strong>body </strong>of this macro will not be
+run.&nbsp;&nbsp; <strong>response </strong>is an object containing the code and
+description of the http response we wish to return. &nbsp;&nbsp; The default value is the
+value of <strong>*response-ok*</strong> (which has a code of 200 and a string descriptor
+&quot;OK&quot;).&nbsp;&nbsp; <strong>content-type </strong>is a string describing the MIME
+type of the body (if any) sent after the headers.&nbsp; It has a form like
+&quot;text/html&quot;.&nbsp;&nbsp; If <strong>content-type</strong> isn't given here then
+the content-type value in the entity (which is set in the call to <strong>publish)</strong>
 will be used.</p>
 
 <p align="left">&nbsp;</p>
@@ -2167,7 +2200,7 @@ network problems or buggy clients don't cause those resources to be unavailable 
 clients.&nbsp;&nbsp; AllegroServe uses timeouts to ensure that no client can hold a web
 server resource for more than a certain amount of time.</p>
 
-<p>Three common ways for a resource to be held are
+<p>Three common ways for a resource to be held are 
 
 <ol>
   <li>A client stops sending a request in the middle of the request.&nbsp;&nbsp; This can
@@ -2199,7 +2232,8 @@ default is 60 seconds.</p>
 AllegroServe allows for an http request&nbsp; function to be run and finished sending back
 its response.&nbsp; The initial value for this slot of the wserver object is found in <strong>*http-response-timeout*
 </strong>which defaults to 120 seconds.&nbsp; You can alter this timeout value with the <strong>:timeout</strong>
-argument to <strong>with-http-response</strong>. </p>
+argument to <strong>with-http-response</strong> or by specifying a <strong>:timeout</strong>
+when publishing the entity.</p>
 
 <h3>Acl 6.1 or newer</h3>
 
@@ -2220,8 +2254,15 @@ socket to finish.&nbsp;&nbsp; The value is initialized to the value of *http-io-
 -&nbsp; the number of seconds AllegroServe allows for an http request function to be run
 and finished sending back its response. The initial value for this slot of the wserver
 object is found in <strong>*http-response-timeout*</strong> which defaults to 300 seconds.
-You can alter this timeout value with the :timeout argument to <strong>with-http-response</strong>.
-</p>
+You can alter this timeout value with the :timeout argument to <strong>with-http-response</strong>
+or by specifying a <strong>:timeout </strong>argument to the publish function creating the
+entity.</p>
+
+<p><strong>publish-directory </strong>and <strong>publish-file </strong>default their <strong>timeout</strong>
+argument in a way that makes sense based on whether the Lisp supports I/O timeouts.
+&nbsp;&nbsp; If I/O timeouts are supported then there is no reason to do a global timeout
+for the whole response if you're just sending back a file.&nbsp;&nbsp; Thus in this case
+the <strong>timeout</strong> argument defaults to a huge number.</p>
 
 <hr>
 
