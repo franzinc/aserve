@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: clpage.cl,v 1.9 2004/12/15 20:53:43 jkf Exp $
+;; $Id: clpage.cl,v 1.10 2005/02/11 00:46:10 jkf Exp $
 
 
 (eval-when (compile load eval) (require :aserve))
@@ -640,7 +640,7 @@
 	     
 	     (match-search-string (obj ch)
 	       `(if* (eql ,ch (schar (search-string ,obj) 
-				      (search-counter ,obj)))
+				     (search-counter ,obj)))
 		   then (incf (search-counter ,obj))
 		   else (init-search-obj ,obj))))
 	     
@@ -671,9 +671,9 @@
 	
 	; start tag can end with > or a space character preceeding
 	; attributes
-	(if* (and (end-of-search-p start-tag)
-		  (member ch '(#\> #\space #\tab #\newline)))
-	   then (incf nest-level)
+	(if* (end-of-search-p start-tag)
+	   then (if* (member ch '(#\> #\space #\tab #\newline))
+		   then (incf nest-level))
 		(init-search-obj start-tag))
 	
 	(incf chcount)

@@ -1,3 +1,8 @@
+2005-02-10  John Foderaro  <jkf@tiger.franz.com>
+1.12
+	*  clpage.cl - fix parsing of nested elements where the outer
+		element name is a prefix of the inner element name.
+
 2004-12-15  John Foderaro  <jkf@tiger.franz.com>
 1.11
 	* remove debugging format statement
