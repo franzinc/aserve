@@ -1,6 +1,6 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.12.2.1 2000/02/08 19:48:37 jkf Exp $
+;; $Id: load.cl,v 1.12.2.2 2000/02/18 18:04:33 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -18,12 +18,12 @@
 (defparameter *iserve-other-files*
     ;; other files that make up the neo dist
     '("readme.txt"
-      "examples.cl"
-      "foo.txt"
-      "fresh.jpg"
+      "examples/examples.cl"
+      "examples/foo.txt"
+      "examples/fresh.jpg"
+      "examples/prfile9.jpg"
       "load.cl"
-      "neo.html"
-      "prfile9.jpg"
+      "doc/iserve.html"
       "htmlgen/htmlgen.html"
       ))
 
@@ -71,18 +71,18 @@
 (defun make-distribution ()
   ;; make a distributable version of iserve
   (run-shell-command "rm -fr iserve-dist")
-  (run-shell-command "mkdir iserve-dist")
+  (run-shell-command "mkdir iserve-dist iserve-dist/doc iserve-dist/examples")
   (copy-files-to *iserve-files* "iserve.fasl")
   (copy-files-to '("htmlgen/htmlgen.html")
 		 "iserve-dist/htmlgen.html")
   (dolist (file '("iserve.fasl"
-		  "iserve.html"
+		  "doc/iserve.html"
 		  "readme.txt"
-		   "examples.cl"
-		   "examples.fasl"
-		   "foo.txt"
-		   "fresh.jpg"
-		   "prfile9.jpg"))
+		   "examples/examples.cl"
+		   "examples/examples.fasl"
+		   "examples/foo.txt"
+		   "examples/fresh.jpg"
+		   "examples/prfile9.jpg"))
     (copy-files-to (list file)
 		   (format nil "iserve-dist/~a" file))))
 		
@@ -92,6 +92,7 @@
   ;;
   (run-shell-command "rm -fr iserve-src")
   (run-shell-command "mkdir iserve-src iserve-src/iserve iserve-src/iserve/htmlgen")
+  (run-shell-command "mkdir iserve-src/iserve/doc iserve-src/iserve/examples")
   (dolist (file (append (mapcar #'(lambda (file) (format nil "~a.cl" file))
 				*iserve-files*)
 			*iserve-other-files*))

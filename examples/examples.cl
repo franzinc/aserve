@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: examples.cl,v 1.23.2.1 2000/02/08 19:48:37 jkf Exp $
+;; $Id: examples.cl,v 1.1.2.1 2000/02/18 18:04:36 jkf Exp $
 
 ;; Description:
 ;;   neo examples
@@ -132,7 +132,7 @@
 
 
 ;; display a picture from a file.
-(publish-file :path "/pic" :file "prfile9.jpg"
+(publish-file :path "/pic" :file "examples/prfile9.jpg"
 	      :content-type "image/jpeg")
 
 
@@ -266,18 +266,18 @@
 
 ;; a preloaded picture file
 (publish-file :path "/neoweb/fresh.jpg"
-	      :file "fresh.jpg"
+	      :file "examples/fresh.jpg"
 	      :content-type "image/jpeg"
 	      :preload t)
 
 ;; a preloaded text file
 (publish-file :path "/foo"
-	      :file "foo.txt"
+	      :file "examples/foo.txt"
 	      :content-type "text/plain"
 	      :preload t)
 
 (publish-file :path "/foo.txt"
-	      :file "foo.txt"
+	      :file "examples/foo.txt"
 	      :content-type "text/plain"
 	      :preload nil)
 

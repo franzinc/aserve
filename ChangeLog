@@ -1,3 +1,7 @@
+2000-02-18  John Foderaro  <jkf@tiger.franz.com>
+
+	* moved examples and doc to their own directories
+
 2000-02-08  John Foderaro  <jkf@tiger.franz.com>
 1.1.0
 	renamed neo to Allegro iServe
