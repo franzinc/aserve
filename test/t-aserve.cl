@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.26 2001/08/09 18:02:14 jkf Exp $
+;; $Id: t-aserve.cl,v 1.27 2001/08/15 17:53:12 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -1134,7 +1134,11 @@
       (setq step 1)
       (test 200 (values2
 		 (x-do-http-request (format nil "~a/test-pd/server.pem"
-					    prefix-local)))))))
+					    prefix-local))))
+      
+      ; remove entry so subsequent tests won't see it
+      (publish-file :path "/test-pd/server.pem" :remove t)
+      )))
 
 			 
 		       

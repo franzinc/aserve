@@ -1,3 +1,7 @@
+2001-08-15  John Foderaro  <jkf@tiger.franz.com>
+1.2.5
+	* main.cl - incf version number for new release
+
 2001-08-09  John Foderaro  <jkf@tiger.franz.com>
 
 	*  publish.cl - added :filter functionality to publish-directory
