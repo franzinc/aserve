@@ -1,4 +1,4 @@
-;; -*- mode: common-lisp; package: neo -*-
+;; -*- mode: common-lisp; package: net.iserve -*-
 ;;
 ;; decode.cl
 ;;
@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: decode.cl,v 1.3 2000/01/07 22:40:35 jkf Exp $
+;; $Id: decode.cl,v 1.3.2.1 2000/02/08 19:48:36 jkf Exp $
 
 ;; Description:
 ;;   decode/encode code
@@ -28,7 +28,7 @@
 ;;-
 
 
-(in-package :neo)
+(in-package :net.iserve)
 
 ;---------------- urlencoding ----------------
 ; there are two similar yet distinct encodings for character strings

@@ -1,4 +1,4 @@
-;; -*- mode: common-lisp; package: neo -*-
+;; -*- mode: common-lisp; package: net.iserve -*-
 ;;
 ;; macs.cl
 ;;
@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: macs.cl,v 1.5 2000/01/28 19:44:29 jkf Exp $
+;; $Id: macs.cl,v 1.5.2.1 2000/02/08 19:48:37 jkf Exp $
 
 ;; Description:
 ;;   useful internal macros
@@ -31,10 +31,10 @@
  (require :uri))
 
 ;; macros used by neo
-(defpackage :neo
-  (:use :common-lisp :excl :htmlgen :net.uri))
+(defpackage :net.iserve
+  (:use :common-lisp :excl :net.html.generator :net.uri))
 
-(in-package :neo)
+(in-package :net.iserve)
 
 
 

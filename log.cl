@@ -1,4 +1,4 @@
-;; -*- mode: common-lisp; package: neo -*-
+;; -*- mode: common-lisp; package: net.iserve -*-
 ;;
 ;; log.cl
 ;;
@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: log.cl,v 1.5 2000/01/28 19:44:29 jkf Exp $
+;; $Id: log.cl,v 1.5.2.1 2000/02/08 19:48:37 jkf Exp $
 
 ;; Description:
 ;;   neo's logging
@@ -27,7 +27,7 @@
 ;;- http://www.franz.com/~jkf/coding_standards.html
 ;;-
 
-(in-package :neo)
+(in-package :net.iserve)
 
 
 (defun logmess (message)

@@ -1,4 +1,4 @@
-;; -*- mode: common-lisp; package: neo -*-
+;; -*- mode: common-lisp; package: net.iserve -*-
 ;;
 ;; main.cl
 ;;
@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: main.cl,v 1.19 2000/02/08 17:09:15 jkf Exp $
+;; $Id: main.cl,v 1.19.2.1 2000/02/08 19:48:37 jkf Exp $
 
 ;; Description:
 ;;   neo's main loop
@@ -28,8 +28,8 @@
 ;;-
 
 
-(defpackage :neo
-  (:use :common-lisp :excl :htmlgen)
+(defpackage :net.iserve
+  (:use :common-lisp :excl :net.html.generator)
   (:export
    #:base64-decode
    #:base64-encode
@@ -91,10 +91,10 @@
    #:*response-internal-server-error*
    #:*wserver*))
 
-(in-package :neo)
+(in-package :net.iserve)
 
 
-(defparameter *neo-version* '(1 0 9))
+(defparameter *iserve-version* '(1 1 0))
 
 ;;;;;;;  debug support 
 
@@ -266,7 +266,7 @@
 		 (append ,g-headers (request-reply-headers ,g-req))))
        (send-response-headers ,g-req ,g-ent :pre)
        (if* (not (member :omit-body (request-reply-strategy ,g-req)))
-	  then (let ((htmlgen:*html-stream* (request-reply-stream ,g-req)))
+	  then (let ((*html-stream* (request-reply-stream ,g-req)))
 		 (progn ,@body)))
        (send-response-headers ,g-req ,g-ent :post))))
 			  
@@ -593,7 +593,7 @@
   ; create accept thread
   (setf (wserver-accept-thread *wserver*)
     (mp:process-run-function 
-     (list :name (format nil "neo-accept-~d" (incf *thread-index*))
+     (list :name (format nil "iserve-accept-~d" (incf *thread-index*))
 	   :initial-bindings
 	   `((*wserver*  . ',*wserver*)
 	     (*debug-io* . ',(wserver-terminal-io *wserver*))

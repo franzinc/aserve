@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: examples.cl,v 1.23 2000/02/08 17:09:15 jkf Exp $
+;; $Id: examples.cl,v 1.23.2.1 2000/02/08 19:48:37 jkf Exp $
 
 ;; Description:
 ;;   neo examples
@@ -30,10 +30,10 @@
 
 
 ;; examples of web pages
-(defpackage :neoe ;; neo example
-  (:use :common-lisp :excl :htmlgen :neo))
+(defpackage :net.iserve.examples ;; neo example
+  (:use :common-lisp :excl :net.html.generator :net.iserve))
 
-(in-package :neoe)
+(in-package :net.iserve.examples)
 
 ;; flush all publishing done so far:
 (unpublish :all t)
@@ -211,7 +211,7 @@
  :content-type "text/html"
  :function
  #'(lambda (req ent)
-     (format t "request uri is ~s~%" (neo::request-uri req))
+     (format t "request uri is ~s~%" (request-uri req))
      (let ((lookup (assoc "symbol" (request-query req) :test #'equal)))
        (with-http-response (req ent)
 	 (with-http-body (req ent)
@@ -355,7 +355,7 @@
 		     )
 		 (loop
 		   ; get headers for the next item
-		   (if* (null (setq h (neo:get-multipart-header req)))
+		   (if* (null (setq h (get-multipart-header req)))
 		      then ; no more items
 			   (return))
 		   (format t "parsed headers: ~s~%" h)
@@ -396,7 +396,7 @@
 		       (let ((buffer (make-array 1024
 						 :element-type '(unsigned-byte 8))))
 			 
-			 (loop (let ((count (neo:get-multipart-sequence 
+			 (loop (let ((count (get-multipart-sequence 
 					     req 
 					     buffer
 					     :raw t)))
@@ -429,7 +429,7 @@
 				  :expires :never)
 	       (set-cookie-header req
 				  :name "the time"
-				  :value (neo::universal-time-to-date
+				  :value (net.iserve::universal-time-to-date
 					  (get-universal-time))
 				  :path "/cookieverify"
 				  :expires (+ (get-universal-time)

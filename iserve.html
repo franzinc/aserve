@@ -1,32 +1,31 @@
 <html>
 
 <head>
-<title>Neo</title>
+<title>Allegro iServe</title>
 <meta name="GENERATOR" content="Microsoft FrontPage 3.0">
 </head>
 
 <body>
 
-<h1 align="center">Neo</h1>
+<h1 align="center">Allegro iServe</h1>
 
 <h2 align="left">Introduction</h2>
 
-<p><strong>Neo</strong> is a webserver currently being written at <a
-href="http://www.franz.com">Franz Inc</a>.&nbsp;&nbsp; <em>The name <strong>neo</strong>
-is just an internal project name and isn't intended to be the name of&nbsp; the final
-product.</em>&nbsp;&nbsp;&nbsp; Neo is designed to work with the <a href="htmlgen.html">htmlgen</a>
-system for generating dynamic html, as one of the big advantages of&nbsp; a web server
-written in Common Lisp is the ability to generate html dynamically.&nbsp; In this document
-we'll consider the web server and dynamic html generation to be parts of the same product.</p>
+<p><strong>Allegro iSeve </strong>is a webserver&nbsp; written at <a
+href="http://www.franz.com">Franz Inc</a>.&nbsp;&nbsp;iServe is designed to work with the <a
+href="htmlgen.html">htmlgen</a> system for generating dynamic html, as one of the big
+advantages of&nbsp; a web server written in Common Lisp is the ability to generate html
+dynamically.&nbsp; In this document we'll consider the web server and dynamic html
+generation to be parts of the same product.</p>
 
-<p>The design goals of Neo are: 
+<p>The design goals of iServe are: 
 
 <ul>
-  <li>a very small footprint.&nbsp;&nbsp; It should be possible to make Neo a part of every
+  <li>a very small footprint.&nbsp;&nbsp; It should be possible to make iServe a part of every
     application without being concerned about the impact of its size and processing
     requirements.</li>
-  <li>simple configuration.&nbsp; Neo should start automatically with minimal input from the
-    user.&nbsp; </li>
+  <li>simple configuration.&nbsp; iServe should start automatically with minimal input from
+    the user.&nbsp; </li>
   <li>easy to use.&nbsp;&nbsp; The typical scenarios should be easy to program with just
     knowledge of simple html.</li>
   <li>usable in commerical applications .</li>
@@ -39,12 +38,12 @@ we'll consider the web server and dynamic html generation to be parts of the sam
 
 <p>&nbsp;</p>
 
-<h2>Running Neo</h2>
+<h2>Running iServe</h2>
 
-<p>Running&nbsp; Neo requires that you 
+<p>Running&nbsp; iServe requires that you 
 
 <ul>
-  <li><strong>load</strong> <em>neo.fasl</em> into Lisp</li>
+  <li><strong>load</strong> <em>iserve.fasl</em> into Lisp</li>
   <li><strong>publish </strong>zero or more urls</li>
   <li><strong>start</strong> the server</li>
   <li><strong>publish </strong>zero or more urls</li>
@@ -57,8 +56,8 @@ and after you start the server.</p>
 
 <h2>Starting the server</h2>
 
-<p>The function <font face="Courier New">neo:start</font> is used to start the server
-running.</p>
+<p>The function <font face="Courier New">net.iserve:start</font> is used to start the
+server running.</p>
 
 <p><strong><font face="Courier New">(start &amp;key port listeners chunking keep-alive
 server debug)</font></strong></p>
@@ -114,14 +113,14 @@ argument is passed in).</p>
 <h2>Publishing information</h2>
 
 <p>Once the server is started it will accept requests from http clients, typically web
-browsers.&nbsp;&nbsp; Each request is parsed and then Neo searches for an object to handle
-that request.&nbsp;&nbsp; That object is called an <strong>entity</strong>.&nbsp; If an
-entity is found, it is passed the request and is responsible for generating and sending a
-response to the client.&nbsp; If an entity can't be found then Neo sends back a response
-saying that that request was invalid.</p>
+browsers.&nbsp;&nbsp; Each request is parsed and then iServe searches for an object to
+handle that request.&nbsp;&nbsp; That object is called an <strong>entity</strong>.&nbsp;
+If an entity is found, it is passed the request and is responsible for generating and
+sending a response to the client.&nbsp; If an entity can't be found then iServe sends back
+a response saying that that request was invalid.</p>
 
 <p><em>Publishing</em> is the process of creating entities and registering them in the
-tables scanned by Neo after a request is read.</p>
+tables scanned by iServe after a request is read.</p>
 
 <h3>Components of a request</h3>
 
@@ -211,7 +210,7 @@ destination server)</font></strong></p>
 files stored in the directory specified by the destination.&nbsp;&nbsp; The <strong>host</strong>,
 <strong>port </strong>and <strong>server</strong> arguments are as described above for <strong>publish.</strong>
 &nbsp;&nbsp;&nbsp;&nbsp; When a request comes in for which there isn't an entity that
-matches it exactly,&nbsp; Neo checks to see if a prefix of the request matches the
+matches it exactly,&nbsp; iServe checks to see if a prefix of the request matches the
 request.&nbsp; If so, and if the resulting entity is a <strong>directory-entity</strong>
 as created by this function, then it strips the prefix off the given request and appends
 the remaining part of the request to the destination string.&nbsp; It then publishes that
@@ -253,10 +252,10 @@ the response is only that the request wasn't found.</p>
 <p>There are a variety of ways that a response can been sent back to the http client
 depending on whether keep-alive is being done, chunking is possible, whether the response
 is text or binary, whether the client already has the most recent data, and whether the
-size of the body of the response is known before the headers are sent.&nbsp; Neo deals
-with complexity of determing the optimal response strategy and the user need only use a
-few specific macros in the computation of the response in order ot take advantage of Neo's
-strategy computation</p>
+size of the body of the response is known before the headers are sent.&nbsp; iServe
+handles the complexity of determing the optimal response strategy and the user need only
+use a few specific macros in the computation of the response in order ot take advantage of
+iServe's strategy computation</p>
 
 <p>Here's a very simple computed response.&nbsp; It just puts &quot;Hello World!&quot; in
 the browser window:</p>
@@ -276,7 +275,7 @@ back with Chunked transfer encoding and it may or may not keep the connection al
 sending back the response.&nbsp;&nbsp; The user code doesn't have to deal with those
 possibilities, it just uses <strong>with-http-response</strong> and <strong>with-http-body</strong>
 and the rest is automatic.&nbsp; The <strong>html</strong> macro is part of the htmlgen
-package that accompanies Neo.&nbsp;&nbsp; In the case above we are being lazy and not
+package that accompanies iServe.&nbsp;&nbsp; In the case above we are being lazy and not
 putting out the html directives that should be found on every page of html since most
 browsers are accomodating.&nbsp;&nbsp; Here's the function that generates the correct
 html:</p>
@@ -356,8 +355,8 @@ face="Courier New"> (with-http-body (req ent)) </font>in the body of an with-htt
 <p align="left">The <strong>format</strong> argument specifies whether the code in the <strong>body</strong>
 will want to write <strong>:text</strong> (e.g. <strong>write-char</strong>) or <strong>:binary</strong>
 (e.g. <strong>write-byte</strong>) when it writes the data of the body of the response.
-&nbsp;&nbsp;&nbsp;&nbsp; Based on the value of the <strong>format</strong> argument, Neo
-will create the correct kind of response stream.&nbsp;&nbsp; If <strong>format </strong>is
+&nbsp;&nbsp;&nbsp;&nbsp; Based on the value of the <strong>format</strong> argument,
+iServe will create the correct kind of response stream.&nbsp;&nbsp; If <strong>format </strong>is
 not specified here it will default to the value specified when <strong>publish</strong>
 was called to create the entity.</p>
 
@@ -455,9 +454,9 @@ universal time format).&nbsp; This defaults to the time when the request arrived
 <p><strong><font face="Courier New">(request-reply-headers request)</font></strong> -
 accessor - an alist of headers to send out with the reply.&nbsp; Each entry in the alist
 is a cons where the <strong>car</strong> is a string holding the header name and the <strong>cdr</strong>
-is the value (it is printed using the <strong>~a</strong> format directive).
-&nbsp;&nbsp; Typically <strong>request-reply-headers</strong> isn't used, instead the
-headers to be sent are passed as the <strong>:header</strong> argument to <strong>with-http-body</strong>.
+is the value (it is printed using the <strong>~a</strong> format directive). &nbsp;&nbsp;
+Typically <strong>request-reply-headers</strong> isn't used, instead the headers to be
+sent are passed as the <strong>:header</strong> argument to <strong>with-http-body</strong>.
 </p>
 
 <p><strong><font face="Courier New">(request-reply-content-length request) </font></strong>&nbsp;&nbsp;&nbsp;
@@ -571,7 +570,7 @@ would be something like</p>
 
 <p>Note that the filename is expressed in the syntax of the operating system on which the
 web browser is running.&nbsp; This syntax may or may not make sense to the Lisp pathname
-functions of the Neo web server as it may be running on a totally different operating
+functions of the iServe web server as it may be running on a totally different operating
 system.</p>
 
 <p>&nbsp;</p>

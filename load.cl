@@ -1,13 +1,13 @@
-;; load in neo
+;; load in iServe
 ;;
-;; $Id: load.cl,v 1.12 2000/01/28 19:44:29 jkf Exp $
+;; $Id: load.cl,v 1.12.2.1 2000/02/08 19:48:37 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
 ;(require :defftype)
 
-(defparameter *neo-files* 
-    '("../htmlgen/htmlgen"
+(defparameter *iserve-files* 
+    '("htmlgen/htmlgen"
       "macs"
       "main"
       "parse"
@@ -15,7 +15,7 @@
       "publish"
       "log" ))
 
-(defparameter *neo-other-files*
+(defparameter *iserve-other-files*
     ;; other files that make up the neo dist
     '("readme.txt"
       "examples.cl"
@@ -23,14 +23,16 @@
       "fresh.jpg"
       "load.cl"
       "neo.html"
-      "prfile9.jpg"))
+      "prfile9.jpg"
+      "htmlgen/htmlgen.html"
+      ))
 
-(defparameter *neo-examples*
+(defparameter *iserve-examples*
     '("examples"))
 
 
 (with-compilation-unit  nil
-  (dolist (file (append *neo-files* *neo-examples*))
+  (dolist (file (append *iserve-files* *iserve-examples*))
     (case *loadswitch*
       (:compile-if-needed (compile-file-if-needed (format nil "~a.cl" file)))
       (:compile (compile-file (format nil "~a.cl" file)))
@@ -40,12 +42,12 @@
       
 
 (defun makeapp ()
-  (run-shell-command "rm -fr neoserver")
+  (run-shell-command "rm -fr iserveserver")
   (generate-application
-   "neoserver"
-   "neoserver/"
+   "iserveserver"
+   "iserveserver/"
    '(:sock :process :defftype :foreign :ffcompat "loadonly.cl" "load.cl")
-   :restart-init-function 'neo::start-cmd
+   :restart-init-function 'net.iserve::start-cmd
    :application-administration '(:resource-command-line
 				 ;; Quiet startup:
 				 "-Q")
@@ -67,14 +69,14 @@
 
 
 (defun make-distribution ()
-  ;; make a distributable version of neo
-  (run-shell-command "rm -fr neo-dist")
-  (run-shell-command "mkdir neo-dist")
-  (copy-files-to *neo-files* "neo.fasl")
-  (copy-files-to '("../htmlgen/htmlgen.html")
-		 "neo-dist/htmlgen.html")
-  (dolist (file '("neo.fasl"
-		  "neo.html"
+  ;; make a distributable version of iserve
+  (run-shell-command "rm -fr iserve-dist")
+  (run-shell-command "mkdir iserve-dist")
+  (copy-files-to *iserve-files* "iserve.fasl")
+  (copy-files-to '("htmlgen/htmlgen.html")
+		 "iserve-dist/htmlgen.html")
+  (dolist (file '("iserve.fasl"
+		  "iserve.html"
 		  "readme.txt"
 		   "examples.cl"
 		   "examples.fasl"
@@ -82,20 +84,20 @@
 		   "fresh.jpg"
 		   "prfile9.jpg"))
     (copy-files-to (list file)
-		   (format nil "neo-dist/~a" file))))
+		   (format nil "iserve-dist/~a" file))))
 		
 
 (defun make-src-distribution ()
-  ;; make a source distribution of neo
+  ;; make a source distribution of iserve
   ;;
-  (run-shell-command "rm -fr neo-src")
-  (run-shell-command "mkdir neo-src neo-src/neo neo-src/htmlgen")
+  (run-shell-command "rm -fr iserve-src")
+  (run-shell-command "mkdir iserve-src iserve-src/iserve iserve-src/iserve/htmlgen")
   (dolist (file (append (mapcar #'(lambda (file) (format nil "~a.cl" file))
-				*neo-files*)
-			*neo-other-files*))
+				*iserve-files*)
+			*iserve-other-files*))
     (copy-files-to
      (list file)
-     (format nil "neo-src/neo/~a" file))))
+     (format nil "iserve-src/iserve/~a" file))))
 
   
   
