@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.80 2000/10/26 05:28:37 jkf Exp $
+;; $Id: main.cl,v 1.81 2000/10/27 02:49:33 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -2194,11 +2194,13 @@ in get-multipart-sequence"))
 	   else ; just get any buffer
 		(if* buffers
 		   then (setf (sresource-data sresource) (cdr buffers))
-			(setq to-return (car buffers))))))
+			(setq to-return (car buffers)))
+		
+		)))
   
     (if* to-return
        then ; found one to return, must init
-		      
+	    
 	    (let ((init (sresource-init sresource)))
 	      (if* init
 		 then (funcall init sresource to-return)))
@@ -2214,8 +2216,7 @@ in get-multipart-sequence"))
   (if* buffer 
      then (mp:without-scheduling
 	    ;; if debugging
-	    (if* (member buffer (sresource-data sresource)
-			 :test #'eq)
+	    (if* (member buffer (sresource-data sresource) :test #'eq)
 	       then (error "freeing freed buffer"))
 	    ;;
 	    

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.25 2000/10/26 05:43:10 jkf Exp $
+;; $Id: proxy.cl,v 1.26 2000/10/27 02:49:34 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -134,7 +134,7 @@
   expires	; universal time when this entry expires
   
   
-  request	; request header block 
+  ;; request	; request header block 
   data		; data blocks (first is the response header block)
   data-length	; number of octets of data
   blocks	; number of cache blocks (length of the value in data slot)
@@ -267,7 +267,7 @@
   ;; get the response and if respond is true send back the response
   ;;
   (let* ((request-body (get-request-body req))
-	 (outbuf (get-sresource *header-block-sresource*))
+	 (outbuf (get-header-block))
 	 (outend)
 	 (clibuf)
 	 (cliend)
@@ -307,7 +307,8 @@
 
 	    ;(logmess "got proxy request")
 	    ;(dump-header-block (request-header-block req) *initial-terminal-io*)
-				    
+
+	    
 	    ; create outgoing headers by copying
 	    (copy-headers (request-header-block req) outbuf
 			  *header-client-array*)
@@ -389,7 +390,8 @@
 	  
 	    ; now the headers
 	    (write-sequence outbuf sock :end outend)
-    
+
+	    
 	    ; now the body if any
 	    (if* request-body
 	       then (write-sequence request-body sock))
@@ -516,25 +518,27 @@
 	      (if* (and pcache-ent 
 			(eq (request-method req) :get))
 		 then ; we are caching
-		      (cache-response req pcache-ent
-				      response comment clibuf 
-				      body-buffers body-length level)
-		      ; these buffers have been saved in the cache
-		      ; so nil them out so they aren't freed
-		      (setf clibuf nil
-			    body-buffers nil
-			    (request-header-block req) nil))
+		      (let ((tmp-clibuf clibuf)
+			    (tmp-body-buffers body-buffers))
+			(setf clibuf nil
+			      body-buffers nil)
+			(cache-response req pcache-ent
+					response comment tmp-clibuf 
+					tmp-body-buffers body-length level)
+			; these buffers have been saved in the cache
+			; so nil them out so they aren't freed
+			))
 		
-	      (dolist (block body-buffers)
-		(free-sresource *header-block-sresource* block))
+	      (dolist (block body-buffers) (free-header-block block))
 	      )))
     
       ;; cleanup forms
       (if* sock 
 	 then (ignore-errors (force-output sock))
 	      (ignore-errors (close sock :abort t)))
-      (free-sresource *header-block-sresource* outbuf)
-      (free-sresource *header-block-sresource* clibuf))))
+      
+      (free-header-block outbuf)
+      (free-header-block clibuf))))
 
     
 (defun parse-response-buffer (buff)
@@ -963,6 +967,7 @@
   ;; show all the proxy cache entries
   (let ((now (get-universal-time)))
     (flet ((display-pcache-ent (ent)
+	     
 	     (html (:b "uri: ")
 		   (:princ-safe (pcache-ent-key ent))
 		   :br
@@ -994,7 +999,9 @@
 				      (pcache-ent-disk-location ent)))))
 		   :p
 		   :br
-		   )))
+		   )
+	     
+	     ))
       (with-http-response (req ent)
 	(with-http-body (req ent)
 	  (html
@@ -1043,8 +1050,22 @@
 	    
 	     ))))))))
 
-				
-      
+#+ignore
+(defun verify-memory-cache (tag)
+  ;; verify that all memory cache items are not on the free list too
+  
+  (let ((pcache (wserver-pcache *wserver*)))
+    (let ((ent (pcache-ent-next (queueobj-mru 
+				 (pcache-queueobj pcache))))
+	  (last-ent (queueobj-lru (pcache-queueobj pcache))))
+      (loop
+	(if* (or (null ent)  (eq last-ent ent)) then (return))
+	;; test to see if block are on the free list
+	  (setq *bug* ent)
+	(dolist (db (pcache-ent-data ent))
+	  (chk-header-block db tag))
+	(setq ent (pcache-ent-next ent))))
+    ))
   
 
 
@@ -1120,6 +1141,9 @@
 	(rendered-uri 
 	 (transform-uri (net.uri:render-uri (request-raw-uri req) nil)))
 	(pcache (wserver-pcache *wserver*)))
+    
+    (setf (pcache-ent-key new-ent) rendered-uri)
+    
     (proxy-request req ent :pcache-ent new-ent :respond respond :level level)
     (if* (member (pcache-ent-code new-ent) '(200 
 					     302 ; redirect
@@ -1131,14 +1155,17 @@
 	       then (logmess (format nil "replace cache entry for ~a"
 				     rendered-uri)))
 	    
-	    (setf (pcache-ent-key new-ent) rendered-uri)
 	    
 	    (push new-ent
 		  (gethash rendered-uri
 			   (pcache-table pcache)))
 
 	    ; put at the head of the memory queue
-	    (move-pcache-ent new-ent nil (pcache-queueobj pcache))
+	    ; could already be dead from some other threads o
+	    ; be careful
+	    (if* (lock-pcache-ent new-ent)
+	       then (move-pcache-ent new-ent nil (pcache-queueobj pcache))
+		    (unlock-pcache-ent new-ent))
 			      
 	    ; and disable the old entry
 	    (if* pcache-ent
@@ -1348,7 +1375,11 @@
     
       ; link into the toq, at the mru position
       (if* toq
-	 then (let* ((mru-head (queueobj-mru toq))
+	 then ;debugging
+	      (if* (eq (pcache-ent-state pcache-ent) :dead)
+		 then (break "shouldn't be dead during move"))
+	      
+	      (let* ((mru-head (queueobj-mru toq))
 		     (mru (pcache-ent-next mru-head)))
 		(setf (pcache-ent-next mru-head) pcache-ent
 		      (pcache-ent-prev pcache-ent) mru-head
@@ -1506,7 +1537,11 @@
 		    *extra-lifetime*)
 	      
 	      (if* *entry-cached-hook*
-		 then (funcall *entry-cached-hook* pcache-ent level))
+		 then (if* (lock-pcache-ent pcache-ent)
+			 then (unwind-protect
+				  (funcall *entry-cached-hook* 
+					   pcache-ent level)
+				(unlock-pcache-ent pcache-ent))))
 	      )
 		       
      elseif (eql response-code 304)

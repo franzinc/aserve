@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.17 2000/10/26 05:28:37 jkf Exp $
+;; $Id: headers.cl,v 1.18 2000/10/27 02:49:33 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -294,6 +294,8 @@
 
 (defun get-header-block ()
   (get-sresource *header-block-sresource*))
+
+
 
 
 (defun free-header-blocks (blocks)
@@ -914,7 +916,28 @@
 			 (pop cest)
 		    else (return t))))))))
 	       
-			 
+
+(defun header-match-prefix-string (buff header string)
+  ;; match the prefix of the header vlue against the given string
+  
+  (if* (symbolp header)
+     then (let ((val (get header 'kwdi)))
+	    (if* (null val)
+	       then (error "no such header as ~s" header))
+	    (setq header val)))
+  
+  (multiple-value-bind (rstart rend)
+      (header-buffer-values buff header)
+    (if* (and rstart (>= (- rend rstart) (length string)))
+       then ; compare byte by byte
+	    (dotimes (i (length string) t)
+	      (if* (not (eql (ausb8 buff rstart) 
+			     (char-code (schar string i))))
+		 then (return nil))
+	      (incf rstart)))))
+
+  
+  
 	       
 (defun add-trailing-crlf (buff xx)
   ;; buff is a parsed header block.
