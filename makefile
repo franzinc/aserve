@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.9 2002/01/25 15:43:01 jkf Exp $
+# $Id: makefile,v 1.10 2003/10/24 15:15:57 jkf Exp $
 #
 # On Windows, this makefile requires the use of GNU make from Redhat
 # (http://sources.redhat.com/cygwin/).
@@ -33,7 +33,7 @@ srcdist: FORCE
 	$(mlisp) -batch -L build.tmp -kill
 
 clean:	FORCE
-	rm -fr *.fasl */*.fasl build.tmp
+	rm -fr *.fasl */*.fasl webactions/*.fasl webactions/clpcode/*.fasl build.tmp
 
 cleanall distclean: clean
 	rm -fr aserve-src
