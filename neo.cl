@@ -12,7 +12,22 @@
 (in-package :neo)
 
 
-(defvar *ndebug* t)   ; print debugging stuff
+(defvar *ndebug* 200)         ; print debugging stuff
+(defvar *dformat-level* 20)  ; debug level at which this stuff prints
+
+(defmacro debug-format (level &rest args)
+  ;; do the format to *debug-io* if the level of this error
+  ;; is matched by the value of *ndebug*
+  `(if* (>= *ndebug* ,level)
+      then (format *debug-io* "d> ") 
+	   (format *debug-io* ,@args)))
+
+(defmacro dformat (&rest args)
+  ;; do the format and then send to *debug-io*
+  `(if* (>= *ndebug* *dformat-level*)
+      then (format ,@args)
+	   (format *debug-io* ,@(cdr args))))
+
 
 (eval-when (compile load eval)
   ;; these are the common headers and are stored in slots in 
@@ -83,64 +98,14 @@
 	   
 	   
    
-  
-(defclass http-request-0.9 (http-header-mixin)
-  ;; http protocol 0.9 doesn't support mime headers for requests
-  ((command  ;; keyword giving the command in this request
-    :initarg :command
-    :reader command)
-   (url ;; string - the argument to the command
-    :initarg :url
-    :reader url)
-   (args  ;; alist of arguments if there were any after a ? on the url
-    :initarg :args
-    :reader args)
-   (protocol ;; symbol naming the http protocol 
-    :initarg :protocol
-    :reader protocol)
-   (protocol-string ;; string naming the protcol
-    :initarg :protocol-string
-    :reader protocol-string)
-   (body  ;; string buffer holding the data for this command
-    :initarg :body
-    :accessor body)
-   (alist ;; alist of headers not stored in slots
-    :initform nil
-    :accessor alist)
-   (client-ipaddr  ;; who is connecting to us
-    :initarg :client-ipaddr)
-   
-   (response ;; stream to which to send the response
-    :accessor response)
-   
-   (finished ;; true when this request has been handled
-    :initform nil	
-    :accessor finished)
-   
-   (socket ;; the socket we're communicating throgh
-    :initarg :socket
-    :reader socket)
-   
-   (mime-type ;; the mime type of the response to this request
-    :accessor mime-type)
-   
-   ))
 
 
-(defclass http-request-1.0 (http-request-0.9)
-  ;; http 1.0 uses mime headers in a request to set parameters
-  ;; there are some ad hoc persistent connection things
-  ()
-  )
-
-(defclass http-request-1.1 (http-request-1.0)
-  ;; http 1.1 uses chunked transfers for blocks of data where
-  ;; you don't want to specify the size in advance
-  ()
-  )
 
 
-(defclass xhttp-request (http-header-mixin)
+
+
+
+(defclass http-request (http-header-mixin)
   ;; incoming
   ((command  ;; keyword giving the command in this request
     :initarg :command
@@ -225,6 +190,7 @@
 (defvar *read-request-timeout* 20)
 
 
+#+ignore
 (defmacro with-http-response ((kind request mime-type &rest args) &rest body)
   ;; write a response back to the server
   ;; kind is a http response value
@@ -235,7 +201,7 @@
 	(req (gensym)))
     `(let* ((,req ,request)
 	    (,str (make-response-stream ,req))
-	    (*response-stream* ,str)
+	    (htmlgen:*html-stream* ,str)
 	    )
        (setf (response ,req) ,str)
        (setf (mime-type ,req) ,mime-type)
@@ -249,7 +215,7 @@
        (post-process-request ,req)
        )))
        
-
+#+ignore
 (defmacro with-fixed-response ((kind request mime-type
 				&key content-length
 				     last-modified) &rest body)
@@ -298,14 +264,18 @@
 					 :local-port port
 					 :reuse-address t
 					 :format :bivalent)))
-    
-    (unwind-protect
-	(loop
-	  (restart-case
-	      (process-connection (socket:accept-connection main-socket))
-	    (:loop ()  ; abort out of error without closing socket
-	      nil)))
-      (close main-socket))))
+
+    ;; for the simple case we turn off keep alives since
+    ;; browsers tend to overlap their requests and without
+    ;; a listener we get stuck
+    (let ((*enable-keep-alive* nil))
+      (unwind-protect
+	  (loop
+	    (restart-case
+		(process-connection (socket:accept-connection main-socket))
+	      (:loop ()  ; abort out of error without closing socket
+		nil)))
+	(close main-socket)))))
 
 
 (defun start-cmd ()
@@ -336,6 +306,7 @@
 	;; get first command
 	(tagbody  again
 	  (mp:with-timeout (*read-request-timeout* 
+			    (debug-format 5 "request timed out on read~%")
 			    (log-timed-out-request-read sock)
 			    (return-from process-connection nil))
 	    (setq req (read-http-request sock)))
@@ -350,8 +321,11 @@
 		  (logmess "got valid request")
 		  (handle-request req)
 		  (let ((sock (socket req)))
-		    (if* (resp-keep-alive req)
+		    (if* (member :keep-alive
+				 (resp-strategy req)
+				 :test #'eq)
 		       then ; continue to use it
+			    (debug-format 10 "request over, keep socket alive~%")
 			    (force-output sock)
 			    (go again))))))
     (ignore-errors (close sock))))
@@ -382,7 +356,7 @@
 		    (return-from read-http-request nil))
       
 	    (if* *ndebug* 
-	       then (format *debug-io* "got line of size ~d: " end)
+	       then (debug-format  5 "got line of size ~d: " end)
 		    (dotimes (i end) (write-char (schar buffer i) *debug-io*))
 		    (terpri *debug-io*) (force-output *debug-io*)
 		    )
@@ -399,7 +373,7 @@
 	    (multiple-value-bind (host newurl args)
 		(parse-url url)
 	      
-	      (setq req (make-instance 'xhttp-request
+	      (setq req (make-instance 'http-request
 			  :command cmd
 			  :url newurl
 			  :args args
@@ -415,7 +389,8 @@
 	    
 	    (if* (and (not (eq protocol :http/0.9))
 		      (null (read-request-headers req sock buffer)))
-	       then (return-from read-http-request nil))
+	       then (debug-format 5 "no headers, ignore~%")
+		    (return-from read-http-request nil))
 	    
 	    ;; let the handler do this
 	    #+ignore
@@ -441,12 +416,17 @@
 
 
 ;; determine the class of the request object for a give protocol
+#+ignore
 (defmethod http-request-class ((protocol (eql :http/0.9)))
   'http-request-0.9)
 
+
+#+ignore
 (defmethod http-request-class ((protocol (eql :http/1.0)))
   'http-request-1.0)
 
+
+#+ignore
 (defmethod http-request-class ((protocol (eql :http/1.1)))
   'http-request-1.1)
 
@@ -466,7 +446,7 @@
     
     
     
-
+#+ignore
 (defmethod read-entity-body ((req http-request-1.1) sock)
   ;; http/1.1 offers up the chunked transfer encoding
   ;; we can't handle that at present...
@@ -485,6 +465,7 @@
 	  
 	  
 			     
+#+ignore
 (defmethod read-entity-body ((req http-request-1.0) sock)
   ;; Read the message following the request header, if any.
   ;; Here's my heuristic
@@ -513,6 +494,8 @@
 	       else ; there is no body
 		    t))))
 
+
+#+ignore
 (defmethod read-entity-body ((req http-request-0.9) sock)
   ;; read up to end of file, that will be the body
   (let ((ans (make-array 2048 :element-type 'character
@@ -548,6 +531,16 @@
 		   then (decf start) ; back up to toss out return
 			)
 		(setf (schar buffer start) #\null) ; null terminate
+		
+		; debug output
+		(if* (>= *ndebug* 100)
+		   then ; dump out buffer
+			(format *debug-io* "d> read on socket: ")
+			(dotimes (i start)
+			  (write-char (schar buffer i) *debug-io*))
+			(terpri *debug-io*))
+		;; end debug
+			
 		(return-from read-sock-line (values buffer start))
 	   else ; store character
 		(if* (>= start max)
@@ -573,11 +566,15 @@
 		      
 				  
 				
-				
+
+
+#+ignore
 (defmethod make-response-stream ((req http-request-0.9))
   ;; use the actual stream
   (socket req))
 
+
+#+ignore
 (defmethod make-response-stream ((req http-request-1.0))
   ;; build a string output stream so we can
   ;; determine the response size
@@ -586,9 +583,12 @@
 ;; for http/1.1 we'll want to do chunking here
 
 
+#+ignore
 (defmethod post-process-request ((req http-request-0.9))
   nil)
 
+
+#+ignore
 (defmethod post-process-request ((req http-request-1.0))
   ;; put out headers and then the body that's been generated.
   (let ((ans (get-output-stream-string (response req))))

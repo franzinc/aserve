@@ -21,6 +21,12 @@
 		  :accessor last-modified
 		  :initform nil ; means always considered new
 		  )
+   (format :initarg :format  ;; :text or :binary
+	   :reader  entity-format)
+   
+   (content-type :initarg :content-type
+		 :reader content-type
+		 :initform nil)
    
    )
   )
@@ -28,7 +34,7 @@
 
 (defclass file-entity (entity)
     ;; a file to be published
-    ((mime-type :initarg :mime-type :reader mime-type)
+    (
      (file  :initarg :file :reader file)
      (contents :initarg :contents :reader contents
 	       :initform nil)
@@ -85,7 +91,7 @@
 ;  use :binary if you're not sure
 
 (defmethod transfer-mode ((ent entity))
-  :binary   ; the default
+  (or (entity-format ent) :binary)
   )
 
 
@@ -100,7 +106,8 @@
 
 ;; url exporting
 
-(defun publish (&key host port url function class)
+(defun publish (&key host port url function class format
+		     content-type)
   ;; publish the given url
   ;; if file is given then it specifies a file to return
   ;; 
@@ -108,12 +115,14 @@
 	       :host host
 	       :port port
 	       :url  url
-	       :function function)))
+	       :function function
+	       :format format
+	       :content-type content-type)))
     (setf (gethash url *exact-url*) ent))
   )
 	     
 
-(defun publish-file (&key host port url file mime-type class preload)
+(defun publish-file (&key host port url file content-type class preload)
   ;; return the given file as the value of the url
   ;; for the given host.
   ;; If host is nil then return for any host
@@ -136,15 +145,15 @@
 			    :port port
 			    :url  url
 			    :file file
-			    :mime-type mime-type
-			    :contents guts
+			    :content-type content-type
+			    :contents  guts
 			    :last-modified lastmod))))
        else (setq ent (make-instance (or class 'file-entity)
 			:host host
 			:port port
 			:url  url
 			:file file
-			:mime-type mime-type)))
+			:content-type content-type)))
   
     (setf (gethash url *exact-url*) ent)))
 
@@ -152,6 +161,7 @@
 
 
 
+#+ignore
 (defmethod handle-request ((req http-request-0.9))
   ;; do the server response to the given request
   
@@ -181,6 +191,8 @@
 
 
 
+
+#+ignore
 (defmethod failed-request ((req http-request-0.9))
   (with-http-response (*response-not-found* req "text/html")
     (html "The request for "
@@ -188,7 +200,7 @@
 	  " was not found on this server.")))
 
 
-(defmethod handle-request ((req xhttp-request))
+(defmethod handle-request ((req http-request))
   ;; do the server response to the given request
   
   ; look for an exact match
@@ -218,11 +230,12 @@
 				
 
 
-#+ignore
-(defmethod process-entity ((req http-request-0.9) (entity computed-entity))
+
+(defmethod process-entity ((req http-request) (entity computed-entity))
   ;; 
   (let ((fcn (entity-function entity)))
     (funcall fcn req entity)))
+
 
 #+ignore
 (defmethod process-entity ((req http-request-0.9) (entity file-entity))
@@ -267,9 +280,12 @@
 
 
 
-(defmacro with-http-response2 ((req ent
+(defmacro with-http-response ((req ent
 				&key (timeout 60)
-				     (check-modified t))
+				     (check-modified t)
+				     (response '*response-ok*)
+				     content-type
+				     )
 			       &rest body)
   ;;
   ;; setup to response to an http request
@@ -282,35 +298,40 @@
     `(let ((,g-req ,req)
 	   (,g-ent ,ent)
 	   (,g-timeout ,timeout)
-	   (,g-check-modified ,check-modified))
+	   (,g-check-modified ,check-modified)
+	   )
        (catch 'with-http-response
 	 (compute-strategy ,g-req ,g-ent)
-	 ;(keep-alive-check ,g-req ,g-ent)
 	 (up-to-date-check ,g-check-modified ,g-req ,g-ent)
 	 (mp::with-timeout ((if* (> ,g-timeout 0)
 			       then ,g-timeout
 			       else 9999999)
 			    (timedout-response ,g-req ,g-ent))
+	   ,(if* response
+	       then `(setf (resp-code ,g-req) ,response))
+	   ,(if* content-type
+	       then `(setf (resp-content-type ,g-req) ,content-type)
+	       else `(setf (resp-content-type ,g-req) (content-type ,g-ent)))
 	   ,@body
 	   )))))
 
 
 (defmacro with-http-body ((req ent &key format)
 			  &rest body)
-    (let ((g-req (gensym))
+  (let ((g-req (gensym))
 	(g-ent (gensym))
-	  (g-format (gensym)))
-      `(let ((,g-req ,req)
-	     (,g-ent ,ent)
-	     (,g-format ,format))
-	 (declare (ignore-if-unused ,g-req ,g-ent ,g-format))
-	 ; (compute-response-headers ,g-req ,g-ent)
-	 ,(if* body 
-	     then `(compute-response-stream ,g-req ,g-ent))
-	 (send-response-headers ,g-req ,g-ent :pre)
-	 (if* (not (member :omit-body (resp-strategy ,g-req)))
-	    then (progn ,@body))
-	 (send-response-headers ,g-req ,g-ent :post))))
+	(g-format (gensym)))
+    `(let ((,g-req ,req)
+	   (,g-ent ,ent)
+	   (,g-format ,format))
+       (declare (ignore-if-unused ,g-req ,g-ent ,g-format))
+       ,(if* body 
+	   then `(compute-response-stream ,g-req ,g-ent))
+       (send-response-headers ,g-req ,g-ent :pre)
+       (if* (not (member :omit-body (resp-strategy ,g-req)))
+	  then (let ((htmlgen:*html-stream* (resp-stream ,g-req)))
+		 (progn ,@body)))
+       (send-response-headers ,g-req ,g-ent :post))))
 			  
 	 
 	       
@@ -318,7 +339,7 @@
        
        
   
-(defmethod process-entity ((req xhttp-request) (ent file-entity))
+(defmethod process-entity ((req http-request) (ent file-entity))
     
   (let ((contents (contents ent)))
     (if* contents
@@ -328,10 +349,9 @@
 	      
 	    ; * should check for range here
 	    ; for now we'll send it all
-	    (with-http-response2 (req ent)
-	      (setf (resp-code req) *response-ok*)
+	    (with-http-response (req ent
+				     :content-type (content-type ent))
 	      (setf (resp-content-length req) (length contents))
-	      (setf (resp-content-type req) (mime-type ent))
 	      (push (cons "Last-Modified"
 			  (universal-time-to-date 
 			   (min (resp-date req) 
@@ -353,7 +373,7 @@
 					:direction :input
 					:element-type '(unsigned-byte 8)))))
 		 then ; file not readable
-		      (with-http-response2 (req ent)
+		      (with-http-response (req ent)
 			(setf (resp-code req) *response-not-found*)
 			(with-http-body (req ent)))
 		      (return-from process-entity nil))
@@ -368,7 +388,7 @@
 		      (declare (dynamic-extent buffer))
 		      
 		      (setf (last-modified ent) lastmod)
-		      (with-http-response2 (req ent)
+		      (with-http-response (req ent)
 
 			(setf (resp-code req) *response-ok*)
 			(setf (resp-content-length req) size)
@@ -420,6 +440,7 @@
 		      (<= (last-modified ent) if-modified-since))
 	       then ; send back a message that it is already
 		    ; up to date
+		    (debug-format 10 "entity is up to date~%")
 		    (setf (resp-code req) *response-not-modified*)
 		    (with-http-body (req ent)
 		      ;; force out the header
@@ -471,7 +492,7 @@
 
 
 
-(defmethod compute-strategy ((req xhttp-request) (ent entity))
+(defmethod compute-strategy ((req http-request) (ent entity))
   ;; determine how we'll respond to this request
   
   (let ((strategy nil))
@@ -511,27 +532,56 @@
 			      '(:string-output-stream
 				:keep-alive
 				:post-headers)))
-		    
-		    ; keep alive not requested
+	       else ; keep alive not requested
 		    (setq strategy '(:use-socket-stream
 				     ))))
     
     ;;  save it
-    
+
+    (debug-format 10 "strategy is ~s~%" strategy)
     (setf (resp-strategy req) strategy)
     
     ))
 			     
 		    
-		    
+(defmethod compute-strategy ((req http-request) (ent file-entity))
+  ;; for files we can always use the socket stream and keep alive
+  ;; since we konw the file length ahead of time
+  
+  (let ((keep-alive (and *enable-keep-alive*
+		      (equalp "keep-alive" 
+			      (header-slot-value "connection" req))))
+	(strategy))
+    
+    (if*  (eq (command req) :get)
+       then (setq strategy (if* keep-alive
+	       then '(:use-socket-stream :keep-alive)
+			      else '(:use-socket-stream)))
+       else (setq strategy (call-next-method)))
+    
+    (debug-format 10 "file strategy is ~s~%" strategy)
+    (setf (resp-strategy req) strategy)))
+
+	    
+	    
+  
 		    
 		    
     
     
 	    
 
-(defmethod send-response-headers ((req xhttp-request) (ent entity) time)
-  ;; we have all the info to send out the headers of our response
+(defmethod send-response-headers ((req http-request) (ent entity) time)
+  ;;
+  ;; called twice (from with-http-body) in the generation of a response 
+  ;; to an http request
+  ;; 1. before the body forms are run.  in this case time eq :pre
+  ;; 2. after the body forms are run.  in this case  time eq :post
+  ;;
+  ;; we send the headers out at the time appropriate to the 
+  ;; strategy.  We also deal with a body written to a
+  ;; string output stream
+  ;;
     
   (mp:with-timeout (60 (logmess "timeout during header send")
 		       (setf (resp-keep-alive req) nil)
@@ -551,7 +601,7 @@
       
       (if* send-headers
 	 then (let ((code (resp-code req)))
-		(format sock "~a ~d  ~a~a"
+		(dformat sock "~a ~d  ~a~a"
 			(protocol-string req)
 			(response-number code)
 			(response-desc   code)
@@ -568,49 +618,49 @@
       (if* (and send-headers
 		(not (eq (protocol req) :http/0.9)))
 	 then ; can put out headers
-	      (format sock "Date: ~a~a" 
+	      (dformat sock "Date: ~a~a" 
 		      (universal-time-to-date (resp-date req))
 		      *crlf*)
 
 	      (if* (member :keep-alive strategy :test #'eq)
-		 then (format sock "Connection: Keep-Alive~aKeep-Alive: timeout=~d~a"
+		 then (dformat sock "Connection: Keep-Alive~aKeep-Alive: timeout=~d~a"
 			      *crlf*
 			      *read-request-timeout*
 			      *crlf*)
-		 else (format sock "Connection: Close~a" *crlf*))
+		 else (dformat sock "Connection: Close~a" *crlf*))
       
-	      (format sock "Server: neo/0.1~a" *crlf*)
+	      (dformat sock "Server: neo/0.1~a" *crlf*)
       
 	      (if* (resp-content-type req)
-		 then (format sock "Content-Type: ~a~a" 
+		 then (dformat sock "Content-Type: ~a~a" 
 			      (resp-content-type req)
 			      *crlf*))
 
 	      (if* (member :chunked strategy :test #'eq)
-		 then (format sock "Transfer-Encoding: Chunked~a"
+		 then (dformat sock "Transfer-Encoding: Chunked~a"
 			      *crlf*)
 		      (setq chunked-p t))
 	      
 	      (if* (and (not chunked-p)
 			(resp-content-length req))
-		 then (format sock "Content-Length: ~d~a"
+		 then (dformat sock "Content-Length: ~d~a"
 			      (resp-content-length req)      
 			      *crlf*))
 	      
 	      (dolist (head (resp-headers req))
-		(format sock "~a: ~a~a"
+		(dformat sock "~a: ~a~a"
 			(car head)
 			(cdr head)
 			*crlf*))
-	      (write-string *crlf* sock))
+	      (dformat sock "~a" *crlf*))
       
-      (if* (and send-headers chunk-p)
-	      (if* (eq time :pre))
-	 then (force-output sock)
-	      (socket:socket-control sock :output-chunking t)
-	 else ; shut down chunking
-	      (socket:socket-control sock :output-chunking-eof t)
-	      (write-sequence *crlf* sock))
+      (if* (and send-headers chunked-p)
+	 then (if* (eq time :pre)
+		 then (force-output sock)
+		      (socket:socket-control sock :output-chunking t)
+		 else ; shut down chunking
+		      (socket:socket-control sock :output-chunking-eof t)
+		      (write-sequence *crlf* sock)))
       
       
       ; if we did post-headers then there's a string input
@@ -620,16 +670,20 @@
 
       	
       
-(defmethod compute-response-stream ((req xhttp-request) (ent file-entity))
+(defmethod compute-response-stream ((req http-request) (ent file-entity))
   ;; send directly to the socket since we already know the length
-  ;; may have to switch to chunking however.
   ;;
-  (let ((sock (socket req)))
-    (if* (eq :chunked (resp-transfer-encoding req))
-       then (force-output sock)
-	    (socket:socket-control sock :output-chunking t))
-    (setf (resp-stream req) sock)))
+  (setf (resp-stream req) (socket req)))
 
+(defmethod compute-response-stream ((req http-request) (ent computed-entity))
+  ;; may have to build a string-output-stream
+  (if* (member :string-output-stream (resp-strategy req) :test #'eq)
+     then (setf (resp-stream req) (make-string-output-stream))
+     else (setf (resp-stream req) (socket req))))
+
+
+
+#+ignore
 (defmethod finish-response-stream ((req xhttp-request) (ent file-entity))
   ;; we've finished the body.
   (let ((sock (socket req)))
