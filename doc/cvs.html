@@ -1,0 +1,144 @@
+<html>
+
+<head>
+<title>cvs</title>
+<meta name="GENERATOR" content="Microsoft FrontPage 3.0">
+</head>
+
+<body>
+
+<p><strong>Cvs </strong>allows you to automatically merge in the changes we make to
+Allegro aserve to a copy of the source you may have modified.&nbsp;&nbsp; This is much
+easier and less error prone than trying to see what we've changed by comparing source
+distributions and then merging in the changes yourself.&nbsp;&nbsp; A copy of the <strong>cvs</strong>
+document in <strong>pdf</strong> format is <a href="ftp://ftp.franz.com/pub/misc/cvs.pdf">here</a>.&nbsp;
+On our server we are using 1.10.7 of <strong>cvs</strong>, so you'll want to make sure
+your <strong>cvs</strong> client is compatible with that version.</p>
+
+<p>To access our repository via <strong>cvs</strong> here are the parameters you'll need:</p>
+
+<table border="0" width="58%" style="border: medium none" bgcolor="#FFFF00">
+  <tr>
+    <td width="22%"><strong>CVSROOT</strong></td>
+    <td width="87%"><font face="Courier New">:pserver:cvspublic@cvspublic.franz.com:/cvs-public</font></td>
+  </tr>
+  <tr>
+    <td width="22%"><strong>password</strong></td>
+    <td width="87%"><font face="Courier New">cvspublic</font></td>
+  </tr>
+</table>
+
+<p>If you use the <strong>-d</strong> parameter as shown below you won't need to set the <strong>CVSROOT</strong>
+environment variable.&nbsp; </p>
+
+<p>Here is a sample session where you check out aserve for the first time. &nbsp;&nbsp;
+First you have to save the password for the account on your machine, and you do that using
+the <strong>cvs login</strong> command:</p>
+
+<pre>% <strong>cvs -d :pserver:cvspublic@cvspublic.franz.com:/cvs-public login</strong>
+(Logging in to cvspublic@cvspublic.franz.com)
+CVS password: <strong>cvspublic</strong>
+</pre>
+
+<p>Next you check out the source code:</p>
+
+<pre>
+% <strong>cvs -d :pserver:cvspublic@cvspublic.franz.com:/cvs-public checkout aserve</strong>
+cvs server: Updating aserve
+U aserve/ChangeLog
+U aserve/authorize.cl
+U aserve/client.cl
+U aserve/decode.cl
+U aserve/license-lgpl.txt
+U aserve/load.cl
+U aserve/loadonly.cl
+U aserve/log.cl
+U aserve/macs.cl
+U aserve/main.cl
+U aserve/parse.cl
+U aserve/publish.cl
+U aserve/readme.txt
+U aserve/source-readme.txt
+cvs server: Updating aserve/doc
+U aserve/doc/aserve.html
+U aserve/doc/notes-neo.n
+U aserve/doc/rfc2396.txt
+U aserve/doc/tutorial.html
+cvs server: Updating aserve/examples
+U aserve/examples/examples.cl
+U aserve/examples/foo.txt
+U aserve/examples/fresh.jpg
+U aserve/examples/aservelogo.gif
+U aserve/examples/prfile9.jpg
+U aserve/examples/tutorial.cl
+cvs server: Updating aserve/htmlgen
+U aserve/htmlgen/htmlgen.cl
+U aserve/htmlgen/htmlgen.html
+U aserve/htmlgen/test.cl
+%
+
+</pre>
+
+<p>Now you can read <font face="Courier New">aserve/source-readme.txt</font> and learn how
+to build aserve.&nbsp;&nbsp; </p>
+
+<p>To see how <strong>cvs</strong> can help you, suppose you edit <font face="Courier New">aserve/examples/examples.cl</font>
+and add a new page to be published.&nbsp; You can ask <strong>cvs</strong> to tell you
+what you've changed since you last retrieved the source from our repository:&nbsp; </p>
+
+<pre>% <strong>cd aserve</strong>
+
+% <strong>cvs diff</strong>
+cvs server: Diffing .
+cvs server: Diffing doc
+cvs server: Diffing examples
+Index: examples/examples.cl
+===================================================================
+RCS file: /cvs-public/aserve/examples/examples.cl,v
+retrieving revision 1.2
+diff -r1.2 examples.cl
+369a370,378
+&gt;
+&gt; (publish :path &quot;/hiworld&quot;
+&gt; :     content-type &quot;text/html&quot;
+&gt;      :function
+&gt;      #'(lambda (req ent)
+&gt;              (with-http-response (req ent)
+&gt;                 (with-http-body (req ent)
+&gt;                  &quot;hi world&quot;))))
+&gt;
+cvs server: Diffing htmlgen
+%
+
+</pre>
+
+<p>You would now like to retrieve the latest version of the source from our repository and
+merge our changes into your changes.&nbsp;&nbsp; This is done with one command: executed
+from the aserve directory created in the <strong>cvs checkout</strong> command:</p>
+
+<pre>% <strong>cvs update -d</strong>
+cvs server: Updating .
+P client.cl
+cvs server: Updating doc
+cvs server: Updating examples
+M examples/examples.cl
+cvs server: Updating htmlgen
+%</pre>
+
+<p>The response from the command is terse.&nbsp; In this case the <strong>P </strong>before
+<font face="Courier New">client.cl</font> says that there were changes to that file in the
+repository that have now been patched into your copy of the source.&nbsp; The <strong>M</strong>
+before <font face="Courier New">examples/examples.cl</font> says that you have local
+modifications to this file.&nbsp; If you see a file name preceded by <strong>U </strong>(as
+they were in the <strong>cvs update</strong> command earlier), it means that this a new
+file that was downloaded in full.&nbsp; What you must look for is the response <strong>C</strong>
+which said that the updating process found conflicts that it couldn't resolve because both
+we and you modified the same lines in the file.&nbsp;&nbsp; In this case you must edit the
+file and look for the lines surrounded by &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;,
+========= and &gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt; and remove the markers and resolve
+the conflict</p>
+
+<p>We've just mentioned a few of the features of <strong>cvs,</strong> you are advised to
+read the<strong> cvs</strong> manual to get the maximum benefit from it<strong>.</strong></p>
+</body>
+</html>
