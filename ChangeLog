@@ -1,3 +1,24 @@
+2000-04-16    <jkf@DEEDEE>
+
+	* htmlgen/htmlgen.cl - when printing option values inside
+	  a tag, a symbol is now printed as the string
+	  that is its symbol-name
+
+	* debug-on and debug-off are no longer exported symbols.
+	  They continue to exist but you have to use
+          net.iserve::debug-on and net.iserve::debug-off to reach them.
+
+	* added two new response type symbols to aid in doing redirections:
+	    *response-moved-permanently*
+	    *response-temporary-redirect*
+	  note that netscape 4 doesn't understand *response-temporary-redirect*
+          as that's a http/1.1 thing.
+	
+	* request-query takes a :handle-post keyword arguments.  When true
+	  (and that's the default) it will automatically read,
+	  extract, parse and cache the query string from the entity body
+	  when the request is a post request.
+	  
 2000-03-28  John Foderaro  <jkf@tiger.franz.com>
 
 	* move htmlgen.html from htmlgen/ to doc/ so that it's in

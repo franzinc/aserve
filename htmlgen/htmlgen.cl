@@ -23,7 +23,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.4 2000/04/09 04:34:27 jkf Exp $
+;; $Id: htmlgen.cl,v 1.5 2000/04/16 12:35:20 jkf Exp $
 
 ;; Description:
 ;;   html generator
@@ -231,7 +231,10 @@
 (defun prin1-safe-http-string (val)
   ;; print the contents inside a string double quotes (which should
   ;; not be turned into &quot;'s
-  (if* (stringp val)
+  ;; symbols are turned into their name
+  (if* (or (stringp val)
+	   (and (symbolp val) 
+		(setq val (symbol-name val))))
      then (write-char #\" *html-stream*)
 	  (emit-safe *html-stream* val)
 	  (write-char #\" *html-stream*)

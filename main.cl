@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.31 2000/04/09 04:09:43 jkf Exp $
+;; $Id: main.cl,v 1.32 2000/04/16 12:35:20 jkf Exp $
 
 ;; Description:
 ;;   iserve's main loop
@@ -41,8 +41,9 @@
    #:base64-encode
    #:compute-strategy
    #:computed-entity
-   #:debug-off			;; to be documented
-   #:debug-on			;; to be documented
+   ;; don't export, these should be private
+   ; #:debug-off			;; to be documented
+   ; #:debug-on			;; to be documented
    #:decode-form-urlencoded
    #:denied-request
    #:failed-request
@@ -112,6 +113,8 @@
    #:*response-accepted*
    #:*response-not-modified*
    #:*response-bad-request*
+   #:*response-moved-permanently*
+   #:*response-temporary-redirect*
    #:*response-unauthorized*
    #:*response-not-found*
    #:*response-internal-server-error*
@@ -635,7 +638,10 @@
 (defparameter *response-created* (make-resp 201 "Created"))
 (defparameter *response-accepted* (make-resp 202 "Accepted"))
 
+(defparameter *response-moved-permanently* (make-resp 301 "Moved Permanently"))
 (defparameter *response-not-modified* (make-resp 304 "Not Modified"))
+(defparameter *response-temporary-redirect* 
+    (make-resp 307 "Temporary Redirect"))
 (defparameter *response-bad-request* (make-resp 400 "Bad Request"))
 (defparameter *response-unauthorized* (make-resp 401 "Unauthorized"))
 (defparameter *response-not-found* (make-resp 404 "Not Found"))
@@ -997,7 +1003,10 @@
 			(if* (null (uri-host uri))
 			   then (setf (uri-host uri) host)
 				(if* port
-				   then (setf (uri-port uri) port)))))))
+				   then (setf (uri-port uri) port)))
+			
+			(setf (uri-scheme uri) :http)  ; always http
+			))))
 	  
 	    
 	  req  ; return req object
@@ -1509,17 +1518,26 @@
       
 		      
 				  
-(defmethod request-query ((req http-request))
+(defmethod request-query ((req http-request) &key (handle-post t))
   ;; decode if necessary and return the alist holding the
   ;; args to this url.  In the alist items the value is the 
   ;; cdr of the alist item.
+  ;;
+  ;; If there is no query string and this is a post method then
+  ;; the body of will be grabbed and turned into a query alist.
+  ;; If :handle-post is nil then, this automatic process won't be done
+  ;;
   (let ((alist (request-query-alist req)))
     (if* (not (eq alist :empty))
        then alist
        else (let ((arg (uri-query (request-uri req))))
 	      (if* arg
 		 then (setf (request-query-alist req)
-			(decode-form-urlencoded arg)))))))
+			(decode-form-urlencoded arg))
+	       elseif (and handle-post (eq (request-method req) :post))
+		 then (setf (request-query-alist req)
+			(decode-form-urlencoded 
+			 (get-request-body req))))))))
 
 
 
