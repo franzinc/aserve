@@ -1,4 +1,4 @@
-;; -*- mode: common-lisp; package: net.iserve -*-
+;; -*- mode: common-lisp; package: net.aserve -*-
 ;;
 ;; log.cl
 ;;
@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: log.cl,v 1.7 2000/03/20 17:25:32 jkf Exp $
+;; $Id: log.cl,v 1.8 2000/04/17 21:34:25 jkf Exp $
 
 ;; Description:
 ;;   iserve's logging
@@ -31,7 +31,7 @@
 ;;- http://www.franz.com/~jkf/coding_standards.html
 ;;-
 
-(in-package :net.iserve)
+(in-package :net.aserve)
 
 
 (defun logmess (message)

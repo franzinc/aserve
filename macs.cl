@@ -1,4 +1,4 @@
-;; -*- mode: common-lisp; package: net.iserve -*-
+;; -*- mode: common-lisp; package: net.aserve -*-
 ;;
 ;; macs.cl
 ;;
@@ -23,7 +23,7 @@
 ;;
 
 ;;
-;; $Id: macs.cl,v 1.7 2000/03/20 17:25:32 jkf Exp $
+;; $Id: macs.cl,v 1.8 2000/04/17 21:34:25 jkf Exp $
 
 ;; Description:
 ;;   useful internal macros
@@ -36,10 +36,10 @@
  (require :uri))
 
 ;; macros used by iserve
-(defpackage :net.iserve
+(defpackage :net.aserve
   (:use :common-lisp :excl :net.html.generator :net.uri))
 
-(in-package :net.iserve)
+(in-package :net.aserve)
 
 
 

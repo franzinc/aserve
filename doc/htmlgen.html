@@ -48,7 +48,7 @@ discussion below of the syntax of the <strong>html</strong> macro.</p>
 <pre>(html (:html
           (:head (:title &quot;My Document&quot;))
           (:body (:h1 &quot;My Document&quot;)
-            &quot;Hello iServe, the time is &quot;
+            &quot;Hello AllegroServe, the time is &quot;
             (:prin1 (get-universal-time))
 
             (incf *my-counter*) ; evaluated but not printed
@@ -61,7 +61,7 @@ discussion below of the syntax of the <strong>html</strong> macro.</p>
 example, the generated page is surrounded by <strong>&lt;html&gt;</strong> and <strong>&lt;/html&gt;</strong>
 due to the <strong>:html</strong> form.&nbsp;&nbsp;&nbsp; The page contains a header and a
 body surrounded by their respective html markers.&nbsp; The body of the document contains
-a level 1 header followed by the text beginning &quot;Hello, iServe&quot;. &nbsp;&nbsp;
+a level 1 header followed by the text beginning &quot;Hello, AllegroServe&quot;. &nbsp;&nbsp;
 Following that is printed the universal time at the time that the page is generated (i.e
 now rather than when the macro was first processed by lisp). &nbsp;&nbsp; The following <strong>incf</strong>
 expression is evaluated but the result is not printed.&nbsp;&nbsp; In this case we're

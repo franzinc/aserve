@@ -1,4 +1,4 @@
-;; -*- mode: common-lisp; package: net.iserve.client -*-
+;; -*- mode: common-lisp; package: net.aserve.client -*-
 ;;
 ;; client.cl
 ;;
@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.12 2000/04/09 04:34:27 jkf Exp $
+;; $Id: client.cl,v 1.13 2000/04/17 21:34:24 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -33,13 +33,13 @@
 
 
 ;; this will evolve into the http client code but for now it's
-;; just some simple stuff to allow us to test iserve
+;; just some simple stuff to allow us to test aserve
 ;;
 
 
 
-(defpackage :net.iserve.client 
-  (:use :net.iserve :excl :common-lisp)
+(defpackage :net.aserve.client 
+  (:use :net.aserve :excl :common-lisp)
   (:export 
    #:client-request  ; class
    #:client-request-close
@@ -66,7 +66,7 @@
 
 
 
-(in-package :net.iserve.client)
+(in-package :net.aserve.client)
 
 
 
@@ -326,7 +326,7 @@
 					 (or (net.uri:uri-port uri) 80))
 			  :format :bivalent))
     
-    (net.iserve::format-dif :xmit sock "~a ~a ~a~a"
+    (net.aserve::format-dif :xmit sock "~a ~a ~a~a"
 	    (string-upcase (string method))
 	    (uri-path-etc uri)
 	    (string-upcase (string protocol))
@@ -335,16 +335,16 @@
     ; always send a Host header, required for http/1.1 and a good idea
     ; for http/1.0
     (if* (not (eql 80 port))
-       then (net.iserve::format-dif :xmit sock "Host: ~a:~a~a" host port crlf)
-       else (net.iserve::format-dif :xmit  sock "Host: ~a~a" host crlf))
+       then (net.aserve::format-dif :xmit sock "Host: ~a:~a~a" host port crlf)
+       else (net.aserve::format-dif :xmit  sock "Host: ~a~a" host crlf))
     
     ; now the headers
     (if* keep-alive
-       then (net.iserve::format-dif :xmit
+       then (net.aserve::format-dif :xmit
 				    sock "Connection: Keep-Alive~a" crlf))
 
     (if* accept
-       then (net.iserve::format-dif :xmit
+       then (net.aserve::format-dif :xmit
 				    sock "Accept: ~a~a" accept crlf))
     
     (if* content
@@ -356,7 +356,7 @@
 	    (setq content-length (length content)))
     
     (if* content-length
-       then (net.iserve::format-dif :xmit
+       then (net.aserve::format-dif :xmit
 				    sock "Content-Length: ~s~a" content-length crlf))
     
 	    
@@ -364,11 +364,11 @@
        then (let ((str (compute-cookie-string uri
 					      cookies)))
 	      (if* str
-		 then (net.iserve::format-dif :xmit
+		 then (net.aserve::format-dif :xmit
 					      sock "Cookie: ~a~a" str crlf))))
 
     (if* basic-authorization
-       then (net.iserve::format-dif :xmit sock "Authorization: Basic ~a~a"
+       then (net.aserve::format-dif :xmit sock "Authorization: Basic ~a~a"
 		    (base64-encode
 		     (format nil "~a:~a" 
 			     (car basic-authorization)
@@ -378,19 +378,19 @@
     (if* user-agent
        then (if* (stringp user-agent)
 	       thenret
-	     elseif (eq :iserve user-agent)
-	       then (setq user-agent net.iserve::*iserve-version-string*)
+	     elseif (eq :aserve user-agent)
+	       then (setq user-agent net.aserve::*aserve-version-string*)
 	     elseif (eq :netscape user-agent)
 	       then (setq user-agent "Mozilla/4.7 [en] (WinNT; U)")
 	     elseif (eq :ie user-agent)
 	       then (setq user-agent "Mozilla/4.0 (compatible; MSIE 5.01; Windows NT 5.0)")
 	       else (error "Illegal user-agent value: ~s" user-agent))
-	    (net.iserve::format-dif :xmit
+	    (net.aserve::format-dif :xmit
 				    sock "User-Agent: ~a~a" user-agent crlf))
     
     (if* headers
        then (dolist (header headers)
-	      (net.iserve::format-dif :xmit sock "~a: ~a~a" 
+	      (net.aserve::format-dif :xmit sock "~a: ~a~a" 
 				      (car header) (cdr header) crlf)))
     
 
@@ -650,7 +650,7 @@
   ;; parse it too if requested
   (let ((val (cdr (assoc name (client-request-headers creq) :test #'equal))))
     (if* (and parse val)
-       then (net.iserve::parse-header-value val)
+       then (net.aserve::parse-header-value val)
        else val)))
 
     
@@ -745,7 +745,7 @@
   ;; a set-cookie header with cookie as the value 
   ;; jar is the cookie jar into which we want to store the cookie
   
-  (let* ((pval (car (net.iserve::parse-header-value cookie t)))
+  (let* ((pval (car (net.aserve::parse-header-value cookie t)))
 	 namevalue
 	 others
 	 path
@@ -761,25 +761,25 @@
 	    (return-from save-cookie nil))
     
     ;; namevalue has the form name=value
-    (setq namevalue (net.iserve::split-on-character namevalue #\=))
+    (setq namevalue (net.aserve::split-on-character namevalue #\=))
     
     ;; compute path
-    (setq path (cdr (net.iserve::assoc-paramval "path" others)))
+    (setq path (cdr (net.aserve::assoc-paramval "path" others)))
     (if* (null path)
        then (setq path (or (net.uri:uri-path uri) "/"))
        else ; make sure it's a prefix
-	    (if* (not (net.iserve::match-head-p 
+	    (if* (not (net.aserve::match-head-p 
 		       path (or (net.uri:uri-path uri) "/")))
 	       then ; not a prefix, don't save
 		    (return-from save-cookie nil)))
     
     ;; compute domain
-    (setq domain (cdr (net.iserve::assoc-paramval "domain" others)))
+    (setq domain (cdr (net.aserve::assoc-paramval "domain" others)))
     
     (if* domain
        then ; one is given, test to see if it's a substring
 	    ; of the host we used
-	    (if* (null (net.iserve::match-tail-p domain 
+	    (if* (null (net.aserve::match-tail-p domain 
 						 (net.uri:uri-host uri)))
 	       then (return-from save-cookie nil))
        else (setq domain (net.uri:uri-host uri)))
@@ -789,8 +789,8 @@
 		 :path path
 		 :name  (car namevalue)
 		 :value (or (cadr namevalue) "")
-		 :secure (net.iserve::assoc-paramval "secure" others)
-		 :expires (cdr (net.iserve::assoc-paramval "expires" others))
+		 :secure (net.aserve::assoc-paramval "secure" others)
+		 :expires (cdr (net.aserve::assoc-paramval "expires" others))
 		 )))
       ; now put in the cookie jar
       (let ((domain-vals (assoc domain (cookie-jar-items jar) :test #'equal)))
@@ -848,11 +848,11 @@
 	rres)
     
     (dolist (hostval (cookie-jar-items jar))
-      (if* (net.iserve::match-tail-p (car hostval)
+      (if* (net.aserve::match-tail-p (car hostval)
 				     host)
 	 then ; ok for this host
 	      (dolist (item (cdr hostval))
-		(if* (net.iserve::match-head-p (cookie-item-path item)
+		(if* (net.aserve::match-head-p (cookie-item-path item)
 					       path)
 		   then ; this one matches
 			(push item res)))))

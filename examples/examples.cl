@@ -1,4 +1,4 @@
-;; -*- mode: common-lisp; package: net.iserve.examples -*-
+;; -*- mode: common-lisp; package: net.aserve.examples -*-
 ;;
 ;; examples.cl
 ;;
@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.4 2000/03/27 22:47:22 jkf Exp $
+;; $Id: examples.cl,v 1.5 2000/04/17 21:34:28 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -34,10 +34,10 @@
 
 
 ;; examples of web pages
-(defpackage :net.iserve.examples ;; iserve example
-  (:use :common-lisp :excl :net.html.generator :net.iserve))
+(defpackage :net.aserve.examples ;; aserve example
+  (:use :common-lisp :excl :net.html.generator :net.aserve))
 
-(in-package :net.iserve.examples)
+(in-package :net.aserve.examples)
 
 ;; flush all publishing done so far:
 (unpublish :all t)
@@ -57,11 +57,11 @@
 	     (with-http-response (req ent)
 	       (with-http-body (req ent)
 		 (html
-		  (:head (:title "Welcome to Allegro iServe"))
+		  (:head (:title "Welcome to AllegroServe"))
 		  (:body 
-		   (:center ((:img :src "iservelogo.gif")))
-		   (:h1 "Welcome to Allegro iServe")
-		   (:p "These links show off some of iServe's capabilities. ")
+		   (:center ((:img :src "aservelogo.gif")))
+		   (:h1 "Welcome to AllegroServe")
+		   (:p "These links show off some of AllegroServe's capabilities. ")
 		   (:i "This server's host name is "
 		    (:princ-safe (header-slot-value req "host")))
 		   :p
@@ -161,7 +161,7 @@
 
 
 
-(publish-file :path "/iservelogo.gif" :file (example-file "iservelogo.gif")
+(publish-file :path "/aservelogo.gif" :file (example-file "aservelogo.gif")
 	      :content-type "image/gif")
 
 ;; this is a demonstration of how you can return a jpeg 
@@ -244,7 +244,7 @@
        (with-http-response (req ent)
 	 (with-http-body (req ent)
 	   (html (:head (:title "Allegro Apropos"))
-		 ((:body :background "iserveweb/fresh.jpg")
+		 ((:body :background "aserveweb/fresh.jpg")
 		  "New Apropos of "
 		  ((:form :action "apropos"
 			  :method "get")
@@ -293,7 +293,7 @@
 
 
 ;; a preloaded picture file
-(publish-file :path "/iserveweb/fresh.jpg"
+(publish-file :path "/aserveweb/fresh.jpg"
 	      :file (example-file "fresh.jpg")
 	      :content-type "image/jpeg"
 	      :preload t)
@@ -506,7 +506,7 @@
 				  :expires :never)
 	       (set-cookie-header req
 				  :name "the time"
-				  :value (net.iserve::universal-time-to-date
+				  :value (net.aserve::universal-time-to-date
 					  (get-universal-time))
 				  :path "/cookieverify"
 				  :expires (+ (get-universal-time)

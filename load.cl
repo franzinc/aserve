@@ -1,12 +1,12 @@
-;; load in iServe
+;; load in aserve
 ;;
-;; $Id: load.cl,v 1.27 2000/04/17 20:05:10 jkf Exp $
+;; $Id: load.cl,v 1.28 2000/04/17 21:34:24 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
-(defparameter *iserve-root* (directory-namestring *load-truename*))
+(defparameter *aserve-root* (directory-namestring *load-truename*))
 
-(defparameter *iserve-files* 
+(defparameter *aserve-files* 
     '("htmlgen/htmlgen"
       "macs"
       "main"
@@ -18,8 +18,8 @@
       "client"
       ))
 
-(defparameter *iserve-other-files*
-    ;; other files that make up the iserve dist
+(defparameter *aserve-other-files*
+    ;; other files that make up the aserve dist
     '("readme.txt"
       "source-readme.txt"
       "ChangeLog"
@@ -30,21 +30,21 @@
       "examples/fresh.jpg"
       "examples/prfile9.jpg"
       "examples/tutorial.cl"
-      "examples/iservelogo.gif"
+      "examples/aservelogo.gif"
       "load.cl"
-      "test/t-iserve.cl"
-      "doc/iserve.html"
+      "test/t-aserve.cl"
+      "doc/aserve.html"
       "doc/tutorial.html"
       "doc/htmlgen.html"
       ))
 
-(defparameter *iserve-examples*
+(defparameter *aserve-examples*
     '("examples/examples"
       ))
 
 
 (with-compilation-unit  nil
-  (dolist (file (append *iserve-files* *iserve-examples*))
+  (dolist (file (append *aserve-files* *aserve-examples*))
     (case *loadswitch*
       (:compile-if-needed (compile-file-if-needed 
 			   (merge-pathnames (format nil "~a.cl" file)
@@ -61,22 +61,22 @@
 
 ;; after running this function you'll have a lisp binary
 ;; with the webserver loaded.
-;; you can cd to iserveserver and start with
-;;   nohup ./iserverserver -f ../examples/examples.fasl >& errs &
-;; and it will run the server in the background, serving the iserve
+;; you can cd to aserveserver and start with
+;;   nohup ./aserverserver -f ../examples/examples.fasl >& errs &
+;; and it will run the server in the background, serving the aserve
 ;; examples.
 ;;
 (defun makeapp ()
-  (run-shell-command "rm -fr iserveserver")
-  (make-iserve.fasl)
+  (run-shell-command "rm -fr aserveserver")
+  (make-aserve.fasl)
   (generate-application
-   "iserveserver"
-   "iserveserver/"
+   "aserveserver"
+   "aserveserver/"
    '(:sock :process :defftype :foreign 
-     :ffcompat "iserve.fasl")
+     :ffcompat "aserve.fasl")
    ; strange use of find-symbol below so this form can be read without
-   ; the net.iserve package existing
-   :restart-init-function (find-symbol (symbol-name :start-cmd) :net.iserve)
+   ; the net.aserve package existing
+   :restart-init-function (find-symbol (symbol-name :start-cmd) :net.aserve)
    :application-administration '(:resource-command-line
 				 ;; Quiet startup:
 				 "-Q")
@@ -98,22 +98,22 @@
 
 
 (defun make-distribution ()
-  ;; make a distributable version of iserve
+  ;; make a distributable version of aserve
   (run-shell-command 
-   (format nil "rm -fr ~aiserve-dist" *iserve-root*))
+   (format nil "rm -fr ~aaserve-dist" *aserve-root*))
    
   (run-shell-command 
-   (format nil "mkdir ~aiserve-dist ~aiserve-dist/doc ~aiserve-dist/examples ~aiserve-dist/test"
-	   *iserve-root*
-	   *iserve-root*
-	   *iserve-root*
-	   *iserve-root*
+   (format nil "mkdir ~aaserve-dist ~aaserve-dist/doc ~aaserve-dist/examples ~aaserve-dist/test"
+	   *aserve-root*
+	   *aserve-root*
+	   *aserve-root*
+	   *aserve-root*
 	   ))
    
-  (copy-files-to *iserve-files* "iserve.fasl" :root *iserve-root*)
+  (copy-files-to *aserve-files* "aserve.fasl" :root *aserve-root*)
   
-  (dolist (file '("iserve.fasl"
-		  "doc/iserve.html"
+  (dolist (file '("aserve.fasl"
+		  "doc/aserve.html"
 		  "doc/tutorial.html"
 		  "doc/htmlgen.html"
 		  "readme.txt"
@@ -123,101 +123,101 @@
 		  "examples/fresh.jpg"
 		  "examples/prfile9.jpg"))
     (copy-files-to (list file)
-		   (format nil "iserve-dist/~a" file)
-		   :root *iserve-root*)))
+		   (format nil "aserve-dist/~a" file)
+		   :root *aserve-root*)))
 
 
-;; checklist for publishing iserve source for source-master:
+;; checklist for publishing aserve source for source-master:
 ;; 1. incf version number in main.cl, edit ChangeLog and commit
 ;; 2. make clean
-;; 3. start lisp and load iserve/load to compile all files, there should
+;; 3. start lisp and load aserve/load to compile all files, there should
 ;;    be no warnings.
-;; 4. start the server (net.iserve:start :port 8000) 
+;; 4. start the server (net.aserve:start :port 8000) 
 ;;	and run through the samples from Netscape and IE
-;; 5. :cl test/t-iserve
+;; 5. :cl test/t-aserve
 ;; 6. (make-src-distribution)
 ;; 7. (ftp-publish-src)
-;; 8. (publish-docs)   ;  to put latest docs on iserve web page
-;; 9. on beast run /fi/sa/bin/iserve-sync
+;; 8. (publish-docs)   ;  to put latest docs on aserve web page
+;; 9. on beast run /fi/sa/bin/aserve-sync
 ;; 10. ftp download.sourceforge.net and put the tar file in the
-;;     incoming directory, then go to the iserve sourceforget web page and 
+;;     incoming directory, then go to the aserve sourceforget web page and 
 ;;     select the file manager and publish it.
 ;;
 
 
-(defparameter iserve-version-name 
-    (apply #'format nil "iserve-~d.~d.~d" 
+(defparameter aserve-version-name 
+    (apply #'format nil "aserve-~d.~d.~d" 
 	   (symbol-value
 	    (find-symbol 
-	     (symbol-name :*iserve-version*)
-	     :net.iserve))))
+	     (symbol-name :*aserve-version*)
+	     :net.aserve))))
 
 
-(defun make-iserve.fasl ()
-  (copy-files-to *iserve-files* "iserve.fasl" :root *iserve-root*))
+(defun make-aserve.fasl ()
+  (copy-files-to *aserve-files* "aserve.fasl" :root *aserve-root*))
 
 
 
 (defun make-src-distribution ()
-  ;; make a source distribution of iserve
+  ;; make a source distribution of aserve
   ;;
     
   (run-shell-command 
-   (format nil "rm -fr ~aiserve-src" *iserve-root*))
+   (format nil "rm -fr ~aaserve-src" *aserve-root*))
     
   (run-shell-command 
-   (format nil "mkdir ~aiserve-src ~aiserve-src/~a ~aiserve-src/~a/htmlgen "
-	   *iserve-root*
+   (format nil "mkdir ~aaserve-src ~aaserve-src/~a ~aaserve-src/~a/htmlgen "
+	   *aserve-root*
 	   
-	   *iserve-root*
-	   iserve-version-name
+	   *aserve-root*
+	   aserve-version-name
 	   
-	   *iserve-root*
-	   iserve-version-name
+	   *aserve-root*
+	   aserve-version-name
 	   ))
   
   (run-shell-command 
-   (format nil "mkdir ~aiserve-src/~a/doc ~aiserve-src/~a/examples ~aiserve-src/~a/test"
-	   *iserve-root*
-	   iserve-version-name
+   (format nil "mkdir ~aaserve-src/~a/doc ~aaserve-src/~a/examples ~aaserve-src/~a/test"
+	   *aserve-root*
+	   aserve-version-name
 	   
-	   *iserve-root*
-	   iserve-version-name
+	   *aserve-root*
+	   aserve-version-name
 	   
-	   *iserve-root*
-	   iserve-version-name
+	   *aserve-root*
+	   aserve-version-name
 	   
 	   ))
 	   
   (dolist (file (append (mapcar #'(lambda (file) (format nil "~a.cl" file))
-				*iserve-files*)
-			*iserve-other-files*))
+				*aserve-files*)
+			*aserve-other-files*))
     (copy-files-to
      (list file)
-     (format nil "iserve-src/~a/~a" iserve-version-name file)
-     :root *iserve-root*)))
+     (format nil "aserve-src/~a/~a" aserve-version-name file)
+     :root *aserve-root*)))
 
 
 (defun ftp-publish-src ()
   ;; assuming tha we've made the source distribution, tar it
   ;; and copy it to the ftp directory
   (run-shell-command
-   (format nil "(cd ~aiserve-src ; tar cfz ~a.tgz ~a)"
-	   *iserve-root*
-	   iserve-version-name
-	   iserve-version-name))
+   (format nil "(cd ~aaserve-src ; tar cfz ~a.tgz ~a)"
+	   *aserve-root*
+	   aserve-version-name
+	   aserve-version-name))
   (run-shell-command 
-   (format nil "cp ~aiserve-src/~a.tgz /net/candyman/home/ftp/pub/iserve"
-	   *iserve-root*
-	   iserve-version-name)))
+   (format nil "cp ~aaserve-src/~a.tgz /net/candyman/home/ftp/pub/aserve"
+	   *aserve-root*
+	   aserve-version-name)))
 
 (defun publish-docs ()
   ;; copy documentation to the external web site
   (run-shell-command
-   (format nil "cp ~adoc/htmlgen.html ~adoc/iserve.html ~adoc/tutorial.html /net/cobweb/www/opensource/htdocs/iserve"
-	   *iserve-root*
-	   *iserve-root*
-	   *iserve-root*)))
+   (format nil "cp ~adoc/htmlgen.html ~adoc/aserve.html ~adoc/tutorial.html /net/cobweb/www/opensource/htdocs/aserve"
+	   *aserve-root*
+	   *aserve-root*
+	   *aserve-root*)))
 	   
 	    
   

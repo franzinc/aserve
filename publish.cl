@@ -1,4 +1,4 @@
-;; -*- mode: common-lisp; package: net.iserve -*-
+;; -*- mode: common-lisp; package: net.aserve -*-
 ;;
 ;; publish.cl
 ;;
@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.28 2000/04/09 04:09:43 jkf Exp $
+;; $Id: publish.cl,v 1.29 2000/04/17 21:34:25 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -32,7 +32,7 @@
 ;;-
 
 
-(in-package :net.iserve)
+(in-package :net.aserve)
 
 
 (defclass entity ()
@@ -1189,8 +1189,8 @@
 				  *crlf*)
 		 else (format-dif :xmit sock "Connection: Close~a" *crlf*))
       
-	      (format-dif :xmit sock "Server: Allegro-iServe/~a~a" 
-			  *iserve-version-string*
+	      (format-dif :xmit sock "Server: AllegroServe/~a~a" 
+			  *aserve-version-string*
 			  *crlf*)
       
 	      (if* (request-reply-content-type req)

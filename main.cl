@@ -1,4 +1,4 @@
-;; -*- mode: common-lisp; package: net.iserve -*-
+;; -*- mode: common-lisp; package: net.aserve -*-
 ;;
 ;; main.cl
 ;;
@@ -22,17 +22,17 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.33 2000/04/17 15:58:07 jkf Exp $
+;; $Id: main.cl,v 1.34 2000/04/17 21:34:25 jkf Exp $
 
 ;; Description:
-;;   iserve's main loop
+;;   aserve's main loop
 
 ;;- This code in this file obeys the Lisp Coding Standard found in
 ;;- http://www.franz.com/~jkf/coding_standards.html
 ;;-
 
 
-(defpackage :net.iserve
+(defpackage :net.aserve
   (:use :common-lisp :excl :net.html.generator)
   (:export
    #:authorize
@@ -106,7 +106,7 @@
    #:wserver-log-stream
    #:wserver-socket
 
-   #:*iserve-version*
+   #:*aserve-version*
    #:*mime-types*
    #:*response-ok*
    #:*response-created*
@@ -120,19 +120,19 @@
    #:*response-internal-server-error*
    #:*wserver*))
 
-(in-package :net.iserve)
+(in-package :net.aserve)
 
-(defparameter *iserve-version* '(1 1 12))
+(defparameter *aserve-version* '(1 1 13))
 
 
-(provide :iserve)
+(provide :aserve)
 
-(defparameter *iserve-version-string*
+(defparameter *aserve-version-string*
     ;; for when we need it in string format
     (format nil "~d.~d.~d" 
-	    (car *iserve-version*)
-	    (cadr *iserve-version*)
-	    (caddr *iserve-version*)))
+	    (car *aserve-version*)
+	    (cadr *aserve-version*)
+	    (caddr *aserve-version*)))
 	    
 ;;;;;;;  debug support 
 
@@ -763,7 +763,7 @@
   ; create accept thread
   (setf (wserver-accept-thread *wserver*)
     (mp:process-run-function 
-     (list :name (format nil "iserve-accept-~d" (incf *thread-index*))
+     (list :name (format nil "aserve-accept-~d" (incf *thread-index*))
 	   :initial-bindings
 	   `((*wserver*  . ',*wserver*)
 	     #+ignore (*debug-io* . ',(wserver-terminal-io *wserver*))
@@ -771,7 +771,7 @@
      #'http-accept-thread)))
 
 (defun make-worker-thread ()
-  (let* ((name (format nil "~d-iserve-worker" (incf *thread-index*)))
+  (let* ((name (format nil "~d-aserve-worker" (incf *thread-index*)))
 	 (proc (mp:make-process :name name
 				:initial-bindings
 				`((*wserver*  . ',*wserver*)

@@ -1,4 +1,4 @@
-;; -*- mode: common-lisp; package: net.iserve -*-
+;; -*- mode: common-lisp; package: net.aserve -*-
 ;;
 ;; authorize.cl
 ;;
@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: authorize.cl,v 1.2 2000/03/16 17:53:28 layer Exp $
+;; $Id: authorize.cl,v 1.3 2000/04/17 21:34:24 jkf Exp $
 
 ;; Description:
 ;;   classes and functions for authorizing access to entities
@@ -31,7 +31,7 @@
 ;;- http://www.franz.com/~jkf/coding_standards.html
 ;;-
 
-(in-package :net.iserve)
+(in-package :net.aserve)
 
 (defclass authorizer ()
   ;; denotes information on authorizing access to an entity

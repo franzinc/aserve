@@ -1,4 +1,4 @@
-;; -*- mode: common-lisp; package: net.iserve.test -*-
+;; -*- mode: common-lisp; package: net.aserve.test -*-
 ;;
 ;; t-iserve.cl
 ;;
@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-iserve.cl,v 1.7 2000/03/22 22:32:16 jkf Exp $
+;; $Id: t-aserve.cl,v 1.1 2000/04/17 21:34:29 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -34,38 +34,38 @@
 (eval-when (compile load eval)
   (require :tester))
 
-(defpackage :net.iserve.test
-  (:use :common-lisp :excl :net.html.generator :net.iserve 
-	:net.iserve.client
+(defpackage :net.aserve.test
+  (:use :common-lisp :excl :net.html.generator :net.aserve 
+	:net.aserve.client
 	:util.test)
   )
 
-(in-package :net.iserve.test)
+(in-package :net.aserve.test)
 
 ; set to nil before loading the test to prevent the test from auto-running
-(defvar user::*do-iserve-test* t)
+(defvar user::*do-aserve-test* t)
 
-(defun test-iserve ()
-  (with-tests (:name "iserve")
-    (let ((port (start-iserve-running)))
+(defun test-aserve ()
+  (with-tests (:name "aserve")
+    (let ((port (start-aserve-running)))
       (format t "server started on port ~d~%" port)
       (unwind-protect 
 	  (progn
 	    (test-publish-file port)
 	    (test-publish-computed port)
 	    (test-authorization port))
-	(stop-iserve-running)))))
+	(stop-aserve-running)))))
     
 
 
-(defun start-iserve-running ()
-  ;; start iserve, return the port on which we've started iserve
+(defun start-aserve-running ()
+  ;; start aserve, return the port on which we've started aserve
   (let ((wserver (start :port nil)))	; let the system pick a port
     (unpublish :all t) ; flush anything published
-    (socket::local-port (net.iserve::wserver-socket wserver))
+    (socket::local-port (net.aserve::wserver-socket wserver))
     ))
 
-(defun stop-iserve-running ()
+(defun stop-aserve-running ()
   (shutdown))
 
 
@@ -73,7 +73,7 @@
 ;-------- publish-file tests
 
 (defvar *dummy-file-value* nil)
-(defvar *dummy-file-name*  "iservetest.xx")
+(defvar *dummy-file-name*  "aservetest.xx")
 
 (defun build-dummy-file (length line-length name)
   ;; write a dummy file named  name  (if name isn't nil)
@@ -98,9 +98,9 @@
 
 (defun test-publish-file (port)
   (let (dummy-1-contents 
-	(dummy-1-name "xxiservetest.txt")
+	(dummy-1-name "xxaservetest.txt")
 	dummy-2-contents
-	(dummy-2-name "xx2iservetest.txt")
+	(dummy-2-name "xx2aservetest.txt")
 	(prefix-local (format nil "http://localhost:~a" port))
 	(prefix-dns   (format nil "http://~a:~a" 
 			      (long-site-name)
@@ -533,7 +533,7 @@
 
 
     
-(if* user::*do-iserve-test* then (test-iserve))
+(if* user::*do-aserve-test* then (test-aserve))
 
 	
     

@@ -1,4 +1,4 @@
-;; -*- mode: common-lisp; package: net.iserve -*-
+;; -*- mode: common-lisp; package: net.aserve -*-
 ;;
 ;; parse.cl
 ;;
@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.19 2000/04/09 04:09:43 jkf Exp $
+;; $Id: parse.cl,v 1.20 2000/04/17 21:34:25 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -34,7 +34,7 @@
 ;;-
 
 
-(in-package :net.iserve)
+(in-package :net.aserve)
 
 
 ;; parseobj -- used for cons-free parsing of strings

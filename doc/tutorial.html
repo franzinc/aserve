@@ -1,47 +1,48 @@
 <html>
 
 <head>
-<title>Allegro iServe Tutorial</title>
+<title>AllegroServe Tutorial</title>
 <meta name="GENERATOR" content="Microsoft FrontPage 3.0">
 </head>
 
 <body>
 
-<h1 align="center">Allegro iServe Tutorial</h1>
+<h1 align="center">AllegroServe Tutorial</h1>
 
 <p align="left"><strong><small>copyright (c) 2000 Franz Inc</small></strong></p>
 
-<p>This document is a companion to the iServe reference manual.&nbsp;&nbsp; Here we will
-take you through various examples and demonstrate how to use the facilities of the iServe
-web server.&nbsp;&nbsp; Refer to the reference manual for more details on the functions we
-mention here.</p>
+<p>This document is a companion to the AllegroServe reference manual.&nbsp;&nbsp; Here we
+will take you through various examples and demonstrate how to use the facilities of the
+AllegroServe web server.&nbsp;&nbsp; Refer to the reference manual for more details on the
+functions we mention here.</p>
 
-<h1>Loading iServe</h1>
+<h1>Loading AllegroServe</h1>
 
-<p>iServe is distributed as a single fasl file: iserve.fasl.&nbsp;&nbsp;&nbsp; If the file
-is installed where <strong>require</strong> can find it then you need only type</p>
+<p>AllegroServe is distributed as a single fasl file: AllegroServe.fasl.&nbsp;&nbsp;&nbsp;
+If the file is installed where <strong>require</strong> can find it then you need only
+type</p>
 
-<pre>(require :iserve)</pre>
+<pre>(require :aserve)</pre>
 
 <p>to ensure that it's loaded.&nbsp; Otherwise you'll have to call the <strong>load</strong>
-function.&nbsp;&nbsp; In the subsequent steps we've assumed that you've loaded iServe into
-Lisp.</p>
+function.&nbsp;&nbsp; In the subsequent steps we've assumed that you've loaded
+AllegroServe into Lisp.</p>
 
 <h1>Package setup</h1>
 
-<p>iServe consists of two components: a web server and an html generator.&nbsp; These are
-located in two Lisp packages: <strong>net.iserve</strong> and <strong>net.html.generator</strong>.
+<p>AllegroServe consists of two components: a web server and an html generator.&nbsp;
+These are located in two Lisp packages: <strong>net.aserve</strong> and <strong>net.html.generator</strong>.
 &nbsp;&nbsp; These are long package names to type so the first thing to do is to create a
 package that <em>uses</em> these packages as well as the normal Lisp packages.&nbsp; Let's
 create a package called <strong>tutorial</strong> and make that the current package:</p>
 
 <pre>(defpackage :tutorial 
-    (:use :common-lisp :excl :net.iserve :net.html.generator))
+    (:use :common-lisp :excl :net.aserve :net.html.generator))
 
 (in-package :tutorial)
 </pre>
 
-<h1>Starting iServe</h1>
+<h1>Starting AllegroServe</h1>
 
 <p>Normally you would publish all the pages for your site and then start the web server.
 &nbsp; That way everyone would see a consistent view of your site.&nbsp; However, for this
@@ -60,18 +61,18 @@ on port <strong>8000</strong>. </p>
 tutorial(5): </pre>
 
 <p>Now the web server is up and running.&nbsp;&nbsp; Let's assume that we're running
-iServe on a machine named <strong>test.franz.com</strong>.&nbsp; If you now go to a web
-browser and ask for <a href="http://test.franz.com">http://test.franz.com</a>&nbsp; you
-will contact this iServe server and it will respond that whatever you asked for wasn't
-found on the server (since we haven't published any pages).&nbsp; You can also try <a
+AllegroServe on a machine named <strong>test.franz.com</strong>.&nbsp; If you now go to a
+web browser and ask for <a href="http://test.franz.com">http://test.franz.com</a>&nbsp;
+you will contact this AllegroServe server and it will respond that whatever you asked for
+wasn't found on the server (since we haven't published any pages).&nbsp; You can also try <a
 href="http://test">http://test</a> and get the same result (although the response message
 will be slightly different).&nbsp; If you are running the web browser on test.franz.com as
 well you can ask for <a href="http://localhost">http://localhost</a> and get a similar
 &quot;not found&quot; response.&nbsp;&nbsp;&nbsp; This demonstrates that web servers are
 known by many names.&nbsp; If you choose to take advantage of that (creating what are
-known as <strong>Virtual Hosts</strong>) then iServe will support you .&nbsp; However if
-you want to create web pages that are served by whatever name can be used to reach the
-server, then iServe will allow you to do that as well.</p>
+known as <strong>Virtual Hosts</strong>) then AllegroServe will support you .&nbsp;
+However if you want to create web pages that are served by whatever name can be used to
+reach the server, then AllegroServe will allow you to do that as well.</p>
 
 <p>Type <strong>:proc</strong> to Lisp and look at which Lisp lightweight processes are
 running:</p>
@@ -82,17 +83,17 @@ P Dis Sec dSec Priority State Process Name, Whostate, Arrest
 * 2 0 0.0 0 waiting Connect to Emacs daemon, waiting for input
 * 1 0 0.0 0 inactive Run Bar Process
 * 1 0 0.0 0 waiting Editor Server, waiting for input
-<strong>* 1 0 0.0 0 waiting iserve-accept-6, waiting for input</strong>
-<strong>* 0 0 0.0 0 inactive 1-iserve-worker
-* 0 0 0.0 0 inactive 2-iserve-worker
-* 0 0 0.0 0 inactive 3-iserve-worker
-* 0 0 0.0 0 inactive 4-iserve-worker
-* 0 0 0.0 0 inactive 5-iserve-worker</strong>
+<strong>* 1 0 0.0 0 waiting AllegroServe-accept-6, waiting for input</strong>
+<strong>* 0 0 0.0 0 inactive 1-aserve-worker
+* 0 0 0.0 0 inactive 2-aserve-worker
+* 0 0 0.0 0 inactive 3-aserve-worker
+* 0 0 0.0 0 inactive 4-aserve-worker
+* 0 0 0.0 0 inactive 5-aserve-worker</strong>
 tutorial(7): </pre>
 
-<p>We've emboldened the threads that are part of iServe.&nbsp;&nbsp;&nbsp; The thread
-named <strong>iserve-accept-6</strong> is waiting for an http request.&nbsp; When one
-arrives it passes it off to one of the <strong>iserve-worker</strong> threads and then
+<p>We've emboldened the threads that are part of AllegroServe.&nbsp;&nbsp;&nbsp; The
+thread named <strong>aserve-accept-6</strong> is waiting for an http request.&nbsp; When
+one arrives it passes it off to one of the <strong>aserve-worker</strong> threads and then
 loops back to wait for the next request.&nbsp; The number of of worker threads is
 determined by the <strong>:listeners</strong> argument to the <strong>start</strong>
 function.</p>
@@ -104,7 +105,7 @@ function.</p>
 put some words in it, and then</p>
 
 <pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/sample.txt&quot;)
-#&lt;net.iserve::file-entity @ #x2076e0c2&gt;
+#&lt;net.aserve::file-entity @ #x2076e0c2&gt;
 tutorial(31):</pre>
 
 <p>Now if we ask a web browser for <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>
@@ -113,9 +114,9 @@ content-type in the call to <strong>publish-file</strong> the content-type will 
 determined by the &quot;<strong>txt</strong>&quot; file type, which is associated with the
 &quot;<strong>text/plain</strong>&quot; content-type.</p>
 
-<p>Because we didn't specify a <strong>:host</strong> argument to <strong>publish-file </strong>iServe
+<p>Because we didn't specify a <strong>:host</strong> argument to <strong>publish-file </strong>AllegroServe
 will return this page to any browser regardless of the host name used to name the machine.
-&nbsp; So iServe will respond to requests for <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>
+&nbsp; So AllegroServe will respond to requests for <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>
 and <a href="http://test/foo">http://test:8000/foo</a> and <a href="http://localhost/foo">http://localhost:8000/foo</a>.
 &nbsp;&nbsp; </p>
 
@@ -123,18 +124,18 @@ and <a href="http://test/foo">http://test:8000/foo</a> and <a href="http://local
 
 <pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/sample.txt&quot; 
                             :host &quot;test.franz.com&quot;)
-#&lt;net.iserve::file-entity @ #x2076e0c2&gt;
+#&lt;net.aserve::file-entity @ #x2076e0c2&gt;
 tutorial(31):</pre>
 
-<p>Then iServe will only respond to requests for <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>.
+<p>Then AllegroServe will only respond to requests for <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>.
 &nbsp; If we do</p>
 
 <pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/sample.txt&quot; 
                             :host (&quot;test&quot; &quot;test.franz.com&quot;))
-#&lt;net.iserve::file-entity @ #x2076e0c2&gt;
+#&lt;net.aserve::file-entity @ #x2076e0c2&gt;
 tutorial(31):</pre>
 
-<p>Then iServe will only respond to <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>
+<p>Then AllegroServe will only respond to <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>
 and <a href="http://test/foo">http://test:8000/foo</a>.&nbsp;&nbsp;&nbsp; This type of
 restriction is useful if you want to create the illusion that a single machine is really a
 set of machines, each with its own set of web pages.&nbsp;&nbsp; Suppose that the machine <strong>test.franz.com</strong>
@@ -144,10 +145,10 @@ specified in the request</p>
 
 <pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/<strong>test</strong>-sample.txt&quot; 
                             :host &quot;<strong>test</strong>.franz.com&quot;)
-#&lt;net.iserve::file-entity @ #x2076e0c2&gt;
+#&lt;net.aserve::file-entity @ #x2076e0c2&gt;
 tutorial(31): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/<strong>sales</strong>-sample.txt&quot; 
                             :host &quot;<strong>sales</strong>.franz.com&quot;)
-#&lt;net.iserve::file-entity @ #x2076e324&gt;</pre>
+#&lt;net.aserve::file-entity @ #x2076e324&gt;</pre>
 
 <p>Now you will get different results if you ask for&nbsp; <a
 href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a> and <a
@@ -155,9 +156,9 @@ href="http://sales.franz.com/foo">http://sales.franz.com:8000/foo</a>. </p>
 
 <h1>Publishing a computed page</h1>
 
-<p>The most important reason for using the iServe web server is that you can compute a web
-page when a request comes in.&nbsp;&nbsp; This allows your program to display the most up
-to date information on the page or tailor the page to each browser.
+<p>The most important reason for using the AllegroServe web server is that you can compute
+a web page when a request comes in.&nbsp;&nbsp; This allows your program to display the
+most up to date information on the page or tailor the page to each browser.
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Using the <strong>publish</strong> function, a lisp
 function called a <em>response function</em> is associated with a <strong>url.&nbsp; </strong>When
 a request comes in that matches that url, the response function is run and it must
@@ -187,18 +188,18 @@ for the response (it can be overridden by an argument to <strong>with-http-respo
 <p>A response function must use the <strong>with-http-response</strong> and <strong>with-http-body
 </strong>macros and then send any additional data to the stream <strong>*html-stream*</strong>.
 &nbsp;&nbsp;&nbsp; Despite the name of the stream, the data need not always be html.
-&nbsp;&nbsp;&nbsp; The purpose of <strong>with-http-response</strong> is to allow iServe
-to determine how it will setup streams to respond to the request.&nbsp;&nbsp;&nbsp; iServe
-will also check to see if the browser already has an up-to-date copy of this page cached
-in which case it will not even run the code in the body of the <strong>with-http-response</strong>
-macro.&nbsp;&nbsp; <strong>with-http-body</strong> is responsible for sending back the
-response code and headers,&nbsp; and the body of <strong>with-http-body </strong>is where
-lisp code can send data which will be the body of the response.&nbsp; </p>
+&nbsp;&nbsp;&nbsp; The purpose of <strong>with-http-response</strong> is to allow
+AllegroServe to determine how it will setup streams to respond to the
+request.&nbsp;&nbsp;&nbsp; AllegroServe will also check to see if the browser already has
+an up-to-date copy of this page cached in which case it will not even run the code in the
+body of the <strong>with-http-response</strong> macro.&nbsp;&nbsp; <strong>with-http-body</strong>
+is responsible for sending back the response code and headers,&nbsp; and the body of <strong>with-http-body
+</strong>is where lisp code can send data which will be the body of the response.&nbsp; </p>
 
 <p>The preceding example sends a very simple plain text string, specifying the
 content-type to be &quot;text/plain&quot;.&nbsp; Typically you'll want to return an html
-page.&nbsp; iServe has a very concise macro for creating html.&nbsp; Here's a response
-function that sends html:</p>
+page.&nbsp; AllegroServe has a very concise macro for creating html.&nbsp; Here's a
+response function that sends html:</p>
 
 <pre>(publish :path &quot;/hello2&quot;
     :content-type &quot;text/html&quot;
@@ -285,9 +286,10 @@ the server are:
     value of this attribute only matters if the <strong>:method</strong> is set to
     &quot;POST&quot;.</li>
   <li><strong>:action</strong> -- this is the url to which the request with the data is sent.
-    &nbsp;&nbsp; With iServe it's often convenient to make this url the same as the url of the
-    entity that created the form, and have the entity handling function determine whether it
-    is being called to display the form or to handle the results of filling out the form.</li>
+    &nbsp;&nbsp; With AllegroServe it's often convenient to make this url the same as the url
+    of the entity that created the form, and have the entity handling function determine
+    whether it is being called to display the form or to handle the results of filling out the
+    form.</li>
 </ol>
 
 <p>Let's examine in detail each of the methods for sending form data:</p>
@@ -296,12 +298,12 @@ the server are:
 
 <p>In a url like <a href="http://www.machine.com/foo/bar?name=joe&amp;age=34">http://www.machine.com/foo/bar?name=gen&amp;age=28</a>
 the characters after the question mark are the <strong>query-string</strong>. &nbsp;&nbsp;
-The query string is <strong>not</strong> used by iServe to determine the entity to handle
-the request.&nbsp; When the entity begins processing the request it can ask for the <strong>request-query
-</strong>of the <strong>request</strong> object. &nbsp;&nbsp; <strong>request-query </strong>will
-return an assoc list where the <strong>car</strong> &nbsp; of each entry is a string (e.g.
-&quot;name&quot; in the example) and the <strong>cdr</strong> is also a string (e.g.
-&quot;gen&quot; in the example).&nbsp;&nbsp;&nbsp; You can ask for the <strong>request-query</strong>
+The query string is <strong>not</strong> used by AllegroServe to determine the entity to
+handle the request.&nbsp; When the entity begins processing the request it can ask for the
+<strong>request-query </strong>of the <strong>request</strong> object. &nbsp;&nbsp; <strong>request-query
+</strong>will return an assoc list where the <strong>car</strong> &nbsp; of each entry is
+a string (e.g. &quot;name&quot; in the example) and the <strong>cdr</strong> is also a
+string (e.g. &quot;gen&quot; in the example).&nbsp;&nbsp;&nbsp; You can ask for the <strong>request-query</strong>
 of any request object and if there is no query string for the request, <strong>request-query
 </strong>will return <strong>nil</strong>. &nbsp;&nbsp; </p>
 
@@ -430,12 +432,12 @@ when it is being called from a <strong>:post</strong> request and must call a se
 functions to retrieve each item from the message body.&nbsp; First it calls <strong>get-multipart-header</strong>
 to get the next header (or <strong>nil</strong> if there are no more headers).
 &nbsp;&nbsp;&nbsp; The header data is an assoc list where the values have different
-formats as described in the iServe manual.&nbsp; After reading the header&nbsp; the
+formats as described in the AllegroServe manual.&nbsp; After reading the header&nbsp; the
 handler must call <strong>get-multipart-sequence</strong> to read successive chunks of
 data associated with this header.</p>
 
 <p>An example demonstrating this is too large to include here but can be found in the
-iServe examples.cl file (search in that file for&nbsp; &quot;getfile-got&quot;)</p>
+AllegroServe examples.cl file (search in that file for&nbsp; &quot;getfile-got&quot;)</p>
 
 <h1>Authorizing a request</h1>
 
@@ -444,8 +446,8 @@ iServe examples.cl file (search in that file for&nbsp; &quot;getfile-got&quot;)<
 access a page.&nbsp;&nbsp; There are two ways to do the authorization checks.&nbsp; You
 can write the tests yourself in the entity function, or you can create an <strong>authorizer
 </strong>object and attach it to the entity.&nbsp;&nbsp;&nbsp; Below we'll show you how to
-write the code to do the checks manually.&nbsp;&nbsp; The Allegro iServe manual describes
-the <strong>authorizer</strong> objects. </p>
+write the code to do the checks manually.&nbsp;&nbsp; The Allegro AllegroServe manual
+describes the <strong>authorizer</strong> objects. </p>
 
 <h2>password</h2>
 
@@ -465,9 +467,9 @@ name and password appear in the url which makes them very easy to spot, so you a
 want to use the &quot;POST&quot; method if you use a form.&nbsp;&nbsp;&nbsp; If on the
 other hand you use the 401 response code, then the name and password are sent in a more
 encrypted form (using an encoding called <strong>base64</strong>) however anyone
-sufficiently motivated can decrypt this without a lot of trouble.&nbsp;&nbsp; iServe does
-not yet support <strong>md5</strong> authentication which is the most secure way to do
-authentication in the HTTP/1.1 protocol.</p>
+sufficiently motivated can decrypt this without a lot of trouble.&nbsp;&nbsp; AllegroServe
+does not yet support <strong>md5</strong> authentication which is the most secure way to
+do authentication in the HTTP/1.1 protocol.</p>
 
 <p>One advantage of using the 401 response to cause the user to enter a name and password
 is that most web browsers will continue to send the entered name and password along with
@@ -540,11 +542,11 @@ href="http://test.franz.com:8000/local-secret">http://test.franz.com:8000/local-
 
 <h1>Multiple servers</h1>
 
-<p>iServe can run multiple independent web servers.&nbsp; Each web server listens for
-requests on a different port.&nbsp; Because each web server can appear to be serving pages
-for different hosts (using the virtual host facility already described in the discussion
-of the <strong>publish </strong>functions), it is usually not necessary to use the
-multiple server facility we describe here.&nbsp; </p>
+<p>AllegroServe can run multiple independent web servers.&nbsp; Each web server listens
+for requests on a different port.&nbsp; Because each web server can appear to be serving
+pages for different hosts (using the virtual host facility already described in the
+discussion of the <strong>publish </strong>functions), it is usually not necessary to use
+the multiple server facility we describe here.&nbsp; </p>
 
 <p>All of the information about a web server, including the entities it serves, are stored
 in a <strong>wserver</strong> object.&nbsp;&nbsp;&nbsp;&nbsp; The <em>current<strong> </strong></em>wserver

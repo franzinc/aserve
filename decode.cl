@@ -1,4 +1,4 @@
-;; -*- mode: common-lisp; package: net.iserve -*-
+;; -*- mode: common-lisp; package: net.aserve -*-
 ;;
 ;; decode.cl
 ;;
@@ -23,7 +23,7 @@
 ;;
 
 ;;
-;; $Id: decode.cl,v 1.4 2000/03/16 17:53:28 layer Exp $
+;; $Id: decode.cl,v 1.5 2000/04/17 21:34:24 jkf Exp $
 
 ;; Description:
 ;;   decode/encode code
@@ -33,7 +33,7 @@
 ;;-
 
 
-(in-package :net.iserve)
+(in-package :net.aserve)
 
 ;---------------- urlencoding ----------------
 ; there are two similar yet distinct encodings for character strings
