@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.8 2000/06/08 16:43:58 jkf Exp $
+;; $Id: examples.cl,v 1.9 2000/06/11 14:48:49 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -329,6 +329,19 @@
 	      :file (example-file "foo.txt")
 	      :content-type "text/plain"
 	      :preload nil)
+
+
+;; for benchmarking
+(publish-file :path "/file2000"
+	      :file (example-file "file2000.txt")
+	      :content-type "text/plain"
+	      :preload nil)
+
+(publish-file :path "/file2000-preload"
+	      :file (example-file "file2000.txt")
+	      :content-type "text/plain"
+	      :preload t)
+
 
 ;; an example which causes the web browser to put up the
 ;; name/password box and if you enter the name "foo" and password "bar"
