@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.14 2000/10/12 05:01:18 jkf Exp $
+;; $Id: headers.cl,v 1.15 2000/10/15 15:18:45 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -68,6 +68,7 @@
     ;; to treat his header when proxying a server response to a client
     )
 
+#+ignore
 (defvar *header-cache-match-array*
     ;; indexed by header number.  contains a kwd symbol or nil
     ;; describing how matching should be done
@@ -232,6 +233,7 @@
 				  :initial-contents
 				  (mapcar #'third *http-headers*)))
 		  
+		  #+ignore
 		  (setq *header-cache-match-array*
 		    ',(make-array (length *http-headers*)
 				  :initial-contents

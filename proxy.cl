@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.21 2000/10/12 17:14:26 jkf Exp $
+;; $Id: proxy.cl,v 1.22 2000/10/15 15:18:45 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -133,6 +133,8 @@
   blocks	; number of cache blocks (length of the value in data slot)
   code		; response code
   comment	; response comment 
+  
+  cookie	; the cookie if any with this request
 
   ; count of the internal use of this
   use 		; nil - dead entry. >= 0 - current users of this entry
@@ -761,6 +763,7 @@
       ; clean out and remove the disk caches first
       (dolist (pcache-disk (pcache-disk-caches pcache))
 	(flush-disk-cache pcache pcache-disk 0)
+	(ignore-errors (close (pcache-disk-stream pcache-disk)))
 	(ignore-errors (delete-file (pcache-disk-filename pcache-disk))))
       
       (setf (pcache-disk-caches pcache) nil)
@@ -1051,10 +1054,6 @@
 		  (progn 
 		    (logmess "authorization forces direct")
 		    t))
-	     (and (header-slot-value req :cookie)
-		  (progn
-		    (logmess "cookie forces direct")
-		    t))
 	     )
        then (if* pcache then (incf (pcache-r-direct pcache)))
 	    (logmess (format nil "direct for ~a~%" rendered-uri))
@@ -1072,8 +1071,12 @@
 		(proxy-and-cache-request req ent (get-universal-time) nil t)))
       (if* (lock-pcache-ent pcache-ent)
 	 then (unwind-protect
-		  (progn (use-value-from-cache req ent pcache-ent)
-			 (return))
+		  (if* (equal (pcache-ent-cookie pcache-ent)
+			      (header-slot-value req :cookie))
+		     then ; can use this one
+			  (use-value-from-cache req ent pcache-ent)
+			  (return))
+				 
 		(unlock-pcache-ent pcache-ent))))))
 
 
@@ -1405,6 +1408,7 @@
   (let (now)
     (if* (eql response-code 200)
        then ; full response
+	    
 	    (setf (pcache-ent-code pcache-ent) response-code)
 	    (setf (pcache-ent-comment pcache-ent) comment)
 	  
@@ -1416,7 +1420,9 @@
 		  (pcache-ent-blocks pcache-ent) 
 		  (length (pcache-ent-data pcache-ent)))
 	  
-	    
+
+	    (setf (pcache-ent-cookie pcache-ent)
+	      (header-slot-value req :cookie))
 	  
 	    (setf (pcache-ent-state pcache-ent) nil ; means valid data
 		  (pcache-ent-use  pcache-ent) 0)

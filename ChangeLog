@@ -1,3 +1,7 @@
+2000-10-15  John Foderaro  <jkf@tiger.franz.com>
+1.1.31
+	* support caching requests with cookies
+
 2000-10-12  John Foderaro  <jkf@tiger.franz.com>
 1.1.30
 	*  proxy and cache facilty added.
