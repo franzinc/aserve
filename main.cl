@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.142 2003/01/10 15:31:49 jkf Exp $
+;; $Id: main.cl,v 1.143 2003/02/20 18:13:52 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -2345,7 +2345,21 @@ in get-multipart-sequence"))
 	      :test test)))
 
 
-	
+(defsetf request-query-value 
+    (key req &key (post t) (uri t) 
+		  (test #'equal) (external-format 
+				  *default-aserve-external-format*))
+    (newvalue)
+  ;; make it appear that the query alist contains this extra key/value
+  `(let ((ent (assoc ,key (request-query ,req :post ,post :uri ,uri
+					 :external-format ,external-format)
+		    :test ,test)))
+    (if* ent 
+       then (setf (cdr ent) ,newvalue)
+       else (push (cons ,key ,newvalue) (request-query-alist ,req)))
+    
+    ,newvalue))
+
 
 (defun header-decode-integer (val)
   ;; if val is a string holding an integer return its value

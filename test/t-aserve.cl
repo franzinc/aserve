@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.44 2002/04/10 16:06:50 jkf Exp $
+;; $Id: t-aserve.cl,v 1.45 2003/02/20 18:13:52 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -833,6 +833,14 @@
 			       (header-slot-value req :content-type)
 			       :test #'equal))
 		 (setq req-query-res (request-query req))
+		 
+		 ;; also test here the setf'ing of query values
+		 (test nil (request-query-value "flurber" req))
+		 (setf (request-query-value "flurber" req) "ziftp")
+		 (test "ziftp" (request-query-value "flurber" req)
+		       :test #'equal)
+		 
+		 
 		 (with-http-response (req ent)
 		   (with-http-body (req ent)
 		     (html "hi")))))
