@@ -133,23 +133,24 @@ tables scanned by iServe after a request is read.</p>
 
 <h3>Components of a request</h3>
 
-<p>A request from an http client contains a lot of information.&nbsp; The three items that
+<p>A request from an http client contains a lot of information.&nbsp; The two items that
 determine which entity will handle the request are 
 
 <ul>
-  <li>the name part of the url minus any arguments.&nbsp;&nbsp; The arguments are the
-    characters beginning with the first '?' and extending to the end of the url.&nbsp; For
-    example in the url&nbsp; <a href="http://bar.com:8030/files/foo?xx=3&amp;yy=4">http://bar.com:8030/files/foo?xx=3&amp;yy=4</a>
-    the part we call the name is just <strong>/files/foo.</strong></li>
-  <li>the host to which the request is directed.&nbsp;&nbsp; This is not necessarily the host
-    that is receiving the request due to virtual hosts and proxy servers.&nbsp; This value
-    comes from the <strong>Host:</strong> header line, if one is given.&nbsp; If the <strong>Host:</strong>
-    header line isn't given then this value is <em>unspecified</em> for this request.</li>
-  <li>the port to which the request was directed.&nbsp; Again, this information comes from <strong>Host:</strong>
-    header line, if it is present in the request.&nbsp; If it is not present then this value
-    is <em>unspecified</em>.<font color="#FF0000"> [[this seems wrong.... it should probably
-    default to the actual port number on which neo is listening]]</font></li>
+  <li>the <strong>path</strong> of the url.&nbsp; This is the part of the url after the host
+    name and before the query string (if any).&nbsp; For example in the url&nbsp; <a
+    href="http://bar.com:8030/files/foo?xx=3&amp;yy=4">http://bar.com:8030/files/foo?xx=3&amp;yy=4</a>
+    the part we call the path&nbsp; is just <strong>/files/foo.</strong></li>
+  <li>the <strong>host</strong> to which the request is directed.&nbsp;&nbsp; This is not
+    necessarily the host that is receiving the request due to virtual hosts and proxy
+    servers.&nbsp; This value comes from the <strong>Host:</strong> header line, if one is
+    given.&nbsp; If the <strong>Host:</strong> header line isn't given then this value is <em>unspecified</em>
+    for this request.&nbsp;&nbsp;&nbsp; The <strong>Host:</strong> header line also may
+    include a port number, but we ignore that for the purposes of matching requests to
+    entities.</li>
 </ul>
+
+<p>&nbsp;</p>
 
 <p>&nbsp;</p>
 
@@ -159,17 +160,20 @@ any way it sees fit.</p>
 
 <p>&nbsp;</p>
 
-<p>The following functions create entities and specify which requests they will handle:</p>
+<p>The following functions create entities and specify which requests they will handle.
+&nbsp;&nbsp; An entity is distinguished by the <strong>path</strong> and <strong>host</strong>
+values passed to the particular <strong>publish</strong> function.&nbsp;&nbsp; When a <strong>publish</strong>
+is done for a <strong>path</strong> and <strong>host</strong> for which there is already
+an entity assigned, the old entity is replaced by the new entity.</p>
 
 <p>&nbsp;</p>
 
 <p><strong><font face="Courier New">(publish-file &amp;key path host port&nbsp; file
-content-type class preload server)</font></strong></p>
+content-type class preload remove server)</font></strong></p>
 
 <p>This creates an entity that will return the contents of a file on the disk in response
-to a request.&nbsp;&nbsp; The <strong>url</strong>, <strong>file</strong> and <strong>content-type</strong>
-must be given, the rest of the arguments are optional. (We plan to make <strong>content-type</strong>
-optional too in the future).&nbsp; The arguments have these meanings: 
+to a request.&nbsp;&nbsp; The <strong>url</strong> and <strong>file</strong>&nbsp; must be
+given, the rest of the arguments are optional..&nbsp; The arguments have these meanings: 
 
 <ul>
   <li><strong>path </strong>-- a string that must match the name part of the url as described
@@ -178,10 +182,8 @@ optional too in the future).&nbsp; The arguments have these meanings:
     host part of the request.&nbsp;&nbsp; If this argument is not given then it will match the
     host part of any request.&nbsp; If this argument is given and the request does not have a
     host part specified, then it will not match.</li>
-  <li><strong>port</strong> -- a number that must match the port part of the request.&nbsp; If
-    this argument is not given then it will match the port&nbsp; part of any request.&nbsp; If
-    this argument is given and the request does not have a port&nbsp; part specified, then it
-    will not match.</li>
+  <li><strong>port</strong> -- this argument is currently unused and will likely be removed in
+    future versions.</li>
   <li><strong>file </strong>-- the name of the file to return when a request this entity is
     made.&nbsp;&nbsp; The file doesn't have to exist until the request is made unless <strong>preload</strong>
     is specified as true.</li>
@@ -199,6 +201,11 @@ optional too in the future).&nbsp; The arguments have these meanings:
     up the response to this request.&nbsp; However note that if the file changes on the disk
     after it has been preloaded, this change will <strong>not </strong>be seen until<strong>
     &nbsp; publish-file </strong>is called again<strong>.</strong></li>
+  <li><strong>remove </strong>-- instead of adding an entity, remove the entities that matches
+    the given <strong>path</strong> and <strong>host. </strong> This removes all entities, not
+    just file entities.&nbsp; If a <strong>host</strong> value is not passed in an argument,
+    then this will remove all entities for this <strong>path</strong>, regardless of their <strong>host</strong>
+    values.</li>
   <li><strong>server</strong> -- if this entity should only be served by a particular server,
     then this specifies which server.&nbsp;&nbsp; See the section (to be written) on running
     multiple servers in the same Lisp process.</li>
@@ -241,11 +248,11 @@ the ability to specify how deep in the directory structure it will look and also
 <p>&nbsp;</p>
 
 <p><strong><font face="Courier New">(publish &amp;key path host port content-type function
-class format server)</font></strong></p>
+class format remove server)</font></strong></p>
 
 <p>This creates a mapping from a url to a <strong>computed-entity</strong>, that is an
 entity that computes its response every time a request comes in.&nbsp; The <strong>path</strong>,
-<strong>host</strong>, <strong>port</strong>, <strong>server</strong> and <strong>class</strong>
+<strong>host</strong>, <strong>port</strong>, <strong>remove, server</strong> and <strong>class</strong>
 arguments are as in the other publish functions.&nbsp;&nbsp; The <strong>content-type</strong>
 sets a default value for the response to the request but this can be overridden.&nbsp; The
 <strong>format</strong> argument is either <strong>:text </strong>(the default) or <strong>:binary</strong>

@@ -46,12 +46,12 @@ create a package called <strong>tutorial</strong> and make that the current pack
 tutorial we'll start the server first so that we can immediately see the pages we're
 publishing.</p>
 
-<p>Web servers normally listen on port <strong>80</strong>.&nbsp; On Unix port <strong>80 </strong>
-can only be allocated by the the superuser (called<strong> root</strong>).
-&nbsp;&nbsp;&nbsp; On Windows any user can open port <strong>80</strong> as long as it's
-not yet allocated.&nbsp;&nbsp;&nbsp; In order to make this tutorial work on both Unix and
-Windows (and not require that you run as <strong>root</strong> on Unix), we'll put our web
-server on port <strong>8000</strong>. </p>
+<p>Web servers normally listen on port <strong>80</strong>.&nbsp; On Unix port <strong>80 </strong>can
+only be allocated by the the superuser (called<strong> root</strong>). &nbsp;&nbsp;&nbsp;
+On Windows any user can open port <strong>80</strong> as long as it's not yet
+allocated.&nbsp;&nbsp;&nbsp; In order to make this tutorial work on both Unix and Windows
+(and not require that you run as <strong>root</strong> on Unix), we'll put our web server
+on port <strong>8000</strong>. </p>
 
 <pre>tutorial(4): (start :port 8000)
 #&lt;wserver @ #x206929aa&gt;
@@ -98,18 +98,54 @@ function.</p>
 <h1>Publishing a file</h1>
 
 <p>The simplest way to publish something is to publish files stored on the disk.
-&nbsp;&nbsp; Create&nbsp; a file (here we called it /tmp/foo.txt) and put some words in
-it, and then</p>
+&nbsp;&nbsp; Create&nbsp; a file (here we called it <strong>/tmp/foo.txt</strong>) and put
+some words in it, and then</p>
 
 <pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/foo.txt&quot;)
 #&lt;net.iserve::file-entity @ #x2076e0c2&gt;
 tutorial(31):</pre>
 
-<p>Now if we ask for <a href="http://test.franz.com/foo">http://test.franz.com/foo</a>
+<p>Now if we ask a web browser for <a href="http://test.franz.com/foo">http://test.franz.com/foo</a>
 we'll see the contents of the file in the web browser.&nbsp; Since we didn't specify a
 content-type in the call to <strong>publish-file</strong> the content-type will be
-determined by the &quot;txt&quot; file type, which is associated with the
-&quot;text/plain&quot; content-type.</p>
+determined by the &quot;<strong>txt</strong>&quot; file type, which is associated with the
+&quot;<strong>text/plain</strong>&quot; content-type.</p>
+
+<p>Because we didn't specify a <strong>:host</strong> argument to <strong>publish-file </strong>iServe
+will return this page to any brower regardless of the host name used to name the machine.
+&nbsp; So iServe will respond to requests for <a href="http://test.franz.com/foo">http://test.franz.com/foo</a>
+and <a href="http://test/foo">http://test/foo</a> and <a href="http://localhost/foo">http://localhost/foo</a>.
+&nbsp;&nbsp; </p>
+
+<p>If we do </p>
+
+<pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/foo.txt&quot; :host &quot;test.franz.com&quot;)
+#&lt;net.iserve::file-entity @ #x2076e0c2&gt;
+tutorial(31):</pre>
+
+<p>Then iServe will only respond to requests for <a href="http://test.franz.com/foo">http://test.franz.com/foo</a>.
+&nbsp; If we do</p>
+
+<pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/foo.txt&quot; :host (&quot;test&quot; &quot;test.franz.com&quot;))
+#&lt;net.iserve::file-entity @ #x2076e0c2&gt;
+tutorial(31):</pre>
+
+<p>Then iServe will only respond to <a href="http://test.franz.com/foo">http://test.franz.com/foo</a>
+and <a href="http://test/foo">http://test/foo</a>.&nbsp;&nbsp;&nbsp; This type of
+restriction is useful if you want to create the illusion that a single machine is really a
+set of machines, each with its own set of web pages.&nbsp;&nbsp; Suppose that the machine <strong>test.franz.com</strong>
+also had the name <strong>sales.franz.com</strong>.&nbsp; You could publish two different
+ways to respond to the &quot;<strong>/foo</strong>&quot; url, depending on the host name
+specified in the request</p>
+
+<pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/<strong>test</strong>-foo.txt&quot; :host &quot;<strong>test</strong>.franz.com&quot;)
+#&lt;net.iserve::file-entity @ #x2076e0c2&gt;
+tutorial(31): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/<strong>sales</strong>-foo.txt&quot; :host &quot;<strong>sales</strong>.franz.com&quot;)
+#&lt;net.iserve::file-entity @ #x2076e324&gt;</pre>
+
+<p>Now you will get different results if you ask for&nbsp; <a
+href="http://test.franz.com/foo">http://test.franz.com/foo</a> and <a
+href="http://sales.franz.com/foo">http://sales.franz.com/foo</a>. </p>
 
 <h1>Publishing a computed page</h1>
 

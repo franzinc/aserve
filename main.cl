@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: main.cl,v 1.19.2.2 2000/03/02 14:17:16 jkf Exp $
+;; $Id: main.cl,v 1.19.2.3 2000/03/03 03:07:07 jkf Exp $
 
 ;; Description:
 ;;   neo's main loop
@@ -530,8 +530,6 @@
   (if* (and debug (numberp debug))
      then (setq *ndebug* debug))
 
-  (build-mime-types-table) 
-
   ; shut down existing server
   (shutdown server) 
   
@@ -738,7 +736,10 @@
 	(loop
 	  (mp:with-timeout (*read-request-timeout* 
 			    (debug-format 5 "request timed out on read~%")
-			    (log-timed-out-request-read sock)
+			    ; this is too common to log, it happens with
+			    ; every keep alive socket when the user stops
+			    ; clicking
+			    ;;(log-timed-out-request-read sock)
 			    (return-from process-connection nil))
 	    (setq req (read-http-request sock)))
 	  (if* (null req)

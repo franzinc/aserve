@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: parse.cl,v 1.14.2.2 2000/03/02 14:17:16 jkf Exp $
+;; $Id: parse.cl,v 1.14.2.3 2000/03/03 03:07:07 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -550,7 +550,29 @@
 				(return))
 		   else (incf start)))))
     po))
-  
+
+
+(defun split-on-character (str char)
+  ;; given a string return a list of the strings between occurances
+  ;; of the given character.
+  ;; If the character isn't present then the list will contain just
+  ;; the given string.
+  (let ((po (split-string str char)))
+    (prog1 (let ((items (parseobj-next po)))
+	     (if* (eql items 1)
+		then ; character doesn't exist, just return the 
+		     ; string in a list
+		     (list str)
+		else (let ((start (parseobj-start po))
+			   (end   (parseobj-end   po))
+			   (res))
+		       (dotimes (i items)
+			 (push (subseq str (svref start i) (svref end i)) res))
+		       (nreverse res))))
+      (free-parseobj po))))
+    
+
+
 (defun split-into-words (str)
   ;; split the given string into words (items separated by white space)
   ;;
