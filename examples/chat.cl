@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.2 2000/07/25 23:27:03 jkf Exp $
+;; $Id: chat.cl,v 1.3 2000/07/26 02:23:58 jkf Exp $
 
 ;; Description:
 ;;   aserve chat program
@@ -328,6 +328,7 @@
 ; functions
 (defun start-chat (&key port home restart (listeners 10))
   ;; start the chat system going
+  (declare (special socket::*dns-configured*))
   
   (unpublish :all t) ; useful during debugging, remove afterwards
   
@@ -355,11 +356,11 @@
   ; setup for reverse dns lookups.  don't do reverse lookups if we
   ; have to use the C library
   #+(version>= 6 0)
-  (if* (and (boundp socket::*dns-configured*)
+  (if* (and (boundp 'socket::*dns-configured*)
 	    socket::*dns-configured*)
      thenret
      else (socket:configure-dns :auto t)
-	  (setq *do-dnscheck socket::*dns-configured*
+	  (setq *do-dnscheck* socket::*dns-configured*
 		socket::*dns-mode* :acldns))
   
   
@@ -1781,9 +1782,12 @@
 
 (defun chatviewers (req ent)
   ;; display page of chat viewers (except us)
-  (let ((chat (chat-from-req req))
+  (let* ((chat (chat-from-req req))
 	(user (user-from-req req))
 	(time (get-universal-time))
+	(is-owner
+	  (equal (and chat (secret-key chat)) 
+		 (request-query-value "s" req)))
 	(qstring)
 	(viewers))
     (if* (null chat)
@@ -1838,7 +1842,30 @@
 						)
 					    (:princ-safe
 					     (user-handle vuser))))
+				   elseif (and is-owner *do-dnscheck*)
+				     then ; name then ip address
+					  (let ((name (viewent-hostname
+						       viewent)))
+					    (if* (null name)
+					       then (setq name
+						      (setf (viewent-hostname
+							     viewent)
+							(socket::dns-query
+							 (viewent-ipaddr
+							  viewent)
+							 :type :ptr
+							 :repeat 1
+							 :timeout 0))))
+					    (if* (null name)
+					       then (setf name
+						      (socket:ipaddr-to-dotted
+						       (viewent-ipaddr
+							viewent))))
+					    
+					  (html
+					   (:princ name)))
 				     else ; ip address
+						    
 					  (html
 					   (:princ
 					    (socket:ipaddr-to-dotted
