@@ -8,9 +8,9 @@
 <body>
 
 <h1 align="center">AllegroServe - A Web Application Server<br>
-<small><small><small>version <font face="Courier New">1.2.26</font></small></small></small></h1>
+<small><small><small>version <font face="Courier New">1.2.27</font></small></small></small></h1>
 
-<p align="left"><strong><small>copyright(c) 2000-2001. Franz Inc</small></strong></p>
+<p align="left"><strong><small>copyright(c) 2000-2003. Franz Inc</small></strong></p>
 
 <h2 align="left">Table of Contents</h2>
 
@@ -22,6 +22,8 @@
 <font face="Courier New">&nbsp; <a href="#f-shutdown">shutdown</a></font><br>
 <a href="#publishing-information">Publishing Information</a><br>
 <font face="Courier New">&nbsp; <a href="#f-publish-file">publish-file</a><br>
+&nbsp;&nbsp;&nbsp; </font><a href="#entity-hook-function">Entity hook function</a><font
+face="Courier New"><br>
 &nbsp; <a href="#f-publish-directory">publish-directory</a><br>
 &nbsp;&nbsp; </font>&nbsp; <a href="#directory-access-files">Directory Access Files</a><font
 face="Courier New"><br>
@@ -329,7 +331,7 @@ an entity assigned, the old entity is replaced by the new entity.</p>
 <p><a name="f-publish-file"></a><strong><font face="Courier New">(publish-file &amp;key
 path host port&nbsp; file content-type class preload cache-p remove <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-authorizer server timeout plist)</font></strong></p>
+authorizer server timeout plist hook)</font></strong></p>
 
 <p>This creates an entity that will return the contents of a file on the disk in response
 to a request.&nbsp;&nbsp; The <strong>url</strong> and <strong>file</strong>&nbsp; must be
@@ -381,6 +383,8 @@ given, the rest of the arguments are optional..&nbsp; The arguments have these m
     argument is <strong>nil</strong> meaning ignore this value and use the timeout value held
     in the server object and retrieved with<strong> wserver-response-timeout</strong>..</li>
   <li><strong>plist</strong> - initial property list for this entity</li>
+  <li><strong>hook</strong> - a function of three arguments: req,ent and extra.
+    &nbsp;&nbsp; See <a href="#entity-hook-function">entity hook function</a>.</li>
 </ul>
 
 <p>The function that handles requests for files will respond correctly to <strong>If-Modified-Since</strong>
@@ -392,6 +396,41 @@ header lines and thus minimizes network traffic. </p>
 
 <pre>(publish-file :path &quot;/password&quot; :file &quot;/etc/passwd&quot; :content-type &quot;text/plain&quot;)</pre>
 
+<h3><a name="entity-hook-function"></a>Entity Hook Function</h3>
+
+<p>AllegroServe supplies many subclasses of entity which automatically generate a
+responses to requests.&nbsp;&nbsp;&nbsp;&nbsp; There are times when user code needs to run
+during the generation of&nbsp; a response by one of the built-in entity classes.
+&nbsp;&nbsp; For example you may wish to add or modify the headers that will be sent back
+with the <strong>publish-file</strong>'s response.&nbsp;&nbsp;&nbsp; The entity hook
+function is called just before the<strong> with-http-body</strong> in the response
+function.&nbsp; At this point all the response headers have been specified but the hook
+function is free to change them or add new headers.</p>
+
+<p>The entity hook function takes three arguments: <strong>req</strong>, <strong>ent</strong>
+and <strong>extra</strong>.&nbsp;&nbsp; <strong>Req</strong> and <strong>ent</strong> are
+the familiar http-request and entity arguments.&nbsp;&nbsp; <strong>Extra</strong> is
+usually <strong>nil</strong> but will be one of the following symbols to tell&nbsp; the
+hook function if it's being called in a special context.</p>
+
+<table border="1" width="100%">
+  <tr>
+    <td width="21%"><strong>:illegal-range</strong></td>
+    <td width="79%">request has asked for a range of bytes that is not present in the entity.
+    &nbsp; As a result a &quot;416 - Illegal Range Specified&quot;&nbsp; response is being
+    generated.</td>
+  </tr>
+  <tr>
+    <td width="21%"><strong>:in-range</strong></td>
+    <td width="79%">request has asked for a range of bytes and that range is being returned.</td>
+  </tr>
+  <tr>
+    <td width="21%"><strong>:not-modified</strong></td>
+    <td width="79%">request contains an &quot;If Not Modified&quot; header and AllegroServe is
+    returning a &quot;304 - Not Modified&quot; response.</td>
+  </tr>
+</table>
+
 <p>&nbsp;</p>
 
 <p>&nbsp;</p>
@@ -399,7 +438,8 @@ header lines and thus minimizes network traffic. </p>
 <p><a name="f-publish-directory"></a><strong><font face="Courier New">(publish-directory
 &amp;key prefix host port destination remove authorizer server <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-indexes filter timeout plist publisher access-file)</font></strong></p>
+indexes filter timeout plist publisher access-file<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; hook)</font></strong></p>
 
 <p><strong>publish-directory</strong> is used to publish a complete directory tree of
 files.&nbsp; This is similar to how web servers such as Apache publish files. &nbsp;
@@ -409,13 +449,14 @@ created and published.&nbsp; </p>
 
 <p><strong>publish-directory</strong> creates a mapping from all urls whose name begins
 with<strong> prefix</strong> to files stored in the directory specified by the <strong>destination</strong>.&nbsp;&nbsp;
-The <strong>host</strong>, <strong>port, remove, authorizer, plist </strong>and <strong>server</strong>
+The <strong>host</strong>, <strong>port, remove, authorizer, plist, hook </strong>and <strong>server</strong>
 arguments are as described above for <strong>publish-file.</strong>
 &nbsp;&nbsp;&nbsp;&nbsp; The <strong>timeout</strong> argument defaults as described in <strong>publish-file</strong>.
-&nbsp; The <strong>access-file</strong> argument names the <a
-href="#directory-access-files">access file</a> name which will be used in this directory
-tree. When a request comes in for which there isn't an entity that matches it
-exactly,&nbsp; AllegroServe checks to see if a prefix of the request has been
+&nbsp;The <strong>hook</strong> argument specifies what hook function should be put in the
+entities that <strong>publish-directory</strong> creates.&nbsp;&nbsp; The <strong>access-file</strong>
+argument names the <a href="#directory-access-files">access file</a> name which will be
+used in this directory tree. When a request comes in for which there isn't an entity that
+matches it exactly,&nbsp; AllegroServe checks to see if a prefix of the request has been
 registered.&nbsp; If so, and if the resulting entity is a <strong>directory-entity</strong>
 as created by this function, then it strips the prefix off the given request and appends
 the remaining part of the request to the destination string.&nbsp; It then publishes that
@@ -641,19 +682,21 @@ to subdirectories<br>
 <p>&nbsp;</p>
 
 <p><a name="f-publish"></a><strong><font face="Courier New">(publish &amp;key path host
-port content-type function class format remove server authorizer timeout plist)</font></strong></p>
+port content-type function class format remove server authorizer timeout plist hook)</font></strong></p>
 
 <p>This creates a mapping from a url to a <strong>computed-entity</strong>, that is an
 entity that computes its response every time a request comes in.&nbsp; The <strong>path</strong>,
-<strong>host</strong>, <strong>port</strong>, <strong>remove, server</strong> , <strong>authorizer
-</strong>and <strong>class</strong> arguments are as in the other publish
+<strong>host</strong>, <strong>port</strong>, <strong>remove, server</strong> , <strong>authorizer,
+hook </strong>and <strong>class</strong> arguments are as in the other publish
 functions.&nbsp;&nbsp;The <strong>timeout</strong> argument defaults to <strong>nil </strong>always.&nbsp;&nbsp;
 The <strong>content-type</strong> sets a default value for the response to the request but
 this can be overridden.&nbsp; The <strong>format</strong> argument is either <strong>:text
 </strong>(the default) or <strong>:binary</strong> and it specifies the kind of value that
 will be sent back (after the response headers, which are always in text).&nbsp;&nbsp; This
 value is only important if the response is generated in a particular way (described
-below).</p>
+below).&nbsp;&nbsp; The value of the<strong> hook</strong> argument is stored in the
+entity created however the hook function will only be run if the <strong>function</strong>
+supplied makes use of it.</p>
 
 <p>The <strong>function </strong>argument is&nbsp; a function of two arguments: an object
 of class <strong>http-request</strong> that holds a description of the request, and an
@@ -666,7 +709,7 @@ the response is only that the request wasn't found.</p>
 <p><a name="f-publish"></a><a name="f-publish-prefix"></a><strong><font face="Courier New">(publish-prefix
 &amp;key prefix host port content-type function class <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-format remove server authorizer timeout plist)</font></strong></p>
+format remove server authorizer timeout plist hook)</font></strong></p>
 
 <p>This is like <strong>publish </strong>except that it declares <strong>function</strong>
 to be the handler for all urls that begin with the string <strong>prefix</strong>.
@@ -677,19 +720,21 @@ handler for &quot;/foo/bar.html&quot; then the specific handler will be chosen i
 handler is used to make available a whole directory of files since their complete names
 being with a common prefix (namely the directory in which the files are located).
 &nbsp;&nbsp; If you want to publish a whole directory then you probably want to use <strong>publish-directory</strong>
-since it has a number of features to support file publishing.</p>
+since it has a number of features to support file publishing.&nbsp;&nbsp; The value of the<strong>
+hook</strong> argument is stored in the entity created however the hook function will only
+be run if the <strong>function</strong> supplied makes use of it.</p>
 
 <p>&nbsp;</p>
 
 <p><a name="f-publish-multi"></a><strong><font face="Courier New">(publish-multi &amp;key
-path host port content-type items class remove server authorizer timeout)</font></strong></p>
+path host port content-type items class remove server authorizer timeout hook)</font></strong></p>
 
 <p>Some web pages are created from information from various sources.&nbsp;&nbsp; <strong>publish-multi</strong>
 allows you to specify a sequence of places that supply data for the combined web page.
 &nbsp; The data for each page is cached by <strong>publish-multi</strong> so that minimal
 conputation is required each time the page is requested.&nbsp;&nbsp;&nbsp; </p>
 
-<p>The <strong>host, port, content-type, class, remove, server authorizer </strong>and<strong>
+<p>The <strong>host, port, content-type, class, remove, server, authorizer, hook </strong>and<strong>
 timeout</strong> arguments are the same as those of the other publish functions.
 &nbsp;&nbsp; The <strong>items </strong>argument is unique to <strong>publish-multi</strong>
 and is a list of zero or more of the following objects 
