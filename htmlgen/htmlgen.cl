@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.11 2001/04/03 22:18:43 jkf Exp $
+;; $Id: htmlgen.cl,v 1.12 2001/04/13 17:12:51 jkf Exp $
 
 ;; Description:
 ;;   html generator
@@ -325,7 +325,10 @@
 (defun html-print-subst (form subst stream)
   ;; Print the given lhtml form to the given stream
   (assert (streamp stream))
+    
+	       
   (let* ((attrs)
+	 (attr-name)
 	 (name)
 	 (possible-kwd (if* (atom form)
 			  then form
@@ -341,14 +344,15 @@
 	       else ; see if we should subst
 		    (if* (and subst 
 			      attrs 
-			      (setq name (html-process-name-attr ent))
-			      (setq name (getf attrs name))
-			      (setq attrs (assoc name subst :test #'equal)))
+			      (setq attr-name (html-process-name-attr ent))
+			      (setq name (getf attrs attr-name))
+			      (setq attrs (html-find-value name subst)))
 		       then
-			    (if* (functionp (cdr attrs))
-			       then (funcall (cdr attrs) stream)
-			       else (return-from html-print-subst
-				      (html-print-subst
+			    (return-from html-print-subst
+			      (if* (functionp (cdr attrs))
+				 then 
+				      (funcall (cdr attrs) stream)
+				 else (html-print-subst
 				       (cdr attrs)
 				       subst
 				       stream)))))
@@ -360,35 +364,77 @@
 	       then (funcall print-handler ent :set nil nil nil stream)
 	     elseif (stringp form)
 	       then (write-string form stream)
-	       else (error "bad form: ~s" form))
+	       else (princ form stream))
      elseif ent
        then (funcall print-handler 
 		     ent
 		     :full
-		     (if* (consp (car form))
-			then (cdr (car form)))
+		     (if* (consp (car form)) then (cdr (car form)))
 		     form 
 		     subst
 		     stream)
        else (error "Illegal form: ~s" form))))
-	  
+
+  
+(defun html-find-value (key subst)
+  ; find the (key . value) object in the subst list.
+  ; A subst list is an assoc list ((key . value) ....)
+  ; but instead of a (key . value) cons you may have an assoc list
+  ;
+  (let ((to-process nil)
+	(alist subst))
+    (loop
+      (do* ((entlist alist (cdr entlist))
+	    (ent (car entlist) (car entlist)))
+	  ((null entlist) (setq alist nil))
+	(if* (consp (car ent))
+	   then ; this is another alist
+		(if* (cdr entlist)
+		   then (push (cdr entlist) to-process))
+		(setq alist ent)
+		(return) ; exit do*
+	 elseif (equal key (car ent))
+	   then (return-from html-find-value ent)))
+	       
+      (if* (null alist)
+	 then ; we need to find a new alist to process
+	     
+	      (if* to-process
+		 then (setq alist (pop to-process))
+		 else (return))))))
+
 (defun html-standard-print (ent cmd args form subst stream)
   ;; the print handler for the normal html operators
   (ecase cmd
     (:set ; just turn it on
      (format stream "<~a>" (html-process-key ent)))
     (:full ; set, do body and then unset
-     (if* args
-	then (format stream "<~a" (html-process-key ent))
-	     (do ((xx args (cddr xx)))
-		 ((null xx))
-	       ; assume that the arg is already escaped since we read it
-	       ; from the parser
-	       (format stream " ~a=\"~a\"" (car xx) (cadr xx)))
-	     (format stream ">")
-	else (format stream "<~a>" (html-process-key ent)))
-     (dolist (ff (cdr form))
-       (html-print-subst ff subst stream))
+     (let (iter)
+       (if* args
+	  then (if* (and (setq iter (getf args :iter))
+			 (setq iter (html-find-value iter subst)))
+		  then ; remove the iter and pre
+		       (setq args (copy-list args))
+		       (remf args :iter)
+		       (funcall (cdr iter)
+				(cons (cons (caar form)
+					    args)
+				      (cdr form))
+				subst
+				stream)
+		       (return-from html-standard-print)
+		  else
+		       (format stream "<~a" (html-process-key ent))
+		       (do ((xx args (cddr xx)))
+			   ((null xx))
+			 ; assume that the arg is already escaped 
+			 ; since we read it
+			 ; from the parser
+			 (format stream " ~a=\"~a\"" (car xx) (cadr xx)))
+		       (format stream ">"))
+	  else (format stream "<~a>" (html-process-key ent)))
+       (dolist (ff (cdr form))
+	 (html-print-subst ff subst stream)))
      (if* (html-process-has-inverse ent)
 	then ; end the form
 	     (format stream "</~a>" (html-process-key ent))))))
@@ -570,7 +616,7 @@
 (def-std-html :i     t nil)
 (def-std-html :iframe     t nil)
 (def-std-html :ilayer     t nil)
-(def-std-html :img     nil nil)
+(def-std-html :img     nil :id)
 (def-std-html :input     nil nil)
 (def-std-html :ins     t nil)
 (def-std-html :isindex    nil nil)

@@ -1,3 +1,13 @@
+2001-04-04  John Foderaro  <jkf@tiger.franz.com>
+
+	* changed how publish-directory deals with urls that
+	  point to directories and not files.  It used to 
+	  pretend that you specified an index.html or index.htm
+	  file in that directory.  This was bad since relative urls
+	  in the index file would not be processed correctly. with
+	  the change it now redirects to the index.html or index.htm
+	  file so that the browser knows what it's getting.
+
 2001-03-22  John Foderaro  <jkf@tiger.franz.com>
 1.1.41
 	* add os-processes argument to net.aserve:start 
