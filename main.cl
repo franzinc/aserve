@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.117 2001/10/18 21:27:52 jkf Exp $
+;; $Id: main.cl,v 1.118 2001/10/18 21:46:37 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -500,7 +500,12 @@
 		 :initform *standard-output*)
    (names :accessor vhost-names
 	  :initarg :names
-	  :initform nil)))     
+	  :initform nil)
+   
+   ; vhost specific filters, see wserver-filters for doc
+   (filters :accessor vhost-filters
+	    :initarg :filters
+	    :initform nil)))
 
 
 ;;;;;; macros 

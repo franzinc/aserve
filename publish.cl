@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.58 2001/10/18 17:17:14 jkf Exp $
+;; $Id: publish.cl,v 1.59 2001/10/18 21:46:37 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -726,11 +726,16 @@
 				
 
 (defmethod handle-request ((req http-request))
+
   
-  (dolist (filter (wserver-filters *wserver*))
-    ;; run all filters.  a return value of :done means don't
-    ;; run any further filters
+  ;; run all filters, starting with vhost filters
+  ;  a return value of :done means don't
+  ;  run any further filters
+  (dolist (filter (vhost-filters (request-vhost req))
+	    (dolist (filter (wserver-filters *wserver*))
+	      (if* (eq :done (funcall filter req)) then (return))))    
     (if* (eq :done (funcall filter req)) then (return)))
+  
     
   (dolist (locator (wserver-locators *wserver*))
     (let ((ent (standard-locator req locator)))
