@@ -1,4 +1,37 @@
-;; header parsing
+;; -*- mode: common-lisp; package: net.aserve -*-
+;;
+;; headers.cl
+;;
+;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA 
+;;
+;; This code is free software; you can redistribute it and/or
+;; modify it under the terms of the version 2.1 of
+;; the GNU Lesser General Public License as published by 
+;; the Free Software Foundation, as clarified by the AllegroServe
+;; prequel found in license-allegroserve.txt.
+;;
+;; This code is distributed in the hope that it will be useful,
+;; but without any warranty; without even the implied warranty of
+;; merchantability or fitness for a particular purpose.  See the GNU
+;; Lesser General Public License for more details.
+;;
+;; Version 2.1 of the GNU Lesser General Public License is in the file 
+;; license-lgpl.txt that was distributed with this file.
+;; If it is not present, you can access it from
+;; http://www.gnu.org/copyleft/lesser.txt (until superseded by a newer
+;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
+;; Suite 330, Boston, MA  02111-1307  USA
+;;
+;;
+;; $Id: headers.cl,v 1.2 2000/08/17 21:38:30 jkf Exp $
+
+;; Description:
+;;   header parsing
+
+;;- This code in this file obeys the Lisp Coding Standard found in
+;;- http://www.franz.com/~jkf/coding_standards.html
+;;-
+
 
 (in-package :net.aserve)
 
@@ -25,6 +58,16 @@
     ;; version of this header
     )
 
+(defvar *header-client-array*
+    ;; indexed by header number, contains a kwd symbol specifying how
+    ;; to treat his header when proxying a client request to a server
+    )
+
+(defvar *header-server-array*
+    ;; indexed by header number, contains a kwd symbol specifying how
+    ;; to treat his header when proxying a server response to a client
+    )
+
 (defvar *header-count*
     ;; the number of headers we're tracking
     )
@@ -32,55 +75,63 @@
 
 (eval-when (compile eval)
   ;; the headers from the http spec
+  ;; Following the header name we specify how to transfer client
+  ;; request headers and server response headers
+  ;; (header-name client  server)
+  ;; client/server
+  ;;	:p  - pass this header on
+  ;;    :np - don't pass this header on verbatim
+  ;;	:nf - this header won't be found
+  ;;
   (defparameter *http-headers* 
-      '("Accept"
-	"Accept-Charset"
-	"Accept-Encoding"
-	"Accept-Language"
-	"Accept-Ranges"
-	"Age"
-	"Allow"
-	"Authorization"
-	"Cache-control"
-	"Connection"
-	"Content-Encoding"
-	"Content-Language"
-	"Content-Length"
-	"Content-Location"
-	"Content-Md5"
-	"Content-Range"
-	"Content-Type"
-	"Cookie"
-	"Date"
-	"Etag"
-	"Expect"
-	"Expires"
-	"From"
-	"Host"
-	"If-Match"
-	"If-Modified-Since"
-	"If-None-Match"
-	"If-Range"
-	"If-Unmodified-Since"
-	"Last-Modified"
-	"Location"
-	"Max-Forwards"
-	"Pragma"
-	"Proxy-Authenticate"
-	"Proxy-Authorization"
-	"Range"
-	"Referer"
-	"Retry-After"
-	"Server"
-	"TE"
-	"Trailer"
-	"Transfer-Encoding"
-	"Upgrade"
-	"User-Agent"
-	"Vary"
-	"Via"
-	"Warning"
-	"WWW-Authenticate"
+      '(("Accept" :p :nf) 
+	("Accept-Charset" :p :nf)
+	("Accept-Encoding" :p :nf)
+	("Accept-Language" :p :nf)
+	("Accept-Ranges" :p :nf)
+	("Age" :nf :p)
+	("Allow" :nf :p)
+	("Authorization" :p :nf)
+	("Cache-control" :p :p)
+	("Connection" :np :np)
+	("Content-Encoding" :p :p)
+	("Content-Language" :p :p)
+	("Content-Length" :np :np)
+	("Content-Location" :p :p)
+	("Content-Md5" :p :p)
+	("Content-Range" :p :p)
+	("Content-Type" :p :p)
+	("Cookie" :nf :p)
+	("Date" :p :p)
+	("Etag" :p :p)
+	("Expect" :np :nf)
+	("Expires"             :nf   :p)
+	("From"                :p    :nf)
+	("Host"                :p    :nf)
+	("If-Match"            :p    :nf)
+	("If-Modified-Since"   :p    :nf)
+	("If-None-Match"       :p    :nf)
+	("If-Range"            :p    :nf)
+	("If-Unmodified-Since" :p    :nf)
+	("Last-Modified"       :nf   :p)
+	("Location" 	       :nf   :p)
+	("Max-Forwards"        :np   :nf)  
+	("Pragma"              :p    :p)
+	("Proxy-Authenticate"  :nf   :p)
+	("Proxy-Authorization" :p    :nf)
+	("Range" :p :nf)
+	("Referer" :p :nf)
+	("Retry-After" :nf :p)
+	("Server" :nf :p)
+	("TE" :p :nf)
+	("Trailer" :np :np)
+	("Transfer-Encoding" :np :np)
+	("Upgrade" :np :nf)
+	("User-Agent" :p :nf)
+	("Vary" :nf :p)
+	("Via" :np :np)  ; modified by proxy both dierctions
+	("Warning" :p :p)
+	("WWW-Authenticate" :nf :p)
 	)))
 
 (eval-when (compile eval)
@@ -89,6 +140,7 @@
 	  (total-length 0))
       ; compute max and total length
       (dolist (header *http-headers*)
+	(setq header (car header))
 	(let ((len (length header)))
 	  (setq max-length (max max-length len))
 	  (incf total-length len)))
@@ -103,6 +155,7 @@
 	      (plists)
 	      )
 	  (dolist (header *http-headers*)
+	    (setq header (car header))
 	    (let ((len (length header)))
 
 	      (setq header (string-downcase header))
@@ -130,7 +183,18 @@
 		  (setq *header-name-array*
 		    ',(make-array (length *http-headers*)
 				  :initial-contents
-				  *http-headers*))
+				  (mapcar #'first *http-headers*)))
+		  
+		  (setq *header-client-array*
+		    ',(make-array (length *http-headers*)
+				  :initial-contents
+				  (mapcar #'second *http-headers*)))
+		  
+		  (setq *header-server-array*
+		    ',(make-array (length *http-headers*)
+				  :initial-contents
+				  (mapcar #'third *http-headers*)))
+		  
 		  (setq  *header-count* 
 		    ;; number of distinct headers
 		    ,(1+ header-number))
@@ -297,8 +361,17 @@
 			    then (decf back)
 			    else (return)))
 		       
-		       
-		       (push (cons beginhv  back) (svref ans hnum))
+		       ; must keep the header items in the same order 
+		       ; they were received (according to the http spec)
+		       (let ((cur (svref ans hnum))
+			     (new (list (cons beginhv  back))))
+			 (if* cur
+			    then (setq cur (append cur new))
+			    else (setq cur new))
+			 
+			 (setf (svref ans hnum) cur))
+			 
+				 
 		       (setq beginhv nil)
 		       (setq state 0))
 		else (setq state 2))))))
@@ -370,6 +443,15 @@
 	       `(the fixnum
 		  (+ (the fixnum (ash (aref buff ,index) 8))
 		     (aref buff (1+ ,index))))))
+    
+    ;; be a nice guy and handle a symbolic header keyword name
+    (if* (symbolp header-index)
+       then (let ((ans (get header-index 'kwdi)))
+	      (if* (null ans)
+		 then (error "no such header as ~s" header-index))
+	      (setq header-index ans)))
+    
+	    
     (let ((table-index (- (length buff)
 			  2
 			  (ash header-index 1) ; *2 
@@ -397,40 +479,51 @@
 				  (nreverse res)))
 		   else (values first-start first-end)))))))
 
-						  
-(defun header-buffer-header-value (req header)
+(defun buffer-subseq-to-string (buff start end)
+  ;; extract a subsequence of the usb8 buff and return it as a string
+  (let ((str (make-string (- end start))))
+    (do ((i start (1+ i))
+	 (ii 0 (1+ ii)))
+	((>= i end))
+      (setf (schar str ii) 
+	(code-char (aref buff i))))
+    str))
+
+(defun header-buffer-req-header-value (req header)
+  ;; see header-buffer-header-value for what this does.
+  (header-buffer-header-value (request-header-block req) header))
+
+
+(defun header-buffer-header-value (buff header)
   ;; header is a number or keyword symbol.
   ;; return nil or the header value as a string
+  ;; 
+  ;; according to the http spec, multiple headers with the same name
+  ;; is only allowed when the header value is a comma separated list
+  ;; of items, and the sequence of header values can be considered
+  ;; as one big value separated by commas
+  ;;
   (if* (symbolp header)
      then (setq header (get header 'kwdi)))
   
   (if* (fixnump header)
-     then (let (buff)
-	    (multiple-value-bind (start end)
-		(header-buffer-values 
-		 (setq buff (request-header-block req)) header)
-	      ; we only get the first value
-	      (if* start
-		 then (let ((str (make-string (- end start))))
-			(do ((i start (1+ i))
-			     (ii 0 (1+ ii)))
-			    ((>= i end))
-			  (setf (schar str ii) 
-			    (code-char (aref buff i))))
-			str))))))
-
-  
-    
-		    
-		    
-			
-			
-		    
-	      
-      
-			  
-      
-      
+     then 
+	  (multiple-value-bind (start end others)
+	      (header-buffer-values buff header)
+	    ; we only get the first value
+	    (if* start
+	       then (let ((ans (buffer-subseq-to-string buff start end)))
+		      (if* others
+			 then ; must concatente the others as well
+			      (let (res)
+				(dolist (oth others)
+				  (push (buffer-subseq-to-string buff 
+								 (car oth)
+								 (cdr oth))
+					res)
+				  (push ", " res))
+				(apply #'concatenate 'string ans res))
+			 else ans))))))
 
 	
 	
@@ -514,22 +607,12 @@
 
       
       (dotimes (i *header-count*)
-	(multiple-value-bind (start end rest)
-	    (header-buffer-values thebuf i)
-	  (if* start
-	     then (push (cons start end) rest))
-	  (dolist (res rest)
-	  
-	    (if* res
-	       then (format t "~d: ~a ~s '" 
-			    i
-			    (svref *header-name-array* i)
-			    res)
-		    (do ((ind (car res) (1+ ind)))
-			((>= ind (cdr res)))
-		      (format t "~c" (code-char (aref thebuf ind))))
-		    (format t "'")
-		    (terpri))))))))
+	(let ((val (header-buffer-header-value thebuf i)))
+	  (if* val
+	     then (format t "~a: ~a~%"
+			  (svref *header-name-array* i)
+			  val)))))))
+	
 
 		    
 (defun dump-header-block (thebuf)

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.56 2000/08/17 14:03:35 jkf Exp $
+;; $Id: main.cl,v 1.57 2000/08/17 21:38:30 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -459,78 +459,78 @@
 	
 
 
-(defmacro header-slot-value (obj name)
+(defmacro header-slot-value (req name)
   ;; name is a keyword symbol naming the header value.
-  ;; retrive the slot's value from the http-request obj obj.
+  ;; retrive the slot's value from the http-request req req.
   (let (ent)
     (if* (stringp name)
        then (header-name-error name))
     (if* (setq ent (assoc name *fast-headers* :test #'eq))
        then ; has a fast accesor
-	    `(or (,(third ent) ,obj)
-		 (setf (,(third ent) ,obj)
-		   (or (header-buffer-header-value ,obj ,name)
+	    `(or (,(third ent) ,req)
+		 (setf (,(third ent) ,req)
+		   (or (header-buffer-req-header-value ,req ,name)
 		       "" ; to speed up the next search
 		       )))
        else ; must get it from the alist
-	    `(header-slot-value-other ,obj ,name))))
+	    `(header-slot-value-other ,req ,name))))
 
 (defun header-slot-value-other (req name)
   ;; handle out of the the 'extra' headers
   (let ((ent (assoc name (request-headers req) :test #'eq)))
     (if* ent
        then (cdr ent)
-       else (let ((ans (or (header-buffer-header-value req name) "")))
+       else (let ((ans (or (header-buffer-req-header-value req name) "")))
 	      (push (cons name ans) (request-headers req))
 	      ans))))
       
 
 
 
-(defsetf header-slot-value (obj name) (newval)
+(defsetf header-slot-value (req name) (newval)
   ;; set the header value regardless of where it is stored
   (let (ent)
     (if* (stringp name)
        then (header-name-error name))
     (if* (setq ent (assoc name *fast-headers* :test #'eq))
-       then `(setf (,(third ent) ,obj) ,newval)
+       then `(setf (,(third ent) ,req) ,newval)
        else (let ((genvar (gensym))
-		  (nobj (gensym)))
-	      `(let* ((,nobj ,obj)
-		      (,genvar (assoc ,name (request-headers ,nobj) 
+		  (nreq (gensym)))
+	      `(let* ((,nreq ,req)
+		      (,genvar (assoc ,name (request-headers ,nreq) 
 				      :test #'eq)))
 		 (if* (null ,genvar)
 		    then (push (setq ,genvar (cons ,name nil))
-			       (request-headers ,nobj)))
+			       (request-headers ,nreq)))
 		 (setf (cdr ,genvar) ,newval))))))
 
-(defmacro reply-header-slot-value (obj name)
+(defmacro reply-header-slot-value (req name)
   ;; name is a string naming the header value (all lower case)
-  ;; retrive the slot's value from the http-request obj obj.
+  ;; retrive the slot's value from the http-request req req.
   (let (ent)
     (if* (stringp name)
        then (header-name-error name))
     (if* (setq ent (assoc name *fast-reply-headers* :test #'eq))
        then ; has a fast accesor
-	    `(,(third ent) ,obj)
+	    `(,(third ent) ,req)
        else ; must get it from the alist
-	    `(cdr (assoc ,name (request-reply-headers ,obj) :test #'eq)))))
+	    `(cdr (assoc ,name (request-reply-headers ,req) :test #'eq)))))
 
-(defsetf reply-header-slot-value (obj name) (newval)
+(defsetf reply-header-slot-value (req name) (newval)
   ;; set the header value regardless of where it is stored
   (let (ent)
     (if* (stringp name)
        then (header-name-error name))
     (if* (setq ent (assoc name *fast-reply-headers* :test #'eq))
-       then `(setf (,(third ent) ,obj) ,newval)
+       then `(setf (,(third ent) ,req) ,newval)
        else (let ((genvar (gensym))
-		  (nobj (gensym)))
-	      `(let* ((,nobj ,obj)
-		      (,genvar (assoc ,name (request-reply-headers ,nobj) 
+		  (nreq (gensym)))
+	      `(let* ((,nreq ,req)
+		      (,genvar (assoc ,name (request-reply-headers ,nreq) 
 				      :test #'eq)))
 		 (if* (null ,genvar)
 		    then (push (setq ,genvar (cons ,name nil))
-			       (request-reply-headers ,nobj)))
+			       (request-reply-headers ,nreq)))
 		 (setf (cdr ,genvar) ,newval))))))
 
 
@@ -539,12 +539,12 @@
 by keyword symbols and not by strings"
 	 name))
 
-(defmacro header-slot-value-integer (obj name)
+(defmacro header-slot-value-integer (req name)
   ;; if the header value exists and has an integer value
   ;; return two values: the value of the integer and t
   ;; else return nil
   
-  `(header-decode-integer (header-slot-value ,obj ,name)))
+  `(header-decode-integer (header-slot-value ,req ,name)))
 
 
 
