@@ -70,7 +70,7 @@ have made Lisp a set-user-id root program.</p>
 
 <p>The&nbsp; are quite a few keyword arguments to <strong>start</strong>, but in practice
 you only need be concerned with <strong>:port</strong> and <strong>:listeners.
-&nbsp;&nbsp; </strong>The arguments have the following meanings: 
+&nbsp;&nbsp;&nbsp; </strong>The arguments have the following meanings: 
 
 <ul>
   <li>port -- the port on which to open the web server.&nbsp; 80 is the default.</li>
@@ -210,17 +210,18 @@ destination server)</font></strong></p>
 <p>This creates a mapping from all urls whose name begins with<strong> prefix</strong> to
 files stored in the directory specified by the destination.&nbsp;&nbsp; The <strong>host</strong>,
 <strong>port </strong>and <strong>server</strong> arguments are as described above for <strong>publish.</strong>
-&nbsp;&nbsp;&nbsp; When a request comes in for which there isn't an entity that matches it
-exactly,&nbsp; Neo checks to see if a prefix of the request matches the request.&nbsp; If
-so, and if the resulting entity is a <strong>directory-entity</strong> as created by this
-function, then it strips the prefix off the given request and appends the remaining part
-of the request to the destination string.&nbsp; It then publishes that (using <strong>publish-file</strong>
-and computing the content-type from the file type).&nbsp;&nbsp; Next that <strong>file-entity
-</strong>is made to handle the request in the normal manner.</p>
+&nbsp;&nbsp;&nbsp;&nbsp; When a request comes in for which there isn't an entity that
+matches it exactly,&nbsp; Neo checks to see if a prefix of the request matches the
+request.&nbsp; If so, and if the resulting entity is a <strong>directory-entity</strong>
+as created by this function, then it strips the prefix off the given request and appends
+the remaining part of the request to the destination string.&nbsp; It then publishes that
+(using <strong>publish-file</strong> and computing the content-type from the file type).
+&nbsp;&nbsp; Next that <strong>file-entity </strong>is made to handle the request in the
+normal manner.</p>
 
 <p>We plan to make a number of refinements to <strong>publish-directory</strong> including
-the ability to specify how deep in the directory structure it will look and also &nbsp;
-restricting what kinds of files it will match.</p>
+the ability to specify how deep in the directory structure it will look and also
+&nbsp;&nbsp; restricting what kinds of files it will match.</p>
 
 <p>&nbsp;</p>
 
@@ -311,7 +312,7 @@ timeout check-modified response content-type) <br>
 and then it runs the code in the <strong>body</strong> which will actually send out the
 response.&nbsp; <strong>req</strong> and <strong>ent</strong> are the request and entity
 objects passed into the function designated to compute the response for the request.
-&nbsp;&nbsp; <strong>timeout </strong>sets a time limit for the computation of the
+&nbsp;&nbsp;&nbsp; <strong>timeout </strong>sets a time limit for the computation of the
 response.&nbsp;&nbsp; The default is 60 (meaning 60 seconds).&nbsp;&nbsp; If <strong>check-modified
 </strong>is true (the default) then the <strong>last-modified </strong>time stored in the
 entity object will be compared against the <strong>if-modified-since </strong>time of the
@@ -319,8 +320,8 @@ request and if that indicates that the client already has the latest copy of thi
 then a <strong>not-modified</strong> response will be automatically returned to the client
 and the <strong>body </strong>of this macro will not be run.&nbsp;&nbsp; <strong>response </strong>is
 an object contaning the code and description of the http response we wish to return.
-&nbsp; The default value is the value of <strong>*response-ok*</strong> (which has a code
-of 200 and a string descriptor &quot;OK&quot;).&nbsp;&nbsp; <strong>content-type </strong>is
+&nbsp;&nbsp; The default value is the value of <strong>*response-ok*</strong> (which has a
+code of 200 and a string descriptor &quot;OK&quot;).&nbsp;&nbsp; <strong>content-type </strong>is
 a string describing the MIME type of the body (if any) sent after the headers.&nbsp; It
 has a form like &quot;text/html&quot;.&nbsp;&nbsp; If <strong>content-type</strong> isn't
 given here then the content-type value in the entity (which is set in the call to <strong>publish)</strong>
@@ -329,13 +330,13 @@ will be used.</p>
 <p align="left">&nbsp;</p>
 
 <p align="left">An http response consists of a line describing the response code, followed
-by headers (unless it's the HTTP/0.9 protocol in which case there are no headers), &nbsp;
-and then followed by the body (if any) of the response.&nbsp;&nbsp; <strong>with-http-response</strong>
+by headers (unless it's the HTTP/0.9 protocol in which case there are no headers),
+&nbsp;&nbsp; and then followed by the body (if any) of the response.&nbsp;&nbsp; <strong>with-http-response</strong>
 doesn't normally send anything to the client.&nbsp; It only does so when it determines
 that the <strong>if-modified-since</strong> predicate doesn't hold and that it must send
 back a <strong>not-modified</strong> response.&nbsp;&nbsp;&nbsp; Thus in the normal case
 it isn't enough, even if there no body to send, to just call <strong>with-http-response</strong>.
-&nbsp;&nbsp;&nbsp;&nbsp; This is where the <strong>with-http-body </strong>is used.</p>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; This is where the <strong>with-http-body </strong>is used.</p>
 
 <p align="left">&nbsp;</p>
 
@@ -347,7 +348,7 @@ headers)&nbsp; &amp;rest body)</font></strong></p>
 <p align="left">This macro causes the whole http response to be sent out.&nbsp; The macro
 itself will send out everything except the body of the response.&nbsp; That is the
 responsibility of the code supplied as the <strong>body </strong>form of the macro.
-&nbsp;&nbsp; In cases where there is no body to the response being sent it is still
+&nbsp;&nbsp;&nbsp; In cases where there is no body to the response being sent it is still
 necessary to call <strong>with-http-body </strong>so that the other parts of the response
 are sent out, e.g.<font face="Courier New"> </font>at a minimum you should put<font
 face="Courier New"> (with-http-body (req ent)) </font>in the body of an with-http-response</p>
@@ -355,10 +356,10 @@ face="Courier New"> (with-http-body (req ent)) </font>in the body of an with-htt
 <p align="left">The <strong>format</strong> argument specifies whether the code in the <strong>body</strong>
 will want to write <strong>:text</strong> (e.g. <strong>write-char</strong>) or <strong>:binary</strong>
 (e.g. <strong>write-byte</strong>) when it writes the data of the body of the response.
-&nbsp;&nbsp;&nbsp; Based on the value of the <strong>format</strong> argument, Neo will
-create the correct kind of response stream.&nbsp;&nbsp; If <strong>format </strong>is not
-specified here it will default to the value specified when <strong>publish</strong> was
-called to create the entity.</p>
+&nbsp;&nbsp;&nbsp;&nbsp; Based on the value of the <strong>format</strong> argument, Neo
+will create the correct kind of response stream.&nbsp;&nbsp; If <strong>format </strong>is
+not specified here it will default to the value specified when <strong>publish</strong>
+was called to create the entity.</p>
 
 <p align="left">The <strong>headers</strong> argument is a list of conses, where the car
 is the header name (a string) and the cdr is the header value.&nbsp; These headers are
@@ -383,8 +384,8 @@ browser sends the result of a form with&nbsp; a POST method.</p>
 <p><strong><font face="Courier New">(header-slot-value request header-name)</font></strong></p>
 
 <p>Return the value given in the request for the given header-name (a string).
-&nbsp;&nbsp;&nbsp;&nbsp; The header-name string should be all lower case.&nbsp; If the
-header wasn't present in this request then nil will be returned.&nbsp;&nbsp; <strong>header-slot-value</strong>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The header-name string should be all lower case.&nbsp; If
+the header wasn't present in this request then nil will be returned.&nbsp;&nbsp; <strong>header-slot-value</strong>
 is a macro that will expand into a fast accessor if the <strong>header-name</strong> is a
 constant string.</p>
 
@@ -407,7 +408,7 @@ the cdr is a string giving the value of the argument.</p>
 server.&nbsp;&nbsp; A form consists of a number of objects, such as text fields, file
 fields, check boxes and radio buttons.&nbsp;&nbsp; Each field has a name.&nbsp;&nbsp; When
 the user takes a certain action, the form data is encoded and sent to the web server.
-&nbsp;&nbsp; There are three ways that data can be sent to the web server.&nbsp; The
+&nbsp;&nbsp;&nbsp; There are three ways that data can be sent to the web server.&nbsp; The
 method used is determined by the attributes of the <strong>&lt;form&gt;</strong> tag that
 defines the form 
 
@@ -463,7 +464,7 @@ recognized.&nbsp;&nbsp; </p>
 <p><strong><font face="Courier New">(get-multipart-header request)</font></strong></p>
 
 <p>This returns nil or&nbsp; the MIME headers for the next form field in alist form.
-&nbsp;&nbsp; If nil is returned then there is no more form data.&nbsp;&nbsp; </p>
+&nbsp;&nbsp;&nbsp; If nil is returned then there is no more form data.&nbsp;&nbsp; </p>
 
 <p>For an input field such as <strong>&lt;input type=&quot;text&quot;
 name=&quot;textthing&quot;&gt; </strong>the value returned by <strong>get-multipart-header</strong>
@@ -495,9 +496,9 @@ system.</p>
 end raw)</font></strong></p>
 
 <p>This retrieves the next chunk of data for the current form field and stores it in <strong>buffer</strong>.
-&nbsp; If <strong>start</strong> is given then it specifies the index in the buffer at
-which to begin storing the data.&nbsp; If <strong>end</strong> is given then it specifies
-the index just after the last index in which to store data.</p>
+&nbsp;&nbsp; If <strong>start</strong> is given then it specifies the index in the buffer
+at which to begin storing the data.&nbsp; If <strong>end</strong> is given then it
+specifies the index just after the last index in which to store data.</p>
 
 <p>The return value is <strong>nil </strong>if there is no more data to return, otherwise
 it is the index one after the last last index filled with data in <strong>buffer.</strong></p>
@@ -513,6 +514,80 @@ format for line separation in Lisp strings).</p>
 
 <p><strong>get-multipart-sequence</strong> may return before filling up the whole buffer,
 so program should be sure to make use of the index returned by <strong>get-multipart-sequence</strong>.</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr>
+
+<hr>
+
+<h2>Cookies</h2>
+
+<p>Cookies are name value pairs that a web server can direct a web browser to save and
+then pass back to the web server under certain circumstances.&nbsp;&nbsp; Some users
+configure their web browsers to reject cookies, thus you are advised against building a
+site that depends on cookies to work.</p>
+
+<p>Each cookie has these components: 
+
+<ol>
+  <li><strong>name</strong> - a string.&nbsp;&nbsp; Since you can get multiple cookies sent to
+    you by a web browser, using a unique name will allow you to distinguish the values.</li>
+  <li><strong>value</strong> - a string</li>
+  <li><strong>path</strong> - a string which must be the prefix of the request from the web
+    browser for this cookie to be sent.&nbsp; The string &quot;/&quot; is the prefix of all
+    requests.</li>
+  <li><strong>domain </strong>- a string which must be the suffix of the name of the machine
+    where the request is being sent in order for this cookie to be sent.</li>
+  <li><strong>expiration</strong> - a time when this cookie expires. </li>
+  <li><strong>secure</strong> - either true or false.&nbsp; If true then this cookie will only
+    be sent if the connection is through a secure socket</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p><strong><font face="Courier New">(set-cookie-header request &amp;key name value expires
+domain path secure)</font></strong></p>
+
+<p>This function should be called between the calls to <strong>with-http-response </strong>and
+<strong>with-http-body</strong>.&nbsp;&nbsp; It can be called more than once.&nbsp; Each
+call will cause one Set-Cookie directive to be sent to the web browser. &nbsp;&nbsp;&nbsp;
+The <strong>name</strong> and <strong>value</strong> arguments should be given (and they
+should be strings).&nbsp; They will be automatically encoded using the same encoding used
+in urls (we call it <em>uriencoding). </em>The purpose of this encoding is to convert
+characters that are either unprintable or those that have a special meaning into a
+printable string.&nbsp;&nbsp;&nbsp; The web browser doesn't care about the <strong>name</strong>
+and <strong>value</strong>, it just stores them and sends them back to the web server.
+&nbsp;&nbsp;&nbsp; If you use the <strong>get-cookie-values </strong>function to retrieve
+the cookie <strong>name</strong> and <strong>value</strong> pairs, then it will
+automatically decode the uriencoding.<br>
+If the <strong>path </strong>argument isn't given, it will default to &quot;/&quot; which
+will allow this cookie to match all requests.<br>
+If the <strong>domain</strong> argument isn't given then it will default to the host to
+which this request was sent.&nbsp; If you wish you to specify this you are only allowed to
+specify a subsequence of the host to which this request was sent (i.e the name of the
+machine running the webserver).&nbsp;&nbsp; The <strong>domain</strong> should have at
+least two periods in it (i.e.&nbsp; &quot;.foo.com&quot;).<br>
+<strong>expiration</strong> can be a lisp universal time or it can be the symbol <strong>:never</strong>
+meaning this should never expire.&nbsp; If <strong>expiration </strong>isn't given or is <strong>nil</strong>
+then this cookie will expire when the user quits their web browser.<br>
+<strong>secure</strong> should be true or false (it defaults to false).</p>
+
+<p>&nbsp;</p>
+
+<p><strong><font face="Courier New">(get-cookie-values request)</font></strong></p>
+
+<p>Return the cookie <strong>name</strong> and <strong>value</strong> pairs from the
+header of the request.&nbsp;&nbsp; Each <strong>name</strong> <strong>value</strong> pair
+will be in a cons whose <strong>car</strong> is the <strong>name</strong> and whose <strong>cdr</strong>
+is the <strong>value</strong>.&nbsp;&nbsp; The names and values will be decoded (in other
+words the decoding done by <strong>set-cookie-header</strong> will be undone).</p>
+
+<p>&nbsp;</p>
+
+<hr>
 
 <p>&nbsp;</p>
 </body>
