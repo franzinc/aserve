@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.64 2000/08/25 00:34:35 jkf Exp $
+;; $Id: main.cl,v 1.65 2000/08/25 15:27:22 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1058,7 +1058,8 @@ by keyword symbols and not by strings"
 			    (debug-format :info "request over, keep socket alive~%")
 			    (force-output sock)
 		       else (return))))))
-    ;; do it in two stages to get around bug in acl6.0beta
+    ;; do it in two stages since each one could error and both have
+    ;; to be attempted
     (ignore-errors (force-output sock))
     (ignore-errors (close sock :abort t))))
 
