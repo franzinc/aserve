@@ -1,10 +1,24 @@
 *******************************************************************************
 <version for this commit> (incf *aserve-version* in main.cl each commit)
 
+2000-05-30  John Foderaro  <jkf@tiger.franz.com>
+1.1.20
+	* macs.cl - add note about where to find the if* macro
+	* main.cl - cache result of get-request-body so that it can
+		    safely be called more than once inside a response
+	            function.   Also be sure to call get-request-body 
+	            if the connection is keep-alive and there might 
+	            be a body following the headers.
+	* t-aserve.cl - test enhancment to get-request-body
+	* doc/aserve.html - fix do-http-request documentation to
+	            reflect change made in 1.1.18
+	            
+
+	
 Fri May 26 22:42:12 PST 2000  Duane Rettig  <duane@beta>
 1.1.19
 	* makefile: set SHELL variable
-	* main.c: incf version
+	* main.cl: incf version
 	
 2000-05-16  John Foderaro  <jkf@tiger.franz.com>
 1.1.18	

@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: macs.cl,v 1.9 2000/05/16 14:01:25 jkf Exp $
+;; $Id: macs.cl,v 1.10 2000/05/30 21:34:15 jkf Exp $
 
 ;; Description:
 ;;   useful internal macros
@@ -37,11 +37,19 @@
  (require :uri))
 
 ;; macros used by iserve
+
 (defpackage :net.aserve
   (:use :common-lisp :excl :net.html.generator :net.uri))
 
 (in-package :net.aserve)
 
+
+;; Note for people using this code in non-Allegro lisps.
+;;
+;; The if* macro used in this code can be found at:
+;;
+;; http://www.franz.com/~jkf/ifstar.txt
+;;
 
 
 ;; macros to speed up some common character operations

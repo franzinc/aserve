@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.4 2000/05/17 14:54:53 jkf Exp $
+;; $Id: t-aserve.cl,v 1.5 2000/05/30 21:34:16 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -755,6 +755,27 @@
     
     (test nil (set-difference post-var-vals req-query-res :test #'equal))
 
+    ;
+    ; test that we can do get-request-body more than once
+    ;
+    (publish :path "/get-request-body-tester"
+	     :content-type "text/plain"
+	     :function
+	     #'(lambda (req ent)
+		 
+		 (with-http-response (req ent)
+		   (test t 
+			 (equal (get-request-body req)
+				"foo and bar"))
+		   (test t 
+			 (equal (get-request-body req)
+				"foo and bar"))
+		   (with-http-body (req ent)))))
+    (do-http-request (format nil "~a/get-request-body-tester" 
+			     prefix-local)
+      :method :post
+      :content "foo and bar"
+      :content-type "text/plain")
     
     ))
     

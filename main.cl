@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.41 2000/05/27 04:44:26 duane Exp $
+;; $Id: main.cl,v 1.42 2000/05/30 21:34:15 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -125,7 +125,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 1 19))
+(defparameter *aserve-version* '(1 1 20))
 
 
 (provide :aserve)
@@ -382,6 +382,10 @@
        (if* (not (member :omit-body (request-reply-strategy ,g-req)))
 	  then (let ((*html-stream* (request-reply-stream ,g-req)))
 		 (progn ,@body)))
+       
+       (if* (member :keep-alive (request-reply-strategy ,g-req))
+	  then ; force the body to be read so we can continue
+	       (get-request-body ,g-req))
        (send-response-headers ,g-req ,g-ent :post))))
 			  
 
@@ -578,11 +582,17 @@
    
    
    (headers ;; alist of headers *not* stored in slots
-    ;* use header-slot-value to retrieve header values sinc
+    ;* use header-slot-value to retrieve header values 
     ;  rather than looking here since not all headers are stored 
     ;  here
     :initform nil
     :accessor request-headers)
+   
+   (request-body 
+    ;; if we've read the request body then this 
+    ;; is the string holding it.
+    :initform nil
+    :accessor request-request-body)
    
    
    
@@ -1111,56 +1121,63 @@
 
 (defmethod get-request-body ((req http-request))
   ;; return a string that holds the body of the http-request
-  ;; 
-  (if* (member (request-method req) '(:put :post))
-     then (multiple-value-bind (length believe-it)
-	      (header-slot-value-integer req "content-length")
-	    (if* believe-it
-	       then ; we know the length
-		    (prog1 (let ((ret (make-string length)))
-			     (read-sequence-with-timeout 
-			      ret length 
-			      (request-socket req)
-			      *read-request-body-timeout*))
+  ;;  cache it for later too
+  (or (request-request-body req)
+      (setf (request-request-body req)
+	(if* (member (request-method req) '(:put :post))
+	   then (multiple-value-bind (length believe-it)
+		    (header-slot-value-integer req "content-length")
+		  (if* believe-it
+		     then ; we know the length
+			  (prog1 (let ((ret (make-string length)))
+				   (read-sequence-with-timeout 
+				    ret length 
+				    (request-socket req)
+				    *read-request-body-timeout*))
 	    
-		      ; netscape (at least) is buggy in that 
-		      ; it sends a crlf after
-		      ; the body.  We have to eat that crlf.  We could check
-		      ; which browser is calling us but it's not clear what
-		      ; is the set of buggy browsers 
-		      (let ((ch (read-char-no-hang (request-socket req)
-						   nil nil)))
-			(if* (eq ch #\return)
-			   then ; now look for linefeed
-				(setq ch (read-char-no-hang 
-					  (request-socket req) nil nil))
-				(if* (eq ch #\linefeed)
-				   thenret 
-				   else (unread-char ch 
-						     (request-socket req)))
-			 elseif ch
-			   then (unread-char ch (request-socket req)))))
+			    ; netscape (at least) is buggy in that 
+			    ; it sends a crlf after
+			    ; the body.  We have to eat that crlf.  
+			    ; We could check
+			    ; which browser is calling us but it's 
+			    ; not clear what
+			    ; is the set of buggy browsers 
+			    (let ((ch (read-char-no-hang (request-socket req)
+							 nil nil)))
+			      (if* (eq ch #\return)
+				 then ; now look for linefeed
+				      (setq ch (read-char-no-hang 
+						(request-socket req) nil nil))
+				      (if* (eq ch #\linefeed)
+					 thenret 
+					 else (unread-char 
+					       ch (request-socket req)))
+			       elseif ch
+				 then (unread-char ch (request-socket req)))))
 				      
 				      
-	       else ; no content length given
-		    (if* (equalp "keep-alive" 
-				 (header-slot-value req "connection"))
-		       then ; must be no body
-			    ""
-		       else ; read until the end of file
-			    (mp:with-timeout (*read-request-body-timeout* nil)
-			      (let ((ans (make-array 2048 
-						     :element-type 'character
-						     :fill-pointer 0))
-				    (sock (request-socket req))
-				    (ch))
-				(loop (if* (eq :eof 
-					       (setq ch (read-char 
-							 sock nil :eof)))
-					 then (return  ans)
-					 else (vector-push-extend ans ch))))))))
-     else "" ; no body
-	  ))
+		     else ; no content length given
+			  (if* (equalp "keep-alive" 
+				       (header-slot-value req "connection"))
+			     then ; must be no body
+				  ""
+			     else ; read until the end of file
+				  (mp:with-timeout 
+				      (*read-request-body-timeout* 
+				       nil)
+				    (let ((ans (make-array 
+						2048 
+						:element-type 'character
+						:fill-pointer 0))
+					  (sock (request-socket req))
+					  (ch))
+				      (loop (if* (eq :eof 
+						     (setq ch (read-char 
+							       sock nil :eof)))
+					       then (return  ans)
+					       else (vector-push-extend ans ch))))))))
+	   else "" ; no body
+		))))
 
 
 
