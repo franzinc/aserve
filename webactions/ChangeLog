@@ -1,0 +1,55 @@
+2003-10-22  John Foderaro  <jkf@tiger.franz.com>
+1.4
+	*  webact.cl - add :content-type flag and :redirect flag
+	   to map entry.  Add tests.
+	   Update document
+
+2003-10-09    <jkf@main.verada.com>
+1.3
+	* webact.cl - add :prefix flag to map entry
+	  webaction.html - more documentation
+
+2003-10-07  John Foderaro  <jkf@tiger.franz.com>
+
+	* webact.cl -  fix :prefix sym name processing so that an existing
+	    file takes precedence over a prefix name.
+
+2003-09-22    <jkf@main.verada.com>
+
+	* webact.cl - add :clp-content-type argument to webaction-project
+		to control the content-type returned by clp pages
+	        - add  (:prefix t)  support in maps to say that
+	         the given symbolic page name matches any sym page name
+	         that extends that given name.
+	* clpage.cl - support clp-content-type declaration
+
+2003-09-18      Colin Meldrum <colin@cobweb>
+
+	* clpage.cl
+	  - whenever opening a .clp file use the external-format of
+	    the associated clp-entity
+	  - fixed a couple of places in the code to parse clp files
+	    which made the assumption that 1 character = 1 file-position.
+	
+	* webact.cl
+	  - added :host argument to webaction-project
+
+2003-09-03    <jkf@main.verada.com>
+1.2
+	* webact.cl: add :authorizer argument to webaction-project
+
+2003-08-13    <jkf@main.verada.com>
+1.1
+	* add 'extended maps' where you can specify more
+	  than one handler for each symbolic page.
+	  update webactions document
+
+2003-07-07    <jkf@tiger.franz.com>
+<noversion>
+	* add clp_select funtion
+
+2003-05-16  John Foderaro  <jkf@tiger.franz.com>
+
+	* add external-format support to clp pages
+	
+
