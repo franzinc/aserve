@@ -9,7 +9,7 @@
 
 <h1 align="center">AllegroServe Tutorial</h1>
 
-<p align="left"><strong><small>copyright (c) 2000 Franz Inc</small></strong></p>
+<p align="left"><strong><small>copyright (c) 2000-2001 Franz Inc</small></strong></p>
 
 <p>This document is a companion to the AllegroServe reference manual.&nbsp;&nbsp; Here we
 will take you through various examples and demonstrate how to use the facilities of the
@@ -107,6 +107,11 @@ put some words in it, and then</p>
 <pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/sample.txt&quot;)
 #&lt;net.aserve::file-entity @ #x2076e0c2&gt;
 tutorial(31):</pre>
+
+<p>If you are running on Windows then the file will have a name like <a
+href="file:///c:/tmp/sample.txt">c:\tmp\sample.txt</a>&nbsp;&nbsp; When this file name is
+written in a Lisp string it would be <a href="file:///c://tmp//sample.txt">&quot;c:\\tmp\\sample.txt&quot;</a>
+due to the special nature of the backslash character.</p>
 
 <p>Now if we ask a web browser for <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>
 we'll see the contents of the file in the web browser.&nbsp; Since we didn't specify a

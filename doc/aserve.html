@@ -288,7 +288,7 @@ an entity assigned, the old entity is replaced by the new entity.</p>
 <p>&nbsp;</p>
 
 <p><a name="f-publish-file"></a><strong><font face="Courier New">(publish-file &amp;key
-path host port&nbsp; file content-type class preload remove server)</font></strong></p>
+path host port&nbsp; file content-type class preload cache-p remove server)</font></strong></p>
 
 <p>This creates an entity that will return the contents of a file on the disk in response
 to a request.&nbsp;&nbsp; The <strong>url</strong> and <strong>file</strong>&nbsp; must be
@@ -317,9 +317,15 @@ given, the rest of the arguments are optional..&nbsp; The arguments have these m
     &nbsp;&nbsp; </li>
   <li><strong>preload</strong> --if true it instructs <strong>AllegroServe</strong> to read
     the contents of the file in immediately and store it in a lisp object.&nbsp; This will
-    speed up the response to this request.&nbsp; However note that if the file changes on the
-    disk after it has been preloaded, this change will <strong>not </strong>be seen until<strong>
-    &nbsp; publish-file </strong>is called again<strong>.</strong></li>
+    speed up the response to this request.&nbsp; If the file on disk is updated AllegroServe
+    will ignore the preloaded content and will access the content from disk.&nbsp;&nbsp; If <strong>preload</strong>
+    is true then you most likely want to specify <strong>cache-p</strong> true as well.</li>
+  <li><strong>cache-p</strong> -- if true then <strong>AllegroServe</strong> will cache the
+    last value read for this file.&nbsp; When asked for this file <strong>AllegroServe</strong>
+    will check to see if the file has changed on disk (using the last modified time as a
+    measure).&nbsp; If the file hasn't changed AllegroServe will returned the cached value,
+    otherwise <strong>AllegroServe</strong> will read in and cache the new contents of the
+    file and will return that as a response.</li>
   <li><strong>remove </strong>-- instead of adding an entity, remove the entities that match
     the given <strong>path</strong> and <strong>host. </strong>This removes all entities, not
     just file entities.&nbsp; If a <strong>host</strong> value is not passed in an argument,

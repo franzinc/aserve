@@ -1,3 +1,10 @@
+2001-07-18    <jkf@CROW>
+
+	* doc/publish.html - update publish-file doc for preload and
+	        cache-p args
+	* doc/htmlgen.html - make first example clearer
+	* doc/tutorial.html - add note to help Windows users
+
 2001-07-18  jkf  <jkf@main.verada.com>
 
 	* publish.cl - add cache-p argument to publish-file which will
