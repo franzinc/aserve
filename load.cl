@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.49 2001/09/21 19:02:40 jkf Exp $
+;; $Id: load.cl,v 1.50 2001/09/24 01:38:26 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -42,7 +42,7 @@
       "load.cl"
       "test/t-aserve.cl"
       "test/server.pem"
-      "test/cgitest.sh"
+      "examples/cgitest.sh"
       "doc/aserve.html"
       "doc/tutorial.html"
       "doc/htmlgen.html"
