@@ -1,6 +1,16 @@
+2000-07-15  John Foderaro  <jkf@tiger.franz.com>
+
+	*  examples/chat.cl - sample program that does web based chat
+
+2000-07-14  John Foderaro  <jkf@tiger.franz.com>
+
+	* client.cl - now do-http-request will always return a uri object
+	    (previously it would return its uri arg unless a redirect
+             was done in which case it would return a uri object)
+
 2000-07-01  John Foderaro  <jkf@tiger.franz.com>
 
-	* client side - handle the "100 continue" response we seem to 
+	* client.cl - handle the "100 continue" response we seem to 
 	 get from IIS whenever we do a post.
 
 2000-06-25  jkf  <jkf@main.verada.com>

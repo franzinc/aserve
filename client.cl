@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.20 2000/07/14 21:48:53 jkf Exp $
+;; $Id: client.cl,v 1.21 2000/07/15 18:21:11 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -214,7 +214,7 @@
 	       )))
 
     (unwind-protect
-	(loop 
+	(progn 
 	  
 	  (loop
 	    (read-client-response-headers creq)
@@ -286,30 +286,23 @@
 			   then (> redirect 0))
 			(setq new-location
 			  (cdr (assoc "location" (client-request-headers creq)
-				      :test #'equal)))
-			)
+				      :test #'equal))))
 		 then ; must do a redirect to get to the real site
 		    
-		      (return (apply #'do-http-request
-				     (net.uri:merge-uris new-location uri)
-				     :redirect
-				     (if* (integerp redirect)
-					then (1- redirect)
-					else redirect)
-				     args))
-	       elseif (eql (client-request-response-code creq)
-			   #.(net.aserve::response-number *response-continue*))
-		 then ; some servers send this to encourage us to
-		      ; send the body during a post, we must ignore it
-		      ; and loop around and get the real response
-		      nil
+		      (apply #'do-http-request
+			     (net.uri:merge-uris new-location uri)
+			     :redirect
+			     (if* (integerp redirect)
+				then (1- redirect)
+				else redirect)
+			     args)
 		 else ; return the values
-		      (return (values 
-			       body
-			       (client-request-response-code creq)
-			       (client-request-headers  creq)
-			       uri
-			       ))))))
+		      (values 
+		       body
+		       (client-request-response-code creq)
+		       (client-request-headers  creq)
+		       (client-request-uri creq)
+		       )))))
       
       ; protected form:
       (client-request-close creq))))
