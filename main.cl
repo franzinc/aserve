@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.123 2001/10/26 19:12:21 jkf Exp $
+;; $Id: main.cl,v 1.124 2001/10/31 19:43:47 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -150,7 +150,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 14))
+(defparameter *aserve-version* '(1 2 15))
 
 (eval-when (eval load)
     (require :sock)
@@ -305,7 +305,7 @@
     )
 
 ; this is only useful on acl6.1 where we do timeout on I/O operations
-(defvar *http-io-timeout* 60)
+(defvar *http-io-timeout* 120)
 
 ; usually set to the default server object created when aserve is loaded.
 ; users may wish to set or bind this variable to a different server
@@ -932,7 +932,8 @@ by keyword symbols and not by strings"
 (defparameter *response-ok* (make-resp 200 "OK"))
 (defparameter *response-created* (make-resp 201 "Created"))
 (defparameter *response-accepted* (make-resp 202 "Accepted"))
-
+(defparameter *response-partial-content*
+    (make-resp 206 "Partial Content"))
 (defparameter *response-moved-permanently* (make-resp 301 "Moved Permanently"))
 (defparameter *response-found* (make-resp 302 "Found"))
 (defparameter *response-see-other* (make-resp 303 "See Other"))
@@ -942,7 +943,8 @@ by keyword symbols and not by strings"
 (defparameter *response-bad-request* (make-resp 400 "Bad Request"))
 (defparameter *response-unauthorized* (make-resp 401 "Unauthorized"))
 (defparameter *response-not-found* (make-resp 404 "Not Found"))
-
+(defparameter *response-requested-range-not-satisfiable*
+    (make-resp 416 "Requested range not satisfiable"))
 (defparameter *response-internal-server-error*
     (make-resp 500 "Internal Server Error"))
 (defparameter *response-not-implemented* (make-resp 501 "Not Implemented"))
@@ -959,7 +961,10 @@ by keyword symbols and not by strings"
 	  *response-temporary-redirect*
 	  *response-bad-request*
 	  *response-unauthorized*
-	  *response-not-found*))
+	  *response-not-found*
+	  *response-requested-range-not-satisfiable*
+	  *response-partial-content*
+	  ))
 
 (defvar *crlf* (make-array 2 :element-type 'character :initial-contents
 			   '(#\return #\linefeed)))
@@ -970,6 +975,7 @@ by keyword symbols and not by strings"
 				    
 			      
 (defun start (&key (port 80 port-p) 
+		   host
 		   (listeners 5)
 		   (chunking t)
 		   (keep-alive t)
@@ -1080,6 +1086,7 @@ by keyword symbols and not by strings"
   
   (let* ((main-socket (socket:make-socket :connect :passive
 					  :local-port port
+					  :local-host host
 					  :reuse-address t
 					  :format :bivalent
 					  

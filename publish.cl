@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.63 2001/10/26 17:11:58 jkf Exp $
+;; $Id: publish.cl,v 1.64 2001/10/31 19:43:47 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -1118,8 +1118,11 @@
 	    
 	    
 	 else ; the non-preloaded case
-	      (let (p)
-	      
+	      (let (p range)
+
+		
+		
+		
 		(setf (last-modified ent) nil) ; forget previous cached value
 	      
 		(if* (null (errorset 
@@ -1138,7 +1141,10 @@
 			    (buffer (make-array 1024 
 						:element-type '(unsigned-byte 8))))
 			(declare (dynamic-extent buffer))
-		      
+
+			
+				
+			
 			(setf (last-modified ent) lastmod
 			      (last-modified-string ent)
 			      (universal-time-to-date lastmod))
@@ -1154,7 +1160,19 @@
 				  (setf (contents ent) wholebuf))
 				(go retry))
 			      
-				
+
+			(if* (setq range (header-slot-value req :range))
+			   then (setq range (parse-range-value range))
+				(if* (not (eql (length range) 1))
+				   then ; ignore multiple ranges 
+					; since we're not
+					; prepared to send back a multipart
+					; response yet.
+					(setq range nil)))
+			(if* range
+			   then (return-from process-entity
+				  (return-file-range-response
+				   req ent range buffer p size)))
 			      
 		      
 			(with-http-response (req ent :format :binary)
@@ -1188,6 +1206,62 @@
     
   t	; we've handled it
   )
+
+
+(defun return-file-range-response (req ent range buffer p size)
+  ;; read and return just the given range from the file.
+  ;; assert: range has exactly one range
+  
+  (let ((start (caar range))
+	(end   (cdar range)))
+    (if* (null start)
+       then ; suffix range
+	    (setq start (max 0 (- size end)))
+	    (setq end (1- size))
+     elseif (null end)
+	    ; extends beyond end
+       then (setq end (1- size))
+       else (setq end (min end (1- size))))
+	    
+    ; we allow end to be 1- start to mean 0 bytes to transfer
+    (if* (> start (1- end))
+       then ; bogus range
+	    (with-http-response (req ent 
+				     :response 
+				     *response-requested-range-not-satisfiable*)
+	      (with-http-body (req ent)
+		(html "416 - Illegal Range Specified")))
+       else ; valid range
+	    (with-http-response (req ent
+				     :response *response-partial-content*
+				     :format :binary)
+	      (setf (reply-header-slot-value req :content-range)
+		(format nil "bytes ~d-~d/~d" start end size))
+	      (setf (request-reply-content-length req) 
+		(max 0 (1+ (- end start))))
+	      (with-http-body (req ent)
+		(file-position p start)
+		(let ((left (max 0 (1+ (- end start)))))
+		  (loop
+		    (if* (<= left 0) then (return))
+		    (let ((got (read-sequence buffer p :end
+					      (min left 1024))))
+		      (if* (<= got 0) then (return))
+		      (write-sequence buffer *html-stream*
+				      :end got)
+		      (decf left got)))))))
+    
+    t ; meaning we sent something
+    ))
+				    
+		
+	    
+	    
+	    
+	    
+	    
+  
+
 
 (defmethod process-entity ((req http-request) (ent directory-entity))
   ;; search for a file in the directory and then create a file
@@ -1488,6 +1562,12 @@
   (let ((fwd) (max-fwd 0) (total-size 0))
     ;; we track max file write date (max-fwd) unless we can't compute
     ;; it in which case max-fwd is nil.
+    
+    (if* (not (member (request-method req) '(:get :head)))
+       then ; we don't want to specify a last modified time except for
+	    ; these two methods
+	    (setq max-fwd nil))
+    
     (dolist (item (items ent))
       (ecase (multi-item-kind item)
 	(:file 

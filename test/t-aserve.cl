@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.36 2001/10/24 17:39:59 jkf Exp $
+;; $Id: t-aserve.cl,v 1.37 2001/10/31 19:43:47 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -270,6 +270,12 @@
     (publish-file :path "/frob2" :file dummy-2-name
 		  :content-type "text/plain"
 		  :preload t)
+    
+    ;; publish with no preload and no cache
+    (publish-file :path "/frob2-npl" :file dummy-2-name
+		  :content-type "text/plain"
+		  :preload nil)
+    
 
     ;; 
     (dolist (cur-prefix (list prefix-local prefix-dns))
@@ -289,7 +295,28 @@
 				   (cdr (assoc :transfer-encoding headers 
 					       :test #'eq))
 				   :test #'equalp))
-	    (test dummy-2-contents body :test #'equal)))))
+	    (test dummy-2-contents body :test #'equal))
+	  
+	  ; try partial gets
+	  (multiple-value-bind (body code headers)
+	      (x-do-http-request (format nil "~a/frob2-npl" cur-prefix)
+				 :protocol protocol
+				 :keep-alive keep-alive
+				 :headers '((:range . "bytes=100-400"))
+				 )
+	    (test 206 code)
+	    (test "text/plain"
+		  (cdr (assoc :content-type headers :test #'eq))
+		  :test #'equal)
+	    (test (subseq dummy-2-contents 100 401)
+		  body :test #'equal)
+	    
+	    (test "bytes 100-400/8178"
+		  (cdr (assoc :content-range headers :test #'eq))
+		  :test #'equal)
+	    
+	    )
+	  )))
 
     
     ;;;; remove published file test

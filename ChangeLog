@@ -1,3 +1,12 @@
+2001-10-31  John Foderaro  <jkf@tiger.franz.com>
+1.2.15
+	* start now takes a host argument to allow you to bind the server
+	  to a specific host
+	* publish-multi will not return 304 (not modified) unless the
+	  request is a get or a head
+	* files published with publish-file will now obey a single
+	  range specifier so they will be download accelerator friendly
+
 2001-10-26  John Foderaro  <jkf@tiger.franz.com>
 
 	* add entity-plist slot to entities and use it to link
