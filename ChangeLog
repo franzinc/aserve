@@ -1,3 +1,7 @@
+2001-09-29  John Foderaro  <jkf@tiger.franz.com>
+
+	* cgi.cl - fix bug where content-length was specified wrong
+
 2001-09-21  John Foderaro  <jkf@tiger.franz.com>
 1.2.10
 	* added ability to run cgi programs

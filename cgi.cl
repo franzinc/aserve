@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: cgi.cl,v 1.2 2001/09/21 19:17:02 jkf Exp $
+;; $Id: cgi.cl,v 1.3 2001/09/29 18:03:51 jkf Exp $
 
 ;; Description:
 ;;   common gateway interface (running external programs)
@@ -116,7 +116,8 @@
 				  content-type)
 			    envs))
 	      (push (cons "CONTENT_LENGTH"
-			  (if* body then (length body) else 0))
+			  (princ-to-string
+			   (if* body then (length body) else 0)))
 		    envs)))
     
     ; now do the rest of the headers.
