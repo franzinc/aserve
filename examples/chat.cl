@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.4 2000/08/04 15:52:09 jkf Exp $
+;; $Id: chat.cl,v 1.5 2000/08/04 16:05:01 jkf Exp $
 
 ;; Description:
 ;;   aserve chat program
@@ -883,7 +883,7 @@
 	(qstring))
     
     (if* *chat-hook*
-       then (if* (funcalll *chat-hook* req ent)
+       then (if* (funcall *chat-hook* req ent)
 	       then (return-from chat)))
     
     
@@ -1910,6 +1910,7 @@
 				     then ; name then ip address
 					  (let ((name (viewent-hostname
 						       viewent)))
+					    #+(version>= 6 0)
 					    (if* (null name)
 					       then (setq name
 						      (setf (viewent-hostname
