@@ -1,6 +1,7 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.31.10.4 2001/06/01 21:22:35 layer Exp $
+;; $Id: load.cl,v 1.31.10.4.4.1 2001/09/10 17:55:42 layer Exp $
+;;
 
 (defvar *loadswitch* :compile-if-needed)
 (defparameter *aserve-root* (directory-namestring *load-truename*))
@@ -174,7 +175,7 @@
 ;; 7. (ftp-publish-src)
 ;; 8. (publish-docs)   ;  to put latest docs on aserve web page
 ;; 9. on spot run /fi/sa/bin/aserve-sync
-;; 10. ftp download.sourceforge.net and put the tar file in the
+;; 10. ftp upload.sourceforge.net and put the tar file in the
 ;;     incoming directory, then go to the aserve sourceforge web page and 
 ;;     select the file manager and publish it.
 ;; 11. cd /www/opensource/devel/www/aserve 

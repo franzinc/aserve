@@ -22,7 +22,8 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-;; $Id: log.cl,v 1.11.6.3 2001/06/01 21:22:35 layer Exp $
+;;
+;; $Id: log.cl,v 1.11.6.3.4.1 2001/09/10 17:55:43 layer Exp $
 
 ;; Description:
 ;;   iserve's logging

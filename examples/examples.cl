@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.10.6.5 2001/06/11 20:14:23 layer Exp $
+;; $Id: examples.cl,v 1.10.6.5.2.1 2001/09/10 17:55:46 layer Exp $
 
 ;; Description:
 ;;   Allegro iServe examples

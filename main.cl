@@ -22,7 +22,8 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-;; $Id: main.cl,v 1.48.2.7 2001/06/26 21:21:07 layer Exp $
+;;
+;; $Id: main.cl,v 1.48.2.7.2.1 2001/09/10 17:55:43 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -73,6 +74,7 @@
 
    #:request-method
    #:request-protocol
+
    #:request-protocol-string
    #:request-query
    #:request-query-value
@@ -106,12 +108,15 @@
    #:wserver
    #:wserver-enable-chunking
    #:wserver-enable-keep-alive
+   #:wserver-external-format
+   #:wserver-filters
    #:wserver-locators
    #:wserver-log-function
    #:wserver-log-stream
    #:wserver-socket
 
    #:*aserve-version*
+   #:*default-aserve-external-format*
    #:*http-response-timeout*
    #:*mime-types*
    #:*response-accepted*
@@ -131,7 +136,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 1))
+(defparameter *aserve-version* '(1 2 7))
 
 (eval-when (eval load)
     (require :sock)
@@ -219,8 +224,11 @@
   ;; do the format to *debug-stream* if the kind of this info
   ;; is matched by the value of *debug-current*
   `(if* (member ,kind *debug-current* :test #'eq)
-      then (format *debug-stream* "d> (~a): " (mp:process-name sys:*current-process*))
-	   (format *debug-stream* ,@args)))
+      then (write-sequence 
+	    (concatenate 'string
+	      (format nil "d> (~a): " (mp:process-name sys:*current-process*))
+	      (format nil ,@args))
+	    *debug-stream*)))
 
 
 (defmacro format-dif (debug-key &rest args)
@@ -229,9 +237,14 @@
   ;; do the format and then send to *initial-terminal-io*
   `(progn (format ,@args)
 	  (if* (member ,debug-key *debug-current* :test #'eq)
-	     then (format *debug-stream* "x>(~a): " 
-			  (mp:process-name sys:*current-process*))
-		  (format *debug-stream* ,@(cdr args)))))
+	     then ; do extra consing to ensure that it all be written out 
+		  ; at once
+		  (write-sequence
+		   (concatenate 'string 
+		     (format nil "x>(~a): " 
+			     (mp:process-name sys:*current-process*))
+		     (format nil ,@(cdr args)))
+		   *debug-stream*))))
 
 (defmacro if-debug-action (kind &rest body)
   ;; only do if the debug value is high enough
@@ -266,6 +279,8 @@
 ;; more specials
 (defvar *max-socket-fd* 0) ; the maximum fd returned by accept-connection
 (defvar *aserve-debug-stream* nil) ; stream to which to seen debug messages
+(defvar *default-aserve-external-format* :latin1-base) 
+(defvar *worker-request*)  ; set to current request object
 
 ; type of socket stream built.
 ; :hiper is possible in acl6
@@ -280,7 +295,8 @@
 (defvar *header-keyword-array*
     ;; indexed by header-number, holds the keyword naming this header
     )
-    
+
+(defvar *not-modified-entity*) ; used to send back not-modified message
 
 	
 ;;;;;;;;;;;;;  end special vars
@@ -315,6 +331,14 @@
 		    (make-instance 'locator-prefix
 		      :name :prefix)) 
     :accessor wserver-locators)
+
+   (filters
+    ;; if non nil is is a list of functions
+    ;; of one arg (a request object) 
+    ;; to be called before looking for a locator.  This function can
+    ;; modify the request if it feels like it.
+    :initform nil
+    :accessor wserver-filters)
    
    (log-function
     ;; function to call after the request is done to 
@@ -337,6 +361,12 @@
     :initarg :accept-hook
     :initform nil
     :accessor wserver-accept-hook)
+
+   (external-format
+    ;; used to bind *default-aserve-external-format* in each thread
+    :initarg :external-format
+    :initform :latin1-base
+    :accessor wserver-external-format)
    
    ;;
    ;; -- internal slots --
@@ -458,7 +488,9 @@ External-format `~s' passed to make-http-client-request filters line endings.
 Problems with protocol may occur." (ef-name ef)))))
 
 (defmacro with-http-body ((req ent
-			   &key format headers (external-format :latin1-base))
+			   &key format headers 
+				(external-format 
+				 *default-aserve-external-format*))
 			  &rest body)
   (declare (ignorable external-format))
   (let ((g-req (gensym))
@@ -863,6 +895,7 @@ by keyword symbols and not by strings"
 		   accept-hook
 		   ssl		 ; enable ssl
 		   os-processes  ; to fork and run multiple instances
+		   (external-format nil efp); to set external format
 		   )
   ;; -exported-
   ;;
@@ -882,6 +915,8 @@ by keyword symbols and not by strings"
   (if* (eq server :new)
      then (setq server (make-instance 'wserver)))
 
+  (if* efp then (setf (wserver-external-format server) external-format))
+	  
   (if* ssl
      then (if* (pathnamep ssl)
 	     then (setq ssl (namestring ssl)))
@@ -1053,7 +1088,8 @@ by keyword symbols and not by strings"
   ;; do all the serving on the main thread so it's easier to
   ;; debug problems
   (let ((main-socket (wserver-socket *wserver*))
-	(ipaddrs (wserver-ipaddrs *wserver*)))
+	(ipaddrs (wserver-ipaddrs *wserver*))
+	(*default-aserve-external-format* (wserver-external-format *wserver*)))
     (unwind-protect
 	(loop
 	  (restart-case
@@ -1114,7 +1150,11 @@ by keyword symbols and not by strings"
 
 (defun http-worker-thread ()
   ;; made runnable when there is an socket on which work is to be done
-  (let ((*print-level* 5))
+  (let ((*print-level* 5)
+	(*worker-request* nil)
+	(*default-aserve-external-format* 
+	 (wserver-external-format *wserver*))
+	)
     ;; lots of circular data structures in the caching code.. we 
     ;; need to restrict the print level
     (loop
@@ -1124,9 +1164,17 @@ by keyword symbols and not by strings"
 	    (if* (not (member :notrap *debug-current* :test #'eq))
 	       then (handler-case (process-connection sock)
 		      (error (cond)
-			(logmess (format nil "~s: got error ~a~%" 
-					 (mp:process-name sys:*current-process*)
-					 cond))))
+			(logmess 
+			 (format nil "~agot error ~a~%" 
+				 (if* *worker-request*
+				    then (format 
+					  nil 
+					  "while processing command ~s~%"
+					  (request-raw-request 
+					   *worker-request*))
+				    else "")
+				 cond
+				 ))))
 	       else (process-connection sock))
 	  (abandon ()
 	      :report "Abandon this request and wait for the next one"
@@ -1136,6 +1184,9 @@ by keyword symbols and not by strings"
     
       )))
 
+
+
+  
 (defun http-accept-thread ()
   ;; loop doing accepts and processing them
   ;; ignore sporatic errors but stop if we get a few consecutive ones
@@ -1279,11 +1330,14 @@ by keyword symbols and not by strings"
 		  ; end this connection by closing socket
 		  (return-from process-connection nil)
 	     else ;; got a request
+		  (setq *worker-request* req) 
+		  
 		  (handle-request req)
 		  (force-output-noblock (request-socket req))
 		  
 		  (log-request req)
 		  
+		  (setq *worker-request* nil)
 		  (free-req-header-block req)
 		  
 		  (let ((sock (request-socket req)))
@@ -1505,6 +1559,7 @@ by keyword symbols and not by strings"
   left		; bytes of content-length left to read
   state		; state where the buffer pointer is pointed
   cur		; current buffer pointer
+  after		; after the boundary value
   end		; index after last byte in the buffer
   boundary	; boundary vector
   socket	; socket we're reading from
@@ -1586,7 +1641,7 @@ by keyword symbols and not by strings"
 	(:header (return)) ; ok
 	((:body :start) 
 	 (loop
-	   (multiple-value-bind (pos state)
+	   (multiple-value-bind (pos state after)
 	       (scan-forward mp-info)
 	     (if* (eq state :partial)
 		then (if* (not (shift-buffer-up-and-read mp-info))
@@ -1594,7 +1649,8 @@ by keyword symbols and not by strings"
 			     (setf (mp-info-state mp-info) :last-boundary)
 			     (return))
 		else (setf (mp-info-cur mp-info) pos
-			   (mp-info-state mp-info) state)
+			   (mp-info-state mp-info) state
+			   (mp-info-after mp-info) after)
 		     (return)))))
 	(:boundary  (scan-forward mp-info))
 	(:last-boundary ; no more space
@@ -1712,14 +1768,35 @@ by keyword symbols and not by strings"
 			      t ; read something in
 			      ))))))
 
-	    
+
+
+;; for debugging
+#+ignore
+(defun dump-mp-info (mp-info)
+  (let ((buff (mp-info-buffer mp-info)))
+    (format t "dump, state is ~s, cur = ~s, after is ~s, end is ~s~%"
+	    (mp-info-state mp-info) (mp-info-cur mp-info) 
+	    (mp-info-after mp-info)
+	    (mp-info-end mp-info)
+	    )
+    (format t "buf:~%")
+    
+    (do ((v (mp-info-cur mp-info) (1+ v)))
+	((>= v (mp-info-end mp-info)))
+      (write-char (code-char (aref buff v))))
+    (format t "<<end>>~%")
+    ))
+	 
+
 (defun scan-forward (mp-info)
   ;; scan forward to the next interesting thing
+  ;;
+  ;; rfc2046 describes the multipart syntax
   ;;
   ;; If the current state is :boundary then we are being called 
   ;;   to locate the next header.  If we find it we set cur to point
   ;;   to it and set the state to :header.  If no more data is available
-  ;;   (and this will never happen if the client works correctly) twe
+  ;;   (and this will never happen if the client works correctly) we
   ;;   set the state to :last-boundary
   ;;   nil is returned
   ;;
@@ -1737,23 +1814,27 @@ by keyword symbols and not by strings"
   ;;	    :partial - we've identified something that could be
   ;;		a boundary or last-boundary but don't have enough
   ;;		data to tell.
+  ;(dump-mp-info mp-info)
   (case (mp-info-state mp-info)
     (:boundary
      ;; skip past boundary if it's in the buffer
      ;; this is called only in get-multipart-header
      (loop
-       (let ((past (+ (mp-info-cur mp-info)
-		      (length (mp-info-boundary mp-info))
-		      2 ; for the crlf
-		      )))
+       (let ((past (mp-info-after mp-info)))
 	 (if* (< past (mp-info-end mp-info))
 	    then ; inside the buffer
 		 (setf (mp-info-cur mp-info) past)
 		 (setf (mp-info-state mp-info) :header)
 		 (return)
-	    else (if* (not (shift-buffer-up-and-read mp-info))
+	    else (if* past
+		    then ; adjust 'past' location to account for shifting
+			 ; buffer contents up
+			 (decf (mp-info-after mp-info)
+			       (mp-info-cur mp-info)))
+		 (if* (not (shift-buffer-up-and-read mp-info))
 		    then ; no more data
 			 (setf (mp-info-state mp-info) :last-boundary)
+			 (setf (mp-info-after mp-info) (mp-info-cur mp-info))
 			 (return))))))
     (:last-boundary nil)
     
@@ -1768,7 +1849,7 @@ by keyword symbols and not by strings"
 	  then (if* (not (shift-buffer-up-and-read mp-info))
 		  then ; no more data available
 		       (setf (mp-info-state mp-info) :last-boundary)
-		       (return-from scan-forward (values 0 :last-boundary))))
+		       (return-from scan-forward (values 0 :last-boundary 0))))
        (setq cur (mp-info-cur mp-info)
 	     end (mp-info-end mp-info))
        
@@ -1786,37 +1867,42 @@ by keyword symbols and not by strings"
 		       (nil)
 		     (if* (>= ind len-boundary)
 			then ; matched the whole boundary
-			     ; minus the tail... a tail of crlf 
-			     ; is a boundary and a --crlf is a last
-			     ; boundary
-				
-			     (if* (< (- end j) 2)
-				then ; can't tell yet
-				     (return-from scan-forward
-				       (values i :partial))
-			      elseif (and (eql (aref mpbuffer j) 
-					       #.(char-code #\return))
-					  (eql (aref mpbuffer (1+ j))
-					       #.(char-code #\linefeed)))
-				then ; it's a boundary match
-				     (return-from scan-forward
-				       (values i :boundary))
-			      elseif (and (eql (aref mpbuffer j) 
-					       #.(char-code #\-))
-					  (eql (aref mpbuffer (1+ j))
-					       #.(char-code #\-)))
-				then ; could be last-boundary
-				     (if* (< (- end j) 4)
-					then ; not enough to tell
-					     (return-from scan-forward
-					       (values i :partial))
-				      elseif (and (eql (aref mpbuffer (+ 2 j))
-						       #.(char-code #\return))
-						  (eql (aref mpbuffer (+ 3 j))
-						       #.(char-code #\linefeed)))
-					then ; hit the end
-					     (return-from scan-forward
-					       (values i :last-boundary))))
+			     ; may be followed by white space 
+			     ; then crlf (for boundary)
+			     ; or -- (for closing boundary)
+			     
+			     (do ((jj j (1+ jj)))
+				 ((>= jj end)
+				  ; can't tell yet
+				  (return-from scan-forward
+				    (values i :partial)))
+			       
+			       (if* (member (aref mpbuffer jj)
+					    '(#.(char-code #\space)
+					      #.(char-code #\tab)))
+				  thenret ; pass over
+				  else ; we need at least 2 chars in the buff
+				       ; to see crlf or --
+				       (if* (>= (1+ jj) end)
+					  then ; only one char
+					       (return-from scan-forward
+						 (values i :partial)))
+					       
+				       (if* (and (eql (aref mpbuffer jj)
+						      #.(char-code #\return))
+						 (eql (aref mpbuffer (1+ jj))
+						      #.(char-code #\newline)))
+					  then (return-from scan-forward
+						 (values i :boundary (+ jj 2)))
+					elseif (and (eq (aref mpbuffer jj)
+							#.(char-code #\-))
+						    (eq (aref mpbuffer (1+ jj))
+							#.(char-code #\-)))
+					  then (return-from scan-forward
+						 (values i :last-boundary (+ jj 2)))
+					  else ; nothing we recognize
+					       (return))))
+				       
 			     ; if here then doesn't match boundary
 			     (return)
 		      elseif (>= j end)
@@ -1824,24 +1910,18 @@ by keyword symbols and not by strings"
 			     (return-from scan-forward
 			       (values i :partial)))
 		     
-		     (if* (not (eq (aref mpbuffer j)
-				   (aref boundary ind)))
-			then (return))))))))))
+		     ; boundary value is downcased so we must downcase 
+		     ; value in buffer.  we had to do the downcasing since
+		     ; I found cases where a case insensitive match had
+		     ; to be done
+		     (let ((bufch (aref mpbuffer j)))
+		       (if* (<= #.(char-code #\A) bufch #.(char-code #\Z))
+			  then (incf bufch #.(- (char-code #\a)
+						(char-code #\A))))
+		       (if* (not (eq bufch (aref boundary ind)))
+			  then (return))))))))))) 
        
 		     
-		     
-						
-						
-					 
-					 
-	   
-	   
-	       
-		       
-	       
-  
-  
-    
 
 
 
@@ -1849,7 +1929,9 @@ by keyword symbols and not by strings"
 				   buffer
 				   &key (start 0)
 					(end (length buffer))
-					(external-format :latin1-base ef-spec))
+					(external-format 
+					 *default-aserve-external-format* 
+					 ef-spec))
   ;; fill the buffer with the chunk of data.
   ;; start at 'start' and go no farther than (1- end) in the buffer
   ;; return the index of the first character not placed in the buffer.
@@ -1869,7 +1951,8 @@ in get-multipart-sequence"))
 	 cur
 	 pos
 	 kind
-	 text-mode)
+	 text-mode
+	 after)
 
     (typecase buffer
       ((array (unsigned-byte 8) (*))
@@ -1880,7 +1963,7 @@ in get-multipart-sequence"))
        (error 
 	"This function only accepts (array (unsigned-byte 8)) or character arrays")))
     (if* (null mp-info)
-       then (error "get-multipart-sequence called before get-mulipart-header"))
+       then (error "get-multipart-sequence called before get-multipart-header"))
     
     (setq mpbuffer (mp-info-buffer mp-info)
 	  cur      (mp-info-cur mp-info))
@@ -1891,14 +1974,15 @@ in get-multipart-sequence"))
 	 ; no data left
 	 (return-from get-multipart-sequence nil))
 	(:start
-	 (error "get-multipart-sequence called before get-mulipart-header"))
+	 (error "get-multipart-sequence called before get-multipart-header"))
 	((:body :partial)
 	 (if* (eq (mp-info-state mp-info) :partial)
 	    then ; this was set below. we will return the partial
 		 ; at then end of the buffer
 		 (setf (mp-info-state mp-info) :body)
 		 (setq pos (mp-info-end mp-info))
-	    else (multiple-value-setq (pos kind) (scan-forward mp-info))
+	    else (multiple-value-setq (pos kind after) (scan-forward mp-info))
+		 (setf (mp-info-after mp-info) after)
 		 (setq cur (mp-info-cur mp-info)) ; scan-forward can change
 		 )
 	 (if* (> pos cur)
@@ -2032,8 +2116,8 @@ in get-multipart-sequence"))
 		      
 				  
 (defmethod request-query ((req http-request) &key (post t) (uri t)
-						  (external-format
-						   :latin1-base))
+						  (external-format 
+						   *default-aserve-external-format*))
   ;; decode if necessary and return the alist holding the
   ;; args to this url.  In the alist items the value is the 
   ;; cdr of the alist item.

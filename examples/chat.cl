@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.1.2.5 2001/06/26 21:21:08 layer Exp $
+;; $Id: chat.cl,v 1.1.2.5.2.1 2001/09/10 17:55:45 layer Exp $
 
 ;; Description:
 ;;   aserve chat program
@@ -51,6 +51,8 @@
 (defvar *do-dnscheck* nil) ; translate ip to dns names
 
 (defvar *chat-hook* nil) ; invoked when the chat page is accessed
+
+(defvar *offer-transcript* nil) ; offer a chat transcript
 
 (defparameter *initial-msg-size* 100)  ; size of initial message array
 (defparameter *msg-increment* 200)  ; how much to grow array each time
@@ -267,6 +269,10 @@
 		    :initarg :message-archive
 		     ;; 1+ last message number archived so far
 		    :accessor chat-message-archive)
+   ; used by experimental code to delete private messages
+   ; message number to scan next
+   (message-prvcheck :initform 0
+		     :accessor chat-message-prvcheck)
    
    ; list of deleted message numbers since the last archive
    (messages-deleted :initform nil
@@ -324,10 +330,11 @@
   dns     ; dns name corresponding to the ip address
   handle  ; from handle (for unlogged in user)
   real    ; true if this is a real handle of a logged in user
-  to	  ; if non nil then a list of uids who are the target of this message
+  to	  ; if non nil then a list of handles who are the target of this message
           ; if nil then this goes to no-one
           ; if t then this goes to everyone
-  time
+  time    ; string - message time in a pretty format
+  (ut 0)  ; universal time of message
   body)
 
 
@@ -383,7 +390,7 @@
 ;				string (secret key)
 ; chat		u,c,[s]		build frameset for the given chat.
 ;				s is the chat secret key [if given.]
-;  chattop      u,c,[s],count,secs,y,z,b  display count messsage and refresh in secs
+;  chattop      u,c,[s],count,secs,y,z,b  display count message and refresh in secs
 ;  chaviewers   u,c,[s]         list who is watching the chat
 ;  chatenter    u,c,[s],pp,purl		box into which to enter a message
 ;  chatcontrol  u,c,[s]		specify message count and refresh seconds
@@ -501,6 +508,8 @@
   (publish :path "/chatviewers" :function 'chatviewers)
   
   (publish :path "/chatmaster" :function 'chatmaster)
+  
+  (publish :path "/chattranscript" :function 'chattranscript)
   )
 
 
@@ -517,39 +526,41 @@
 	      ;; now read in chat data
 	      (dolist (controller (controllers *master-controller*))
 		(dolist (chat (chats controller))
-		  (let (did-delete)
-		    (with-open-file (p (archive-filename chat)
-				     :direction :input)
-		      (do ((message (read p nil :eof) (read p nil :eof)))
-			  ((eq message :eof)
-			   ; use everything is archived we've read
-			   (setf (chat-message-archive chat) 
-			     (chat-message-number chat))
-			   ; remove those put back on redundantly 
-			   ; by delete-chat-message
-			   (setf (chat-messages-deleted chat) nil))
-			(if* message
-			   then (if* (and (consp message)
-					  (eq :delete (car message)))
-				   then (mapcar #'(lambda (num)
-						    (delete-chat-message chat
-									 num))
-						(cdr message))
-					(setq did-delete t)
-				   else (add-chat-message chat message)))))
+		  (and (archive-filename chat)
+		       (probe-file (archive-filename chat))
+		       (let (did-delete)
+			 (with-open-file (p (archive-filename chat)
+					  :direction :input)
+			   (do ((message (read p nil :eof) (read p nil :eof)))
+			       ((eq message :eof)
+				; use everything is archived we've read
+				(setf (chat-message-archive chat) 
+				  (chat-message-number chat))
+				; remove those put back on redundantly 
+				; by delete-chat-message
+				(setf (chat-messages-deleted chat) nil))
+			     (if* message
+				then (if* (and (consp message)
+					       (eq :delete (car message)))
+					then (mapcar #'(lambda (num)
+							 (delete-chat-message chat
+									      num))
+						     (cdr message))
+					     (setq did-delete t)
+					else (add-chat-message chat message)))))
 		    
-		    (if* did-delete
-		       then ; write out archive again this time
-			    ; without the deleted messages
-			    (format t "Rewriting ~s~%" (archive-filename chat))
-			    (let ((messages (chat-messages chat)))
-			      (with-open-file (p (archive-filename chat)
-					       :direction :output
-					       :if-exists :supersede)
-				(dotimes (i (chat-message-next chat))
-				  (let ((message (svref messages i)))
-				    (if* (message-to message)
-				       then (pprint (svref messages i) p))))))))))))))
+			 (if* did-delete
+			    then ; write out archive again this time
+				 ; without the deleted messages
+				 (format t "Rewriting ~s~%" (archive-filename chat))
+				 (let ((messages (chat-messages chat)))
+				   (with-open-file (p (archive-filename chat)
+						    :direction :output
+						    :if-exists :supersede)
+				     (dotimes (i (chat-message-next chat))
+				       (let ((message (svref messages i)))
+					 (if* (message-to message)
+					    then (pprint (svref messages i) p)))))))))))))))
     
 (defun dump-existing-chat (home)
   (mp:with-process-lock ((master-lock *master-controller*))
@@ -1275,8 +1286,7 @@
 	      
 	      (if* ppp
 		 then ; add this user
-		      (format t "tu ~s ... ppp ~s~%" (user-to-users user)
-			      ppp)
+		      
 		      (setq pp (setf (user-to-users user)
 				 (concatenate 'string
 				   (or (user-to-users user) "")
@@ -1287,7 +1297,6 @@
 		 then (setf (user-to-users user) nil)
 		 else (setf (user-to-users user) pp)))
 
-      (format t "pp ~s~%" pp)
       ; do redirect check
       (if* (null user)
 	 then ; do not logged in check
@@ -1474,7 +1483,17 @@
 	      
 	      ((:input :type "submit"
 		       :name "submit"
-		       :value "Update Messages")))))))))))
+		       :value "Update Messages"))
+	      
+	      
+	      ; optional chat transcript link
+	      (if* *offer-transcript*
+		 then (html
+		       :br :hr
+		       ((:a :href (format nil "chattranscript?~a" qstring)
+			    :target "_blank")
+			"View transcript.")))
+	      )))))))))
 		     
 
 (defun compute-integer-value (string)
@@ -1529,6 +1548,7 @@
 		    (request-socket req)))
 	   (dns (or #+ignore (socket:ipaddr-to-hostname ipaddr)
 		    (socket:ipaddr-to-dotted ipaddr)))
+	   (ut (get-universal-time))
 	 
 	   (message 
 	    (make-message
@@ -1540,7 +1560,8 @@
 		    then (mapcar #'user-handle to-users)
 		    else t)
 	     :real (if* user then t else nil)
-	     :time (compute-chat-date)
+	     :time (compute-chat-date ut)
+	     :ut   ut
 	     :body (if* link
 		      then (cons link cvted-body)
 		      else cvted-body))))
@@ -1548,11 +1569,11 @@
       (mp:with-process-lock ((chat-message-lock chat))
 	(add-chat-message chat message)))))
 
-(defun compute-chat-date ()
+(defun compute-chat-date (ut)
   ; return string to use as time for this message
   ; quick hack - hardwire in pdt
   (multiple-value-bind (sec min hour day month)
-      (decode-universal-time (get-universal-time))
+      (decode-universal-time ut)
     (format nil "~d:~2,'0d:~2,'0d Pacific Time, ~a ~d" hour min sec
 	    (month-name month) day
 	    )))
@@ -1722,7 +1743,7 @@
     
     
     (if* (zerop message-next)
-       then (html (:b "There are no messsages in this chat"))
+       then (html (:b "There are no messages in this chat"))
      elseif (<= count 0)
        thenret ; nothing to show
        else ; starting at the end find the counth message
@@ -2468,6 +2489,20 @@
 
 
 
+(defun find-index-of-message (chat number)
+  ;; find index of message 'number' or the first one after that
+  (let ((messages (chat-messages chat))
+	(message-next (chat-message-next chat)))
+    (do ((i (1- message-next) (1- i)))
+	((< i 0) 0)
+      (let* ((message (svref messages i))
+	     (num (message-number message)))
+	(if* (and num
+		  (< num number))
+	   then (return (1+ i))
+	 elseif (eql num number)
+	   then (return i))))))
+    
 (defun archive-chat (chat)
   ;; write out new messages for this chat
   ;; we are inside a process lock for this chat's message lock
@@ -2483,21 +2518,8 @@
 	    ; would be no messages stored
 	    
 	    ; locate the message numbered message-archive
-	    (let ((start-to-save 0))
-	      (do ((i (1- message-next) (1- i)))
-		  ((< i 0))
-		(let* ((message (svref messages i))
-		       (num (message-number message)))
-		  (if* (and num
-			    (< num message-archive))
-		     then (setq start-to-save (1+ i))
-			  (return)
-		   elseif (eq num message-archive)
-		     then (setq start-to-save i)
-			  (return))))
-		
-	
-	    
+	    (let ((start-to-save 
+		   (find-index-of-message chat message-archive)))
 	    
 	      (with-open-file (archive-port (archive-filename chat)
 			       :direction :output
@@ -2761,8 +2783,29 @@
 				 (html :newline)))))))))))))))
 						
 					  
-	    
-		   
+
+
+(defun chattranscript (req ent)
+  (let* ((chat (or (chat-from-req req)
+		   (return-from chattranscript (ancient-link-error req ent))))
+	 (title (format nil "full transcript of chat ~a as of ~a"
+			(chat-name chat) (compute-chat-date
+					  (get-universal-time)))))
+
+    (with-http-response (req ent)
+      (with-http-body (req ent)
+	(html
+	 (:html
+	  (:title (:princ-safe title))
+	  (:body
+	   (:h1 (:princ-safe title))
+	   (let ((*top-frame-bgcolor* "#xffffff") ; white
+		 (*public-font-color* "#x000000") ; black
+		 )
+	     (show-chat-info chat (chat-message-next chat) nil 
+			     "bogushandle" nil))
+	   )))))))
+
 (defun redir-check (req ent chat before)
   ;; check if this request should be redirected
   ;; before is true if we are in the before login state

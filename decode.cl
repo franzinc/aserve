@@ -22,7 +22,9 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-;; $Id: decode.cl,v 1.8.10.3 2001/06/01 21:22:35 layer Exp $
+
+;;
+;; $Id: decode.cl,v 1.8.10.3.4.1 2001/09/10 17:55:42 layer Exp $
 
 ;; Description:
 ;;   decode/encode code
@@ -116,7 +118,8 @@
      then t
      else (svref *uri-encode* code)))
 
-(defun uriencode-string (str &key (external-format :latin1-base))
+(defun uriencode-string (str &key (external-format 
+				      *default-aserve-external-format*))
   ;; encode the given string using uri encoding.
   ;; It may return the same string if no encoding need be done
   ;;
@@ -167,7 +170,8 @@
 			       :end (+ len (* 2 count)))))))))
 
 
-(defun uridecode-string (str &key (external-format :latin1-base))
+(defun uridecode-string (str &key (external-format 
+				      *default-aserve-external-format*))
   ;; decoded the uriencoded string, returning possibly the
   ;; same string
   ;;
@@ -216,7 +220,8 @@
       res))
 
 
-(defun query-to-form-urlencoded (query &key (external-format :latin1-base))
+(defun query-to-form-urlencoded (query &key (external-format 
+					     *default-aserve-external-format*))
   ;; query is a list of conses, each of which has as its 
   ;; car the query name and as its cdr the value.  A value of
   ;; nil means we encode  name=   and nothing else
@@ -255,7 +260,8 @@
 		  `(aref ,buf ,i)))
        ,@body)))
 
-(defun encode-form-urlencoded (str &key (external-format :latin1-base))
+(defun encode-form-urlencoded (str &key (external-format 
+					     *default-aserve-external-format*))
   ;; encode the given string using form-urlencoding
   
   ;; a x-www-form-urlencoded string consists of a sequence 
@@ -333,7 +339,8 @@
   
   
 
-(defun form-urlencoded-to-query (str &key (external-format :latin1-base))
+(defun form-urlencoded-to-query (str &key (external-format 
+					   *default-aserve-external-format*))
   ;; decode the x-www-form-urlencoded string returning a list
   ;; of conses, the car being the name and the cdr the value, for
   ;; each form element.  This list is called a query list.
@@ -410,7 +417,8 @@
        ,@body)))
 
 (defun un-hex-escape (given spacep
-		      &key (external-format :latin1-base))
+		      &key (external-format 
+				      *default-aserve-external-format*))
   ;; convert a string with %xx hex escapes into a string without
   ;; if spacep it true then also convert +'s to spaces
   ;;
