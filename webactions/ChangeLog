@@ -1,3 +1,9 @@
+2005-03-11  John Foderaro  <jkf@tiger.franz.com>
+
+	* webact.cl - back to using a 301 redirect if the request-method
+	    is a post since modern browsers will complain about a 307
+	    redirect in this case.
+
 2005-02-10  John Foderaro  <jkf@tiger.franz.com>
 1.12
 	*  clpage.cl - fix parsing of nested elements where the outer

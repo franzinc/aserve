@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: webact.cl,v 1.13 2005/02/11 00:46:10 jkf Exp $
+;; $Id: webact.cl,v 1.14 2005/03/12 03:39:02 jkf Exp $
 
 
 
@@ -237,8 +237,15 @@
 		(find-locator :exact server)))
 
 (defun redirect-to (req ent dest)
+  ;; the http v1.1 spec says that 307 (temporary redirects) should only be done
+  ;; silently for get's and head's.  For all else (e.g. post) 
+  ;; the browser should ask if the user wants to do the redirect.
+  ;; Thus we use the permantent redirect in that case
   (with-http-response (req ent
-			   :response *response-temporary-redirect*)
+			   :response 
+			   (if* (member (request-method req) '(:get :head))
+			      then *response-temporary-redirect*
+			      else *response-moved-permanently*))
     (setf (reply-header-slot-value req :location) dest)
     (with-http-body (req ent))))
   
