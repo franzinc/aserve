@@ -132,7 +132,7 @@ and after you start the server.</p>
 server running.</p>
 
 <p><strong><font face="Courier New"><a name="f-start"></a>(start &amp;key port listeners
-chunking keep-alive server setuid setgid debug)</font></strong></p>
+chunking keep-alive server setuid setgid debug proxy)</font></strong></p>
 
 <p>If no arguments are given then <strong>start</strong>&nbsp; starts a multi-threaded web
 server on port 80, which is the standard web server port.&nbsp;&nbsp;&nbsp; If you are
@@ -178,6 +178,8 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
   <li>debug -- if given a number this will print debugging messages whose associated codes are
     this number or less.&nbsp;&nbsp;&nbsp; This is really an internal switch and may be
     removed in future versions.</li>
+  <li>proxy -- if true then this server will also act as a proxy server and will forward http
+    requests to other servers.</li>
 </ul>
 
 <p>&nbsp;</p>
@@ -1356,6 +1358,16 @@ keep-alive headers proxy)</font></strong></p>
     is listening on port 8000 rather than 80.&nbsp;&nbsp; Proxying web servers are often used
     when clients are behind firewalls that prevent direct access to the internet. &nbsp;
     Another use is to centralize the page cache for a group of clients.</td>
+  </tr>
+  <tr>
+    <td width="22%">user-agent</td>
+    <td width="16%">nil</td>
+    <td width="62%">If given it specfies the value of the User-Agent header to be sent with
+    the request.&nbsp; Some sites respond differently based on the user-agent they believe has
+    made the request.&nbsp; The lack of a User-Agent header may cause a server to ignore a
+    request since it believes that it is being probed by a robot.&nbsp; The value of
+    user-agent can be a string or one of the keywords <strong>:aserve</strong>, <strong>:netscape</strong>
+    or <strong>:ie</strong> in which case an appropriate user agent string is sent.</td>
   </tr>
 </table>
 
