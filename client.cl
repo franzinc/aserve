@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.2 2000/03/16 17:53:28 layer Exp $
+;; $Id: client.cl,v 1.3 2000/03/16 17:54:55 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -625,7 +625,7 @@
 		   (loop
 		     (if* (>= ,i ,max) then (fail))
 		     (if* (eql ,ch (schar ,buffer ,i)) 
-			then (return (buf-substr start i ,buffer ,downcasep)))
+			then (return (buf-substr start ,i ,buffer ,downcasep)))
 		     (incf ,i)
 		     )))
 	      
@@ -649,7 +649,7 @@
 		;; skip to first char not ch
 		`(loop
 		   (if* (>= ,i ,max) then (fail))
-		   (if* (not (eq ,ch (schar buffer ,i)))
+		   (if* (not (eq ,ch (schar ,buffer ,i)))
 		      then (return))
 		   (incf ,i)))
 	      
@@ -678,6 +678,11 @@
 				     basic-authorization
 				     content-length 
 				     content)
+  
+  ;; to be done:
+  (declare (ignore content content-length basic-authorization
+		   cookies))
+   
   ;; start a request 
   
   ; parse the uri we're accessing
@@ -723,99 +728,113 @@
 
 
     
-(defmethod read-client-response-headers ((creq client-response))
+(defmethod read-client-response-headers ((creq client-request))
   ;; read the response and the headers
   (let ((buff (get-header-line-buffer))
 	(buff2 (get-header-line-buffer))
 	(pos 0)
-	(len)
+	len
+	len2
 	(sock (client-request-socket creq))
 	(headers)
-	protcol
+	protocol
 	response
 	comment
 	saveheader
-	saveheader-len
 	)
-    (with-better-scan-macros
-	(if* (null (setq len (read-socket-line creq buff (length buff))))
-	   then ; eof getting response
-		(error "premature eof from server"))
-      (macrolet ((fail ()
-		   (let ((i 0))
-		     (error "illegal response from web server: ~s"
-			    (collect-to-eol buff i len)))))
-	(setq protocol (collect-to #\space buff pos len))
-	(skip-to-not #\space buff pos len)
-	(setq response (collect-to #\space buff pos len))
-	(skip-to-not #\space buff pos len)
-	(setq comment (collect-to-eol buff pos len)))
+    (unwind-protect
+	(with-better-scan-macros
+	    (if* (null (setq len (read-socket-line sock buff (length buff))))
+	       then ; eof getting response
+		    (error "premature eof from server"))
+	  (macrolet ((fail ()
+		       `(let ((i 0))
+			  (error "illegal response from web server: ~s"
+				 (collect-to-eol buff i len)))))
+	    (setq protocol (collect-to #\space buff pos len))
+	    (skip-to-not #\space buff pos len)
+	    (setq response (collect-to #\space buff pos len))
+	    (skip-to-not #\space buff pos len)
+	    (setq comment (collect-to-eol buff pos len)))
 
-      (if* (equalp protocol "HTTP/1.0")
-	 then (setq protocol :http/1.0)
-       elseif (equalp protocol "HTTP/1.1")
-	 else (error "unknown protocol: ~s" protocol))
+	  (if* (equalp protocol "HTTP/1.0")
+	     then (setq protocol :http/1.0)
+	   elseif (equalp protocol "HTTP/1.1")
+	     then (setq protocol :http/1.1)
+	     else (error "unknown protocol: ~s" protocol))
       
-      (setf (client-request-protocol creq) protocol)
+	  (setf (client-request-protocol creq) protocol)
       
-      (setf (client-request-response-code creq) 
-	(quick-convert-to-integer respone))
+	  (setf (client-request-response-code creq) 
+	    (quick-convert-to-integer response))
       
-      (setf (client-request-response-comment creq) comment)
+	  (setf (client-request-response-comment creq) comment)
       
      
-      ; now read the header lines
-      (loop
-	(if* saveheader
-	   then ; buff2 has the saved header we should work on next
-		(exch buff buff2)
-		(setq len len2
-		      saveheader nil)
-	 elseif (null (setq len (read-socket-line creq buff (length buff))))
-	   then ; eof before header lines
-		(error "premature eof in headers")
-	 elseif (eql len 0)
-	   then ; last header line
-		(return))
+	  ; now read the header lines
+	  (loop
+	    (if* saveheader
+	       then ; buff2 has the saved header we should work on next
+		    (psetf buff buff2  
+			   buff2 buff)
+		    (setq len len2
+			  saveheader nil)
+	     elseif (null (setq len (read-socket-line sock buff (length buff))))
+	       then ; eof before header lines
+		    (error "premature eof in headers"))
+	    
+	    
+	     (if* (eql len 0)
+	       then ; last header line
+		    (return))
 	  
-	; got header line. Must get next one to see if it's a continuation
-	(if* (null (setq len2 (read-socket-line creq buff2 (length buff2))))
-	   then ; eof before crlf ending the headers
-		(error "premature eof in headers")
-	 elseif (and (> len2 0)
-		     (eq #\space (schar buff2 0)))
-	   then ; a continuation line
-		(if* (< (length buff) (+ len len2))
-		   then (let ((buff3 (make-array (+ len len2 50)
-						 :element-type 'character)))
-			  (dotimes (i len)
-			    (setf (schar buff3 i) (schar buff i))
-			    (put-header-line-buffer buff)
-			    (setq buff buff3))))
-		; can all fit in buff
-		(do ((to len (1+ to))
-		     (from 0 (1+ from)))
-		    ((>= from len2))
-		  (setf (schar buff to) (schar buff2 from))
-		  )
-	   else ; must be a new header line
-		(setq saveheader t))
+	    ; got header line. Must get next one to see if it's a continuation
+	    (if* (null (setq len2 (read-socket-line sock buff2 (length buff2))))
+	       then ; eof before crlf ending the headers
+		    (error "premature eof in headers")
+	     elseif (and (> len2 0)
+			 (eq #\space (schar buff2 0)))
+	       then ; a continuation line
+		    (if* (< (length buff) (+ len len2))
+		       then (let ((buff3 (make-array (+ len len2 50)
+						     :element-type 'character)))
+			      (dotimes (i len)
+				(setf (schar buff3 i) (schar buff i))
+				(put-header-line-buffer buff)
+				(setq buff buff3))))
+		    ; can all fit in buff
+		    (do ((to len (1+ to))
+			 (from 0 (1+ from)))
+			((>= from len2))
+		      (setf (schar buff to) (schar buff2 from))
+		      )
+	       else ; must be a new header line
+		    (setq saveheader t))
 	  
-	; parse header
-	(let ((pos 0)
-	      (headername)
-	      (headervalue))
-	  (macrolet ((fail ()
-		       (let ((i 0))
-			 `(error "header line missing a colon:  ~s" 
-				 (collect-to-eol buff i len)))))
-	    (setq headername (collect-to #\: buff pos len)))
+	    ; parse header
+	    (let ((pos 0)
+		  (headername)
+		  (headervalue))
+	      (macrolet ((fail ()
+			   `(let ((i 0))
+			      (error "header line missing a colon:  ~s" 
+				     (collect-to-eol buff i len)))))
+		(setq headername (collect-to #\: buff pos len)))
 	  
-	  (incf pos) ; past colon
-	  (skip-to-not #\space buff pos len)
-	  (setq headervalue (collect-to-eol buff pos len))
+	      (incf pos) ; past colon
+	      (macrolet ((fail ()
+			   `(progn (setq headervalue "")
+				   (return))))
+		(skip-to-not #\space buff pos len)
+		(setq headervalue (collect-to-eol buff pos len)))
 	  
-	  (push (cons headername headervalue) headers))))))
+	      (push (cons headername headervalue) headers)))
+      
+	  (setf (client-request-headers creq) headers)
+	  
+	  creq  ; return the client request object
+	  )
+      (progn (put-header-line-buffer buff2 buff)))))
 		  
 	      
 (defun quick-convert-to-integer (str)
@@ -829,16 +848,68 @@
 	   then (setq res (+ (* 10 res) chn)))))
     res))
 
-	
+
+
+
+(defun read-socket-line (socket buffer max)
+  ;; read the next line from the socket.
+  ;; the line may end with a newline or a return, newline, or eof
+  ;; in any case don't put that the end of line characters in the buffer
+  ;; return the number of characters in the buffer which will be zero
+  ;; for an empty line.
+  ;; on eof return nil
+  ;;
+  (let ((i 0))
+    (loop
+      (let ((ch (read-char socket nil nil)))
+	(if* (null ch)
+	   then ; eof from socket
+		(if* (> i 0)
+		   then ; actually read some stuff first
+			(return i)
+		   else (return nil) ; eof
+			)
+	 elseif (eq ch #\return)
+	   thenret ; ignore
+	 elseif (eq ch #\newline)
+	   then ; end of the line,
+		(return i)
+	 elseif (< i max)
+	   then ; ignore characters beyone line end
+		(setf (schar buffer i) ch)
+		(incf i))))))
+		
+		
+    
       
 ;; buffer pool for string buffers of the right size for a header
 ;; line
 
 (defvar *response-header-buffers* nil)
 
+(defun get-header-line-buffer ()
+  ;; return the next header line buffer
+  (let (buff)
+    (mp:without-scheduling 
+      (setq buff (pop *response-header-buffers*)))
+    (if* buff
+       thenret
+       else (make-array 200 :element-type 'character))))
+
+(defun put-header-line-buffer (buff &optional buff2)
+  ;; put back up to two buffers
+  (mp:without-scheduling
+    (push buff *response-header-buffers*)
+    (if* buff2 then (push buff2 *response-header-buffers*))))
+
+
 
     
-    
+(defun  doit ()
+  (setq xx 
+    (net.iserve.client::make-http-client-request "http://www.franz.com"))
+  (net.iserve.client::read-client-response-headers xx))
+
     
   
 	    
@@ -848,8 +919,7 @@
 
 
 
-		    
-  
+		      
 			
 					   
   
