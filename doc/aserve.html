@@ -440,7 +440,7 @@ port content-type function class format remove server timeout)</font></strong></
 entity that computes its response every time a request comes in.&nbsp; The <strong>path</strong>,
 <strong>host</strong>, <strong>port</strong>, <strong>remove, server</strong> and <strong>class</strong>
 arguments are as in the other publish functions.&nbsp;&nbsp;The <strong>timeout</strong>
-argument defaults to <strong>nil </strong> always.&nbsp;&nbsp; The <strong>content-type</strong>
+argument defaults to <strong>nil </strong>always.&nbsp;&nbsp; The <strong>content-type</strong>
 sets a default value for the response to the request but this can be overridden.&nbsp; The
 <strong>format</strong> argument is either <strong>:text </strong>(the default) or <strong>:binary</strong>
 and it specifies the kind of value that will be sent back (after the response headers,
@@ -513,7 +513,7 @@ World!&lt;/body&gt;&lt;/html&gt;.</font></p>
 <hr>
 
 <p align="left"><a name="f-with-http-response"></a><strong><font face="Courier New">(with-http-response
-(req ent &amp;key timeout check-modified response content-type) <br>
+(req ent &amp;key timeout check-modified format response content-type) <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 &amp;rest body)</font></strong></p>
 
@@ -539,7 +539,18 @@ type of the body (if any) sent after the headers.&nbsp; It has a form like
 the content-type value in the entity (which is set in the call to <strong>publish)</strong>
 will be used.</p>
 
-<p align="left">&nbsp;</p>
+<p align="left">The <strong>format</strong> argument specifies whether the code that
+writes the body of the response will want to write <strong>:text</strong> (e.g. <strong>write-char</strong>)
+or <strong>:binary</strong> (e.g. <strong>write-byte</strong>) when it writes the data of
+the body of the response. &nbsp;&nbsp;&nbsp;&nbsp; Based on the value of the <strong>format</strong>
+argument, AllegroServe will create the correct kind of response stream.&nbsp;&nbsp; If <strong>format
+</strong>is not specified here it will default to the value specified when <strong>publish</strong>
+was called to create the entity.&nbsp; If not <strong>:format </strong>argument was passed
+to <strong>publish</strong> then <strong>:binary</strong> format is assumed.
+&nbsp;&nbsp;&nbsp; If <strong> :binary</strong> is specified then you can write both text
+and binary to the stream&nbsp; since Allegro's binary streams also support text calls as
+well.&nbsp; If you specify <strong>:text</strong> then you may end up with a stream that
+supports only text operations.</p>
 
 <p align="left">An http response consists of a line describing the response code, followed
 by headers (unless it's the HTTP/0.9 protocol in which case there are no headers),
@@ -565,14 +576,6 @@ necessary to call <strong>with-http-body </strong>so that the other parts of the
 are sent out, e.g.<font face="Courier New"> </font>at a minimum you should put<font
 face="Courier New"> (with-http-body (req ent)) </font>in the body of a with-http-response</p>
 
-<p align="left">The <strong>format</strong> argument specifies whether the code in the <strong>body</strong>
-will want to write <strong>:text</strong> (e.g. <strong>write-char</strong>) or <strong>:binary</strong>
-(e.g. <strong>write-byte</strong>) when it writes the data of the body of the response.
-&nbsp;&nbsp;&nbsp;&nbsp; Based on the value of the <strong>format</strong> argument,
-AllegroServe will create the correct kind of response stream.&nbsp;&nbsp; If <strong>format
-</strong>is not specified here it will default to the value specified when <strong>publish</strong>
-was called to create the entity.</p>
-
 <p align="left">The <strong>headers</strong> argument is a list of conses, where the car
 is the header name (a keyword symbol) and the cdr is the header value.&nbsp; These headers
 are added to the headers sent as part of this response.</p>
@@ -585,6 +588,11 @@ The variable <strong>*html-stream*</strong> is bound to the value of <strong>(re
 req)</strong> before the <strong>body</strong> is evaluated.&nbsp;&nbsp; This makes it
 easy&nbsp; to use the <strong>html</strong> macro to generate html as part of the
 response. </p>
+
+<p align="left"><em>Note: there used to be a <strong>:format</strong> argument to <strong>with-http-body.
+</strong> That argument was never used by <strong>with-http-body</strong>.&nbsp; The <strong>:format
+</strong> argument has been moved to <strong>with-http-response </strong>so that it can
+now have an effect on the stream created.</em></p>
 
 <hr>
 
