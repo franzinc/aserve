@@ -2,23 +2,27 @@
 ;;
 ;; main.cl
 ;;
-;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA  - All rights reserved.
+;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA 
 ;;
-;; The software, data and information contained herein are proprietary
-;; to, and comprise valuable trade secrets of, Franz, Inc.  They are
-;; given in confidence by Franz, Inc. pursuant to a written license
-;; agreement, and may be stored and used only in accordance with the terms
-;; of such license.
+;; This code is free software; you can redistribute it and/or
+;; modify it under the terms of the version 2.1 of
+;; the GNU Lesser General Public License as published by 
+;; the Free Software Foundation; 
 ;;
-;; Restricted Rights Legend
-;; ------------------------
-;; Use, duplication, and disclosure of the software, data and information
-;; contained herein by any agency, department or entity of the U.S.
-;; Government are subject to restrictions of Restricted Rights for
-;; Commercial Software developed at private expense as specified in
-;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
+;; This code is distributed in the hope that it will be useful,
+;; but without any warranty; without even the implied warranty of
+;; merchantability or fitness for a particular purpose.  See the GNU
+;; Lesser General Public License for more details.
 ;;
-;; $Id: main.cl,v 1.19.2.5 2000/03/14 23:13:23 jkf Exp $
+;; Version 2.1 of the GNU Lesser General Public License is in the file 
+;; license-lgpl.txt that was distributed with this file.
+;; If it is not present, you can access it from
+;; http://www.gnu.org/copyleft/lesser.txt (until superseded by a newer
+;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
+;; Suite 330, Boston, MA  02111-1307  USA
+;;
+;;
+;; $Id: main.cl,v 1.19.2.6 2000/03/15 20:38:18 jkf Exp $
 
 ;; Description:
 ;;   iserve's main loop
@@ -35,19 +39,29 @@
    #:authorizer
    #:base64-decode
    #:base64-encode
+   #:compute-strategy
+   #:computed-entity
    #:decode-form-urlencoded
+   #:denied-request
+   #:failed-request
    #:get-basic-authorization
    #:get-cookie-values
    #:get-multipart-header
    #:get-multipart-sequence
    #:get-request-body
+   #:handle-request
    #:header-slot-value
-   #:location-authorizer
-   #:password-authorizer
+   #:http-request  	; class
+   #:locator		; class
+   #:location-authorizer  ; class
+   #:password-authorizer  ; class
+   #:process-entity
    #:publish
    #:publish-file
    #:publish-directory
    #:set-basic-authorization
+   #:standard-locator
+   #:unpublish-locator
 
    #:request-method
    #:request-protocol
@@ -101,7 +115,7 @@
 (in-package :net.iserve)
 
 
-(defparameter *iserve-version* '(1 1 2))
+(defparameter *iserve-version* '(1 1 3))
 
 ;;;;;;;  debug support 
 
@@ -533,6 +547,8 @@
   ;;
   ;; start the web server
   ;; return the server object
+  #+mswindows
+  (declare (ignore setuid setgid))
   
 
   (if* (eq server :new)

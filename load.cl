@@ -1,6 +1,6 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.12.2.5 2000/03/14 23:13:23 jkf Exp $
+;; $Id: load.cl,v 1.12.2.6 2000/03/15 20:38:18 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -17,8 +17,11 @@
       "log" ))
 
 (defparameter *iserve-other-files*
-    ;; other files that make up the neo dist
+    ;; other files that make up the iserve dist
     '("readme.txt"
+      "source-readme.txt"
+      "ChangeLog"
+      "license-lgpl.txt"
       "examples/examples.cl"
       "examples/foo.txt"
       "examples/fresh.jpg"
@@ -87,6 +90,7 @@
 		 "iserve-dist/htmlgen.html")
   (dolist (file '("iserve.fasl"
 		  "doc/iserve.html"
+		  "doc/tutorial.html"
 		  "readme.txt"
 		   "examples/examples.cl"
 		   "examples/examples.fasl"
@@ -122,7 +126,8 @@
 		     :if-exists :supersede
 		     :element-type '(unsigned-byte 8))
       (dolist (file files)
-	(if* (null (pathname-type file))
+	(if* (and (null (pathname-type file))
+		  (not (probe-file file)))
 	   then (setq file (concatenate 'string file  ".fasl")))
 	(with-open-file (in file :element-type '(unsigned-byte 8))
 	  (loop

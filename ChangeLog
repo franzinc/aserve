@@ -1,3 +1,9 @@
+2000-03-15  John Foderaro  <jkf@tiger.franz.com>
+1.1.3
+	* switch to lgpl license.  
+	* add source-readme.txt to describe what to do with
+	  the source
+
 2000-03-14  John Foderaro  <jkf@tiger.franz.com>
 1.1.2
 	* add authorizer objects to support checking for valid

@@ -2,6 +2,16 @@ The Allegro iServe Webserver
 copyright (c) 1999,2000 Franz Inc.
 
 
+
+!! Note: this readme is for people receiving the binary only
+         distribution of iserve.
+
+         If you received a source distribution, then follow
+         the instructions in source-readme.txt instead.
+
+
+
+
 This is a distribution of the current state of the iServe web server.
 This is not a finished product.   We are distributing this so that
 people can see what directions we are taking in our design.
