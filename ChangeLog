@@ -1,5 +1,8 @@
 *******************************************************************************
 merge from trunk to acl61 branch
+command: ../../join.sh trunk trunk_to_acl61_merge4 trunk_to_acl61_merge5 aserve
+*******************************************************************************
+merge from trunk to acl61 branch
 command: ../../join.sh trunk trunk_to_acl61_merge3 trunk_to_acl61_merge4 aserve
 *******************************************************************************
 merge from trunk to acl61 branch
@@ -11,6 +14,10 @@ command: ../../join.sh trunk trunk_to_acl61_merge1 trunk_to_acl61_merge2 aserve
 merge from trunk to acl61 branch
 command: ../../join.sh trunk acl61 trunk_to_acl61_merge1 aserve
 *******************************************************************************
+
+2001-09-20  Kevin Layer  <layer@crikey>
+
+	* makefile (clean): add `r' to `rm'
 
 2001-09-18  Kevin Layer  <layer@crikey>
 1.2.9
