@@ -154,7 +154,12 @@
 	    (setq sock (socket:make-socket :remote-host host
 					   :remote-port (or port 80)
 					   :format :bivalent))
-    
+
+	    (if* *watch-for-open-sockets*
+		   then (schedule-finalization 
+			 sock 
+			 #'check-for-open-socket-before-gc))
+	    
 	    (net.aserve::format-dif :xmit sock "~a ~a ~a~a"
 				    (string-upcase (string method))
 				    (net.aserve.client::uri-path-etc uri)

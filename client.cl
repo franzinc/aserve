@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.23 2000/08/17 14:03:34 jkf Exp $
+;; $Id: client.cl,v 1.24 2000/08/24 23:26:52 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -378,6 +378,11 @@
 	      (socket:make-socket :remote-host host
 				  :remote-port port
 				  :format :bivalent)))
+    
+    (if* net.aserve::*watch-for-open-sockets*
+       then (schedule-finalization 
+	     sock 
+	     #'net.aserve::check-for-open-socket-before-gc))
     
     (if* query
        then (case method

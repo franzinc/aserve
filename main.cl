@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.62 2000/08/24 18:18:32 jkf Exp $
+;; $Id: main.cl,v 1.63 2000/08/24 23:26:52 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -152,6 +152,11 @@
 
 (defparameter *debug-stream* *initial-terminal-io*)
 
+; set to true to automatically close sockets about to be gc'ed
+; open sockets should never be subject to gc unless there's a bug
+; in the code leading to leaks.
+(defvar *watch-for-open-sockets* t) 
+
 (defmacro define-debug-kind (name class what)
   `(progn (ecase ,class
 	    (:all (pushnew ,name *debug-all*))
@@ -227,6 +232,22 @@
   ;; only do if the debug value is high enough
   `(progn (if* (member ,kind *debug-current* :test #'eq)
 	     then ,@body)))
+
+(defparameter *fins* nil)
+(defun check-for-open-socket-before-gc (socket)
+  (push socket *fins*)
+  (if* (open-stream-p socket)
+     then (logmess 
+	   (format nil 
+		   "socket ~s is open yet is about to be gc'ed. It will be closed" 
+		   socket))
+	  (ignore-errors (close socket))
+     else (logmess 
+	   (format nil 
+		   "socket ~s is closed as it should be" 
+		   socket))
+	  ))
+
 
 ;;;;;;;;;;; end debug support ;;;;;;;;;;;;
 
@@ -844,7 +865,10 @@ by keyword symbols and not by strings"
 		   then ; new ip address by which this machine is known
 			(push localhost ipaddrs)
 			(setf (wserver-ipaddrs *wserver*) ipaddrs))
-		
+		(if* *watch-for-open-sockets*
+		   then (schedule-finalization 
+			 sock 
+			 #'check-for-open-socket-before-gc))
 		(process-connection sock))
 	    
 	    (:loop ()  ; abort out of error without closing socket
@@ -923,6 +947,11 @@ by keyword symbols and not by strings"
 	  (handler-case
 	      (let ((sock (socket:accept-connection main-socket))
 		    (localhost))
+		
+		(if* *watch-for-open-sockets*
+		   then (schedule-finalization 
+			 sock 
+			 #'check-for-open-socket-before-gc))
 		
 		; track all the ipaddrs by which we're reachable
 		(if* (not (member (setq localhost (socket:local-host sock))
