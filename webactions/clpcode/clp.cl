@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: clp.cl,v 1.5 2004/01/23 17:22:59 jkf Exp $
+;; $Id: clp.cl,v 1.6 2004/01/23 19:45:24 jkf Exp $
 
 
 (in-package :net.aserve)
@@ -194,7 +194,7 @@
 		  then (cvt-to-integer
 			(locate-any-value req args name)))
 	  value (cvt-to-integer value))
-    ;(format   t "name ~s ... value ~s~%" name value)
+    ;(format   t "eq: name ~s ... value ~s~%" name value)
     (if* (and name value
 	      (eql name value))
        then ; process the body
@@ -216,8 +216,8 @@
 		  then (cvt-to-integer
 			(locate-any-value req args name)))
 	  value (cvt-to-integer value))
-    ;(format   t "name ~s ... value ~s~%" name value)
-    (if* (and name value
+    ;(format   t "neq: name ~s ... value ~s~%" name value)
+    (if* (or (null name) (null value)
 	      (not (eql name value)))
        then ; process the body
 	    (emit-clp-entity req ent body))))
