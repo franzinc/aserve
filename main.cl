@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.125 2001/11/05 22:14:14 jkf Exp $
+;; $Id: main.cl,v 1.126 2001/11/06 19:18:48 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -2202,7 +2202,7 @@ in get-multipart-sequence"))
     (let ((got 0))
       (loop
 	(let ((this (rational-read-sequence string sock :start got)))
-	  (if* (<= this 0)
+	  (if* (<= this got)
 	     then (return nil) ; eof too early
 	     else (setq  got    this)
 		  (if* (>= got length ) then (return string))))))))

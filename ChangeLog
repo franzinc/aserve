@@ -1,3 +1,7 @@
+2001-11-06  John Foderaro  <jkf@tiger.franz.com>
+
+	* fix bug causing infinite loop when reading truncated form body
+
 2001-11-05  John Foderaro  <jkf@tiger.franz.com>
 1.2.16
 	* failed request now identifies AllegroServe as the server
