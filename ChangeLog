@@ -1,3 +1,11 @@
+2001-10-26  John Foderaro  <jkf@tiger.franz.com>
+
+	* add entity-plist slot to entities and use it to link
+	  file entities to their parent directory entities with
+	  the :parent indicator
+	* add map-entities function
+	* print vhosts in a why that shows their host names
+
 2001-10-24  John Foderaro  <jkf@tiger.franz.com>
 1.2.14
 	* added access files for publish-directory.  These allow

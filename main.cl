@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.120 2001/10/24 17:39:59 jkf Exp $
+;; $Id: main.cl,v 1.121 2001/10/26 16:38:35 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -47,6 +47,7 @@
    ; #:debug-on			
    #:denied-request
    #:enable-proxy
+   #:entity-plist
    #:failed-request
    #:form-urlencoded-to-query
    #:get-basic-authorization
@@ -61,6 +62,7 @@
    #:locator		; class
    #:location-authorizer  ; class
    #:location-authorizer-patterns
+   #:map-entities
    #:password-authorizer  ; class
    #:process-entity
    #:publish
@@ -77,6 +79,7 @@
    #:vhost-log-stream
    #:vhost-error-stream
    #:vhost-names
+   #:vhost-plist
 
    #:request-method
    #:request-protocol
@@ -507,7 +510,21 @@
    ; vhost specific filters, see wserver-filters for doc
    (filters :accessor vhost-filters
 	    :initarg :filters
-	    :initform nil)))
+	    :initform nil)
+
+   ; property list for users to store per-vhost specific info
+   (plist  :accessor vhost-plist
+	   :initarg :plist
+	   :initform nil)
+   ))
+
+(defmethod print-object ((vhost vhost) stream)
+  (print-unreadable-object (vhost stream :type t :identity t)
+    (format stream "~{ ~a~}"
+	    (let ((names (vhost-names vhost)))
+	      (if* (or (null names) (consp names)) 
+		 then names
+		 else (list names))))))
 
 
 ;;;;;; macros 

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.61 2001/10/24 17:39:59 jkf Exp $
+;; $Id: publish.cl,v 1.62 2001/10/26 16:38:35 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -82,6 +82,11 @@
    (timeout  :initarg :timeout
 	     :initform nil
 	     :accessor entity-timeout)
+   
+   ; property list for storing info on this entity
+   (plist    :initarg :plist
+	     :initform nil
+	     :accessor entity-plist)
    
    ; extra holds random info we need for a particular entity
    (extra    :initarg :extra  :reader entity-extra)
@@ -995,6 +1000,57 @@
   (setf (locator-info locator) nil))
 
 
+(defmethod map-entities (function (locator locator))
+  ;; do nothing if no mapping function defined
+  (declare (ignore function))
+  nil)
+
+(defmethod map-entities (function (locator locator-exact))
+  ;; map the function over the entities in the locator
+  (maphash #'(lambda (k v)
+	       (let (remove)
+		 (dolist (pair v)
+		   (if* (eq :remove (funcall function (cdr pair)))
+		      then (push pair remove)))
+		 (if* remove
+		    then (dolist (rem remove)
+			   (setq v (remove rem v :test #'eq)))
+			 (if* (null v)
+			    then (remhash k (locator-info locator))
+			    else (setf (gethash k (locator-info locator)) 
+				   v)))))
+	   (locator-info locator)))
+
+(defmethod map-entities (function (locator locator-prefix))
+  (let (outer-remove)
+    (dolist (ph (locator-info locator))
+      (let (remove)
+	(dolist (hh (prefix-handler-host-handlers ph))
+	  (let ((ent (host-handler-entity hh)))
+	    (if* ent 
+	       then (if* (eq :remove (funcall function ent))
+		       then (push hh remove)))))
+	(if* remove
+	   then (let ((v (prefix-handler-host-handlers ph)))
+		  (dolist (rem remove)
+		    (setq v (remove rem v :test #'eq)))
+		  (if* (null v)
+		     then (push ph outer-remove) ; remove whole thing
+		     else (setf (prefix-handler-host-handlers ph) v))))))
+    
+    (if* outer-remove
+       then ; remove some whole prefixes
+	    (let ((v (locator-info locator)))
+	      (dolist (rem outer-remove)
+		(setq v (remove rem v :test #'eq)))
+	      (setf (locator-info locator) v)))
+    ))
+  
+	      
+
+
+
+  
 
 
 
@@ -1274,7 +1330,9 @@
 		  :authorizer (or local-authorizer
 				  (entity-authorizer ent))
 		  :content-type content-type
-		  :timeout (entity-timeout ent))))
+		  :timeout (entity-timeout ent)
+		  :plist (list :parent ent) ; who spawned us
+		  )))
       
 
 
