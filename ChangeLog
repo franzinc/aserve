@@ -1,3 +1,7 @@
+2000-04-17  John Foderaro  <jkf@tiger.franz.com>
+1.1.12
+	* add test/t-iserve.cl to the list of files in the ftp distribution
+
 2000-04-16    <jkf@DEEDEE>
 
 	* htmlgen/htmlgen.cl - when printing option values inside

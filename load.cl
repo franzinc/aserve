@@ -1,6 +1,6 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.24 2000/04/09 04:34:27 jkf Exp $
+;; $Id: load.cl,v 1.25 2000/04/17 15:58:07 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -31,6 +31,7 @@
       "examples/tutorial.cl"
       "examples/iservelogo.gif"
       "load.cl"
+      "test/t-iserve.cl"
       "doc/iserve.html"
       "doc/tutorial.html"
       "doc/htmlgen.html"
@@ -101,10 +102,12 @@
    (format nil "rm -fr ~aiserve-dist" *iserve-root*))
    
   (run-shell-command 
-   (format nil "mkdir ~aiserve-dist ~aiserve-dist/doc ~aiserve-dist/examples"
+   (format nil "mkdir ~aiserve-dist ~aiserve-dist/doc ~aiserve-dist/examples ~aiserve-dist/test"
 	   *iserve-root*
 	   *iserve-root*
-	   *iserve-root*))
+	   *iserve-root*
+	   *iserve-root*
+	   ))
    
   (copy-files-to *iserve-files* "iserve.fasl" :root *iserve-root*)
   
@@ -124,7 +127,7 @@
 
 
 ;; checklist for publishing iserve source for source-master:
-;; 1. incf version number, edit ChangeLog and commit
+;; 1. incf version number in main.cl, edit ChangeLog and commit
 ;; 2. make clean
 ;; 3. start lisp and load iserve/load to compile all files, there should
 ;;    be no warnings.
@@ -135,7 +138,10 @@
 ;; 7. (ftp-publish-src)
 ;; 8. (publish-docs)   ;  to put latest docs on iserve web page
 ;; 9. on beast run /fi/sa/bin/iserve-sync
-;; 
+;; 10. ftp download.sourceforge.net and put the tar file in the
+;;     incoming directory, then go to the iserve sourceforget web page and 
+;;     select the file manager and publish it.
+;;
 
 
 (defparameter iserve-version-name 
@@ -159,7 +165,7 @@
    (format nil "rm -fr ~aiserve-src" *iserve-root*))
     
   (run-shell-command 
-   (format nil "mkdir ~aiserve-src ~aiserve-src/~a ~aiserve-src/~a/htmlgen"
+   (format nil "mkdir ~aiserve-src ~aiserve-src/~a ~aiserve-src/~a/htmlgen "
 	   *iserve-root*
 	   
 	   *iserve-root*
@@ -170,12 +176,17 @@
 	   ))
   
   (run-shell-command 
-   (format nil "mkdir ~aiserve-src/~a/doc ~aiserve-src/~a/examples"
+   (format nil "mkdir ~aiserve-src/~a/doc ~aiserve-src/~a/examples ~aiserve-src/~a/test"
 	   *iserve-root*
 	   iserve-version-name
 	   
 	   *iserve-root*
-	   iserve-version-name))
+	   iserve-version-name
+	   
+	   *iserve-root*
+	   iserve-version-name
+	   
+	   ))
 	   
   (dolist (file (append (mapcar #'(lambda (file) (format nil "~a.cl" file))
 				*iserve-files*)
