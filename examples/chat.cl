@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.5 2000/08/04 16:05:01 jkf Exp $
+;; $Id: chat.cl,v 1.6 2000/08/25 01:08:50 jkf Exp $
 
 ;; Description:
 ;;   aserve chat program
@@ -334,7 +334,7 @@
   ;; start the chat system going
   (declare (special socket::*dns-configured*))
   
-  (unpublish :all t) ; useful during debugging, remove afterwards
+  ;(unpublish :all t) ; useful during debugging, remove afterwards
   
   (if* (not (stringp home))
      then (error "must specify :home value as a string naming a directory (no trailing slash)"))
@@ -895,7 +895,6 @@
 	       (add-secret req
 			   (add-user req (chat-query-string chat)))))
 	    
-	    (format t "qstring ~s~%" qstring) (force-output)
 	    (with-http-response  (req ent)
 	      (with-http-body (req ent)
 		(html 
@@ -980,7 +979,9 @@
 	 (qstring))
     
     (if* (null chat)
+
        then (return-from chattop (ancient-link-error req ent)))
+    
 
     (let ((delete (request-query-value "y" req)))
       (if* delete
@@ -1242,6 +1243,12 @@
   
     
 (defun add-chat-data (chat req handle body user to-user purl)
+  ;; chat is chat object
+  ;; req is http request object
+  ;; handle is handle typed by user (only matters  if user not logged in)
+  ;; body is the string that's the posting
+  ;; user is the user object if user is logged in
+  ;; to-user is nil or the string naming the private message receipient
   ;; purl is picture url value
   (multiple-value-bind (prefix link) 
       (if* (and (stringp purl) (not (equal "" purl)))
@@ -1324,7 +1331,40 @@
 		 elseif (eql (message-number message) number)
 		   then (return message)))))))
 		      
+
+(defun show-message-p (message handle)
+  ;; return true if this message should be shown to someone with
+  ;; the handle 'handle' 
+  ;;
+  ;; handle is non-nil iff this person is logged in.
+  ;;
+  ;; message-to is nil if this is a deleted message in which case
+  ;; no one should see it.
+  ;;
+  (or 
+   ; show everyone
+   (eq t (message-to message)) 
+   
+   ; message specifically to handle
+   (and handle (member handle (message-to message) :test #'equal))
+   
+   ; message from 'handle' and to at least one person
+   (and (equal (message-handle message) handle)
+	(message-to message))))
+
+
+(defun find-nth-message (messages start handle count)
+  ;; count down from start to find the index of the counth
+  ;; message visible to handle.  return that index
   
+  (assert (> count 0))
+  
+  (loop
+    (if* (<= start 0) then (return 0))
+    (let ((message (svref messages start)))
+      (if* (show-message-p message handle)
+	 then (if* (<= (decf count) 0) then (return start)))
+      (decf start))))
   
 (defun show-chat-info (chat count recent-first handle ownerp)
   ;; show the messages for all and those private ones for handle
@@ -1333,19 +1373,23 @@
 	(messages (chat-messages chat))
 	(first-message)
 	(last-message)
-	(message-increment))
+	(nth-message)
+	(message-increment)
+	)
     (if* (zerop message-next)
        then (html (:b "There are no messsages in this chat"))
      elseif (<= count 0)
        thenret ; nothing to show
-       else (if* recent-first
+       else ; starting at the end find the counth message
+	    (setq nth-message
+	      (find-nth-message messages (1- message-next) handle count))
+	    
+	    (if* recent-first
 	       then (setq first-message (1- message-next)
-			  last-message (max 0
-					    (- message-next count))
+			  last-message nth-message
 			  message-increment -1)
 	       else (setq last-message (1- message-next)
-			  first-message (max 0
-					     (- message-next count))
+			  first-message nth-message
 			  message-increment 1))
 
 	    (if* recent-first
@@ -1500,7 +1544,7 @@
       
       ; worked, do a redirect
       (with-http-response (req ent :response *response-moved-permanently*)
-	(setf (reply-header-slot-value req "location")
+	(setf (reply-header-slot-value req :location)
 	  (format  nil "chat?~a&x=~a"
 		   (add-secret req 
 			       (chat-query-string chat))
@@ -1555,7 +1599,7 @@
       ; go to the chat as the user
       (with-http-response (req ent :response
 			       *response-moved-permanently*)
-	(setf (reply-header-slot-value req "location")
+	(setf (reply-header-slot-value req :location)
 	  (format nil "chat?~a&x=~a" 
 		  (add-secret req qstring) new-ustring))
 	(with-http-body (req ent) 
@@ -1818,7 +1862,8 @@
 		   then ; replace old one
 			(setf (viewent-time empty-ent) time
 			      (viewent-user empty-ent) user
-			      (viewent-ipaddr empty-ent) ipaddr)
+			      (viewent-ipaddr empty-ent) ipaddr
+			      (viewent-hostname empty-ent) nil)
 		   else 
 			(push (setq empty-ent 
 				(make-viewent :time time
@@ -1872,7 +1917,7 @@
 		  (format nil "30;url=chatviewers?~a" qstring)))
 	  (:body
 	   
-	   ((:font :size 1)
+	   ((:font :size 2)
 	    ((:a :href (concatenate 'string
 			 "chatenter?pp=*&" qstring)
 		 :target "chatenter"
