@@ -1,5 +1,19 @@
 2000-05-16  John Foderaro  <jkf@tiger.franz.com>
+1.1.18	
+	* ! Non upward-compatiable change ! - the function
+	   do-http-request returns arguments in a different
+	   order, it now returns the body value first, then the
+	   response code and then the headers.
+	* fixed bug in publish-directory (sourceforge bug 105426)
+	* added query and content-type arguments to do-http-request
+	  and make-http-client-request.  These make it even easier
+	  to send form data to web servers
+	
+	
+2000-05-16  John Foderaro  <jkf@tiger.franz.com>
 1.1.17
+
+
 	* in order to make portions of the LGPL license meaningful
 	  for a Lisp program we've added a prequel to the license
 	  agreement in the file license-allegroserve.txt.

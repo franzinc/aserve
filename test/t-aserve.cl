@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.3 2000/05/04 20:21:14 jkf Exp $
+;; $Id: t-aserve.cl,v 1.4 2000/05/17 14:54:53 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -46,6 +46,11 @@
 (defvar user::*do-aserve-test* t)
 
 (defun test-aserve ()
+  ;; tests are run on a variety of threads, so we have to 
+  ;; account for those other thread errors separately.
+  (setq util.test::*test-errors* 0
+        util.test::*test-successes* 0
+	util.test::*test-unexpected-failures* 0)
   (with-tests (:name "aserve")
     (let ((port (start-aserve-running)))
       (format t "server started on port ~d~%" port)
@@ -57,7 +62,15 @@
 	    (test-encoding)
 	    (test-forms port)
 	    )
-	(stop-aserve-running)))))
+	(stop-aserve-running))))
+  (if* (or (> util.test::*test-errors* 0)
+	   (> util.test::*test-successes* 0)
+	   (> util.test::*test-unexpected-failures* 0))
+     then (format t "~%Test information from other threads:~%")
+	  (format t "Successes: ~d~%" util.test::*test-successes*)
+	  (format t "Errors:    ~d~%" util.test::*test-errors*)
+	  (format t "Unexpected failures: ~d~%" 
+		  util.test::*test-unexpected-failures*)))
     
 
 
@@ -72,6 +85,15 @@
   (shutdown))
 
 
+
+
+(defmacro values2 (form)
+  ;; return the second value
+  (let ((v1 (gensym))
+	(v2 (gensym)))
+    `(multiple-value-bind (,v1 ,v2) ,form
+       (declare (ignore ,v1))
+       ,v2)))
 
 ;-------- publish-file tests
 
@@ -126,7 +148,7 @@
       (dolist (keep-alive '(nil t))
 	(dolist (protocol '(:http/1.0 :http/1.1))
 	  (format t "test 1 - ~s~%" (list keep-alive protocol))
-	  (multiple-value-bind (code headers body)
+	  (multiple-value-bind (body code headers)
 	      (do-http-request (format nil "~a/frob" cur-prefix)
 		:protocol protocol
 		:keep-alive keep-alive)
@@ -162,7 +184,7 @@
       (dolist (keep-alive '(nil t))
 	(dolist (protocol '(:http/1.0 :http/1.1))
 	  (format t "test 2 - ~s~%" (list keep-alive protocol))
-	  (multiple-value-bind (code headers body)
+	  (multiple-value-bind (body code headers)
 	      (do-http-request (format nil "~a/frob2" cur-prefix)
 		:protocol protocol
 		:keep-alive keep-alive)
@@ -181,28 +203,28 @@
     ;;;; remove published file test
     ;;
     ; verify it's still there
-    (test 200 (values (do-http-request (format nil "~a/frob" prefix-local))))
-    (test 200 (values (do-http-request (format nil "~a/frob" prefix-dns))))
+    (test 200 (values2 (do-http-request (format nil "~a/frob" prefix-local))))
+    (test 200 (values2 (do-http-request (format nil "~a/frob" prefix-dns))))
     
     ; remove it
     (publish-file :path "/frob" :remove t)
     
     ; verify that it's not there:
-    (test 404 (values (do-http-request (format nil "~a/frob" prefix-local))))
-    (test 404 (values (do-http-request (format nil "~a/frob" prefix-dns))))
+    (test 404 (values2 (do-http-request (format nil "~a/frob" prefix-local))))
+    (test 404 (values2 (do-http-request (format nil "~a/frob" prefix-dns))))
     
     ;; likewise for frob2
     
     ; verify it's still there
-    (test 200 (values (do-http-request (format nil "~a/frob2" prefix-local))))
-    (test 200 (values (do-http-request (format nil "~a/frob2" prefix-dns))))
+    (test 200 (values2 (do-http-request (format nil "~a/frob2" prefix-local))))
+    (test 200 (values2 (do-http-request (format nil "~a/frob2" prefix-dns))))
     
     ; remove it
     (publish-file :path "/frob2" :remove t)
     
     ; verify that it's not there:
-    (test 404 (values (do-http-request (format nil "~a/frob2" prefix-local))))
-    (test 404 (values (do-http-request (format nil "~a/frob2" prefix-dns))))
+    (test 404 (values2 (do-http-request (format nil "~a/frob2" prefix-local))))
+    (test 404 (values2 (do-http-request (format nil "~a/frob2" prefix-dns))))
     
     
 
@@ -220,13 +242,13 @@
 		  :file dummy-2-name
 		  :content-type "text/plain")
     
-    (multiple-value-bind (code headers body)
+    (multiple-value-bind (body code headers)
 	(do-http-request (format nil "~a/checkit" prefix-local))
       (declare (ignore headers))
       (test 200 (and :df-test code))
       (test dummy-1-contents body :test #'equal))
     
-    (multiple-value-bind (code headers body)
+    (multiple-value-bind (body code headers)
 	(do-http-request (format nil "~a/checkit" prefix-dns))
       (declare (ignore headers))
       (test 200 (and :df-test code))
@@ -237,10 +259,10 @@
 		  :host "localhost"
 		  :remove t)
     ; verify it's gone:
-    (test 404 (values (do-http-request (format nil "~a/checkit" 
+    (test 404 (values2 (do-http-request (format nil "~a/checkit" 
 					       prefix-local))))
     ; but the the dns one is still there
-    (test 200 (values (do-http-request (format nil "~a/checkit" prefix-dns))))
+    (test 200 (values2 (do-http-request (format nil "~a/checkit" prefix-dns))))
     
     ; remove the dns one
     (publish-file :path "/checkit" 
@@ -248,7 +270,7 @@
 		  :remove t)
     
     ; verify it's gone too
-    (test 404 (values (do-http-request (format nil "~a/checkit" 
+    (test 404 (values2 (do-http-request (format nil "~a/checkit" 
 					       prefix-dns))))
 
     
@@ -299,7 +321,7 @@
 			 (write-sequence this *html-stream*))))))
       (dolist (keep-alive '(nil t))
 	(dolist (protocol '(:http/1.0 :http/1.1))
-	  (multiple-value-bind (code headers body)
+	  (multiple-value-bind (body code headers)
 	      (do-http-request (format nil "~a~a" prefix-local (car pair))
 		:protocol protocol
 		:keep-alive keep-alive)
@@ -341,8 +363,9 @@
 			     (with-http-body (req ent)))))))
     
     ; no dice with no password
-    (multiple-value-bind (code headers)
+    (multiple-value-bind (body code headers)
 	(do-http-request (format nil "~a/secret" prefix-local))
+      (declare (ignore body))
       (test 401 code)
       ; verify that we are asking for the right realm
       (test "Basic realm=\"secretserver\""
@@ -352,12 +375,12 @@
     
     ; good password
     (test 200
-	  (values (do-http-request (format nil "~a/secret" prefix-local)
+	  (values2 (do-http-request (format nil "~a/secret" prefix-local)
 		    :basic-authorization '("foo" . "bar"))))
     
     ; bad password
     (test 401
-	  (values (do-http-request (format nil "~a/secret" prefix-local)
+	  (values2 (do-http-request (format nil "~a/secret" prefix-local)
 		    :basic-authorization '("xxfoo" . "bar"))))
     
 
@@ -382,11 +405,11 @@
 		  else (failed-request req)))))
     
     (test 200
-	  (values (do-http-request (format nil "~a/local-secret"
+	  (values2 (do-http-request (format nil "~a/local-secret"
 					   prefix-local))))
     
     (test 404
-	  (values (do-http-request (format nil "~a/local-secret"
+	  (values2 (do-http-request (format nil "~a/local-secret"
 					   prefix-dns))))
     
     
@@ -407,23 +430,24 @@
 		 (html (:head (:title "Secret page"))
 		       (:body "You made it to the secret page"))))))
     
-    (multiple-value-bind (ccode headers)
+    (multiple-value-bind (body ccode headers)
 	(do-http-request (format nil "~a/secret-auth" prefix-local))
+      (declare (ignore body))
       (test 401 ccode)
       (test "Basic realm=\"SecretAuth\""
 	    (cdr (assoc "www-authenticate" headers :test #'equal))
 	    :test #'equal))
     
     (test 200
-	  (values (do-http-request (format nil "~a/secret-auth" prefix-local)
+	  (values2 (do-http-request (format nil "~a/secret-auth" prefix-local)
 		    :basic-authorization '("foo2" . "bar2"))))
     
     (test 200
-	  (values (do-http-request (format nil "~a/secret-auth" prefix-local)
+	  (values2 (do-http-request (format nil "~a/secret-auth" prefix-local)
 		    :basic-authorization '("foo3" . "bar3"))))
     
     (test 401
-	  (values (do-http-request (format nil "~a/secret-auth" prefix-local)
+	  (values2 (do-http-request (format nil "~a/secret-auth" prefix-local)
 		    :basic-authorization '("foo4" . "bar4"))))
     
 
@@ -446,21 +470,21 @@
       ;; from anywhere
       
       (test 200
-	  (values (do-http-request (format nil "~a/secret-loc-auth"
+	  (values2 (do-http-request (format nil "~a/secret-loc-auth"
 					   prefix-local))))
       (test 200
-	  (values (do-http-request (format nil "~a/secret-loc-auth"
+	  (values2 (do-http-request (format nil "~a/secret-loc-auth"
 					   prefix-dns))))
       
       ; now deny all
       (setf (location-authorizer-patterns loca) '(:deny)) 
       
       (test 404
-	  (values (do-http-request (format nil "~a/secret-loc-auth"
+	  (values2 (do-http-request (format nil "~a/secret-loc-auth"
 					   prefix-local))))
       
       (test 404
-	  (values (do-http-request (format nil "~a/secret-loc-auth"
+	  (values2 (do-http-request (format nil "~a/secret-loc-auth"
 					   prefix-dns))))
       
       
@@ -469,11 +493,11 @@
 	'((:accept "127.0" 8)
 	  :deny))
       (test 200
-	  (values (do-http-request (format nil "~a/secret-loc-auth"
+	  (values2 (do-http-request (format nil "~a/secret-loc-auth"
 					   prefix-local))))
       
       (test 404
-	  (values (do-http-request (format nil "~a/secret-loc-auth"
+	  (values2 (do-http-request (format nil "~a/secret-loc-auth"
 					   prefix-dns))))
       
       ;; accept from dns name only 
@@ -483,11 +507,11 @@
 	  :deny))
       
       (test 404
-	  (values (do-http-request (format nil "~a/secret-loc-auth"
+	  (values2 (do-http-request (format nil "~a/secret-loc-auth"
 					   prefix-local))))
       
       (test 200
-	  (values (do-http-request (format nil "~a/secret-loc-auth"
+	  (values2 (do-http-request (format nil "~a/secret-loc-auth"
 					   prefix-dns))))
       
       
@@ -497,11 +521,11 @@
 	  :accept))
       
       (test 200
-	  (values (do-http-request (format nil "~a/secret-loc-auth"
+	  (values2 (do-http-request (format nil "~a/secret-loc-auth"
 					   prefix-local))))
       
       (test 404
-	  (values (do-http-request (format nil "~a/secret-loc-auth"
+	  (values2 (do-http-request (format nil "~a/secret-loc-auth"
 					   prefix-dns))))
       
       
@@ -511,11 +535,11 @@
 	  :accept))
       
       (test 404
-	  (values (do-http-request (format nil "~a/secret-loc-auth"
+	  (values2 (do-http-request (format nil "~a/secret-loc-auth"
 					   prefix-local))))
       
       (test 200
-	  (values (do-http-request (format nil "~a/secret-loc-auth"
+	  (values2 (do-http-request (format nil "~a/secret-loc-auth"
 					   prefix-dns))))
       
     
@@ -564,17 +588,22 @@
     
 
     ;;-------------------------
-    
+
     (publish :path "/form-tester-both"
 	     :content-type "text/html"
 	     :function
 	     #'(lambda (req ent)
 		 ;; get both uri and post
+		 (if* (eql (request-method req) :post)
+		    then (test "application/x-www-form-urlencoded"
+			       (header-slot-value req "content-type")
+			       :test #'equal))
 		 (setq req-query-res (request-query req))
 		 (with-http-response (req ent)
 		   (with-http-body (req ent)
 		     (html "hi")))))
 
+    
     ;; send query only on uri
     (do-http-request (format nil "~a/form-tester-both?~a" 
 			     prefix-local
@@ -584,12 +613,32 @@
 			      :test #'equal))
     
     
+    ; - use query arg
+    (do-http-request (format nil "~a/form-tester-both" prefix-local)
+      :query uri-var-vals)
+			     
+    (test nil (set-difference uri-var-vals req-query-res
+			      :test #'equal))  
+    
+    
+    
     
     ;; send query only on post
     (do-http-request (format nil "~a/form-tester-both" 
 			     prefix-local)
       :method :post
-      :content (query-to-form-urlencoded post-var-vals))
+      :content (query-to-form-urlencoded post-var-vals)
+      :content-type "application/x-www-form-urlencoded"
+      )
+    
+    (test nil (set-difference post-var-vals req-query-res
+			      :test #'equal))
+    
+    
+    (do-http-request (format nil "~a/form-tester-both" 
+			     prefix-local)
+      :method :post
+      :query post-var-vals)
     
     (test nil (set-difference post-var-vals req-query-res
 			      :test #'equal))
@@ -601,7 +650,9 @@
 			     (query-to-form-urlencoded uri-var-vals))
 	
       :method :post
-      :content (query-to-form-urlencoded post-var-vals))
+      :content (query-to-form-urlencoded post-var-vals)
+      :content-type "application/x-www-form-urlencoded"
+      )
     
     (test nil (set-difference (append post-var-vals 
 				      uri-var-vals)
@@ -637,7 +688,9 @@
     (do-http-request (format nil "~a/form-tester-uri" 
 			     prefix-local)
       :method :post
-      :content (query-to-form-urlencoded post-var-vals))
+      :content (query-to-form-urlencoded post-var-vals)
+      :content-type "application/x-www-form-urlencoded"
+      )
     
     (test nil req-query-res)
     
@@ -648,7 +701,9 @@
 			     (query-to-form-urlencoded uri-var-vals))
 	
       :method :post
-      :content (query-to-form-urlencoded post-var-vals))
+      :content (query-to-form-urlencoded post-var-vals)
+      :content-type "application/x-www-form-urlencoded"
+      )
     
     (test nil (set-difference uri-var-vals
 			      req-query-res
@@ -681,7 +736,9 @@
     (do-http-request (format nil "~a/form-tester-post" 
 			     prefix-local)
       :method :post
-      :content (query-to-form-urlencoded post-var-vals))
+      :content (query-to-form-urlencoded post-var-vals)
+      :content-type "application/x-www-form-urlencoded"
+      )
     
     (test nil (set-difference req-query-res post-var-vals :test #'equal))
     
@@ -692,7 +749,9 @@
 			     (query-to-form-urlencoded uri-var-vals))
 	
       :method :post
-      :content (query-to-form-urlencoded post-var-vals))
+      :content (query-to-form-urlencoded post-var-vals)
+      :content-type "application/x-www-form-urlencoded"
+      )
     
     (test nil (set-difference post-var-vals req-query-res :test #'equal))
 
@@ -701,7 +760,7 @@
     
 
   
-  
+
   
   
 

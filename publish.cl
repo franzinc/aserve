@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.30 2000/05/16 14:01:25 jkf Exp $
+;; $Id: publish.cl,v 1.31 2000/05/17 14:54:53 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -600,10 +600,11 @@
 		  (cur  (cdr back) (cdr cur)))
 		((null cur)
 		 ; put at end
-		 (setf (cdr back) `((,prefix (,host ,ent)))))
+		 (setf (cdr back) `((,prefix ((,host ,ent))))))
 	      (if* (>= len (length (caar cur)))
 		 then (setf (cdr back)
-			`(,new-ent ,@cur))))))
+			`(,new-ent ,@cur))
+		      (return)))))
   
   ent
   ))

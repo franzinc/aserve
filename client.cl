@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.16 2000/05/16 14:01:25 jkf Exp $
+;; $Id: client.cl,v 1.17 2000/05/17 14:54:53 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -183,6 +183,8 @@
 			(protocol  :http/1.1)
 			(accept "*/*")
 			content
+			content-type
+			query
 			(format :text) ; or :binary
 			cookies ; nil or a cookie-jar
 			(redirect t) ; auto redirect if needed
@@ -201,6 +203,8 @@
 	       :protocol protocol
 	       :accept  accept
 	       :content content
+	       :content-type content-type
+	       :query query
 	       :cookies cookies
 	       :basic-authorization basic-authorization
 	       :keep-alive keep-alive
@@ -273,9 +277,10 @@
 			   args)
 	       else ; return the values
 		    (values 
+		     body
 		     (client-request-response-code creq)
 		     (client-request-headers  creq)
-		     body))))
+		     ))))
       
       ; protected form:
       (client-request-close creq))))
@@ -299,29 +304,30 @@
 				     (accept "*/*") 
 				     cookies  ; nil or a cookie-jar
 				     basic-authorization
-				     content-length 
 				     content
+				     content-length 
+				     content-type
+				     query
 				     headers
 				     proxy
 				     user-agent
 				     )
   
-   
-  ;; start a request 
+
+  (let (host sock port fresh-uri)
+    ;; start a request 
   
-  ; parse the uri we're accessing
-  (if* (not (typep uri 'net.uri:uri))
-     then (setq uri (net.uri:parse-uri uri)))
+    ; parse the uri we're accessing
+    (if* (not (typep uri 'net.uri:uri))
+       then (setq uri (net.uri:parse-uri uri)
+		  fresh-uri t))
+    
+    ; make sure it's an http uri
+    (if* (not (eq :http (or (net.uri:uri-scheme uri) :http)))
+       then (error "Can only do client access of http uri's, not ~s" uri))
   
-  ; make sure it's an http uri
-  (if* (not (eq :http (or (net.uri:uri-scheme uri) :http)))
-     then (error "Can only do client access of http uri's, not ~s" uri))
-  
-  ; make sure that there's a host
-  (let ((host (net.uri:uri-host uri))
-	(sock)
-	(port))
-    (if* (null host)
+    ; make sure that there's a host
+    (if* (null (setq host (net.uri:uri-host uri)))
        then (error "need a host in the client request: ~s" uri))
 
     ; default the port to 80
@@ -350,6 +356,22 @@
 	      (socket:make-socket :remote-host host
 				  :remote-port port
 				  :format :bivalent)))
+    
+    (if* query
+       then (case method
+	      ((:get :put)  ; add info the uri
+	       ; must not blast a uri we were passed
+	       (if* (not fresh-uri)
+		  then (setq uri (net.uri:copy-uri uri)))
+	       (setf (net.uri:uri-query uri) (query-to-form-urlencoded
+					      query)))
+	      (:post 	; make the content
+	       (if* content
+		  then (error "Can't specify both query ~s and content ~s"
+			      query content))
+	       (setq content (query-to-form-urlencoded query)
+		     content-type "application/x-www-form-urlencoded"))))
+		 
     
     (net.aserve::format-dif :xmit sock "~a ~a ~a~a"
 			    (string-upcase (string method))
@@ -414,7 +436,11 @@
 	       else (error "Illegal user-agent value: ~s" user-agent))
 	    (net.aserve::format-dif :xmit
 				    sock "User-Agent: ~a~a" user-agent crlf))
-    
+
+    (if* content-type
+       then (net.aserve::format-dif :xmit sock "Content-Type: ~a~a"
+				    content-type
+				    crlf))
     (if* headers
        then (dolist (header headers)
 	      (net.aserve::format-dif :xmit sock "~a: ~a~a" 
