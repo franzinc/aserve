@@ -9,7 +9,7 @@
 
 <h1 align="center"><strong>HTML Generation Facility</strong></h1>
 
-<p><small><small>This document copyright (c) 2000-2001 Franz Inc.</small></small></p>
+<p><small><small>This document copyright (c) 2000-2003 Franz Inc.</small></small></p>
 
 <h2>Introduction</h2>
 
@@ -81,9 +81,12 @@ describe the syntax in detail.</p>
 </em>[Macro]</strong></p>
 
 <p>The forms are processed from left to right.&nbsp; The most&nbsp; likely effect is that
-html output is generated.&nbsp; The output is sent to the stream htmlgen:*html-stream*.
-&nbsp; The action taken depends on what the form looks like at macro-expansion time.
-&nbsp;&nbsp; The possibilities are: 
+html output is generated.&nbsp; The output is sent to the stream <strong>net.html.generator:*html-stream*</strong>.
+&nbsp; The <strong>html</strong> macro is designed to run inside AllegroServe's <strong>with-http-body</strong>
+macro which binds <strong>*html-stream*</strong> to the correct stream.&nbsp;&nbsp; Also
+the <strong>html-stream </strong>macro described below binds <strong>*html-stream* </strong>before
+calling <strong>html.</strong>&nbsp; The action taken by <strong>html</strong> depends on
+what the form looks like at macro-expansion time. &nbsp;&nbsp; The possibilities are: 
 
 <ul>
   <li>string -&nbsp; A string is simply written (using <strong>princ</strong>) to the output
@@ -159,8 +162,9 @@ formn)</font>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 </em>[Macro]</strong></p>
 
-<p>This binds htmlgen:*html-stream* to the value of the stream argument and then evaluates
-the <em>form<strong> </strong></em>arguments just like the <strong>html</strong> macro. </p>
+<p>This binds <strong>net.html.generator:*html-stream*</strong> to the value of the stream
+argument and then evaluates the <em>form<strong> </strong></em>arguments just like the <strong>html</strong>
+macro. </p>
 
 <p>&nbsp;</p>
 
@@ -172,7 +176,8 @@ customization of the table.&nbsp; First we show how to build a table of squares.
 <pre>defun simple-table-a ()
    (with-open-file (p &quot;test.html&quot;
         :direction :output
-        :if-exists :supersede)
+        :if-exists :supersede
+        :if-does-not-exist :create)
 
      (html-stream p 
         (:html
