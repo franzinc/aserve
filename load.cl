@@ -1,6 +1,6 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.12.2.3 2000/02/18 18:13:49 jkf Exp $
+;; $Id: load.cl,v 1.12.2.4 2000/03/07 22:46:28 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -22,24 +22,33 @@
       "examples/foo.txt"
       "examples/fresh.jpg"
       "examples/prfile9.jpg"
+      "examples/tutorial.cl"
       "load.cl"
       "doc/iserve.html"
+      "doc/tutorial.html"
       "htmlgen/htmlgen.html"
       ))
 
 (defparameter *iserve-examples*
-    '("examples/examples"))
+    '("examples/examples"
+      ))
 
 
 (with-compilation-unit  nil
   (dolist (file (append *iserve-files* *iserve-examples*))
     (case *loadswitch*
-      (:compile-if-needed (compile-file-if-needed (format nil "~a.cl" file)))
-      (:compile (compile-file (format nil "~a.cl" file)))
+      (:compile-if-needed (compile-file-if-needed 
+			   (merge-pathnames (format nil "~a.cl" file)
+					    *load-truename*)))
+      (:compile (compile-file 
+		 (merge-pathnames (format nil "~a.cl" file)
+				  *load-truename*)))
       (:load nil))
-    (load (format nil "~a.fasl" file))))
+    (load (merge-pathnames 
+	   (format nil "~a.fasl" file)
+	   *load-truename*))))
 
-      
+
 
 (defun makeapp ()
   (run-shell-command "rm -fr iserveserver")

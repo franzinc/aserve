@@ -202,7 +202,7 @@ given, the rest of the arguments are optional..&nbsp; The arguments have these m
     after it has been preloaded, this change will <strong>not </strong>be seen until<strong>
     &nbsp; publish-file </strong>is called again<strong>.</strong></li>
   <li><strong>remove </strong>-- instead of adding an entity, remove the entities that matches
-    the given <strong>path</strong> and <strong>host. </strong> This removes all entities, not
+    the given <strong>path</strong> and <strong>host. </strong>This removes all entities, not
     just file entities.&nbsp; If a <strong>host</strong> value is not passed in an argument,
     then this will remove all entities for this <strong>path</strong>, regardless of their <strong>host</strong>
     values.</li>
@@ -225,14 +225,14 @@ header lines and thus minimizes network traffic. </p>
 <p>&nbsp;</p>
 
 <p><strong><font face="Courier New">(publish-directory &amp;key prefix host port
-destination server)</font></strong></p>
+destination remove server)</font></strong></p>
 
 <p>This creates a mapping from all urls whose name begins with<strong> prefix</strong> to
 files stored in the directory specified by the destination.&nbsp;&nbsp; The <strong>host</strong>,
-<strong>port </strong>and <strong>server</strong> arguments are as described above for <strong>publish.</strong>
-&nbsp;&nbsp;&nbsp;&nbsp; When a request comes in for which there isn't an entity that
-matches it exactly,&nbsp; iServe checks to see if a prefix of the request matches the
-request.&nbsp; If so, and if the resulting entity is a <strong>directory-entity</strong>
+<strong>port, remove </strong>and <strong>server</strong> arguments are as described above
+for <strong>publish.</strong> &nbsp;&nbsp;&nbsp;&nbsp; When a request comes in for which
+there isn't an entity that matches it exactly,&nbsp; iServe checks to see if a prefix of
+the request matches the request.&nbsp; If so, and if the resulting entity is a <strong>directory-entity</strong>
 as created by this function, then it strips the prefix off the given request and appends
 the remaining part of the request to the destination string.&nbsp; It then publishes that
 (using <strong>publish-file</strong> and computing the content-type from the file type).

@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: main.cl,v 1.19.2.3 2000/03/03 03:07:07 jkf Exp $
+;; $Id: main.cl,v 1.19.2.4 2000/03/07 22:46:28 jkf Exp $
 
 ;; Description:
 ;;   neo's main loop
@@ -95,7 +95,7 @@
 (in-package :net.iserve)
 
 
-(defparameter *iserve-version* '(1 1 0))
+(defparameter *iserve-version* '(1 1 1))
 
 ;;;;;;;  debug support 
 
@@ -943,28 +943,55 @@
 (defmethod get-request-body ((req http-request))
   ;; return a string that holds the body of the http-request
   ;; 
-  (multiple-value-bind (length believe-it)
-      (header-slot-value-integer req "content-length")
-      (if* believe-it
-	 then ; we know the length
-	      (let ((ret (make-string length)))
-		(read-sequence-with-timeout ret length (request-socket req)
-					    *read-request-body-timeout*))
-	 else ; no content length given
-	      (if* (equalp "keep-alive" 
-			   (header-slot-value req "connection"))
-		 then ; must be no body
-		      ""
-		 else ; read until the end of file
-		      (mp:with-timeout (*read-request-body-timeout* nil)
-			(let ((ans (make-array 2048 :element-type 'character
-					       :fill-pointer 0))
-			      (sock (request-socket req))
-			      (ch))
-			  (loop (if* (eq :eof 
-					 (setq ch (read-char sock nil :eof)))
-				   then (return  ans)
-				   else (vector-push-extend ans ch)))))))))
+  (if* (member (request-method req) '(:put :post))
+     then (multiple-value-bind (length believe-it)
+	      (header-slot-value-integer req "content-length")
+	    (if* believe-it
+	       then ; we know the length
+		    (prog1 (let ((ret (make-string length)))
+			     (read-sequence-with-timeout 
+			      ret length 
+			      (request-socket req)
+			      *read-request-body-timeout*))
+	    
+		      ; netscape (at least) is buggy in that 
+		      ; it sends a crlf after
+		      ; the body.  We have to eat that crlf.  We could check
+		      ; which browser is calling us but it's not clear what
+		      ; is the set of buggy browsers 
+		      (let ((ch (read-char-no-hang (request-socket req)
+						   nil nil)))
+			(if* (eq ch #\return)
+			   then ; now look for linefeed
+				(setq ch (read-char-no-hang 
+					  (request-socket req) nil nil))
+				(if* (eq ch #\linefeed)
+				   thenret 
+				   else (unread-char ch 
+						     (request-socket req)))
+			 elseif ch
+			   then (unread-char ch (request-socket req)))))
+				      
+				      
+	       else ; no content length given
+		    (if* (equalp "keep-alive" 
+				 (header-slot-value req "connection"))
+		       then ; must be no body
+			    ""
+		       else ; read until the end of file
+			    (mp:with-timeout (*read-request-body-timeout* nil)
+			      (let ((ans (make-array 2048 
+						     :element-type 'character
+						     :fill-pointer 0))
+				    (sock (request-socket req))
+				    (ch))
+				(loop (if* (eq :eof 
+					       (setq ch (read-char 
+							 sock nil :eof)))
+					 then (return  ans)
+					 else (vector-push-extend ans ch))))))))
+     else "" ; no body
+	  ))
 
 
 

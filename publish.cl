@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: publish.cl,v 1.23.2.4 2000/03/03 15:50:44 jkf Exp $
+;; $Id: publish.cl,v 1.23.2.5 2000/03/07 22:46:28 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -161,6 +161,21 @@
   ;; use to map prefixes to entities
   ()
   )
+
+
+;; the info slot of a locator-prefix class is a list of
+;; prefix-handler objects, sorted by the length of the path
+;; (from longest to smallest).
+(defstruct (prefix-handler (:type list))
+  path           ;; string which must be the prefix of the url part to match
+  host-handlers  ;; list of host-handlers
+  )
+
+(defstruct (host-handler  (:type list))
+  host	  ;; list of host names to match.  nil means match anything
+  entity  ;; entity object to handle this request
+  )
+
 
 
 
@@ -481,12 +496,15 @@
 
 
 
+
+
 (defun publish-directory (&key prefix 
-			       host
+			       (host nil host-p)
 			       port
 			       destination
 			       (server *wserver*)
 			       locator
+			       remove
 			       )
   
   ;; make a whole directory available
@@ -505,38 +523,67 @@
 		       )))
     
   (dolist (entpair (locator-info locator))
-    (if* (equal (car entpair) prefix)
-       then ; match, now scan for hosts
-	    (dolist (hostpair (cdr entpair))
-	      (if* (null (set-exclusive-or (car hostpair) host))
-		 then ; match, replace old one
-		      (setf (cdr hostpair) ent)
-		      (return-from publish-directory)))
+    (if* (equal (prefix-handler-path entpair) prefix)
+       then ; match, prefix
+	    (if* (and remove (not host-p))
+	       then ; remove all entries for all hosts
+		    (setf (locator-info locator)
+		      (remove entpair (locator-info locator)))
+		    (return-from publish-directory nil))
+	    
+	    ; scan for particular host
+	    (dolist (hostpair (prefix-handler-host-handlers entpair))
+	      (if* (null (set-exclusive-or (host-handler-host hostpair) 
+					   host
+					   :test #'equalp))
+		 then ; match existing one
+		      (if* remove
+			 then ; make it go away
+			      (setf (prefix-handler-host-handlers entpair)
+				(remove hostpair 
+					(prefix-handler-host-handlers 
+					 entpair)))
+			 else (setf (host-handler-entity hostpair) ent))
+		      (return-from publish-directory ent)))
+	    
 	    ; no match, must add it
+	    (if* remove 
+	       then ; no work to do
+		    (return-from publish-directory nil))
+		    
 	    (if* (null host)
 	       then ; add at end
-		    (setf (cdr entpair)
-		      (append (cdr entpair) (list (list host ent))))
+		    (setf (prefix-handler-host-handlers entpair)
+		      (append (prefix-handler-host-handlers entpair) 
+			      (list (make-host-handler :host host 
+						       :entity ent))))
 	       else ; add at beginning
-		    (setf (cdr entpair)
-		      (cons (list host ent) (cdr entpair))))
-	    (return-from publish-directory)))
+		    (setf (prefix-handler-host-handlers entpair)
+		      (cons (make-host-handler :host host :entity ent) 
+			    (prefix-handler-host-handlers entpair))))
+	    (return-from publish-directory ent)))
 
   ; prefix not present, must add.
   ; keep prefixes in order, with max length first, so we match
   ; more specific before less specific
   
+  (if* remove 
+     then ; no work to do
+	  (return-from publish-directory nil))
+  
   (let ((len (length prefix))
-	(list (locator-info locator)))
+	(list (locator-info locator))
+	(new-ent (make-prefix-handler
+		     :path prefix
+		     :host-handlers (list (make-host-handler :host host 
+					      :entity ent)))))
     (if* (null list)
        then ; this is the first
-	    (setf (locator-info locator)
-	      `((,prefix (,host ,ent))))
+	    (setf (locator-info locator) (list new-ent))
      elseif (>= len
 		(length (caar list)))
        then ; this one should preceed all other ones
-	    (setf (locator-info locator)
-	      `((,prefix (,host ,ent)) ,@list))
+	    (setf (locator-info locator) (cons new-ent list))
        else ; must fit somewhere in the list
 	    (do* ((back list (cdr back))
 		  (cur  (cdr back) (cdr cur)))
@@ -545,7 +592,9 @@
 		 (setf (cdr back) `((,prefix (,host ,ent)))))
 	      (if* (>= len (length (caar cur)))
 		 then (setf (cdr back)
-			`((,prefix (,host ,ent)) ,@cur))))))
+			`(,new-ent ,@cur))))))
+  
+  ent
   ))
 		 
 
@@ -696,13 +745,32 @@
   ;; standard function for finding an entity in an exact locator
   ;; return the entity if one is found, else return nil
   (let* ((url (uri-path (request-uri req)))
-	 (len-url (length url)))
+	 (len-url (length url))
+	 (req-host (header-slot-value req "host")))
+    
+    (setq req-host (car (split-on-character req-host #\:)))
 	     
     (dolist (entpair (locator-info locator))
-      (if* (and (>= len-url (length (car entpair)))
-		(buffer-match url 0 (car entpair)))
+      (if* (and (>= len-url (length (prefix-handler-path entpair)))
+		(buffer-match url 0 (prefix-handler-path entpair)))
 	 then ; we may already be a wiener
-	      (return (cdr entpair))))))
+	      (dolist (host-h (prefix-handler-host-handlers entpair))
+		(let ((host (host-handler-host host-h)))
+		  (if* host
+		     then ; host specified, must match it
+			  (if* req-host
+			     then ; host passed in 
+				  (if* (member req-host host
+					       :test #'equalp)
+				     then (return-from standard-locator
+					    (host-handler-entity
+					     host-h)))
+			     else ; no host passed in, can't work
+				  nil)
+		     else ; no host specified, it always wins
+			  (return-from standard-locator
+			    (host-handler-entity host-h)))))))))
+					  
   
 
 (defun find-locator (name wserver)
@@ -815,6 +883,7 @@
 			      (decf size got)))))))
 		      
 		      
+		
 		(close p))))))
 	      
 		
@@ -857,17 +926,11 @@
     ;; ok realname is a file.
     ;; create an entity object for it, publish it, and dispatch on it
     
-    ; must compute the mime type
-    (let ((chpos (find-it-rev #\. realname 0 (length realname)))
-	  (mtype "application/octet-stream"))
-      (if* chpos
-	 then  (let ((ext (subseq realname (1+ chpos))))
-		 (setq mtype (or (gethash ext *mime-types*) mtype))))
       
-      (process-entity req (publish-file :url (uri-path 
-					      (request-uri req))
-					:file realname
-					:content-type mtype)))
+    (process-entity req (publish-file :path (uri-path 
+					     (request-uri req))
+				      :file realname
+				      ))
       
     t))
     
