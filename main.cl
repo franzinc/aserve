@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.89 2000/12/29 15:57:49 jkf Exp $
+;; $Id: main.cl,v 1.90 2001/01/02 16:52:28 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -376,7 +376,12 @@
     ;; proxy cache
     :initform nil
     :accessor wserver-pcache)
-    
+
+   (shutdown-hooks
+    ;; list of functions to call, passing this wserver object as an arg
+    ;; when the server shuts down
+    :initform nil
+    :accessor wserver-shutdown-hooks)
    ))
 
 
@@ -830,6 +835,7 @@ by keyword symbols and not by strings"
 		   setgid
 		   proxy
 		   cache       ; enable proxy cache
+		   restore-cache ; restore a proxy cache
 		   debug-stream  ; stream to which to send debug messages
 		   accept-hook
 		   ssl		 ; enable ssl
@@ -873,12 +879,14 @@ by keyword symbols and not by strings"
   
   
   ; shut down existing server
-  (shutdown server) 
+  (shutdown :server server) 
 
   (if* proxy 
      then (enable-proxy :server server))
-  
-  (if* cache
+
+  (if* restore-cache
+     then (restore-proxy-cache restore-cache :server server)
+  elseif cache
      then ; cache argument can have many forms
 	  (let ((memory-size #.(* 10 1024 1024)) ; default 10mb
 		(disk-caches nil))
@@ -942,7 +950,7 @@ by keyword symbols and not by strings"
     ))
 
 
-(defun shutdown (&optional (server *wserver*))
+(defun shutdown (&key (server *wserver*) save-cache)
   ;; shutdown the neo server
   ; first kill off old processes if any
   (let ((proc (wserver-accept-thread server)))
@@ -961,8 +969,12 @@ by keyword symbols and not by strings"
   
   (setf (wserver-worker-threads server) nil)
   
-  (kill-proxy-cache :server server)
-  )
+  (dolist (hook (wserver-shutdown-hooks server))
+    (funcall hook server))
+  
+  (if* save-cache
+     then (save-proxy-cache save-cache :server server)
+     else (kill-proxy-cache :server server)))
 
 
 (defun start-simple-server ()

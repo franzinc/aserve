@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.31 2000/12/27 19:47:08 jkf Exp $
+;; $Id: proxy.cl,v 1.32 2001/01/02 16:52:28 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -1015,41 +1015,44 @@
   (let (pcache)
     (setf (wserver-pcache server)
       (setq pcache (make-pcache 
-		    :table (make-hash-table :test #'equal)
+		    :table (make-hash-table :size 1000 :test #'equal)
 		    :queueobj (make-and-init-queueobj))))
     
     (configure-memory-cache :server server :size size)
-    
+    (start-proxy-cache-processes server pcache)))
 
-    (let ((name (format nil "~d-cache-cleaner" (incf *thread-index*))))
-      (setf (pcache-cleaner pcache)
-	(mp:process-run-function 
-	 name
-	 #'(lambda (server)
-	     (let ((*wserver* server)
-		   (pcache (wserver-pcache server)))
-	       (loop
-		 (mp:with-process-lock ((pcache-cleaner-lock pcache))
-		   (if* (null (pcache-cleaner pcache))
-		      then ; indication that we should exit
-			   (return))
-		   (ignore-errors (cache-housekeeping)))
-		 (sleep 30))))
-	 server))
-      (setf (getf (mp:process-property-list (pcache-cleaner pcache))
-		  'short-name)
-	(format nil "c~d" *thread-index*))
-      )
+
+(defun start-proxy-cache-processes (server pcache)
+  (let ((name (format nil "~d-cache-cleaner" (incf *thread-index*))))
+    (setf (pcache-cleaner pcache)
+      (mp:process-run-function 
+       name
+       #'(lambda (server)
+	   (let ((*wserver* server)
+		 (pcache (wserver-pcache server)))
+	     (loop
+	       (if* (null (wserver-accept-thread server))
+		  then ; we are shutting down, exit thread
+		       (return))
+		 
+	       (mp:with-process-lock ((pcache-cleaner-lock pcache))
+		 (ignore-errors (cache-housekeeping)))
+	       (sleep 30))))
+       server))
+    (setf (getf (mp:process-property-list (pcache-cleaner pcache))
+		'short-name)
+      (format nil "c~d" *thread-index*))
+    )
   
-    (publish :path "/cache-stats"
-	     :function
-	     #'(lambda (req ent)
-		 (display-proxy-cache-statistics req ent pcache)))
-    (publish :path "/cache-entries"
-	     :function
-	     #'(lambda (req ent)
-		 (display-proxy-cache-entries req ent pcache)))
-    ))
+  (publish :path "/cache-stats"
+	   :function
+	   #'(lambda (req ent)
+	       (display-proxy-cache-statistics req ent pcache)))
+  (publish :path "/cache-entries"
+	   :function
+	   #'(lambda (req ent)
+	       (display-proxy-cache-entries req ent pcache)))
+  )
 
 
 (defun kill-proxy-cache (&key (server *wserver*))
@@ -1062,7 +1065,7 @@
     (mp:with-process-lock ((pcache-cleaner-lock pcache))
       ;; now we know that the other thread cleaning out
       ;; the cache won't call cache-housekeeping while we're
-      ;; busy doing out business.
+      ;; busy doing our business.
       
       ; this will signal the cache cleaner process to exit
       (setf (pcache-cleaner pcache) nil)
@@ -2357,3 +2360,121 @@
 (defun add-transform (function)
   (pushnew function *uri-transforms*))
 
+
+
+
+;-------- state save/restore
+
+; items to save
+;  pcache   (wserver-pcache)
+; 
+
+; structures needing saving
+(defmethod make-load-form ((obj pcache) &optional env) 
+  (make-load-form-saving-slots obj :environment env))
+
+(defmethod make-load-form ((obj pcache-disk) &optional env)
+  (make-load-form-saving-slots obj :environment env))
+
+(defmethod make-load-form ((obj pcache-ent) &optional env)
+  (make-load-form-saving-slots obj :environment env))
+
+(defmethod make-load-form ((obj queueobj) &optional env)
+  (make-load-form-saving-slots obj :environment env))
+
+(without-package-locks
+(defmethod make-load-form ((obj mp:process-lock) &optional env)
+  (make-load-form-saving-slots obj :environment env))
+
+; this is just temporary until we get a patch for this in uri.fasl
+(defmethod make-load-form ((self net.uri:uri) &optional env)
+  (declare (ignore env))
+  `(make-instance ',(class-name (class-of self))
+     :scheme ,(uri-scheme self)
+     :host ,(uri-host self)
+     :port ,(uri-port self)
+     :path ',(uri-path self)
+     :query ,(uri-query self)
+     :fragment ,(uri-fragment self)
+     :plist ',(uri-plist self)
+     :string ,(net.uri::uri-string self)
+     ; bug is missing ' in parsed-path value
+     :parsed-path ',(net.uri::.uri-parsed-path self)))
+)
+
+(defun save-proxy-cache (filename &key (server *wserver*))
+  ;; after the server threads have been saved, this function can 
+  ;; be called to save out the state of the proxy cache
+  
+  ; prepare to save by removing objects that can't be saved
+  
+  (let ((pcache (wserver-pcache server)))
+    (if* (null pcache) 
+       then (return-from save-proxy-cache nil))
+    
+    (setf (pcache-cleaner pcache) nil)
+    
+    ; don't save the hash table since we can recreate it as since
+    ; saving it is very expensive due to the fasl-circle check
+    (setf (pcache-table pcache) nil)
+    
+    (dolist (pcache-disk (pcache-disk-caches pcache))
+      ; for each disk cache
+      (ignore-errors (close (pcache-disk-stream pcache-disk)))
+      (setf (pcache-disk-stream pcache-disk) nil)))
+    
+  
+  (with-open-file (p filename :direction :output :if-exists :supersede)
+    (fasl-write (wserver-pcache server) p t))
+  
+  (setf (wserver-pcache server) nil))
+
+
+
+(defun restore-proxy-cache (filename &key (server *wserver*))
+  (let ((pcache (car (fasl-read filename))))
+    (if* (not (typep pcache 'pcache))
+       then (error "file didn't contain a saved cache"))
+    
+    (dolist (pcache-disk (pcache-disk-caches pcache))
+      ; open each cache
+      (let ((filename (pcache-disk-filename pcache-disk)))
+	(setf (pcache-disk-stream pcache-disk)
+	  (open filename 
+		:if-exists :overwrite
+		:if-does-not-exist :error
+		:direction :io
+		#-(and allegro (version>= 6))
+		:element-type
+		#-(and allegro (version>= 6))
+		'(unsigned-byte 8)))))
+    
+    (setf (wserver-pcache server) pcache)
+    
+    ; rebuild the hash table
+    (let ((table (make-hash-table :size 1000 :test #'equal)))
+      (flet ((process-queue (table queueobj)
+	       ;; add all entries to the hash table
+	       (let ((lru-head (queueobj-lru queueobj))
+		     (cur (pcache-ent-next (queueobj-mru queueobj))))
+		 (loop
+		   (if* (eq cur lru-head) then (return))
+		   
+		   (if* (not (eq :dead (pcache-ent-state cur)))
+		      then (push cur
+				 (gethash (pcache-ent-key cur)
+					  table)))
+		   (setq cur (pcache-ent-next cur))))))
+		 
+	(dolist (pcache-disk (pcache-disk-caches pcache))
+	  (process-queue table (pcache-disk-queueobj pcache-disk)))
+	(process-queue table (pcache-queueobj pcache))
+	
+	(setf (pcache-table pcache) table)
+	))
+      
+    
+    (start-proxy-cache-processes server pcache)))
+
+    
+;----

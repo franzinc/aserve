@@ -1,3 +1,15 @@
+2001-01-02  jkf  <jkf@main.verada.com>
+
+	* main.cl, proxy.cl - add the ability to save and restore
+	 the whole state of the proxy cache. (see docs for start
+	 and shutdown in the manual).
+    
+        * ensure that proxy cache threads are killed off when a shutdown
+	  is done.
+	
+>>>     incompatible change: the net.aserve:shutdown function used to
+	take an optional argument.  Now it takes keyword arguments.
+	
 2000-12-27  John Foderaro  <jkf@tiger.franz.com>
 1.1.36
 	* client.cl: handle illegal set-cookie headers sent by Netscape's
