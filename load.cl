@@ -57,7 +57,7 @@
   (run-shell-command "mkdir neo-dist")
   (copy-files-to *neo-files* "neo.fasl")
   (copy-files-to '("../htmlgen/htmlgen.html")
-		 "neo-dist/htmlgen.fasl")
+		 "neo-dist/htmlgen.html")
   (dolist (file '("neo.fasl"
 		  "neo.html"
 		  "readme.txt"
