@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.57 2001/10/16 16:58:20 jkf Exp $
+;; $Id: publish.cl,v 1.58 2001/10/18 17:17:14 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -594,9 +594,9 @@
 		  (dolist (hostpair handlers
 			    ; not found, add it if we're not removing
 			    (if* (not remove)
-			       then (setq handlers
-				      (list (make-host-handler :host host
-							 :entity ent)))))
+			       then (push (make-host-handler :host host
+							:entity ent)
+					  handlers)))
 		    (if* (eq host (host-handler-host hostpair))
 		       then ; a match
 			    (if* remove
@@ -701,25 +701,28 @@
      then ; specify the wild card host
 	  (list :wild)
      else ; convert strings to vhosts
-	  (mapcar #'(lambda (host)
-		      (if* (stringp host)
-			 then (let ((vhost (gethash host
-						    (wserver-vhosts server))))
-				(if* (null vhost)
-				   then ; not defined yet, must define
-					(setq vhost
-					  (setf (gethash host
-							 (wserver-vhosts server))
-					    (make-instance 'vhost
-					      :log-stream
-					      (wserver-log-stream server)
-					      :error-stream
-					      (wserver-log-stream server)
-					      :names 
-					      (list host)))))
-				vhost)
-			 else host))
-		  hosts)))
+	  (let (res)
+	    (dolist (host hosts)
+	      (let (vhost)
+		(if* (stringp host)
+		   then 
+			(if* (null 
+			      (setq vhost (gethash host 
+						   (wserver-vhosts server))))
+			   then ; not defined yet, must define
+				(setq vhost
+				  (setf (gethash host
+						 (wserver-vhosts server))
+				    (make-instance 'vhost
+				      :log-stream
+				      (wserver-log-stream server)
+				      :error-stream
+				      (wserver-log-stream server)
+				      :names 
+				      (list host)))))
+		   else (setq vhost host))
+		(pushnew vhost res :test #'eq)))
+	    res)))
 				
 
 (defmethod handle-request ((req http-request))
