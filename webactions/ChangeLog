@@ -1,5 +1,9 @@
 2004-11-18  John Foderaro  <jkf@tiger.franz.com>
 
+	* webact.cl (redirect-to): do redirections with a 307 response
+		code rather than 301 since we don't want the browser
+		to consider this a permaent redirect
+
 	* clpage.cl (scan-for-end-tag): fix search for a nested
 	  start tag that is followed by attributes
 

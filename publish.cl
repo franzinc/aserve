@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.80 2004/11/08 16:36:22 jkf Exp $
+;; $Id: publish.cl,v 1.81 2004/11/18 22:44:50 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -1491,7 +1491,7 @@
     (if* redir-to
        then ; redirect to an existing index file
 	    (with-http-response (req ent
-				     :response *response-moved-permanently*)
+				     :response *response-temporary-redirect*)
 	      (let ((path (uri-path (request-uri req))))
 		(setf (reply-header-slot-value req :location) 
 		  (concatenate 'string path

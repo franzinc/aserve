@@ -1,3 +1,9 @@
+2004-11-18  John Foderaro  <jkf@tiger.franz.com>
+
+	* use &body in macro definitions to help indenters
+	* use response code 307 for redirects rather than 301 since
+	  browsers are now starting to consider 301 redirects as 
+	  permanent (and since browsers now handle 307 correctly).
 
 2004-09-08  John Foderaro  <jkf@tiger.franz.com>
 

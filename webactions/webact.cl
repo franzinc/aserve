@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: webact.cl,v 1.10 2004/06/09 21:50:58 jkf Exp $
+;; $Id: webact.cl,v 1.11 2004/11/18 22:44:51 jkf Exp $
 
 
 
@@ -238,7 +238,7 @@
 
 (defun redirect-to (req ent dest)
   (with-http-response (req ent
-			   :response *response-moved-permanently*)
+			   :response *response-temporary-redirect*)
     (setf (reply-header-slot-value req :location) dest)
     (with-http-body (req ent))))
   
