@@ -73,7 +73,8 @@
 &nbsp; <a href="#f-make-http-client-request">make-http-client-request</a><br>
 &nbsp; <a href="#f-read-client-response">read-client-response-headers</a><br>
 &nbsp; <a href="#f-client-request-read-sequence">client-request-read-sequence</a><br>
-&nbsp; <a href="#f-client-request-read-close">client-request-close</a></font><br>
+&nbsp; <a href="#f-client-request-read-close">client-request-close</a><br>
+&nbsp; <a href="#f-uriencode-string">uriencode-string</a></font><br>
 <a href="#proxy">Proxy</a><br>
 <a href="#cache">Cache</a><br>
 <a href="#filters">Request Filters</a><br>
@@ -1717,6 +1718,16 @@ client-request)</strong></font></p>
 returns the resources used by this connection to the operating system.&nbsp; </p>
 
 <p>&nbsp;</p>
+
+<p><a name="f-uriencode-string"></a>(<strong><font face="Courier New">uriencode-string&nbsp;
+string &amp;key external-format)</font></strong></p>
+
+<p>Convert the string into a format that would be save to use as a component of a url.
+&nbsp;&nbsp;&nbsp; In this conversion most printing characters are not changed
+&nbsp;&nbsp; All non printing characters and printing characters that could be confused
+with characters that separate fields in a url are encoded a %xy where xy is the
+hexadecimal representation of the char-code of the character.&nbsp;&nbsp; <br>
+external-format defaults to :latin1-base.</p>
 
 <hr>
 
