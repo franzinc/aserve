@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.62 2001/10/26 16:38:35 jkf Exp $
+;; $Id: publish.cl,v 1.63 2001/10/26 17:11:58 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -478,6 +478,7 @@
 		     remove
 		     authorizer
 		     timeout
+		     plist
 		     )
   ;; publish the given url
   ;; if file is given then it specifies a file to return
@@ -504,6 +505,7 @@
 			 :format format
 			 :content-type content-type
 			 :authorizer authorizer
+			 :plist plist
 			 :timeout timeout)))
 	      (publish-entity ent locator path hval)))))
 
@@ -517,6 +519,7 @@
 			  cache-p
 			  remove
 			  authorizer
+			  plist
 			  (timeout #+io-timeout #.(* 100 24 60 60)
 				   #-io-timeout nil))
 			  
@@ -570,6 +573,7 @@
 			    :cache-p cache-p
 			    :authorizer authorizer
 			    :timeout  timeout
+			    :plist plist
 			    ))))
        else (setq ent (make-instance (or class 'file-entity)
 			:host hval 
@@ -580,6 +584,7 @@
 			:cache-p cache-p
 			:authorizer authorizer
 			:timeout timeout
+			:plist plist
 			)))
 
     (publish-entity ent locator path hval)))
@@ -604,6 +609,7 @@
 					#-io-timeout nil)
 			       publisher
 			       access-file
+			       plist
 			       )
   
   ;; make a whole directory available
@@ -627,6 +633,7 @@
 	       :timeout timeout
 	       :publisher publisher
 	       :access-file access-file
+	       :plist plist
 	       )))
     
     (dolist (entpair (locator-info locator))
@@ -707,7 +714,8 @@
 			   content-type
 			   remove
 			   authorizer
-			   timeout)
+			   timeout
+			   plist)
   
   (if* (null locator)
      then (setq locator (find-locator :exact server)))
@@ -727,6 +735,7 @@
 			 server))
 		:port port
 		:path path
+		:plist plist
 		:format :binary ; we send out octets
 		:items (mapcar #'(lambda (it)
 				   (if* (or (symbolp it)
