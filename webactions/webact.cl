@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: webact.cl,v 1.9.10.1 2004/06/10 17:35:24 layer Exp $
+;; $Id: webact.cl,v 1.9.10.1.48.1 2005/01/14 21:24:45 layer Exp $
 
 
 
@@ -99,7 +99,7 @@
    
    ))
 
-(defparameter *webactions-version* "1.10")
+(defparameter *webactions-version* "1.11")
 	      
 (defvar *name-to-webaction* (make-hash-table :test #'equal))
 
@@ -238,7 +238,7 @@
 
 (defun redirect-to (req ent dest)
   (with-http-response (req ent
-			   :response *response-moved-permanently*)
+			   :response *response-temporary-redirect*)
     (setf (reply-header-slot-value req :location) dest)
     (with-http-body (req ent))))
   

@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: macs.cl,v 1.18 2004/01/16 19:31:14 layer Exp $
+;; $Id: macs.cl,v 1.18.84.1 2005/01/14 21:24:45 layer Exp $
 
 ;; Description:
 ;;   useful internal macros
@@ -199,13 +199,13 @@
 ; else use read-write timeouts
 ; 
 #-(version>= 6 1)
-(defmacro with-timeout-local ((time &rest actions) &rest body)
+(defmacro with-timeout-local ((time &rest actions) &body body)
   ;; same as with-timeout 
   `(mp:with-timeout (,time ,@actions) ,@body))   ; ok w-t
 
 
 #+(version>= 6 1)
-(defmacro with-timeout-local ((time &rest actions) &rest body)
+(defmacro with-timeout-local ((time &rest actions) &body body)
   (declare (ignore time))
   (let ((g-blocktag (gensym)))
     `(block ,g-blocktag

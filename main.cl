@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.160.2.2 2004/10/19 20:10:11 layer Exp $
+;; $Id: main.cl,v 1.160.2.2.2.1 2005/01/14 21:24:45 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -38,7 +38,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 38))
+(defparameter *aserve-version* '(1 2 42))
 
 (eval-when (eval load)
     (require :sock)
@@ -148,7 +148,7 @@
 		     (format nil ,@(cdr args)))
 		   *debug-stream*))))
 
-(defmacro if-debug-action (kind &rest body)
+(defmacro if-debug-action (kind &body body)
   ;; only do if the debug value is high enough
   `(progn (if* (member ,kind *debug-current* :test #'eq)
 	     then ,@body)))
@@ -429,7 +429,7 @@
 				    content-type
 				    format
 				    )
-			      &rest body)
+			      &body body)
   ;;
   ;; setup to response to an http request
   ;; do the checks that can shortciruit the request
@@ -479,7 +479,7 @@ Problems with protocol may occur." (ef-name ef)))))
 			   &key headers 
 				(external-format 
 				 '*default-aserve-external-format*))
-			  &rest body)
+			  &body body)
   (declare (ignorable external-format))
   (let ((g-req (gensym))
 	(g-ent (gensym))
@@ -1361,10 +1361,10 @@ by keyword symbols and not by strings"
   
 	
   (unwind-protect
-      (let (req error-obj)
+      (let (req error-obj (chars-seen (list nil)))
 	;; get first command
 	(loop
-	  
+	   
 	  (with-timeout-local (*read-request-timeout* 
 			       (debug-format :info "request timed out on read~%")
 			       ; this is too common to log, it happens with
@@ -1373,7 +1373,8 @@ by keyword symbols and not by strings"
 			       ;;(log-timed-out-request-read sock)
 			       (return-from process-connection nil))
 	    (multiple-value-setq (req error-obj)
-	      (ignore-errors (read-http-request sock))))
+	      (ignore-errors (read-http-request sock chars-seen))))
+	  
 	  (if* (null req)
 	     then ; end of file, means do nothing
 		  ; (logmess "eof when reading request")
@@ -1386,9 +1387,11 @@ by keyword symbols and not by strings"
 				   error-obj)))
 
 		  ; notify the client if it's still listening
-		  (ignore-errors
-		   (format sock "HTTP/1.0 400 Bad Request~a~a" *crlf* *crlf*)
-		   (force-output sock))
+		  (if* (car chars-seen)
+		     then (ignore-errors
+			   (format sock "HTTP/1.0 400 Bad Request~a~a" 
+				   *crlf* *crlf*)
+			   (force-output sock)))
 		   
 		  (return-from process-connection nil)
 	     else ;; got a request
@@ -1409,6 +1412,7 @@ by keyword symbols and not by strings"
 		       then ; continue to use it
 			    (debug-format :info "request over, keep socket alive~%")
 			    (force-output-noblock sock)
+			    (setf (car chars-seen) nil)  ; for next use
 		       else (return))))))
     ;; do it in two stages since each one could error and both have
     ;; to be attempted
@@ -1424,9 +1428,12 @@ by keyword symbols and not by strings"
 
   
 
-(defun read-http-request (sock)
+(defun read-http-request (sock chars-seen)
   ;; read the request from the socket and return and http-request
-  ;; object
+  ;; object and an indication if any characters were read
+  ;;
+  ;; return chars-seeen as the third value since the second
+  ;; value will be reserved for the error object from the ignore-errors
   
   (let ((buffer (get-request-buffer))
 	(req)
@@ -1441,9 +1448,11 @@ by keyword symbols and not by strings"
 	    ;
 	    ; we handle the case of a blank line before the command
 	    ; since the spec says that we should (even though we don't have to)
-      
+
+	      
 	    (multiple-value-setq (buffer end)
-	      (read-sock-line sock buffer 0))
+	      (read-sock-line sock buffer 0 chars-seen))
+	      
       
 	    (if* (null end)
 	       then ; eof or error before crlf
@@ -1466,7 +1475,7 @@ by keyword symbols and not by strings"
 	      (parse-http-command buffer end)
 	    (if* (or (null cmd) (null protocol))
 	       then ; no valid command found
-		    (return-from read-http-request nil))
+		    (return-from read-http-request  nil))
 
 	    (if* (null (net.uri:uri-path uri))
 	       then (setf (net.uri:uri-path uri) "/"))
@@ -1519,8 +1528,8 @@ by keyword symbols and not by strings"
 			
 			(setf (uri-scheme uri) 
 			  (if* (wserver-ssl *wserver*)
-						  then :https
-						  else :http))
+			     then :https
+			     else :http))
 			
 			;; set virtual host in the request
 			(let ((vhost 
@@ -1531,7 +1540,7 @@ by keyword symbols and not by strings"
 			))))
 	  
 	    
-	  req  ; return req object
+	  req ; return req object
 	  )
     
       ; cleanup forms
@@ -2298,12 +2307,17 @@ in get-multipart-sequence"))
     
       
 
-(defun read-sock-line (sock buffer start)
+(defun read-sock-line (sock buffer start chars-seen)
   ;; read a line of data into the socket buffer, starting at start.
   ;; return  buffer and index after last character in buffer.
   ;; get bigger buffer if needed.
   ;; If problems occur free the passed in buffer and return nil.
   ;;
+  ;; returns
+  ;;   buffer
+  ;;   num of chars in buff
+  ;;   t if any characters have been read
+  
   
   (let ((max (length buffer))
 	(prevch))
@@ -2313,7 +2327,10 @@ in get-multipart-sequence"))
 	   then (debug-format :info"eof on socket~%")
 		(free-request-buffer buffer)
 		(return-from read-sock-line nil))
-      
+
+	(if* (null (car chars-seen)) 
+	   then (setf (car chars-seen) t))
+	
 	(if* (eq ch #\linefeed)
 	   then (if* (eq prevch #\return)
 		   then (decf start) ; back up to toss out return

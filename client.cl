@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.43 2004/01/16 19:31:14 layer Exp $
+;; $Id: client.cl,v 1.43.84.1 2005/01/14 21:24:45 layer Exp $
 
 ;; Description:
 ;;   http client code.
@@ -94,7 +94,7 @@
 (defvar crlf (make-array 2 :element-type 'character
 			 :initial-contents '(#\return #\linefeed)))
 
-(defmacro with-better-scan-macros (&rest body)
+(defmacro with-better-scan-macros (&body body)
   ;; define the macros for scanning characters in a string
   `(macrolet ((collect-to (ch buffer i max &optional downcasep)
 		;; return a string containing up to the given char
@@ -204,6 +204,7 @@
 	  (if* (and (member (client-request-response-code creq)
 			    '(#.(net.aserve::response-number *response-found*)
 			      #.(net.aserve::response-number *response-moved-permanently*)
+			      #.(net.aserve::response-number *response-temporary-redirect*)
 			      #.(net.aserve::response-number *response-see-other*))
 			    :test #'eq)
 		    redirect
@@ -826,6 +827,10 @@ or \"foo.com:8000\", not ~s" proxy))
   ;;
   ((items :initform nil
 	  :accessor cookie-jar-items)))
+
+(defmethod print-object ((jar cookie-jar) stream)
+  (print-unreadable-object (jar stream :type t :identity t)
+    (format stream "~d cookies" (length (cookie-jar-items jar)))))
 
 ;* for a given hostname, there will be only one cookie with
 ; a given (path,name) pair

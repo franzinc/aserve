@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.23 2004/01/16 19:31:14 layer Exp $
+;; $Id: htmlgen.cl,v 1.23.84.1 2005/01/14 21:24:45 layer Exp $
 
 ;; Description:
 ;;   html generator
@@ -134,7 +134,7 @@
 	    (form (car xforms) (car xforms)))
 	  ((null xforms))
 
-	(setq form (macroexpand form env))
+	(setq form (macroexpand form env  #+(version>= 7 0) t))
 	
 	(if* (atom form)
 	   then (if* (keywordp form)

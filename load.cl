@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.63.44.1 2004/07/23 06:04:45 duane Exp $
+;; $Id: load.cl,v 1.63.44.1.38.1 2005/01/14 21:24:45 layer Exp $
 ;;
 
 ;
