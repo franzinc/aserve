@@ -4,6 +4,8 @@
    #:decode-form-urlencoded
    #:publish
    #:publish-file
+   #:publish-directory
+   #:unpublish
    #:with-http-response
    #:*response-ok*
 	  )
@@ -11,6 +13,9 @@
 
 (in-package :neo)
 
+
+
+;;;;;;;  debug support 
 
 (defvar *ndebug* 200)         ; print debugging stuff
 (defvar *dformat-level* 20)  ; debug level at which this stuff prints
@@ -24,9 +29,93 @@
 
 (defmacro dformat (&rest args)
   ;; do the format and then send to *debug-io*
-  `(if* (>= *ndebug* *dformat-level*)
-      then (format ,@args)
-	   (format *debug-io* ,@(cdr args))))
+  `(progn (format ,@args)
+	  (if* (>= *ndebug* *dformat-level*)
+	     then (format *debug-io* ,@(cdr args)))))
+
+(defmacro if-debug-action (&rest body)
+  ;; only do if the debug value is high enough
+  `(progn (if* (>= *ndebug* *dformat-level*)
+	     then ,@body)))
+
+;;;;;;;;;;; end debug support ;;;;;;;;;;;;
+
+
+
+
+;;;; speical vars 
+
+(defvar *enable-keep-alive* t)  ; do keep alives if possible
+
+(defvar *enable-chunking* t) ; doing chunking if possible
+
+
+;;;;;;;;;;;;;  end special vars
+
+
+
+
+
+;;;;;; macros 
+
+(defmacro with-http-response ((req ent
+				&key (timeout 60)
+				     (check-modified t)
+				     (response '*response-ok*)
+				     content-type
+				     )
+			       &rest body)
+  ;;
+  ;; setup to response to an http request
+  ;; do the checks that can shortciruit the request
+  ;;
+  (let ((g-req (gensym))
+	(g-ent (gensym))
+	(g-timeout (gensym))
+	(g-check-modified (gensym)))
+    `(let ((,g-req ,req)
+	   (,g-ent ,ent)
+	   (,g-timeout ,timeout)
+	   (,g-check-modified ,check-modified)
+	   )
+       (catch 'with-http-response
+	 (compute-strategy ,g-req ,g-ent)
+	 (up-to-date-check ,g-check-modified ,g-req ,g-ent)
+	 (mp::with-timeout ((if* (> ,g-timeout 0)
+			       then ,g-timeout
+			       else 9999999)
+			    (timedout-response ,g-req ,g-ent))
+	   ,(if* response
+	       then `(setf (resp-code ,g-req) ,response))
+	   ,(if* content-type
+	       then `(setf (resp-content-type ,g-req) ,content-type)
+	       else `(setf (resp-content-type ,g-req) (content-type ,g-ent)))
+	   ,@body
+	   )))))
+
+
+(defmacro with-http-body ((req ent &key format)
+			  &rest body)
+  (let ((g-req (gensym))
+	(g-ent (gensym))
+	(g-format (gensym)))
+    `(let ((,g-req ,req)
+	   (,g-ent ,ent)
+	   (,g-format ,format))
+       (declare (ignore-if-unused ,g-req ,g-ent ,g-format))
+       ,(if* body 
+	   then `(compute-response-stream ,g-req ,g-ent))
+       (send-response-headers ,g-req ,g-ent :pre)
+       (if* (not (member :omit-body (resp-strategy ,g-req)))
+	  then (let ((htmlgen:*html-stream* (resp-stream ,g-req)))
+		 (progn ,@body)))
+       (send-response-headers ,g-req ,g-ent :post))))
+			  
+	 
+;;;;;;;;; end macros
+
+	       
+       
 
 
 (eval-when (compile load eval)
@@ -190,71 +279,8 @@
 (defvar *read-request-timeout* 20)
 
 
-#+ignore
-(defmacro with-http-response ((kind request mime-type &rest args) &rest body)
-  ;; write a response back to the server
-  ;; kind is a http response value
-  ;; request is the request object to which we're replying
-  (declare (ignore args))
-  
-  (let ((str (gensym))
-	(req (gensym)))
-    `(let* ((,req ,request)
-	    (,str (make-response-stream ,req))
-	    (htmlgen:*html-stream* ,str)
-	    )
-       (setf (response ,req) ,str)
-       (setf (mime-type ,req) ,mime-type)
-       (format (socket ,req) "~a ~d ~a~a"
-	       (protocol-string ,req)
-	       (response-number ,kind)
-	       (response-desc   ,kind)
-	       *crlf*)
-       ,@body
+
        
-       (post-process-request ,req)
-       )))
-       
-#+ignore
-(defmacro with-fixed-response ((kind request mime-type
-				&key content-length
-				     last-modified) &rest body)
-  ;; used respond to an http request where the object to
-  ;; send back is a fixed size object
-  (let ((req (gensym))
-	(clen (gensym)))
-    `(let* ((,req ,request)
-	    (*response-stream* (socket ,req))
-	    (,clen ,content-length))
-       
-       (setf (response ,req) (socket ,req))
-       (setf (mime-type ,req) ,mime-type)
-       (socket:set-socket-format *response-stream* :text)
-       (format (socket ,req) "~a ~d ~a~a"
-	       (protocol-string ,req)
-	       (response-number ,kind)
-	       (response-desc   ,kind)
-	       *crlf*)
-       (format *response-stream* "Content-Type: ~a~a"
-	       ,mime-type *crlf*)
-       
-       (if* ,clen
-	  then (format *response-stream* "Content-Length: ~d~a"
-		       ,clen *crlf*))
-       
-       ,(if* last-modified
-	   then `(format *response-stream* "Last-Modified: ~a~a"
-			 (universal-time-to-date ,last-modified)
-			 *crlf*))
-       
-       (format *response-stream* "~a" *crlf*)
-       
-       (format t "command is ~s~%" (command ,req))
-       
-       (if* (eq (command ,req) :get)
-	  then ,@body)
-       
-       )))
 				    
 			      
 (defun start (&key (port 80))
@@ -357,9 +383,10 @@
       
 	    (if* *ndebug* 
 	       then (debug-format  5 "got line of size ~d: " end)
-		    (dotimes (i end) (write-char (schar buffer i) *debug-io*))
-		    (terpri *debug-io*) (force-output *debug-io*)
-		    )
+		    (if-debug-action
+		     (dotimes (i end) (write-char (schar buffer i) 
+						  *debug-io*))
+		     (terpri *debug-io*) (force-output *debug-io*)))
       
 	    (if* (not (eql 0 end))
 	       then (return) ; out of loop
@@ -415,20 +442,6 @@
     
 
 
-;; determine the class of the request object for a give protocol
-#+ignore
-(defmethod http-request-class ((protocol (eql :http/0.9)))
-  'http-request-0.9)
-
-
-#+ignore
-(defmethod http-request-class ((protocol (eql :http/1.0)))
-  'http-request-1.0)
-
-
-#+ignore
-(defmethod http-request-class ((protocol (eql :http/1.1)))
-  'http-request-1.1)
 
 
 (defvar *http-command-list*
@@ -566,42 +579,6 @@
 		      
 				  
 				
-
-
-#+ignore
-(defmethod make-response-stream ((req http-request-0.9))
-  ;; use the actual stream
-  (socket req))
-
-
-#+ignore
-(defmethod make-response-stream ((req http-request-1.0))
-  ;; build a string output stream so we can
-  ;; determine the response size
-  (make-string-output-stream))
-
-;; for http/1.1 we'll want to do chunking here
-
-
-#+ignore
-(defmethod post-process-request ((req http-request-0.9))
-  nil)
-
-
-#+ignore
-(defmethod post-process-request ((req http-request-1.0))
-  ;; put out headers and then the body that's been generated.
-  (let ((ans (get-output-stream-string (response req))))
-    (format (socket req) "Content-Type: ~a~a"
-	    (mime-type req)
-	    *crlf*)
-    (format (socket req) "Content-Length: ~d~a" (length ans) *crlf*)
-    (write-string *crlf* (socket req))
-    (write-sequence ans (socket req))))
-  
-  
-
-
 
 
 (defun date-to-universal-time (date)

@@ -4,8 +4,9 @@
 
 (in-package :neo)
 
+(unpublish :all t)
 
-(publish :url "/" 
+#+ignore (publish :url "/" 
 	 :content-type "text/html"
 	 :function
 	 #'(lambda (req ent)
@@ -173,6 +174,14 @@
 	      :preload nil)
 
 
+
+;; the franz home page
+#+ignore (publish-directory :prefix "/"
+		   :destination "/net/tanya/home/httpd/html/"
+		   )
+
+(publish-directory :prefix "/"
+		   :destination "/net/tanya/www/internal/htdocs/")
 
 
 

@@ -1,3 +1,10 @@
+;; neo
+;; url publishing
+;;
+;; $Id: publish.cl,v 1.8 1999/07/21 15:17:11 jkf Exp $
+;;
+
+
 (in-package :neo)
 
 
@@ -38,6 +45,12 @@
      (file  :initarg :file :reader file)
      (contents :initarg :contents :reader contents
 	       :initform nil)
+     (dependencies 
+      ;; list of (filename . lastmodifiedtime) 
+      ;; for each of the files that this file includes
+      :initarg :dependencies
+		   :initform nil
+		   :accessor dependencies)
      
      ))
 
@@ -52,6 +65,9 @@
   ;; entity that displays the contents of a directory
   ((directory :initarg :directory ; directory to display
 	      :reader entity-directory)
+   (prefix    :initarg :prefix   ; url prefix pointing to ths dir
+	      :reader prefix
+	      :initform "")
    (recurse   :initarg :recurse	   ; t to descend to sub directories
 	      :initform nil
 	      :reader recurse
@@ -63,11 +79,23 @@
 ; urls with a common prefix.
 ;
 (defvar *exact-url* (make-hash-table :test #'equal))
-(defvar *prefix-url* (make-hash-table :test #'equal))
+(defvar *prefix-url* nil)
+
+(defvar *mime-types* (make-hash-table :test #'equal))
+(setf (gethash "html" *mime-types*) "text/html")
+(setf (gethash "htm"  *mime-types*) "text/html")
+(setf (gethash "gif"  *mime-types*) "image/gif")
+(setf (gethash "jpg"  *mime-types*) "image/jpeg")
 
 
 
+(defun unpublish (&key all)
+  (if* all
+     then (clrhash *exact-url*)
+	  (setq *prefix-url* nil)
+     else (error "not done yet")))
 
+  
 ;; methods on entity objects
 
 ;-- content-length -- how long is the body of the response, if we know
@@ -139,7 +167,7 @@
 		   then (error "~s should have been ~d bytes but was ~d"
 			       file
 			       size
-			       got))
+				       got))
 		(setq ent (make-instance (or class 'file-entity)
 			    :host host
 			    :port port
@@ -161,43 +189,23 @@
 
 
 
-#+ignore
-(defmethod handle-request ((req http-request-0.9))
-  ;; do the server response to the given request
+(defun publish-directory (&key prefix 
+			       destination
+			       )
   
-  ; look for an exact match
-  (let ((entity (gethash (url req) *exact-url*)))
-    (if* entity
-       then (let ((entity-host (host entity)))
-	      (if* entity-host
-		 then ; must do a host match
-		      (let ((req-host (host req)))
-			(if* req-host 
-			   then (if* (equal req-host entity-host)
-				   then (return-from handle-request
-					  (process-entity req entity)))
-			   else ; no host given, don't do it
-				nil))
-		 else ; no host specified in entity, do so it
-		      (return-from handle-request
-			(process-entity req entity))))))
-  
-  ; do a partial match
-  
-  ; fill it in
+  ;; make a whole directory available
+  (push (cons prefix (make-instance 'directory-entity 
+		       :directory destination
+		       :prefix prefix
+		       ))
+	  *prefix-url*))
 
-  ; no match, it failed
-  (failed-request req))
+
+			   
 
 
 
 
-#+ignore
-(defmethod failed-request ((req http-request-0.9))
-  (with-http-response (*response-not-found* req "text/html")
-    (html "The request for "
-	  (:princ-safe (url req))
-	  " was not found on this server.")))
 
 
 (defmethod handle-request ((req http-request))
@@ -222,10 +230,36 @@
   
   ; do a partial match
   
-  ; fill it in
+  (let* ((url (url req))
+	 (len-url (length url)))
+	     
+    (dolist (entpair *prefix-url*)
+      (if* (and (>= len-url (length (car entpair)))
+		(buffer-match url 0 (car entpair)))
+	 then ; we may already be a weiner
+	      (if* (process-entity req (cdr entpair))
+		 then ; successful
+		      (return-from handle-request nil)))))
+  
 
   ; no match, it failed
-  (failed-request req))
+  (let ((ent (gethash nil *exact-url*)))
+    (if* (null ent)
+       then ; no  global handler, create one
+	    (setq ent (publish 
+		       :function #'(lambda (req ent)
+				     (with-http-response 
+					 (req ent
+					      :response *response-not-found*)
+				       (with-http-body (req ent)
+					 (html "The request for "
+					       (:princ-safe (url req))
+					       " was not found on this server."))))
+				     
+		       :content-type "text/html"))
+	    (setf (gethash nil *exact-url*) ent)
+	    )
+    (process-entity req ent)))
 	  
 				
 
@@ -237,106 +271,8 @@
     (funcall fcn req entity)))
 
 
-#+ignore
-(defmethod process-entity ((req http-request-0.9) (entity file-entity))
-  ;; send a file's contents back
-  (let ((contents (contents entity)))
-    (if* contents
-       then ; preloaded
-	    (format t "did fast file out~%")
-	    (with-fixed-response (*response-ok*
-				  req
-				  (mime-type entity)
-				  :content-length (length contents)
-				  :last-modified (last-modified entity)
-				  )
-	      (socket:set-socket-format *response-stream* :binary)
-	      (write-sequence contents *response-stream*)
-	      (force-output *response-stream*))
-       else 
-	    (handler-case (with-open-file (p (file entity) :direction :input
-					   :element-type '(unsigned-byte 8))
-			    (let ((size (excl::filesys-size (stream-input-fn p))))
-			      (with-fixed-response (*response-ok* 
-						    req (mime-type entity)
-						    :content-length size
-						    :last-modified
-						    (excl::filesys-write-date
-						     (stream-input-fn p)))
-				(socket:set-socket-format *response-stream* :binary)
-				(let ((buffer (make-array 1024 :element-type
-							  '(unsigned-byte 8))))
-				  (loop (let ((count (read-sequence buffer p)))
-					  (if* (> count 0)
-					     then (write-sequence buffer 
-								  *response-stream*
-								  :end count)
-					     else (return)))))
-				(force-output *response-stream*))))
-	      (error (condition)
-		(with-http-response (*response-not-found* req "text/html")
-		  (html (:head (:title "Not Found"))
-			(:body "The object cannot be found"))))))))
 
 
-
-(defmacro with-http-response ((req ent
-				&key (timeout 60)
-				     (check-modified t)
-				     (response '*response-ok*)
-				     content-type
-				     )
-			       &rest body)
-  ;;
-  ;; setup to response to an http request
-  ;; do the checks that can shortciruit the request
-  ;;
-  (let ((g-req (gensym))
-	(g-ent (gensym))
-	(g-timeout (gensym))
-	(g-check-modified (gensym)))
-    `(let ((,g-req ,req)
-	   (,g-ent ,ent)
-	   (,g-timeout ,timeout)
-	   (,g-check-modified ,check-modified)
-	   )
-       (catch 'with-http-response
-	 (compute-strategy ,g-req ,g-ent)
-	 (up-to-date-check ,g-check-modified ,g-req ,g-ent)
-	 (mp::with-timeout ((if* (> ,g-timeout 0)
-			       then ,g-timeout
-			       else 9999999)
-			    (timedout-response ,g-req ,g-ent))
-	   ,(if* response
-	       then `(setf (resp-code ,g-req) ,response))
-	   ,(if* content-type
-	       then `(setf (resp-content-type ,g-req) ,content-type)
-	       else `(setf (resp-content-type ,g-req) (content-type ,g-ent)))
-	   ,@body
-	   )))))
-
-
-(defmacro with-http-body ((req ent &key format)
-			  &rest body)
-  (let ((g-req (gensym))
-	(g-ent (gensym))
-	(g-format (gensym)))
-    `(let ((,g-req ,req)
-	   (,g-ent ,ent)
-	   (,g-format ,format))
-       (declare (ignore-if-unused ,g-req ,g-ent ,g-format))
-       ,(if* body 
-	   then `(compute-response-stream ,g-req ,g-ent))
-       (send-response-headers ,g-req ,g-ent :pre)
-       (if* (not (member :omit-body (resp-strategy ,g-req)))
-	  then (let ((htmlgen:*html-stream* (resp-stream ,g-req)))
-		 (progn ,@body)))
-       (send-response-headers ,g-req ,g-ent :post))))
-			  
-	 
-	       
-	       
-       
        
   
 (defmethod process-entity ((req http-request) (ent file-entity))
@@ -390,13 +326,12 @@
 		      (setf (last-modified ent) lastmod)
 		      (with-http-response (req ent)
 
-			(setf (resp-code req) *response-ok*)
 			(setf (resp-content-length req) size)
 			(push (cons "Last-Modified"
 				    (universal-time-to-date 
 				     (min (resp-date req) lastmod)))
 			      (resp-headers req))
-			(setf (resp-content-type req) (mime-type ent))
+			
 			
 			(with-http-body (req ent :format :binary)
 			  (loop
@@ -413,7 +348,66 @@
 		(close p))))))
 	      
 		
-
+(defmethod process-entity ((req http-request) (ent directory-entity))
+  ;; search for a file in the directory and then create a file
+  ;; entity for it so we can track last modified and stu
+  
+  ; remove the prefix and tack and append to the given directory
+  
+  (let ((realname (concatenate 'string
+		    (entity-directory ent)
+		    (subseq (url req) (length (prefix ent)))))
+	(newname))
+    (debug-format 10 "directory request for ~s~%" realname)
+    
+    (let ((type (excl::filesys-type realname)))
+      (if* (null type)
+	 then ; not present
+	      (return-from process-entity nil)
+       elseif (eq :directory type)
+	 then ; we have to try index.html and index.htm
+	      (if* (not (eq #\/ (schar realname (1- (length realname)))))
+		 then (setq realname (concatenate 'string realname "/")))
+	      
+	      (if* (eq :file (excl::filesys-type
+			      (setq newname
+				(concatenate 'string realname "index.html"))))
+		 then (setq realname newname)
+		      elseif (eq :file (excl::filesys-type
+			      (setq newname
+				(concatenate 'string realname "index.htm"))))
+		 then (setq realname newname)
+		 else ; failure
+		      (return-from process-entity nil))
+       elseif (not (eq :file type))
+	 then  ; bizarre object
+	      (return-from process-entity nil)))
+    
+    ;; ok realname is a file.
+    ;; create an entity object for it, publish it, and dispatch on it
+    
+    ; must compute the mime type
+    (let ((chpos (find-it-rev #\. realname 0 (length realname)))
+	  (mtype "application/octet-stream"))
+      (if* chpos
+	 then  (let ((ext (subseq realname (1+ chpos))))
+		 (setq mtype (or (gethash ext *mime-types*) mtype))))
+      
+      (process-entity req (publish-file :url (url req) 
+		    :file realname
+		    :content-type mtype)))
+      
+    t))
+    
+     
+      
+		      
+		      
+	      
+	      
+		    
+  
+  
 
 		
 (defun up-to-date-check (doit req ent)
@@ -449,47 +443,6 @@
 		    ))))
 
     
-		    
-    
-    
-
-
-
-(defvar *enable-keep-alive* t)
-
-#+ignore
-(defmethod keep-alive-check ((req xhttp-request) (ent entity))
-  ;; check to see if our response should be a keep alive
-  ;; kinda response
-  ;; this may be overruled later on.
-  ;;
-  ;; our strategy:
-  ;;   Initially we'll do keep alive if the caller wants it
-  ;; 
-  ;; other factors:
-  ;;   if we're running a one thread simple web server then we
-  ;;   don't want keep alives since that will prevent other
-  ;;   requests while the process with the keep alive has it.
-  ;;  
-  ;;   for multithread servers we would want to disallow keep alives
-  ;;	we we started to run out of free threads.
-  (setf (resp-keep-alive req) 
-    (and *enable-keep-alive*
-	 (equalp "keep-alive" (header-slot-value "connection" req)))))
-  
-
-(defvar *enable-chunking* t) ; until we can figure it out
-
-#+ignore 
-(defmethod compute-response-headers ((req xhttp-request) (ent entity))
-  ;; may fill this in later on
-  (if* (and ; (resp-keep-alive req) 
-	    *enable-chunking*
-	    (eq (protocol req) :http/1.1))
-     then (setf (resp-transfer-encoding req) :chunked)
-	  (logmess "using chunking"))
-  nil)
-
 
 
 (defmethod compute-strategy ((req http-request) (ent entity))
@@ -591,6 +544,7 @@
 	   (post-headers (member :post-headers strategy :test #'eq))
 	   (content)
 	   (chunked-p nil)
+	   (code (resp-code req))
 	   (send-headers
 	    (if* post-headers
 	       then (eq time :post)
@@ -600,12 +554,11 @@
       
       
       (if* send-headers
-	 then (let ((code (resp-code req)))
-		(dformat sock "~a ~d  ~a~a"
-			(protocol-string req)
-			(response-number code)
-			(response-desc   code)
-			*crlf*)))
+	 then (dformat sock "~a ~d  ~a~a"
+			 (protocol-string req)
+			 (response-number code)
+			 (response-desc   code)
+			 *crlf*))
       
       (if* (and post-headers
 		(eq time :post)
@@ -619,39 +572,55 @@
 		(not (eq (protocol req) :http/0.9)))
 	 then ; can put out headers
 	      (dformat sock "Date: ~a~a" 
-		      (universal-time-to-date (resp-date req))
-		      *crlf*)
+		       (universal-time-to-date (resp-date req))
+		       *crlf*)
 
 	      (if* (member :keep-alive strategy :test #'eq)
 		 then (dformat sock "Connection: Keep-Alive~aKeep-Alive: timeout=~d~a"
-			      *crlf*
-			      *read-request-timeout*
-			      *crlf*)
+			       *crlf*
+			       *read-request-timeout*
+			       *crlf*)
 		 else (dformat sock "Connection: Close~a" *crlf*))
       
 	      (dformat sock "Server: neo/0.1~a" *crlf*)
       
 	      (if* (resp-content-type req)
 		 then (dformat sock "Content-Type: ~a~a" 
-			      (resp-content-type req)
-			      *crlf*))
+			       (resp-content-type req)
+			       *crlf*))
 
 	      (if* (member :chunked strategy :test #'eq)
 		 then (dformat sock "Transfer-Encoding: Chunked~a"
-			      *crlf*)
+			       *crlf*)
 		      (setq chunked-p t))
 	      
 	      (if* (and (not chunked-p)
 			(resp-content-length req))
 		 then (dformat sock "Content-Length: ~d~a"
-			      (resp-content-length req)      
-			      *crlf*))
+			       (resp-content-length req)      
+			       *crlf*)
+		      (logmess (format nil 
+				       "~d ~s - ~d bytes~%" 
+				       (response-number code)
+				       (response-desc   code)
+				       (resp-content-length req)))
+	       elseif chunked-p
+		 then (logmess (format nil 
+				       "~d ~s - chunked~%" 
+				       (response-number code)
+				       (response-desc   code)
+				       ))
+		 else (logmess (format nil 
+				       "~d ~s - unknown length~%" 
+				       (response-number code)
+				       (response-desc   code)
+				       )))
 	      
 	      (dolist (head (resp-headers req))
 		(dformat sock "~a: ~a~a"
-			(car head)
-			(cdr head)
-			*crlf*))
+			 (car head)
+			 (cdr head)
+			 *crlf*))
 	      (dformat sock "~a" *crlf*))
       
       (if* (and send-headers chunked-p)
@@ -683,13 +652,7 @@
 
 
 
-#+ignore
-(defmethod finish-response-stream ((req xhttp-request) (ent file-entity))
-  ;; we've finished the body.
-  (let ((sock (socket req)))
-    (if* (eq :chunked (resp-transfer-encoding req))
-       then (socket:socket-control sock :output-chunking-eof t)
-	    (write-sequence *crlf* sock))))
+
 
 
 

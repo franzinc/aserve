@@ -16,6 +16,16 @@
        (if* (eq (schar ,buff ,pos) ,ch)
 	  then (return ,pos)))))
 
+(defmacro find-it-rev (ch buff start end)
+  ;; return position of ch in buff from [start end}
+  ;; searching backwards
+  ;;
+  (let ((pos (gensym)))
+    `(do ((,pos (1- ,end) (1- ,pos)))
+	 ((< ,pos ,start))
+       (if* (eq (schar ,buff ,pos) ,ch)
+	  then (return ,pos)))))
+
 (defmacro buffer-substr (buff start end)
   ;; return a string holding the chars in buff from [start end }
   ;;
