@@ -155,7 +155,7 @@ any way it sees fit.</p>
 
 <p>&nbsp;</p>
 
-<p><strong><font face="Courier New">(publish-file &amp;key url host port&nbsp; file
+<p><strong><font face="Courier New">(publish-file &amp;key path host port&nbsp; file
 content-type class preload server)</font></strong></p>
 
 <p>This creates an entity that will return the contents of a file on the disk in response
@@ -164,7 +164,7 @@ must be given, the rest of the arguments are optional. (We plan to make <strong>
 optional too in the future).&nbsp; The arguments have these meanings: 
 
 <ul>
-  <li><strong>url </strong>-- a string that must match the name part of the url as described
+  <li><strong>path </strong>-- a string that must match the name part of the url as described
     above in <strong>Components of a Request</strong></li>
   <li><strong>host -- </strong>a string that must match (in a case insensitive manner) the
     host part of the request.&nbsp;&nbsp; If this argument is not given then it will match the
@@ -198,7 +198,7 @@ header lines and thus minimize network traffic. </p>
 
 <p>This will work on Unix where the password file is stored in /etc.</p>
 
-<pre>(publish-file :url &quot;/password&quot; :file &quot;/etc/passwd&quot; :content-type &quot;text/plain&quot;)</pre>
+<pre>(publish-file :path &quot;/password&quot; :file &quot;/etc/passwd&quot; :content-type &quot;text/plain&quot;)</pre>
 
 <p>&nbsp;</p>
 
@@ -227,11 +227,11 @@ the ability to specify how deep in the directory structure it will look and also
 
 <p>&nbsp;</p>
 
-<p><strong><font face="Courier New">(publish &amp;key url host port content-type function
+<p><strong><font face="Courier New">(publish &amp;key path host port content-type function
 class format server)</font></strong></p>
 
 <p>This creates a mapping from a url to a <strong>computed-entity</strong>, that is an
-entity that computes its response every time a request comes in.&nbsp; The <strong>url</strong>,
+entity that computes its response every time a request comes in.&nbsp; The <strong>path</strong>,
 <strong>host</strong>, <strong>port</strong>, <strong>server</strong> and <strong>class</strong>
 arguments are as in the other publish functions.&nbsp;&nbsp; The <strong>content-type</strong>
 sets a default value for the response to the request but this can be overridden.&nbsp; The
@@ -261,7 +261,7 @@ strategy computation</p>
 <p>Here's a very simple computed response.&nbsp; It just puts &quot;Hello World!&quot; in
 the browser window:</p>
 
-<pre>(publish :url &quot;/hello&quot;
+<pre>(publish :path &quot;/hello&quot;
          :content-type &quot;text/html&quot;
          :function #'(lambda (req ent)
                        (with-http-response (req ent)
@@ -282,7 +282,7 @@ browsers are accomodating.&nbsp;&nbsp; Here's the function that generates the co
 html:</p>
 <div align="left">
 
-<pre>(publish :url &quot;/hello2&quot;
+<pre>(publish :path &quot;/hello2&quot;
          :content-type &quot;text/html&quot;
          :function #'(lambda (req ent)
                        (with-http-response (req ent)
@@ -406,11 +406,11 @@ the cdr is a string giving the value of the argument.</p>
 
 <p>The request object contains information about the http request being processed and it
 contains information about the response that is being computed and returned to the
-requestor.&nbsp;&nbsp; The following functions access slots of the request object.
-&nbsp; Those with names beginning with <strong>resp-</strong> are accessing the slots
-which hold information about the response the to request.&nbsp;&nbsp; When a function is
-listed as an<em> accessor<strong> </strong></em>that means that it can be <strong>setf</strong>'ed
-as well as used to read the slot value.</p>
+requestor.&nbsp;&nbsp; The following functions access slots of the request object. &nbsp;
+Those with names beginning with <strong>resp-</strong> are accessing the slots which hold
+information about the response the to request.&nbsp;&nbsp; When a function is listed as an<em>
+accessor<strong> </strong></em>that means that it can be <strong>setf</strong>'ed as well
+as used to read the slot value.</p>
 
 <p><strong><font face="Courier New">(resp-code request)</font></strong>
 &nbsp;&nbsp;&nbsp;&nbsp; - accessor - the value is describes the response code and string
@@ -421,10 +421,10 @@ in <strong>with-http-response</strong> for more information.</p>
 &nbsp;&nbsp;&nbsp;&nbsp; - accessor - the date the response will be made (in Lisp's
 universal time format)</p>
 
-<p><strong><font face="Courier New">(resp-content-length request) </font></strong>
-&nbsp;&nbsp;&nbsp; - accessor -&nbsp; the value to send as the Content-Length of this
-response.&nbsp;&nbsp; This is computed automatically by neo and thus a user program
-shouldn't have to set this slot under normal circumstances.</p>
+<p><strong><font face="Courier New">(resp-content-length request) </font></strong>&nbsp;&nbsp;&nbsp;
+- accessor -&nbsp; the value to send as the Content-Length of this response.&nbsp;&nbsp;
+This is computed automatically by neo and thus a user program shouldn't have to set this
+slot under normal circumstances.</p>
 
 <p><strong><font face="Courier New">(resp-plist request)</font></strong>
 &nbsp;&nbsp;&nbsp;&nbsp; - accessor -&nbsp; this slot holds a property list on which neo
@@ -526,8 +526,7 @@ would be something like</p>
 
 <pre>((&quot;Content-Disposition&quot;
       (:param &quot;form-data&quot; (&quot;name&quot; . &quot;thefile&quot;)
-                          (&quot;filename&quot; . <a
-href="file:///C://down//550mhz.gif">&quot;C:\\down\\550mhz.gif&quot;</a>)))
+                          (&quot;filename&quot; . &quot;C://down//550mhz.gif&quot;)))
  (&quot;Content-Type&quot; &quot;image/gif&quot;))</pre>
 
 <p>Note that the filename is expressed in the syntax of the operating system on which the
@@ -620,7 +619,8 @@ least two periods in it (i.e.&nbsp; &quot;.foo.com&quot;).<br>
 <strong>expiration</strong> can be a lisp universal time or it can be the symbol <strong>:never</strong>
 meaning this should never expire.&nbsp; If <strong>expiration </strong>isn't given or is <strong>nil</strong>
 then this cookie will expire when the user quits their web browser.<br>
-<strong>secure</strong> should be true or false (it defaults to false).</p>
+<strong>secure</strong> should be true or false.&nbsp; Any non-nil value is interpreted as
+true. The default value is false.</p>
 
 <p>&nbsp;</p>
 
