@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.9 2000/03/22 03:16:20 jkf Exp $
+;; $Id: client.cl,v 1.10 2000/03/27 20:47:48 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -43,8 +43,21 @@
   (:export 
    #:client-request  ; class
    #:client-request-close
+   #:client-request-cookies
+   #:client-request-headers
+   #:client-request-protocol
    #:client-request-read-sequence
+   #:client-request-response-code
+   #:client-request-response-comment
+   #:client-request-socket
+   #:client-request-uri
    #:client-response-header-value
+   #:cookie-item
+   #:cookie-item-expires
+   #:cookie-item-name
+   #:cookie-item-path
+   #:cookie-item-secure
+   #:cookie-item-value
    #:cookie-jar     ; class
    #:do-http-request
    #:make-http-client-request
@@ -66,6 +79,10 @@
   ((uri   	;; uri we're accessing
     :initarg :uri
     :accessor client-request-uri)
+
+   (method	; :get, :put, etc
+    :initarg :method
+    :accessor client-request-method)
    
    (headers ; alist of  ("headername" . "value")
     :initform nil
@@ -167,7 +184,7 @@
 			(redirect t) ; auto redirect if needed
 			basic-authorization  ; (name . password)
 			keep-alive   ; if true, set con to keep alive
-			
+			headers	    ; extra header lines, alist
 			      )
   
   ;; send an http request and return the result as three values:
@@ -181,6 +198,7 @@
 	       :cookies cookies
 	       :basic-authorization basic-authorization
 	       :keep-alive keep-alive
+	       :headers headers
 	       )))
 
     (unwind-protect
@@ -238,7 +256,6 @@
 	    (if* (and redirect
 		      (eql 302 (client-request-response-code creq)))
 	       then ; must do a redirect to get to the read site
-		    (format t "doing redirect~%")
 		    
 		    (apply #'do-http-request
 			   (net.uri:merge-uris
@@ -275,7 +292,9 @@
 				     cookies  ; nil or a cookie-jar
 				     basic-authorization
 				     content-length 
-				     content)
+				     content
+				     headers
+				     )
   
    
   ;; start a request 
@@ -346,6 +365,10 @@
 			     (cdr basic-authorization)))
 		    crlf))
     
+    (if* headers
+       then (dolist (header headers)
+	      (format sock "~a: ~a~a" (car header) (cdr header) crlf)))
+    
 
     (write-string crlf sock)  ; final crlf
     
@@ -363,6 +386,7 @@
       :uri uri
       :socket sock
       :cookies cookies
+      :method method
       )))
 
 
@@ -484,7 +508,10 @@
 			       (cdr headval))))))
 	  
 	  
-	  (if* (equalp "chunked" (client-response-header-value 
+	  (if* (eq :head (client-request-method creq))
+	     then  ; no data is returned for a head request
+		  (setf (client-request-bytes-left creq) 0)
+	   elseif (equalp "chunked" (client-response-header-value 
 				  creq "transfer-encoding"))
 	     then ; data will come back in chunked style
 		  (setf (client-request-bytes-left creq) :chunked)

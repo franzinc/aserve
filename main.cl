@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.28 2000/03/27 15:09:55 jkf Exp $
+;; $Id: main.cl,v 1.29 2000/03/27 20:47:48 jkf Exp $
 
 ;; Description:
 ;;   iserve's main loop
@@ -138,16 +138,16 @@
   ;; do the format to *debug-io* if the level of this error
   ;; is matched by the value of *ndebug*
   `(if* (>= *ndebug* ,level)
-      then (format *debug-io* "~a: d> " (mp:process-name sys:*current-process*))
-	   (format *debug-io* ,@args)))
+      then (format *initial-terminal-io* "~a: d> " (mp:process-name sys:*current-process*))
+	   (format *initial-terminal-io* ,@args)))
 
 (defmacro dformat (&rest args)
-  ;; do the format and then send to *debug-io*
+  ;; do the format and then send to *initial-terminal-io*
   `(progn (format ,@args)
 	  (if* (>= *ndebug* *dformat-level*)
-	     then (format *debug-io* "~a: " 
+	     then (format *initial-terminal-io* "~a: " 
 			  (mp:process-name sys:*current-process*))
-		  (format *debug-io* ,@(cdr args)))))
+		  (format *initial-terminal-io* ,@(cdr args)))))
 
 (defmacro if-debug-action (&rest body)
   ;; only do if the debug value is high enough
@@ -838,8 +838,8 @@
 	       then (debug-format  5 "got line of size ~d: " end)
 		    (if-debug-action
 		     (dotimes (i end) (write-char (schar buffer i) 
-						  *debug-io*))
-		     (terpri *debug-io*) (force-output *debug-io*)))
+						  *initial-terminal-io*))
+		     (terpri *initial-terminal-io*) (force-output *initial-terminal-io*)))
       
 	    (if* (not (eql 0 end))
 	       then (return) ; out of loop
@@ -1372,8 +1372,8 @@
 		; dump out buffer
 		(debug-format *dformat-level* "read on socket: ")
 		(if-debug-action (dotimes (i start)
-				   (write-char (schar buffer i) *debug-io*))
-				 (terpri *debug-io*))
+				   (write-char (schar buffer i) *initial-terminal-io*))
+				 (terpri *initial-terminal-io*))
 		;; end debug
 			
 		(return-from read-sock-line (values buffer start))

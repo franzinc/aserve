@@ -1,5 +1,12 @@
 2000-03-27  John Foderaro  <jkf@tiger.franz.com>
+	* add headers argument to do-http-request and make-http-client-request
+	  to allow you to add headers
+	* fix client requests for :head so it doesn't wait for a body
+	  to be returned
+	
+2000-03-27  John Foderaro  <jkf@tiger.franz.com>
 1.1.9
+
 	* mainly documentation fixes
 
 2000-03-22  John Foderaro  <jkf@tiger.franz.com>

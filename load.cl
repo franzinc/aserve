@@ -1,6 +1,6 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.22 2000/03/27 15:06:14 jkf Exp $
+;; $Id: load.cl,v 1.23 2000/03/27 20:47:48 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -127,13 +127,16 @@
 
 ;; checklist for publishing iserve source for source-master:
 ;; 1. incf version number, edit ChangeLog and commit
-;; 2. start lisp and load iserve/load to compile all files
-;; 3. start the server and run through the samples
-;; 4. :cl test/t-iserve
-;; 5. (make-src-distribution)
-;; 6. (ftp-publish-src)
-;; 7. (publish-docs)   ;  to put latest docs on iserve web page
-;; 8. on beast run /fi/sa/bin/iserve-sync
+;; 2. make clean
+;; 3. start lisp and load iserve/load to compile all files, there should
+;;    be no warnings.
+;; 4. start the server (net.iserve:start :port 8000) 
+;;	and run through the samples from Netscape and IE
+;; 5. :cl test/t-iserve
+;; 6. (make-src-distribution)
+;; 7. (ftp-publish-src)
+;; 8. (publish-docs)   ;  to put latest docs on iserve web page
+;; 9. on beast run /fi/sa/bin/iserve-sync
 ;; 
 
 
