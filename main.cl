@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.132 2002/01/04 19:55:20 jkf Exp $
+;; $Id: main.cl,v 1.133 2002/01/06 19:51:17 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -2190,7 +2190,7 @@ in get-multipart-sequence"))
   ;; get-multipart-header
   ;;
   ;; return values:
-  ;; 1.  nil, :eof, :file, :data   - description of the header
+  ;; 1.  nil, :eof, :file, :data, :nofile   - description of the header
   ;; 2. name  - name of the item
   ;; 3. filename - if type is :file then this is the filename
   ;; 4. content-type - if type is :file this this is the content-type
@@ -2212,7 +2212,11 @@ in get-multipart-sequence"))
 	    (if* (and (consp ct) (stringp (cadr ct)))
 	       then (setq content-type (cadr ct)))
 	    
-	    (values (if* filename then :file else :data)
+	    (values (if* filename 
+		       then (if* (equalp filename "")
+			       then :nofile
+			       else :file)
+		       else :data)
 		    name
 		    filename
 		    content-type))

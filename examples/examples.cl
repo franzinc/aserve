@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.28 2002/01/04 19:55:20 jkf Exp $
+;; $Id: examples.cl,v 1.29 2002/01/06 19:51:17 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -604,22 +604,23 @@
 				     (setq filename
 				       (subseq filename (1+ sep) 
 					       (length filename)))))
-		     (if* filename
+		     (if* (and filename (not (equal filename "")))
 			then (push filename files-written)
-		     (with-open-file (pp filename :direction :output
-				      :if-exists :supersede
-				      :element-type '(unsigned-byte 8))
-		       (format t "writing file ~s~%" filename)
-		       (let ((buffer (make-array 4096
-						 :element-type 
-						 '(unsigned-byte 8))))
+			     (with-open-file (pp filename :direction :output
+					      :if-exists :supersede
+					      :element-type '(unsigned-byte 8))
+			       (format t "writing file ~s~%" filename)
+			       (let ((buffer (make-array 4096
+							 :element-type 
+							 '(unsigned-byte 8))))
 			 
-			 (loop (let ((count (get-multipart-sequence 
-					     req 
-					     buffer)))
-				 (if* (null count) then (return))
-				 (write-sequence buffer pp :end count)))))
-			else ; no filename, just grab as a text
+				 (loop (let ((count (get-multipart-sequence 
+						     req 
+						     buffer)))
+					 (if* (null count) then (return))
+					 (write-sequence buffer pp :end count)))))
+		      elseif (null filename)
+			then  ; no filename, just grab as a text
 			     ; string
 			     (let ((buffer (make-string 1024)))
 			       (loop
@@ -692,6 +693,8 @@
 			  (if* (eq contents :limit)
 			     then ; tried to give us too much
 				  (setq overlimit t)
+			   elseif (equal filename "") ; no file given
+			     thenret ; ignore
 			     else
 				  (with-open-file (p filename 
 						   :direction :output
@@ -702,8 +705,8 @@
 				     filename content-type)
 				    (push filename files-written)
 				    (write-sequence contents p)))))
-		       (nil ; ignore
-			(get-all-multipart-data req)))))
+		       (t ; all else ignore but read to next header
+			(get-all-multipart-data req :limit 1000)))))
 			  
 
 	       

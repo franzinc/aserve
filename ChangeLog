@@ -1,3 +1,7 @@
+2002-01-06  John Foderaro  <jkf@tiger.franz.com>
+
+	* add :nofile return code to parse-multipart-header
+
 2002-01-04  John Foderaro  <jkf@tiger.franz.com>
 1.2.20
 	* main.cl - add two higher level functions to aid retrieving
