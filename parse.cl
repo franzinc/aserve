@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.36 2002/08/09 22:21:46 jkf Exp $
+;; $Id: parse.cl,v 1.37 2003/09/04 21:36:33 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -172,10 +172,37 @@
     (setf (request-header-block req) buff)
     ;; read in all the headers, stop at the last crlf
     (if* (setq end (read-headers-into-buffer sock buff))
-       then (parse-header-block buff 0 end)
+       then (let ((otherheaders (parse-header-block buff 0 end)))
+	      
+	      (if* otherheaders
+		 then ; non standard headers present...store
+		      ; separately
+		      (dolist (otherheader otherheaders)
+			(setf (car otherheader) 
+			  (header-keywordify (car otherheader))))
+		      
+		      (setf (request-headers req)
+			(append (request-headers req) otherheaders))))
+		       
 	    t)))
 	 
-	 
+(defvar *headername-to-kwd* nil)
+
+(defun header-keywordify (name)
+  ;; convert name to keyword.. check cache first
+  (or (cdr (assoc name *headername-to-kwd* :test #'equal))
+      (let ((kwd (intern (if* (eq *current-case-mode* :case-insensitive-upper)
+			    then (string-upcase name)
+			    else name)
+			 (find-package :keyword))))
+	(push (cons name kwd) *headername-to-kwd*)
+	
+	kwd)))
+ 
+
+
+
+
 
 (defun read-headers-into-buffer (sock buff)
   ;; read the header data into the buffer

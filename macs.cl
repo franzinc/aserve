@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: macs.cl,v 1.16 2002/08/09 22:21:45 jkf Exp $
+;; $Id: macs.cl,v 1.17 2003/09/04 21:36:33 jkf Exp $
 
 ;; Description:
 ;;   useful internal macros
@@ -33,8 +33,7 @@
 ;;- http://www.franz.com/~jkf/coding_standards.html
 ;;-
 
-(eval-when (compile load eval)
- (require :uri))
+
 
 ;; macros used by iserve
 

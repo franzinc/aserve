@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.47 2003/05/09 17:34:01 jkf Exp $
+;; $Id: t-aserve.cl,v 1.48 2003/09/04 21:36:33 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -494,8 +494,8 @@
 	(dolist (protocol '(:http/1.0 :http/1.1))
 	  (multiple-value-bind (body code headers)
 	      (x-do-http-request (format nil "~a~a" prefix-local (car pair))
-		:protocol protocol
-		:keep-alive keep-alive)
+				 :protocol protocol
+				 :keep-alive keep-alive)
 	    (test 200 code)
 	    (test (format nil "text/plain" port)
 		  (cdr (assoc :content-type headers :test #'eq))
@@ -517,13 +517,39 @@
 	     :function
 	     #'(lambda (req ent)
 		 (with-http-response (req ent)
-		       (with-http-body (req ent)
-			 (write-sequence "foo" *html-stream*)))))
+		   (with-http-body (req ent)
+		     (write-sequence "foo" *html-stream*)))))
     (multiple-value-bind (body code)
 	(x-do-http-request (format nil "~a/foo%20bar%20baz" prefix-local))
       (test 200 code)
       (test "foo" body :test #'equal))
-			   
+
+    
+    ;; test we can send non-standard headers back and forth
+    
+    (publish :path "/unusual-headers"
+	     :content-type "text/plain"
+	     :function 
+	     #'(lambda (req ent)
+		 
+		 (test "booboo" (header-slot-value req :frobfrob)
+		       :test #'equal)
+		 (with-http-response (req ent)
+		   (setf (reply-header-slot-value req :snortsnort)
+		     "zipzip")
+		   (with-http-body (req ent)
+		     (html "foo the bar")))))
+    
+    (multiple-value-bind (body code headers)
+	(x-do-http-request (format nil "~a/unusual-headers" prefix-local)
+			   :headers '(("frobfrob" . "booboo")))
+      (declare (ignore body))
+      
+      (test 200 code)
+      (test "zipzip" (cdr (assoc "snortsnort" headers :test #'equalp))
+	    :test #'equal))
+		       
+    
     ))
 
 
