@@ -1,3 +1,12 @@
+2001-10-12  John Foderaro  <jkf@tiger.franz.com>
+
+	* using socket stream i/o timeouts in acl6.1
+	* moved the *http-response-timeout* to a slot in the wserver
+	  object so it can be server dependent.
+	* documented timeouts in aserve.html
+	* added timeout test to t-aserve.cl but disabled running them
+	  by default since they take a long time.
+
 2001-10-10  John Foderaro  <jkf@tiger.franz.com>
 1.2.11
 	* upgraded support for virtual hosts, introducting

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.113 2001/10/10 16:32:57 jkf Exp $
+;; $Id: main.cl,v 1.114 2001/10/12 21:51:29 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -117,13 +117,16 @@
    #:wserver-external-format
    #:wserver-filters
    #:wserver-locators
+   #:wserer-io-timeout
    #:wserver-log-function
    #:wserver-log-stream
+   #:wserver-response-timeout
    #:wserver-socket
    #:wserver-vhosts
 
    #:*aserve-version*
    #:*default-aserve-external-format*
+   #:*http-io-timeout*
    #:*http-response-timeout*
    #:*mime-types*
    #:*response-accepted*
@@ -289,6 +292,24 @@
 (defvar *default-aserve-external-format* :latin1-base) 
 (defvar *worker-request*)  ; set to current request object
 
+(defvar *read-request-timeout* 20)
+(defvar *read-request-body-timeout* 60)
+(defvar *http-response-timeout* 
+    #+io-timeout 300 ; 5 minutes for timeout if we support i/o timeouts
+    #-io-timeout 120 ; 2 minutes if we use this for i/o timeouts too.
+    )
+
+; this is only useful on acl6.1 where we do timeout on I/O operations
+(defvar *http-io-timeout* 60)
+
+; usually set to the default server object created when aserve is loaded.
+; users may wish to set or bind this variable to a different server
+; object so it is the default for publish calls.
+; Also bound to the current server object in accept threads, thus
+; user response functions can use this to find the current wserver object.
+(defvar *wserver*)   
+
+
 ; type of socket stream built.
 ; :hiper is possible in acl6
 (defvar *socket-stream-type* 
@@ -385,7 +406,21 @@
        :initarg :default-vhost
      :initform (make-instance 'vhost)
      :accessor wserver-default-vhost)
-       
+
+   (response-timeout
+    ;; seconds a response is allowed to take before it gives up
+    :initarg :response-timeout
+    :initform *http-response-timeout*
+    :accessor wserver-response-timeout)
+   
+   (io-timeout
+    ;; seconds an I/O operation to an http client is allowed to take
+    ;; before an error is signalled.  This is only effective on
+    ;; acl6.1 or newer.
+    :initarg :io-timeout
+    :initform *http-io-timeout*
+    :accessor wserver-io-timeout)
+    
    ;;
    ;; -- internal slots --
    ;;
@@ -471,12 +506,12 @@
 ;;;;;; macros 
 
 (defmacro with-http-response ((req ent
-				&key (timeout '*http-response-timeout*)
-				     (check-modified t)
-				     (response '*response-ok*)
-				     content-type
-				     )
-			       &rest body)
+			       &key timeout
+				    (check-modified t)
+				    (response '*response-ok*)
+				    content-type
+				    )
+			      &rest body)
   ;;
   ;; setup to response to an http request
   ;; do the checks that can shortciruit the request
@@ -485,15 +520,16 @@
 	(g-ent (gensym))
 	(g-timeout (gensym))
 	(g-check-modified (gensym)))
-    `(let ((,g-req ,req)
-	   (,g-ent ,ent)
-	   (,g-timeout ,timeout)
-	   (,g-check-modified ,check-modified)
-	   )
+    `(let* ((,g-req ,req)
+	    (,g-ent ,ent)
+	    (,g-timeout ,(or timeout 
+			     `(wserver-response-timeout *wserver*)))
+	    (,g-check-modified ,check-modified)
+	    )
        (catch 'with-http-response
 	 (compute-strategy ,g-req ,g-ent)
 	 (up-to-date-check ,g-check-modified ,g-req ,g-ent)
-	 (mp::with-timeout ((if* (and (fixnump ,g-timeout)
+	 (mp::with-timeout ((if* (and (fixnump ,g-timeout)  ; ok w-t
 				      (> ,g-timeout 0))
 			       then ,g-timeout
 			       else 9999999)
@@ -507,7 +543,7 @@
 	   )))))
 
 
-#+(and allegro (version>= 6 0 pre-final 1))
+#+(and allegro (version>= 6 0))
 (defun warn-if-crlf (external-format)
   (let ((ef (find-external-format external-format)))
     (if* (not (eq (crlf-base-ef ef) ef))
@@ -778,6 +814,7 @@ by keyword symbols and not by strings"
    
    (vhost  ;; the virtual host to which this request is directed
     :initarg :vhost
+    :initform (wserver-default-vhost *wserver*)
     :accessor request-vhost)
    
    ;;
@@ -898,16 +935,8 @@ by keyword symbols and not by strings"
 (defvar *crlf* (make-array 2 :element-type 'character :initial-contents
 			   '(#\return #\linefeed)))
 
-(defvar *read-request-timeout* 20)
-(defvar *read-request-body-timeout* 60)
-(defvar *http-response-timeout* 120) ; amount of time for an http response
-
 (defvar *thread-index*  0)      ; globalcounter to gen process names
 
-; usually set to the default server object created when aserve is loaded.
-; users may wish to set or bind this variable to a different server
-; object so it is the default for publish calls.
-(defvar *wserver*)   
 
 				    
 			      
@@ -1136,6 +1165,13 @@ by keyword symbols and not by strings"
 		   then (schedule-finalization 
 			 sock 
 			 #'check-for-open-socket-before-gc))
+		
+		#+io-timeout
+		(socket:socket-control 
+		 sock 
+		 :read-timeout (wserver-io-timeout *wserver*)
+		 :write-timeout (wserver-io-timeout *wserver*))
+		       
 		(process-connection sock))
 	    
 	    (:loop ()  ; abort out of error without closing socket
@@ -1249,6 +1285,12 @@ by keyword symbols and not by strings"
 			(push localhost ipaddrs)
 			(setf (wserver-ipaddrs *wserver*) ipaddrs))
 		
+		#+io-timeout
+		(socket:socket-control 
+		 sock 
+		 :read-timeout (wserver-io-timeout *wserver*)
+		 :write-timeout (wserver-io-timeout *wserver*))
+		
 		; another useful test to see if we're losing file
 		; descriptors
 		(let ((fd (excl::stream-input-fn sock)))
@@ -1348,13 +1390,13 @@ by keyword symbols and not by strings"
       (let ((req))
 	;; get first command
 	(loop
-	  (mp:with-timeout (*read-request-timeout* 
-			    (debug-format :info "request timed out on read~%")
-			    ; this is too common to log, it happens with
-			    ; every keep alive socket when the user stops
-			    ; clicking
-			    ;;(log-timed-out-request-read sock)
-			    (return-from process-connection nil))
+	  (with-timeout-local (*read-request-timeout* 
+			       (debug-format :info "request timed out on read~%")
+			       ; this is too common to log, it happens with
+			       ; every keep alive socket when the user stops
+			       ; clicking
+			       ;;(log-timed-out-request-read sock)
+			       (return-from process-connection nil))
 	    (setq req (read-http-request sock)))
 	  (if* (null req)
 	     then ; end of file, means do nothing
@@ -1389,7 +1431,7 @@ by keyword symbols and not by strings"
   ;; do a force-output but don't get hung up if we get blocked on output
   ;; this happens enough with sockets that it's a real concern
   ; 30 seconds is enough time to wait
-  (mp:with-timeout (30) 
+  (with-timeout-local (30) 
     (force-output stream)))
 
   
@@ -1569,7 +1611,7 @@ by keyword symbols and not by strings"
 			     then ; must be no body
 				  ""
 			     else ; read until the end of file
-				  (mp:with-timeout 
+				  (with-timeout-local
 				      (*read-request-body-timeout* 
 				       nil)
 				    (let ((ans (make-array 
@@ -2096,7 +2138,8 @@ in get-multipart-sequence"))
   ;; read length bytes into sequence, timing out after timeout
   ;; seconds
   ;; return nil if things go wrong.
-  (mp:with-timeout (timeout nil)
+  (declare (ignorable timeout))
+  (with-timeout-local (timeout nil)
     (let ((got 0))
       (loop
 	(let ((this (rational-read-sequence string sock :start got)))

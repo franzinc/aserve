@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.30 2001/10/10 16:32:57 jkf Exp $
+;; $Id: t-aserve.cl,v 1.31 2001/10/12 21:51:29 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -48,11 +48,17 @@
 (defvar *x-ssl*   nil) ; true when we want to do ssl client calls
 (defvar *proxy-wserver* nil)
 
+; if true run timeout test
+(defvar *test-timeouts* nil)
+
 ; stack of old values
 (defvar *save-x-proxy* nil)
 (defvar *save-proxy-wserver* nil)
 
-(defun test-aserve ()
+; remember where we were loaded from so we can run manually
+(defparameter *aserve-load-truename* *load-truename*)
+
+(defun test-aserve (test-timeouts)
   ;; run the allegroserve tests three ways:
   ;;  1. normally
   ;   2. through an allegroserve proxy to test the proxy
@@ -77,6 +83,8 @@
 		   (test-forms port)
 		   (test-client port)
 		   (test-cgi port)
+		   (if* test-timeouts 
+		      then (test-timeouts port))
 		   ))
 	    (format t "~%~%===== test direct ~%~%")
 	    (do-tests)
@@ -98,7 +106,7 @@
 		    (format t "~%~%===== test through ssl ~%~%")
 		    (setq port (start-aserve-running 
 				(merge-pathnames 
-				 "server.pem" *load-truename*)))
+				 "server.pem" *aserve-load-truename*)))
 		    (do-tests)
 	       else (format t "~%>> it isn't so ssl tests skipped~%~%")))
 	; cleanup forms:
@@ -1115,7 +1123,7 @@
 			      port))
 	(step 0))
     (multiple-value-bind (ok whole dir)
-	(match-regexp "\\(.*[/\\]\\).*" (namestring *load-truename*))
+	(match-regexp "\\(.*[/\\]\\).*" (namestring *aserve-load-truename*))
       (declare (ignore whole))
       (if* (not ok) 
 	 then (error "can't find the server.pem directory"))
@@ -1239,13 +1247,55 @@
    
 	    
 	
-	
+(defun test-timeouts (port)
+  ;; test aserve timing out when the client is non responsive
+  (let (#+ignore (prefix-local (format nil "http://localhost:~a" port)))
+    (format t "timeout tests.. expect pauses~%")(force-output)
+    
+    ;; try making a connection and not sending any headers.
+    ;; we should timeout
+    (let ((sock (socket:make-socket :remote-host "localhost"
+				    :remote-port port)))
+      (unwind-protect
+       (progn
+       (format sock "GET /timeouttest HTTP/1.0~c~cfoo: bar~c~c"
+	       #\return #\newline #\return #\newline)
+       (force-output sock)
+       
+       ; try sending data periodically but in enough time to
+       ; bypass the timeout
+       (dotimes (i 5)
+	 (sleep (max 1 (- net.aserve:*http-io-timeout* 10)))
+	 (format t "send packet~%")(force-output)
+	 (format sock "brap: brop~c~c" #\return #\newline)
+	 (force-output sock)
+	 )
+       
+       ; now sleep for longer than it should take for the timeout to occur
+       (sleep (+ 3 (max *http-response-timeout* *http-io-timeout*)))
+       (test-error
+	;; now we should get a connection reset by peer
+	(progn (format sock "brap: brop~c~c" #\return #\newline)
+	       (force-output sock)
+	       (format sock "brap: brop~c~c" #\return #\newline)
+	       (force-output sock))
+	:condition-type 'errno-stream-error
+	))
+       (ignore-errors (close sock :abort t))))))
+       
+	      
+	      
+       
+       
+    
+    
+  
   
 
 
     
 (if* user::*do-aserve-test* 
-   then (test-aserve)
+   then (test-aserve *test-timeouts*)
    else (format t 
 		" (net.aserve.test::test-aserve) will run the aserve test~%"))
 

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.54 2001/10/10 16:32:57 jkf Exp $
+;; $Id: publish.cl,v 1.55 2001/10/12 21:51:29 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -1195,9 +1195,9 @@
   ;; string output stream
   ;;
     
-  (mp:with-timeout (60 (logmess "timeout during header send")
-		       ;;(setf (request-reply-keep-alive req) nil)
-		       (throw 'with-http-response nil))
+  (with-timeout-local (60 (logmess "timeout during header send")
+			  ;;(setf (request-reply-keep-alive req) nil)
+			  (throw 'with-http-response nil))
     (let* ((sock (request-socket req))
 	   (strategy (request-reply-strategy req))
 	   (extra-headers (request-reply-headers req))
@@ -1228,8 +1228,8 @@
 	 then ; must get data to send from the string output stream
 	      (setq content 
 		(if* (request-reply-stream req)
-			then (get-output-stream-string 
-			      (request-reply-stream req))
+		   then (get-output-stream-string 
+			 (request-reply-stream req))
 		   else ; no stream created since no body given
 			""))
 	      (setf (request-reply-content-length req) (length content)))

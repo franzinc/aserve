@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: cgi.cl,v 1.3 2001/09/29 18:03:51 jkf Exp $
+;; $Id: cgi.cl,v 1.4 2001/10/12 21:51:29 jkf Exp $
 
 ;; Description:
 ;;   common gateway interface (running external programs)
@@ -186,7 +186,7 @@
 	   then (ignore-errors (close from-script-stream)))
 	(if* pid
 	   then ;; it may be bad to wait here...
-		(mp:with-timeout (60)
+		(mp:with-timeout (60) ; ok w-t
 		  (sys:reap-os-subprocess :pid pid :wait t)))))))
 
     
@@ -209,7 +209,7 @@
 		  (start 0))
 	      (push buff buffs)
 	      (loop
-		(mp:with-timeout (timeout (error "cgi timed out"))
+		(mp:with-timeout (timeout (error "cgi timed out")) ; ok w-t
 		  (let ((len (read-sequence buff stream
 					    :start start)))
 		    (if* (<= len start)
