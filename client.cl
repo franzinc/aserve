@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.26 2000/09/07 19:48:04 jkf Exp $
+;; $Id: client.cl,v 1.27 2000/09/15 01:04:15 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -377,11 +377,20 @@
 	      
 	      (setq sock (socket:make-socket :remote-host phost
 					     :remote-port pport
-					     :format :bivalent)))
+					     :format :bivalent
+					     :type 
+					     #+hiper-socket :hiper
+					     #-hiper-socket :stream
+					     )))
        else (setq sock 
 	      (socket:make-socket :remote-host host
 				  :remote-port port
-				  :format :bivalent)))
+				  :format :bivalent
+				  :type 
+					     #+hiper-socket :hiper
+					     #-hiper-socket :stream
+					     
+				  )))
 
     #+(and allegro (version>= 6 0))
     ;; cac 28aug00

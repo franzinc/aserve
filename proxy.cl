@@ -59,7 +59,7 @@
 			(net.uri:copy-uri uri :scheme nil :host nil))
 		      (handle-request req)
 		 else ; must really proxy
-		      (proxy-request req ent))))))
+		      (proxy-cache-request req ent))))))
 
 		      
 		      
@@ -234,16 +234,15 @@
 			    (eq response 204)
 			    (eq response 304)))
 		 then ; got to read the body
-		      (if* (null given-content-length)
-			 then (multiple-value-setq (body-buffers body-length)
-				(read-into-block-buffers sock nil))
-			 else (multiple-value-setq (body-buffers body-length)
-				(read-into-block-buffers sock 
-							 given-content-length))
-			      (if* (not (eql body-length given-content-length))
-				 then (warn "content-length ~s but body length ~d"
-					    given-content-length body-length)
-				      (setq given-content-length body-length))))
+		      (multiple-value-setq (body-buffers body-length)
+			(read-into-block-buffers sock 
+						 given-content-length))
+		      
+		      (if* (and given-content-length
+				(not (eql body-length given-content-length)))
+			 then (warn "content-length ~s but body length ~d"
+				    given-content-length body-length)
+			      (setq given-content-length body-length)))
     
 	      (close sock)  (setq sock nil)
 
@@ -286,6 +285,17 @@
 		(write-sequence clibuf rsock :end cliend)
 		(if* body-length 
 		   then (write-body-buffers rsock body-buffers body-length))
+		
+		(if* (cache-response
+		      req
+		      response comment
+		      clibuf cliend body-buffers body-length)
+		   then ; these buffers have been saved in the cache
+			; so nil them out so they aren't freed
+			(setf clibuf nil
+			      body-buffers nil
+			      (request-header-block req) nil))
+		
 		(dolist (block body-buffers)
 		  (free-sresource *header-block-sresource* block))
 		(force-output rsock)))))
@@ -463,7 +473,18 @@
 
 (defstruct pcache-ent
   last-modified ; last modified date of entity (in universal-time format)
-  data		; data blocks (first is the header block)
+  request	; request header block 
+  response-header-size ; bytes in the header response object
+  data		; data blocks (first is the response header block)
+  data-length	; number of octets of data
+  code		; response code
+  comment	; response comment 
+
+  ; count of the internal use of this
+  use		; nil - dead entry. >= 0 - current users of this entry
+  
+  ; number of times this entry was returned due to a request
+  (returned 0)
   )
 
 
@@ -479,26 +500,155 @@
   ;; if we've got a proxy cache then retrieve it from there
   ;; else just proxy the request
   
-  (let ((pcache (wserver-pcache *wserver*))
-	(pcache-ent))
+  (let ((pcache (wserver-pcache *wserver*)))
     
     (if* (or (null pcache)
 	     (not (eq (request-method req) :get)))
        then (return-from proxy-cache-request
 	      (proxy-request req ent)))
+
+    (logmess (format nil "cache: look for ~a~%" (net.uri:render-uri (request-raw-uri req) nil)))
     
-    (setq pcache-ent
-      (gethash (net.uri:render-uri (request-raw-uri req) nil) 
-	       (pcache-table pcache)))
+    (dolist (pcache-ent
+		(gethash (net.uri:render-uri (request-raw-uri req) nil) 
+			 (pcache-table pcache))
+	      ; here is failed to match in the cache
+	      (proxy-request req ent))
+      
+      ; see if this request matches our request
+      
+      (if* (lock-pcache-ent pcache-ent)
+	 then (unwind-protect
+		  (if* (and (match-request-blocks 
+			     (request-header-block req)
+			     (pcache-ent-request pcache-ent))
+			    
+			    (response-is-young-enough 
+			     (pcache-ent-last-modified pcache-ent)
+			     (request-header-block req)))
+		     then (send-cached-response req pcache-ent)
+			  (return))
+		; cleanup
+		(unlock-pcache-ent pcache-ent))))))
+
+
+(defun send-cached-response (req pcache-ent)
+  ;; send back this response
+  (let ((rsock (request-socket req)))
+    (format rsock "HTTP/1.1 ~d ~a~a" 
+	    (pcache-ent-code pcache-ent)
+	    (pcache-ent-comment pcache-ent) *crlf*)
+
+    (let ((data (pcache-ent-data pcache-ent))
+	  (data-length (pcache-ent-data-length pcache-ent)))
+      (write-sequence (car data) rsock :end (pcache-ent-data-length pcache-ent))
+      (if* data-length 
+	 then (write-body-buffers rsock (cdr data) data-length))
+		
+		
+      (force-output rsock))))
+
+
+
+(defun lock-pcache-ent (pcache-ent)
+  ;; attempt to increase the use count of this entry by one.
+  ;; If successful return true.
+  ;; If the entry is dead return nil
+  (mp:without-scheduling
+    (let ((val (pcache-ent-use pcache-ent)))
+      (if* val
+	 then (setf (pcache-ent-use pcache-ent) (1+ val))))))
+
+(defun unlock-pcache-ent (pcache-ent)
+  ;; reduce the use count of this entry
+  (mp:without-scheduling
+    (let ((val (pcache-ent-use pcache-ent)))
+      (if* val
+	 then (setf (pcache-ent-use pcache-ent) (1- val))))))
     
-    (if* pcache-ent
-       then ; see if this applies
-	    nil
-	    )))
+
+(defun match-request-blocks (request-block cache-block)
+  ;; compare the header entries that have to match for this
+  ;; cached request to be used.
+  ;;
+  (let ((hcma *header-cache-match-array*))
+    (dotimes (i (length hcma) t)
+      (let ((ent (svref hcma i)))
+	(if* ent
+	   then (if* (not (header-match-values request-block
+					       cache-block
+					       i
+					       (eq ent :mx)))
+		   then ; give up
+			(return nil)))))))
+
+
+(defun response-is-young-enough (last-modified-ut request-block)
+  ;; return true if the last-modified date satisified
+  ;; the contraints of the request
+  
+  (declare (ignore last-modified-ut request-block))
+  
+  
+  ;; to be done
+  t
+  )
+    
+
+(defun cache-response (req response-code comment client-response-header
+		       crh-end body-buffers body-length)
+  
+  ;; if we are caching, save the information about this response 
+  ;; in the cache.
+  ;; return true if we did save the info.
+  
+  (let ((pcache (wserver-pcache *wserver*)))
+    
+    (if* (eq (request-method req) :get)
+       then ; cache only gets
+	    
+	    
+	    (logmess (format nil "cache: caching response to ~a~%" (net.uri:render-uri (request-raw-uri req) nil)))
+	    (let ((pcache-ent 
+		   (make-pcache-ent
+		    :request (request-header-block req)
+		    :data  (cons client-response-header body-buffers)
+		    :response-header-size crh-end
+		    :data-length body-length
+		    :code	response-code
+		    :comment   comment
+		    :last-modified 0 ; to be filled in
+		    :use 0)))
+	      (push pcache-ent
+		    (gethash (net.uri:render-uri (request-raw-uri req) nil) 
+			     (pcache-table pcache)))
+	      t))))
 
 	    
-    
-   
+(defun dump-cache ()
+  ;; dump the proxy cache
+  (let ((pcache (wserver-pcache *wserver*)))
+    (if* (null pcache)
+       then (format t "There is no cache~%")
+       else (format t  "~%---- proxy cache --- ~%")
+	    (maphash #'(lambda (k values)
+			 (format t "uri: ~a~%" k)
+			 (dolist (pcache-ent values)
+			   (format t " code: ~s~%data-length: ~s~%"
+				   (pcache-ent-code  pcache-ent)
+				   (pcache-ent-data-length pcache-ent))
+			   (format t " use: ~d~%last-modified: ~d~%"
+				   (pcache-ent-use  pcache-ent)
+				   (pcache-ent-last-modified  pcache-ent))
+			   (format t " request header:~%")
+			   (dump-header-block (pcache-ent-request 
+					       pcache-ent))
+			   (format t "~%-----~%")
+			   
+			   
+			   (format t "~%")))
+		     (pcache-table pcache)))))
+
     
 
 		  

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.7 2000/09/13 23:58:42 jkf Exp $
+;; $Id: headers.cl,v 1.8 2000/09/15 01:04:15 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -66,6 +66,11 @@
 (defvar *header-server-array*
     ;; indexed by header number, contains a kwd symbol specifying how
     ;; to treat his header when proxying a server response to a client
+    )
+
+(defvar *header-cache-match-array*
+    ;; indexed by header number.  contains a kwd symbol or nil
+    ;; describing how matching should be done
     )
 
 (defvar *header-count*
@@ -201,6 +206,11 @@
 		    ',(make-array (length *http-headers*)
 				  :initial-contents
 				  (mapcar #'third *http-headers*)))
+		  
+		  (setq *header-cache-match-array*
+		    ',(make-array (length *http-headers*)
+				  :initial-contents
+				  (mapcar #'fourth *http-headers*)))
 		  
 		  (setq  *header-count* 
 		    ;; number of distinct headers
@@ -665,7 +675,48 @@
   (incf end)
   end)
 	    
-  
+
+
+(defun header-match-values (request-block cache-block i exactp)
+  ;; compare the header value for the current request vrs the cache-block
+  ;; they match if they are identical
+  ;; or if (not exact) and the request-block value is not given.
+  ;;
+  (multiple-value-bind (rstart rend rest)
+      (header-buffer-values request-block i)
+    (multiple-value-bind (cstart cend cest)
+	(header-buffer-values cache-block i)
+      
+      (or (and (null rstart) (null cstart)) ; both not present
+	  (and (null rstart) (not exactp)) ; not given in request and !exact
+	  
+	  ; check for both present and identical
+	  (and rstart cstart
+	       (eql (- rend rstart) (- cend cstart)) ; same size
+	       (equal rest cest)
+	       
+	       (loop
+		 (do ((rr rstart (1+ rr))
+		      (cc cstart (1+ cc)))
+		     ((>= rr rend))
+		   (if* (not (eq (aref request-block rr)
+				 (aref cache-block cc)))
+		      then (return-from header-match-values nil)))
+		 
+		 (if* rest
+		    then (setq rstart (caar rest)
+			       rend   (cdar rest)
+			       
+			       cstart (caar cest)
+			       cend   (cdar cest))
+			 (pop rest)
+			 (pop cest)
+		    else (return t))))))))
+	       
+			 
+	       
+	  
+	  
 
 #+ignore (defun testit ()
   ;; test the parsing
@@ -712,7 +763,7 @@
 			res)
 		(do ((ind (car res) (1+ ind)))
 		    ((>= ind (cdr res)))
-		  (format t "~c" (code-char (aref thebuf ind))))
+		  (write-char (code-char (aref thebuf ind))))
 		(format t "'")
 		(terpri))))))
 
