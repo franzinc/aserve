@@ -94,10 +94,11 @@
 	(progn
 	  
 	  (format *debug-stream* "do proxy to ~s~%" uri)
+	  (force-output *debug-stream*)
 
 	  (handler-bind ((error #'(lambda (cond)
 				    (format *debug-stream*
-					    "error during proxy: ~s~%" cond)
+					    "error during proxy: ~a~%" cond)
 				    (if* (eq state :pre-send)
 				       then ; haven't sent anything
 					    ; so send failed response

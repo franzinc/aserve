@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.9 2000/08/20 19:13:23 jkf Exp $
+;; $Id: t-aserve.cl,v 1.10 2000/08/21 23:32:41 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -55,7 +55,8 @@
         util.test::*test-successes* 0
 	util.test::*test-unexpected-failures* 0)
   (with-tests (:name "aserve")
-    (let ((port (start-aserve-running)))
+    (let* ((*wserver* *wserver*)
+	   (port (start-aserve-running)))
       (format t "server started on port ~d~%" port)
       (unwind-protect 
 	  (flet ((do-tests ()
@@ -90,7 +91,8 @@
 
 (defun start-aserve-running ()
   ;; start aserve, return the port on which we've started aserve
-  (let ((wserver (start :port nil)))	; let the system pick a port
+  (let ((wserver (start :port nil :server :new))); let the system pick a port
+    (setq *wserver* wserver)
     (unpublish :all t) ; flush anything published
     (socket::local-port (net.aserve::wserver-socket wserver))
     ))
@@ -367,7 +369,8 @@
 	    (test (format nil "text/plain" port)
 		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
-	    (if* (eq protocol :http/1.1)
+	    (if* (and (eq protocol :http/1.1)
+		      (null *x-proxy*))
 	       then (test "chunked"
 			  (cdr (assoc :transfer-encoding headers 
 				      :test #'eq))
@@ -595,7 +598,7 @@
 	(str2 (make-string 256)))
     (dotimes (i 256)
       (setf (schar str1 i) (code-char i))
-      (setf (schar str1 i) (code-char (mod (+ i 10) 256))))
+      (setf (schar str2 i) (code-char (mod (+ i 10) 256))))
     
     (let ((query `(("foo bar" . "baz")
 		   (,str1 . "a b c d")

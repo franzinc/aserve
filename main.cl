@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.58 2000/08/20 19:13:23 jkf Exp $
+;; $Id: main.cl,v 1.59 2000/08/21 23:32:41 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -754,6 +754,7 @@ by keyword symbols and not by strings"
 		   debug      ; set debug level
 		   setuid
 		   setgid
+		   proxy
 		   )
   ;; -exported-
   ;;
@@ -770,7 +771,9 @@ by keyword symbols and not by strings"
   
   ; shut down existing server
   (shutdown server) 
-  
+
+  (if* proxy 
+     then (enable-proxy server))
   
   (let* ((main-socket (socket:make-socket :connect :passive
 					  :local-port port

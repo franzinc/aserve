@@ -1,3 +1,9 @@
+2000-08-21  John Foderaro  <jkf@tiger.franz.com>
+
+	*  add :proxy arg to net.aserve:start so you can enable the proxy
+	   when you start the server.
+	*  fix test suite to report only legit errors
+
 2000-08-20  jkf  <jkf@main.verada.com>
 1.1.26
 	*  Added a proxy capability.  enable-proxy will turn it on.
