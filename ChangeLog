@@ -1,3 +1,8 @@
+2003-07-08  Kevin Layer  <layer@crikey>
+
+	* packages.cl: fmakunbound 'get-request-body so there are not
+	  conflicts with earlier patch versions
+
 2003-07-07  Kevin Layer  <layer@crikey>
 
 	* packages.cl: v2 of the patch for 6.2
