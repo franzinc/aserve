@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.26 2000/03/22 11:46:55 jkf Exp $
+;; $Id: main.cl,v 1.27 2000/03/22 22:32:16 jkf Exp $
 
 ;; Description:
 ;;   iserve's main loop
@@ -54,6 +54,7 @@
    #:http-request  	; class
    #:locator		; class
    #:location-authorizer  ; class
+   #:location-authorizer-patterns
    #:password-authorizer  ; class
    #:process-entity
    #:publish
@@ -114,10 +115,10 @@
 
 (in-package :net.iserve)
 
-
 (defparameter *iserve-version* '(1 1 7))
 
 
+(provide :iserve)
 
 (defparameter *iserve-version-string*
     ;; for when we need it in string format
@@ -127,6 +128,8 @@
 	    (caddr *iserve-version*)))
 	    
 ;;;;;;;  debug support 
+
+(defvar *trap-errors* t)    ; have handler auto catch errors
 
 (defvar *ndebug* 0)         ; level for printing debugging info
 (defvar *dformat-level* 20)  ; debug level at which this stuff prints
@@ -649,7 +652,7 @@
      (list :name (format nil "iserve-accept-~d" (incf *thread-index*))
 	   :initial-bindings
 	   `((*wserver*  . ',*wserver*)
-	     (*debug-io* . ',(wserver-terminal-io *wserver*))
+	     #+ignore (*debug-io* . ',(wserver-terminal-io *wserver*))
 	     ,@excl:*cl-default-special-bindings*))
      #'http-accept-thread)))
 
@@ -658,7 +661,7 @@
 	 (proc (mp:make-process :name name
 				:initial-bindings
 				`((*wserver*  . ',*wserver*)
-				  (*debug-io* . ',(wserver-terminal-io 
+				  #+ignore (*debug-io* . ',(wserver-terminal-io 
 						   *wserver*))
 				  ,@excl:*cl-default-special-bindings*)
 				)))
@@ -671,15 +674,23 @@
 (defun http-worker-thread ()
   ;; made runnable when there is an socket on which work is to be done
   (loop
-    
+
     (let ((sock (car (mp:process-run-reasons sys:*current-process*))))
-      (handler-case (process-connection sock)
-	(error (cond)
-	  (logmess (format nil "~s: got error ~a~%" 
-			   (mp:process-name sys:*current-process*)
-			   cond))))
+      (restart-case
+	  (if* *trap-errors*
+	     then (handler-case (process-connection sock)
+		    (error (cond)
+		      (logmess (format nil "~s: got error ~a~%" 
+				       (mp:process-name sys:*current-process*)
+				       cond))))
+	     else (process-connection sock))
+	(abandon ()
+	    :report "Abandon this request and wait for the next one"
+	  nil))
       (atomic-incf (wserver-free-workers *wserver*))
-      (mp:process-revoke-run-reason sys:*current-process* sock))))
+      (mp:process-revoke-run-reason sys:*current-process* sock))
+    
+    ))
 
 (defun http-accept-thread ()
   ;; loop doing accepts and processing them

@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.16 2000/03/21 05:55:55 jkf Exp $
+;; $Id: parse.cl,v 1.17 2000/03/22 22:32:16 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -165,9 +165,10 @@
     (if* (null blankpos)
        then ; must be http/0.9
 	    (return-from parse-http-command (values cmd 
-						    (buffer-substr buffer
+						    (parse-uri
+						     (buffer-substr buffer
 								   urlstart
-								   end)
+								   end))
 						    :http/0.9)))
     
     (let ((url (buffer-substr buffer urlstart blankpos))

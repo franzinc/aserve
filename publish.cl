@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.26 2000/03/20 17:25:32 jkf Exp $
+;; $Id: publish.cl,v 1.27 2000/03/22 22:32:16 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -689,12 +689,10 @@
 	 then ; check if it is authorized
 	      (let ((authorizer (entity-authorizer ent)))
 		(if* authorizer
-		   then (let ((result (authorize authorizer
-						 req
-						 ent)))
+		   then (let ((result (authorize authorizer req ent)))
 			  (if* (eq result t)
-			     then (return-from handle-request
-				    (process-entity req ent))
+			     then (if* (process-entity req ent)
+				     then (return-from handle-request))
 			   elseif (eq result :done)
 			     then ; already responsed
 				  (return-from handle-request nil)
@@ -706,8 +704,8 @@
 			  ; failed request
 			  )
 		   else ; no authorizer, let anyone access
-			(return-from handle-request
-			  (process-entity req ent))
+			(if* (process-entity req ent)
+			   then (return-from handle-request))
 			)))))
   
   ; no handler
@@ -744,24 +742,25 @@
   ;; generate a response to a request that we can't handle
   (let ((entity (wserver-denied-request *wserver*)))
     (if* (null entity)
-       then (setq entity (make-instance 'computed-entity
-			   :function #'(lambda (req ent)
-					 (with-http-response 
-					     (req ent
-						  :response *response-not-found*)
-					   (with-http-body (req ent)
-					     (html 
-					      (:head (:title "404 - NotFound")
-						     (:body
-						      (:h1 "Not Found")
-						      "The request for "
-						      (:princ-safe 
-						       (render-uri 
-							(request-uri req)
-							nil
-							))
-						      " was denied."))))))
-			   :content-type "text/html"))
+       then (setq entity 
+	      (make-instance 'computed-entity
+		:function #'(lambda (req ent)
+			      (with-http-response 
+				  (req ent
+				       :response *response-not-found*)
+				(with-http-body (req ent)
+				  (html 
+				   (:head (:title "404 - NotFound")
+					  (:body
+					   (:h1 "Not Found")
+					   "The request for "
+					   (:princ-safe 
+					    (render-uri 
+					     (request-uri req)
+					     nil
+					     ))
+					   " was denied."))))))
+		:content-type "text/html"))
 	    (setf (wserver-denied-request *wserver*) entity))
     (process-entity req entity)))
 
@@ -851,7 +850,9 @@
 (defmethod process-entity ((req http-request) (entity computed-entity))
   ;; 
   (let ((fcn (entity-function entity)))
-    (funcall fcn req entity)))
+    (funcall fcn req entity)
+    t	; processed
+    ))
 
 
 
@@ -892,7 +893,6 @@
 					:direction :input
 					:element-type '(unsigned-byte 8)))))
 		 then ; file not readable
-		      (failed-request req)
 		      
 		      (return-from process-entity nil))
 	      
@@ -935,7 +935,11 @@
 		      
 		      
 		
-		(close p))))))
+		(close p))))
+    
+    t	; we've handled it
+    ))
+
 	      
 		
 (defmethod process-entity ((req http-request) (ent directory-entity))
@@ -944,12 +948,22 @@
   
   ; remove the prefix and tack and append to the given directory
   
-  (let ((realname (concatenate 'string
-		    (entity-directory ent)
-		    (subseq (uri-path (request-uri req))
-			    (length (prefix ent)))))
-	(newname))
+  (let* ((postfix nil)
+	 (realname (concatenate 'string
+		     (entity-directory ent)
+		     (setq postfix (subseq (uri-path (request-uri req))
+					   (length (prefix ent))))))
+	 (newname))
     (debug-format 10 "directory request for ~s~%" realname)
+    
+    ; we can't allow the brower to specify a url with 
+    ; any ..'s in it as that would allow the browser to 
+    ; search outside the tree that's been published
+    (if* (match-regexp "\\.\\.[\\/]" postfix)
+       then ; contains ../ or ..\  
+	    ; ok, it could be valid, like foo../, but that's unlikely
+	    (return-from process-entity nil))
+    
     
     (let ((type (excl::filesys-type realname)))
       (if* (null type)

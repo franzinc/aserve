@@ -1,4 +1,19 @@
 2000-03-22  John Foderaro  <jkf@tiger.franz.com>
+1.1.8
+	* fix http/0.9 processing
+	
+	* make errors in http worker threads, if uncaught (see below)
+	  and if the emacs-lisp interface is running, cause a new
+	  emacs window to appear in which you can debug the problem
+	
+	* add net.iserve::*trap-errors* (default t).  If set to
+	  nil then errors in http processing by iserve will result
+	  in error break loops.
+
+	* fixed errors in publish-directory.  Also prevent user from
+	passing ../ in urls to access above the published directory
+	
+2000-03-22  John Foderaro  <jkf@tiger.franz.com>
 1.1.7
 	* make initial lisp listerner of standalone version sleep
 	  so that the process can be put in the background.
