@@ -3,6 +3,8 @@
   (:export
    #:base64-decode
    #:decode-form-urlencoded
+   #:get-multipart-header
+   #:get-multipart-sequence
    #:get-request-body
    #:header-slot-value
    #:publish
@@ -30,7 +32,7 @@
 (in-package :neo)
 
 
-(defparameter *neo-version* '(1 0 1))
+(defparameter *neo-version* '(1 0 2))
 
 ;;;;;;;  debug support 
 
@@ -817,8 +819,11 @@
   ebuf		; index after last valid char in buffer
   eline         ; index after last valid char not crlf in buffer
   left		; bytes left after buffer exhausted
+  leftoff	; place to start again inside this buffer
   boundary	; boundary string
   socket	; socket stream connected to browser
+  seen-end-of-segment	; reached the boundary
+  seen-end-of-all-segments ; reached all the boundaries
   )
 
 
@@ -861,16 +866,25 @@
        then ; no headers left
 	    (return-from get-multipart-header nil))
     
+    (if* (mp-info-seen-end-of-all-segments mp-info)
+       then ; already at eof
+	    (return-from get-multipart-header nil))
+    
     ; read header lines
     (let ((headers)
 	  (heads)
 	  (buffer (mp-info-buffer mp-info)))
       (tagbody again
 	(loop
+	  (setf (mp-info-seen-end-of-segment mp-info) nil)
+	  
 	  (case (get-multipart-line mp-info)
-	    (:eof (return-from get-multipart-header nil))
+	    ((:eof :boundary-end)
+	     (setf (mp-info-seen-end-of-all-segments mp-info) t)
+	     (return-from get-multipart-header nil))
+	    
 	    (:boundary (go again))
-	    (:boundary-end (return-from get-multipart-header nil))
+	    
 	    (:data (if* (eq (mp-info-eline mp-info) 0)
 		      then (return) ; end of headers
 		      else (if* (member (schar buffer 0) '(#\space 
@@ -891,6 +905,8 @@
 							(mp-info-eline mp-info))
 					 headers)))))))
 
+      (setf (mp-info-seen-end-of-segment mp-info) nil)
+      
       (format t "Headers is ~s~%" headers)
       
       ; now parse headers
@@ -917,6 +933,12 @@
 	 (size (length buffer))
 	 (fd (mp-info-socket mp-info))
 	 (ch))
+
+    (if* (mp-info-seen-end-of-all-segments mp-info)
+       then (return-from get-multipart-line :eof))
+    
+    (if* (mp-info-seen-end-of-segment mp-info)
+       then (return-from get-multipart-line :boundary))
     
     (loop 
       (if* (and len (<= len 0))
@@ -928,7 +950,7 @@
 	      (return))
     
       (setq ch (read-char fd nil :eof))
-      (if* (not (eq ch :eof)) then (write-char ch))
+      ;(if* (not (eq ch :eof)) then (write-char ch))
       (if* len then (decf len))
       (if* (eq :eof ch)
 	 then (return) ; out of the loop
@@ -942,6 +964,7 @@
   
     (setf (mp-info-left mp-info) len)
     (setf (mp-info-ebuf mp-info) i)
+    (setf (mp-info-leftoff mp-info) nil)
   
     (let ((eline i))
       ; find postition before the crlf, if any
@@ -969,35 +992,96 @@
 						       (length boundary)))
 					(eq #\- (schar buffer 
 						       (1+ (length boundary)))))
-				 then :boundary-end
-				 else :boundary)
-			 else :boundary)
+				 then (setf 
+					  (mp-info-seen-end-of-all-segments 
+					   mp-info) t)
+				      :boundary-end
+				 else (setf (mp-info-seen-end-of-segment 
+					     mp-info) t)
+				      :boundary)
+			 else(setf (mp-info-seen-end-of-segment mp-info) t)
+			      :boundary)
 		 else :data)
        elseif (and (eq i 0) (eq ch :eof))
-	 then :eof
+	 then (setf (mp-info-seen-end-of-all-segments mp-info) t)
+	      :eof
 	 else :data))))
       
 		
     
 (defmethod get-multipart-sequence ((req http-request)
 				   buffer
-				   &key start end raw)
+				   &key (start 0) 
+					(end (length buffer))
+					(raw nil raw-p))
   ;; fill the buffer with the next line of data.
   ;; start at 'start' and go no farther than (1- end) in the buffer
   ;; return the index of the first character not place in the buffer.
-  )
-	      
-      
-      
-      
+  (let (mp-info text-grab)
     
-    
-    
-    
-    
-	  
+    (typecase buffer
+      ((array character (*))
+       (setq text-grab t))
+      ((array (unsigned-byte 8) (*))
+       (setq text-grab nil 
+	     raw (if* (not raw-p) then t else raw)))
+      (t (error "get-multipart-sequence should be given a (simple-array character (*)) or (array (unsigned-byte 8) (*)), not this sequence: ~s" buffer)))
   
-    
+  
+    (setq mp-info (getf (resp-plist req) 'mp-info))
+    (if* (null mp-info)
+       then ; haven't grabbed the header yet, do that and toss it, and
+	    ; start the flow of information
+	    (if* (null (get-multipart-header req))
+	       then ; no data to read
+		    (return-from get-multipart-sequence nil))
+	    (setq mp-info (getf (resp-plist req) 'mp-info)))
+  
+    (if* (null (mp-info-leftoff mp-info))
+       then (case (get-multipart-line mp-info)
+	      ((:boundary :eof :boundary-end)
+	       (return-from get-multipart-sequence nil))
+	      (:data (setf (mp-info-leftoff mp-info) 0))))
+  
+    (do ((dest start (1+ dest))
+	 (leftoff (mp-info-leftoff mp-info)
+		  (1+ leftoff))
+	 (eline   (mp-info-eline mp-info))
+	 (ebuf    (mp-info-ebuf  mp-info))
+	 (s-buffer  (mp-info-buffer mp-info)))
+	((>= dest end)
+	 ; ran out of buffer
+	 (if* raw
+	    then (if* (< leftoff ebuf)
+		    then (setf (mp-info-leftoff mp-info) leftoff)
+		    else (setf (mp-info-leftoff mp-info) nil))
+	    else (if* (<= leftoff eline)
+		    then (setf (mp-info-leftoff mp-info) leftoff)
+		    else (setf (mp-info-leftoff mp-info) nil)))
+	 dest)
+
+      (if* raw
+	 then (if* (< leftoff ebuf)
+		 then (let ((ch (schar s-buffer leftoff)))
+			(if* text-grab 
+			   then (setf (aref buffer dest) ch)
+			   else (setf (aref buffer dest) (char-code ch))))
+		 else (setf (mp-info-leftoff mp-info) nil)
+		      (return-from get-multipart-sequence dest))
+	 else ; non raw, do eol processing
+	      
+	      (let (ch)
+		(if* (< leftoff eline)
+		   then (setq ch (schar s-buffer leftoff))
+		   else (setq ch #\newline))
+		;(format t "lo ~d  dest ~s  ch ~s~%" leftoff dest ch)
+		(if* text-grab 
+		   then (setf (aref buffer dest) ch)
+		   else (setf (aref buffer dest) (char-code ch)))
+		(if* (>= leftoff eline)
+		   then (setf (mp-info-leftoff mp-info) nil)
+			(return-from get-multipart-sequence (1+ dest))))))
+    ))
   
 
 

@@ -387,5 +387,125 @@ constant string.</p>
 begin at the first question mark and continue until the end of the url.&nbsp;&nbsp; Each
 item in the alist is a cons where the car is a string giving the name of the argument and
 the cdr is a string giving the value of the argument.</p>
+
+<hr>
+
+<p>&nbsp;</p>
+
+<h2>Form Processing</h2>
+
+<p>Forms are used on web pages in order to allow the user to send information to the web
+server.&nbsp;&nbsp; A form consists of a number of objects, such as text fields, file
+fields, check boxes and radio buttons.&nbsp;&nbsp; Each field has a name.&nbsp;&nbsp; When
+the user takes a certain action, the form data is encoded and sent to the web server.
+&nbsp;&nbsp; There are three ways that data can be sent to the web server.&nbsp; The
+method used is determined by the attributes of the <strong>&lt;form&gt;</strong> tag that
+defines the form
+
+<ul>
+  <li><strong>&lt;form method=&quot;get&quot;&gt; -&nbsp; </strong>The data is made part of
+    the <strong>url</strong> that is sent to the web server and is separated from the url
+    itself by a question mark.&nbsp; The neo url handler code uses <strong>(url-argument-alist</strong>
+    <strong>req)</strong> to retrieve the alist of form names and values.&nbsp;&nbsp; This
+    method has a few disadvantages - the amount of data that can be sent is limited since the
+    size of urls is limited.&nbsp; Also the data is visible to everyone seeing the url and
+    that may not be desireable.&nbsp; </li>
+  <li><strong>&lt;form method=&quot;post&quot;&gt; - </strong>The data is send in the body of
+    the request.&nbsp;&nbsp;&nbsp; The neo url handler code calls <strong>(get-request-body
+    req)</strong> to retrieve the body from the web browser and then <strong>(decode-form-urlencoded
+    body) </strong> to turn it into an alist that associates form field names with values.</li>
+  <li><strong>&lt;form method=&quot;post&quot; enctype=&quot;multipart/form-data&quot;&gt; - </strong>The
+    data is sent in the body of the request in MIME format, with each field in its own
+    separate MIME entity.&nbsp;&nbsp;&nbsp; This method is only necessary when one of the
+    fields in the form is a <strong>&lt;input type=&quot;file&quot;&gt;</strong> ssince that
+    causes the whole contents of a file to be sent from the browser to the web server.
+    &nbsp; When sending a file you would like to include information such as the file name and
+    content-type of the file, and by sending it in MIME format there is room for this
+    information in the MIME header.&nbsp;&nbsp; We describe how to retrieve data from such a
+    form next.</li>
+</ul>
+
+<h3>Retreving multipart/form-data information</h3>
+
+<p>If you create a form with <strong>&lt;form method=&quot;post&quot;
+enctype=&quot;multipart/form-data&quot;&gt;</strong> then your url handler must do the
+following to retrieve the value of each field in the form:
+
+<ol>
+  <li>Call <strong>(get-multipart-header req)</strong> to return the MIME headers of the next
+    field.&nbsp; If this returns nil then there are no more fields to retrieve.</li>
+  <li>Create a buffer and call <strong>(get-multipart-sequence req buffer)</strong> repeatedly
+    to return the next chunk of data.&nbsp; When there is no more data to read for this field
+    &nbsp; <strong>get-multipart-sequence</strong> will return nil.&nbsp; </li>
+  <li>go back to step 1</li>
+</ol>
+
+<p>It's important to retrieve all of the data sent with the form, even if that data is
+just ignored.&nbsp; This is because there may be another http request following this one
+and it's important to advance to the beginning of that request so that it is properly
+recognized.&nbsp;&nbsp; </p>
+
+<p>Details on the functions are given next.</p>
+
+<p><strong><font face="Courier New">&nbsp;</font></strong></p>
+
+<hr>
+
+<p><strong><font face="Courier New">(get-multipart-header request)</font></strong></p>
+
+<p>This returns nil or&nbsp; the MIME headers for the next form field in alist form.
+&nbsp;&nbsp; If nil is returned then there is no more form data.&nbsp;&nbsp; </p>
+
+<p>For an input field such as <strong>&lt;input type=&quot;text&quot;
+name=&quot;textthing&quot;&gt; </strong>the value returned by <strong>get-multipart-header</strong>
+would be</p>
+
+<pre>((&quot;Content-Disposition&quot;
+      (:param &quot;form-data&quot; (&quot;name&quot; . &quot;textthing&quot;))))</pre>
+
+<p>For an input field such as <strong>&lt;input type=&quot;file&quot;
+name=&quot;thefile&quot;&gt; </strong>the value returned by <strong>get-multipart-header</strong>
+would be something like</p>
+
+<pre>((&quot;Content-Disposition&quot;
+      (:param &quot;form-data&quot; (&quot;name&quot; . &quot;thefile&quot;)
+                          (&quot;filename&quot; . <a
+href="file:///C://down//550mhz.gif">&quot;C:\\down\\550mhz.gif&quot;</a>)))
+ (&quot;Content-Type&quot; &quot;image/gif&quot;))</pre>
+
+<p>Note that the filename is expressed in the syntax of the operating system on which the
+web browser is running.&nbsp; This syntax may or may not make sense to the Lisp pathname
+functions of the Neo web server as it may be running on a totally different operating
+system.</p>
+
+<p>&nbsp;</p>
+
+<hr>
+
+<p><strong><font face="Courier New">(get-multipart-sequence request buffer &amp;key start
+end raw)</font></strong></p>
+
+<p>This retrieves the next chunk of data for the current form field and stores it in <strong>buffer</strong>.
+&nbsp; If <strong>start</strong> is given then it specifies the index in the buffer at
+which to begin storing the data.&nbsp; If <strong>end</strong> is given then it specifies
+the index just after the last index in which to store data.</p>
+
+<p>The return value is <strong>nil </strong>if there is no more data to return, otherwise
+it is the index one after the last last index filled with data in <strong>buffer.</strong></p>
+
+<p>The buffer can be a one dimensional array of <strong>character</strong> or of <strong>
+(unsigned-byte 8)</strong>.&nbsp;&nbsp; If the buffer is a <strong>character</strong>
+buffer then <strong>raw</strong> defaults to <strong>nil, </strong>otherwise <strong>raw </strong>defaults
+to true.</p>
+
+<p>If <strong>raw </strong>is true then the buffer is filled with the bytes just as they
+are sent from the web browser.&nbsp; If <strong>raw</strong> is false then the sequence of
+characters #\return #\newline is converted to just #\newline (which is the preferred
+format for line separation in Lisp strings).</p>
+
+<p><strong>get-multipart-sequence</strong> may return before filling up the whole buffer,
+so program should be sure to make use of the index returned by <strong>get-multipart-sequence</strong>.</p>
+
+<p>&nbsp;</p>
 </body>
 </html>

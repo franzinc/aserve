@@ -224,6 +224,14 @@ n					  :name "username"))))))))))
 
 
 
+;; these two urls show how to transfer a user-selected file from
+;; the client browser to the server.
+;; 
+;; We use two urls (/getfile to put up the form and /getfile-post to
+;; handle the post action of the form).   We could have done it all
+;; with one url but since there's a lot of code it helps in the
+;; presentation to separate the two.
+;;
 (publish :url "/getfile"
 	 :content-type "text/html"
 	 :function
@@ -236,10 +244,14 @@ n					  :name "username"))))))))))
 				:method "post"
 				:action "/getfile-got")
 			 "Let me know what file to grab"
+			 :br
 			 ((:input :type "file" 
 				  :name "thefile"
 				  :value "foo.txt"))
-			  ((:input :type "submit")))))))))
+			 :br
+			 ((:input :type "text" :name "textthing"))
+			 :br
+			 ((:input :type "submit")))))))))
 
 ;; this called with the file from 
 (publish :url "/getfile-got"
@@ -248,10 +260,71 @@ n					  :name "username"))))))))))
 	 #'(lambda (req ent)
 	     
 	     (with-http-response (req ent)
-	       (format t "mp headers: ~s~%"
-		       (neo::get-multipart-header req))
-	       (with-http-body (req ent)
-		 (html "foo")))))
+	       (let ((h nil)
+		     (counter 0)
+		     (files-written)
+		     )
+		 (loop
+		   ; get headers for the next item
+		   (if* (null (setq h (neo:get-multipart-header req)))
+		      then ; no more items
+			   (return))
+		   
+		   ; we can get the filename from the header if 
+		   ; it was an <input type="file"> item.  If there is
+		   ; no filename, we just create one.
+		   (let ((cd (assoc "content-disposition" h :test #'equalp))
+			 (filename)
+			 (sep))
+		     (if* (and cd (consp (cadr cd)))
+			then (setq filename (cdr (assoc "filename" 
+							(cddr (cadr cd))
+							:test #'equalp)))
+			     (if* filename
+				then ;; locate the part of the filename
+				     ;; after the last directory separator.
+				     ;; the common lisp pathname functions are
+				     ;; no help since the filename syntax
+				     ;; may be foreign to the OS on which
+				     ;; the server is running.
+				     (setq sep
+				       (max (or (position #\/ filename
+							  :from-end t) -1)
+					    (or (position #\\ filename
+							  :from-end t) -1)))
+				     (setq filename
+				       (subseq filename (1+ sep) 
+					       (length filename)))))
+		     (if* (null filename)
+			then (setq filename (format nil "tempfile~d"
+						    (incf counter))))
+		     
+		     (push filename files-written)
+		     (with-open-file (pp filename :direction :output
+				      :if-exists :supersede
+				      :element-type '(unsigned-byte 8))
+		       (format t "writing file ~s~%" filename)
+		       (let ((buffer (make-array 1024
+						 :element-type '(unsigned-byte 8))))
+			 
+			 (loop (let ((count (neo:get-multipart-sequence 
+					     req 
+					     buffer
+					     :raw t)))
+				 (if* (null count) then (return))
+				 (write-sequence buffer pp :end count)))))
+		
+		     ))
+	       
+	       
+		 ;; now send back a response for the browser
+	       
+		 (with-http-body (req ent)
+		   (html (:html (:head (:title "form example"))
+				(:body "proceessed the form, files written"
+				       (dolist (file (nreverse files-written))
+					 (html :br "file: "
+					       (:b (:prin1-safe file))))))))))))
 
 	     
 	     
@@ -259,7 +332,7 @@ n					  :name "username"))))))))))
 ;; set of machines so you'll have to modify them to point to an
 ;; existing tree of pages on your machine if you want to see this work.
 
-;; the franz home page
+;; the franz home pagey
 #+ignore (publish-directory :prefix "/"
 		   :destination "/net/tanya/home/httpd/html/"
 		   )
