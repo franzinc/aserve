@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.2 2000/08/17 21:38:30 jkf Exp $
+;; $Id: headers.cl,v 1.3 2000/08/19 14:30:35 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -584,7 +584,80 @@
 
 							   
 							   
-		   
+(defun copy-headers (frombuf tobuf header-array)
+  ;; copy the headers denoted as :p (pass) in header array 
+  ;; in frombuf to the tobuf
+  (let ((toi 0))
+    (dotimes (i (length header-array))
+      (if* (eq :p (svref header-array i))
+	 then ; passed intact
+	      (multiple-value-bind (start end others)
+		  (header-buffer-values frombuf i)
+		(loop
+		  (if* (null start) then (return))
+		  ; copy in header name
+		  (let ((name (svref *header-name-array* i)))
+		    (dotimes (j (length name))
+		      (setf (aref tobuf toi) (char-code (schar name j)))
+		      (incf toi))
+		    (setf (aref tobuf toi) #.(char-code #\:))
+		    (incf toi)
+		    (setf (aref tobuf toi) #.(char-code #\space))
+		    (incf toi)
+		    (do ((j start (1+ j)))
+			((>= j end))
+		      (setf (aref tobuf toi) (aref frombuf j))
+		      (incf toi))
+		    (setf (aref tobuf toi) #.(char-code #\return))
+		    (incf toi)
+		    (setf (aref tobuf toi) #.(char-code #\linefeed))
+		    (incf toi))
+		  (let ((next (pop others)))
+		    (if* next
+		       then (setq start (car next)
+				  end   (cdr next))
+		       else (return)))))))
+    toi))
+
+	      
+(defun insert-header (buff end header value)
+  ;; insert the header (kwd symbol or integer) at the end of the current buffer
+  ;; end is the index of the next buffer position to fill
+  ;; return the index of the first unfilled spot of the buffer
+  ;;
+  (if* (symbolp header)
+     then (let ((val (get header 'kwdi)))
+	    (if* (null val)
+	       then (error "no such header as ~s" header))
+	    (setq header val)))
+  (let ((name (svref *header-name-array* header)))
+    (dotimes (j (length name))
+      (setf (aref tobuf end) (char-code (schar name j)))
+      (incf end))
+    (setf (aref tobuf end) #.(char-code #\:))
+    (incf end)
+    (setf (aref tobuf end) #.(char-code #\space))
+    (incf end)
+    (dotimes (j (length value))
+      (setf (aref tobuf end) (char-code (schar frombuf j)))
+      (incf end))
+    (setf (aref tobuf end) #.(char-code #\return))
+    (incf end)
+    (setf (aref tobuf end) #.(char-code #\linefeed))
+    (incf end))
+  
+  end)
+  
+			     
+
+(defun insert-end-of-headers (buff end)
+  ;; put in the final crlf
+  (setf (aref tobuf end) #.(char-code #\return))
+  (incf end)
+  (setf (aref tobuf end) #.(char-code #\linefeed))
+  (incf end)
+  end)
+	    
   
 
 #+ignore (defun testit ()
