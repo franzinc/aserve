@@ -69,7 +69,7 @@ well you can ask for <a href="http://localhost">http://localhost</a> and get a s
 known by many names.&nbsp; If you choose to take advantage of that (creating what are
 known as <strong>Virtual Hosts</strong>) then iServe will support you .&nbsp; However if
 you want to create web pages that are served by whatever name can be used to reach the
-server, then iServe will allow you to do that well.</p>
+server, then iServe will allow you to do that as well.</p>
 
 <p>Type <strong>:proc</strong> to Lisp and look at which Lisp lightweight processes are
 running:</p>
@@ -98,10 +98,10 @@ function.</p>
 <h1>Publishing a file</h1>
 
 <p>The simplest way to publish something is to publish files stored on the disk.
-&nbsp;&nbsp; Create&nbsp; a file (here we called it <strong>/tmp/foo.txt</strong>) and put
-some words in it, and then</p>
+&nbsp;&nbsp; Create&nbsp; a file (here we called it <strong>/tmp/sample.txt</strong>) and
+put some words in it, and then</p>
 
-<pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/foo.txt&quot;)
+<pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/sample.txt&quot;)
 #&lt;net.iserve::file-entity @ #x2076e0c2&gt;
 tutorial(31):</pre>
 
@@ -119,14 +119,16 @@ and <a href="http://test/foo">http://test:8000/foo</a> and <a href="http://local
 
 <p>If we do </p>
 
-<pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/foo.txt&quot; :host &quot;test.franz.com&quot;)
+<pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/sample.txt&quot; 
+                            :host &quot;test.franz.com&quot;)
 #&lt;net.iserve::file-entity @ #x2076e0c2&gt;
 tutorial(31):</pre>
 
 <p>Then iServe will only respond to requests for <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>.
 &nbsp; If we do</p>
 
-<pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/foo.txt&quot; :host (&quot;test&quot; &quot;test.franz.com&quot;))
+<pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/sample.txt&quot; 
+                            :host (&quot;test&quot; &quot;test.franz.com&quot;))
 #&lt;net.iserve::file-entity @ #x2076e0c2&gt;
 tutorial(31):</pre>
 
@@ -138,9 +140,11 @@ also had the name <strong>sales.franz.com</strong>.&nbsp; You could publish two 
 ways to respond to the &quot;<strong>/foo</strong>&quot; url, depending on the host name
 specified in the request</p>
 
-<pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/<strong>test</strong>-foo.txt&quot; :host &quot;<strong>test</strong>.franz.com&quot;)
+<pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/<strong>test</strong>-sample.txt&quot; 
+                            :host &quot;<strong>test</strong>.franz.com&quot;)
 #&lt;net.iserve::file-entity @ #x2076e0c2&gt;
-tutorial(31): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/<strong>sales</strong>-foo.txt&quot; :host &quot;<strong>sales</strong>.franz.com&quot;)
+tutorial(31): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/<strong>sales</strong>-sample.txt&quot; 
+                            :host &quot;<strong>sales</strong>.franz.com&quot;)
 #&lt;net.iserve::file-entity @ #x2076e324&gt;</pre>
 
 <p>Now you will get different results if you ask for&nbsp; <a
@@ -150,7 +154,7 @@ href="http://sales.franz.com/foo">http://sales.franz.com:8000/foo</a>. </p>
 <h1>Publishing a computed page</h1>
 
 <p>The most important reason for using the iServe web server is that you can compute a web
-page when a request come in.&nbsp;&nbsp; This allows your program to display the most up
+page when a request comes in.&nbsp;&nbsp; This allows your program to display the most up
 to date information on the page or tailor the page to each browser.
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Using the <strong>publish</strong> function, a lisp
 function called a <em>response function</em> is associated with a <strong>url.&nbsp; </strong>When
@@ -183,13 +187,13 @@ content-type for the response (it can be overridden by an argument to <strong>wi
 &nbsp;&nbsp;&nbsp; Despite the name of the stream, the data need not always be html.
 &nbsp;&nbsp;&nbsp; The purpose of <strong>with-http-response</strong> is to allow iServe
 to determine how it will setup streams to respond to the request.&nbsp;&nbsp;&nbsp; iServe
-will also check to see if the browser already has an up to date copy of this page cached
+will also check to see if the browser already has an up-to-date copy of this page cached
 in which case it will not even run the code in the body of the <strong>with-http-response</strong>
 macro.&nbsp;&nbsp; <strong>with-http-body</strong> is responsible for sending back the
 response code and headers,&nbsp; and the body of <strong>with-http-body </strong>is where
 lisp code can send data which will be the body of the response.&nbsp; </p>
 
-<p>The preceeding example sends a very simple plain text string, specifying the
+<p>The preceding example sends a very simple plain text string, specifying the
 content-type to be &quot;text/plain&quot;.&nbsp; Typically you'll want to return an html
 page.&nbsp; iServe has a very concise macro for creating html.&nbsp; Here's a response
 function that sends html:</p>
@@ -207,10 +211,10 @@ function that sends html:</p>
                            ((:font :color &quot;blue&quot;) &quot;World!&quot;))))))))
 </pre>
 
-<p>While both of the preceeding response functions generate their response at request
-time, they both send back the exact same response every time.&nbsp;&nbsp; That's not a
-very good demonstration of dynamic web pages.&nbsp;&nbsp; The following page shows how you
-can implement a simple counter for the number of accesses:</p>
+<p>While both of the preceding response functions generate their response at request time,
+they both send back the exact same response every time.&nbsp;&nbsp; That's not a very good
+demonstration of dynamic web pages.&nbsp;&nbsp; The following page shows how you can
+implement a simple counter for the number of accesses:</p>
 
 <pre>(publish :path &quot;/hello-count&quot;
     :content-type &quot;text/html&quot;
@@ -293,10 +297,10 @@ the characters after the question mark are the <strong>query-string</strong>. &n
 The query string is <strong>not</strong> used by iServe to determine the entity to handle
 the request.&nbsp; When the entity begins processing the request it can ask for the <strong>request-query
 </strong>of the <strong>request</strong> object. &nbsp;&nbsp; <strong>request-query </strong>will
-return a assoc list where the <strong>car</strong> &nbsp; of each entry is a string (e.g.
+return an assoc list where the <strong>car</strong> &nbsp; of each entry is a string (e.g.
 &quot;name&quot; in the example) and the <strong>cdr</strong> is also a string (e.g.
 &quot;gen&quot; in the example).&nbsp;&nbsp;&nbsp; You can ask for the <strong>request-query</strong>
-of any request object and if there is no query string for the request <strong>request-query
+of any request object and if there is no query string for the request, <strong>request-query
 </strong>will return <strong>nil</strong>. &nbsp;&nbsp; </p>
 
 <p>This is a typical entity handler that generates a form and handles the result of
@@ -355,7 +359,7 @@ this section we'll describe how to handle&nbsp; the default encoding, called:
 to convert the encoded body into an assoc list, where every entry is a cons consisting of
 a string naming the value and then the string containing the value.</p>
 
-<p>The following sample show a single entity handler function that can put up a form and
+<p>The following sample shows a single entity handler function that can put up a form and
 can process data from the form.&nbsp;&nbsp; It isn't necessary to use the same handler for
 putting up and processing the data from a form.&nbsp;&nbsp;&nbsp; In this example we
 create a form with a big box for entering text.&nbsp;&nbsp; We invite the user to enter
@@ -436,8 +440,8 @@ iServe examples.cl file (search in that file for&nbsp; &quot;getfile-got&quot;)<
 <p>You don't necessarily want to allow everyone to access every page you publish.
 &nbsp;&nbsp; We will describe common ways to check whether someone has permission to
 access a page.&nbsp;&nbsp; There are two ways to do the authorization checks.&nbsp; You
-can do write the tests yourself in the entity function, or you can create an <strong>authorizer
-</strong>object an attach it to the entity.&nbsp;&nbsp;&nbsp; Below we'll show you how to
+can write the tests yourself in the entity function, or you can create an <strong>authorizer
+</strong>object and attach it to the entity.&nbsp;&nbsp;&nbsp; Below we'll show you how to
 write the code to do the checks manually.&nbsp;&nbsp; The Allegro iServe manual describes
 the <strong>authorizer</strong> objects. </p>
 
@@ -448,7 +452,7 @@ a name and password.&nbsp;&nbsp; You can create a form and have the user enter t
 information and then click on a button to submit it.&nbsp;&nbsp; Another way is to return
 a 401 (response unauthorized) code to the request made to access your page. &nbsp;&nbsp;
 When given that response, the web browser will pop up a window requesting a name and
-password, and after that's entered the browser resends the request but includes the name
+password, and after that's entered, the browser resends the request but includes the name
 and password in the header.</p>
 
 <p>The method you choose for asking for the name and password may depend on how secure you
@@ -456,8 +460,8 @@ want the response to be.&nbsp; Using a form the name and password are sent to th
 server without any encoding at all (other than the simple urlencoding which only affects
 unusual characters).&nbsp;&nbsp; If your form uses the &quot;GET&quot; method then the
 name and password appear in the url which makes them very easy to spot, so you at least
-want to the &quot;POST&quot; method if you use a form.&nbsp;&nbsp;&nbsp; If on the other
-hand you use the 401 response code, then the name and password are sent in a more
+want to use the &quot;POST&quot; method if you use a form.&nbsp;&nbsp;&nbsp; If on the
+other hand you use the 401 response code, then the name and password are sent in a more
 encrypted form (using an encoding called <strong>base64</strong>) however anyone
 sufficiently motivated can decrypt this without a lot of trouble.&nbsp;&nbsp; iServe does
 not yet support <strong>md5</strong> authentication which is the most secure way to do
@@ -496,8 +500,8 @@ people.</p>
 
 <p>You can determine the address from which a request was made and restrict access based
 on that address.&nbsp;&nbsp;&nbsp; If the request came through a proxy server then you are
-really determing the address of the proxy server.&nbsp; The following code only serves the
-'secret' page if the request came from a browser running on the same machine as the
+really determining the address of the proxy server.&nbsp; The following code only serves
+the 'secret' page if the request came from a browser running on the same machine as the
 server, and which is made over the loopback network on the machine.&nbsp;&nbsp; The
 loopback network is a network that exists entirely inside the operating system of the
 machine.&nbsp; The convention is that a loopback network address has 127 in the most
@@ -525,6 +529,12 @@ significant byte, and that is what we test for in the following example:</p>
                                 &quot;You cannot access this page &quot;
                                 &quot;from your location&quot;)))))))))
 </pre>
+
+<p>To see how this examples works differently depending on whether the access is through
+the loopback network or the regular network, try accessing it via <a
+href="http://localhost:8000/local-secret">http://localhost:8000/local-secret</a> and <a
+href="http://test.franz.com:8000/local-secret">http://test.franz.com:8000/local-secret</a>
+&nbsp; (where we are assuming that you are running on <strong>test-franz.com</strong>). </p>
 
 <h1>Multiple servers</h1>
 

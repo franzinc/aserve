@@ -659,6 +659,25 @@ which access should be authorized by a certain name and password.</p>
 
 <p>&nbsp;</p>
 
+<p>This example manually tests for basic authorization where the name is <strong>foo</strong>
+and the password is <strong>bar</strong>.</p>
+
+<pre>(publish :path &quot;/secret&quot;
+    :content-type &quot;text/html&quot;
+    :function
+    #'(lambda (req ent)
+        (multiple-value-bind (name password) (<strong>get-basic-authorization</strong> req)
+           (if* (and (equal name &quot;foo&quot;) (equal password &quot;bar&quot;))
+             then (with-http-response (req ent)
+                    (with-http-body (req ent)
+                      (html (:head (:title &quot;Secret page&quot;))
+                            (:body &quot;You made it to the secret page&quot;))))
+             else ; this will cause browser to put up a name/password dialog
+                  (with-http-response (req ent :response *response-unauthorized*)
+                     (<strong>set-basic-authorization</strong> req &quot;secretserver&quot;)
+                     (with-http-body (req ent)))))))
+</pre>
+
 <h3>authorizer classes</h3>
 
 <p>If an entity has an associated <strong>authorizer</strong> object, then before that
@@ -915,8 +934,10 @@ must send a response back to the client itself.&nbsp; <strong>handle-request</st
 locators to find the entity (more on this below), and then if an entity is found and that
 entity has an authorizer, it calls <strong>authorize</strong> to see if this request is
 allowed to access the selected entity.&nbsp; If the entity passes the authorization then <strong>process-entity</strong>
-is called to cause the entity to respond to the request.&nbsp; If there is no entity to
-respond then <strong>failed-request</strong> is called to send back a failure message.</p>
+is called to cause the entity to respond to the request.&nbsp; <strong>process-entity</strong>
+returns true if it processed the entity, and nil if did not in which case the search
+continues for an entity.&nbsp; If there is no entity to respond then <strong>failed-request</strong>
+is called to send back a failure message.</p>
 
 <p>A <strong>locator</strong> is an object used to map requests into entities.
 &nbsp;&nbsp; The value of <strong>(wserver-locators *wserver*)</strong> is a list of
@@ -996,65 +1017,23 @@ response.</p>
 
 <hr>
 
+<h2>Client functions</h2>
+
+<p>iServe has a set of functions that perform http client-side actions.&nbsp;&nbsp; These
+functions are useful in computed pages that reflect the contents of other pages.&nbsp; We
+also use the client-side http functions to test iServe.</p>
+
+<p>The client-side functions are exported from the<font face="Courier New">
+net.iserve.client</font> package.</p>
+
+<p>There is one function <strong>do-http-request </strong>that sends a request and
+retrieves the response.&nbsp;&nbsp;&nbsp; This is the most convenient function to use to
+retrieve a web page.</p>
+
+<p>If you need more control over the process you can use the functions: <strong>make-http-request</strong>,
+<strong>read-client-response-headers </strong>and <strong>client-request-read-sequence</strong>.</p>
+
 <p>&nbsp;</p>
-
-<h2>Working with the Apache web server</h2>
-
-<p>There may be reasons, practical or political, where you would like to use another web
-server to handle the bulk of pages on your site and only use Iserve for dynamic pages.
-&nbsp;&nbsp; This is easy to do if the other web server has the ability to act as a <em>proxy</em>.
-&nbsp;&nbsp; The newest versions of the Apache web server have the proxy capability.
-&nbsp;&nbsp; In this section we'll describe what you have to do to configure Apache and to
-generate proxy-friendly html.&nbsp;&nbsp; The Apache notes apply to version 1.3.9 of
-&nbsp; Apache and are likely to apply to other versions as well (but it would be useful to
-read the document on the proxy module just in case).</p>
-
-<p>The proxy support for Apache is found in the Proxy Module rather than being built into
-the server.&nbsp;&nbsp; First you must make sure that the proxy module is loaded into
-Apache by looking for references to it in the main Apache configuration file (httpd.conf),
-and ensuring that those references are not commented out.</p>
-
-<p>Then you should ensure that proxying is turned on with this line in httpd.conf:</p>
-
-<p><font face="Courier New">ProxyRequests on</font></p>
-
-<p>Next you have to decide which urls on the Apache server should be sent to Iserve to be
-processed.&nbsp; Suppose we say that all urls that begin /iserve/ should be sent to
-Iserve, and that Iserve will run on the same machine as Apache but will listen on port
-8080.&nbsp;&nbsp; We state this by adding this line to httpd.conf:</p>
-
-<p><font face="Courier New">ProxyPass /iserve/ http://localhost:8080/<br>
-ProxyPassReverse /iserve/ http://localhost:8080/</font></p>
-
-<p>The second line is to ensure that redirects get translated back to a form that the
-client can understand.</p>
-
-<p>After these changes are made Apache must be restarted in order for them to take effect.</p>
-
-<p>Now if a web browser asks for <a href="http://yourmachine.com/iserve/">http://yourmachine.com/iserve/</a>
-&nbsp; it will see the result of&nbsp; Apache asking for <a href="http://localhost:8080/">http://localhost:8080/</a>
-.&nbsp;&nbsp; What you would like is that if links are followed on the web page returned,
-that the illusion is maintained that pages in the <a href="http://localhost:8080/">http://localhost:8080/</a>
-tree are found below <a href="http://yourmachine.com/iserve/">http://yourmachine.com/iserve/</a>.
-&nbsp; In order for this to work, the web pages must use <em>relative<strong> </strong></em>links
-to name pages in the same tree.&nbsp; For example if you used absolute links as in </p>
-
-<p><font face="Courier New">((:a :href&nbsp; &quot;/foo&quot;) &quot;click on me and I'll
-fail&quot;)</font></p>
-
-<p>then when the user clicked on this the web browser would ask for <a
-href="http://yourmachine.com/foo">http://yourmachine.com/foo</a> which would not be sent
-to Iserve&nbsp; to return the correct page.j</p>
-
-<p>However if the path to the url was written without the leading slash, and thus were
-relative, then clicking on this link:</p>
-
-<p><font face="Courier New">((:a :href &quot;foo&quot;) &quot;click on me and it will
-work&quot;)</font></p>
-
-<p>will cause a request for&nbsp; <a href="http://yourmachine.com/iserve/foo">http://yourmachine.com/iserve/foo</a>
-which will be sent to Iserve as <a href="http://localhost:8080/foo">http://localhost:8080/foo</a>
-which will return the correct page (the page published with a path of &quot;/foo&quot;).</p>
 
 <p>&nbsp;</p>
 </body>
