@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: packages.cl,v 1.5 2004/03/04 01:57:33 jkf Exp $
+;; $Id: packages.cl,v 1.6 2004/06/09 22:01:33 jkf Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe
@@ -40,7 +40,8 @@
 (in-package :user)
 
 (eval-when (compile load eval)
- (require :uri))
+  (require :uri)
+  (require :streamc))
 
 
 (defpackage :net.aserve

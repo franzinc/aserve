@@ -1,3 +1,10 @@
+2004-06-09  John Foderaro  <jkf@tiger.franz.com>
+1.2.37
+	* main.cl - return a 400 response if there's an error reading
+	    the request.  
+	    Use process locks when allocating sresources rather
+	    then without-scheduling.
+
 2004-04-29  John Foderaro  <jkf@tiger.franz.com>
 
 	* main.cl - http-worker-thread don't expect the stream
