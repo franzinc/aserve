@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.88 2000/12/27 19:47:08 jkf Exp $
+;; $Id: main.cl,v 1.89 2000/12/29 15:57:49 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1121,7 +1121,14 @@ by keyword symbols and not by strings"
 		    (pop workers))))
 	  
 	    (error (cond)
-	      (logmess (format nil "accept: error on accept ~a" cond))
+	      (logmess (format nil "accept: error ~s on accept ~a" 
+			       error-count cond))
+	      ;; we seem to get a string of connection reset by peers,
+	      ;; perhaps due to connections that piled up before
+	      ;; we started work. So we don't want to close down
+	      ;; the accepting loop ever, thus we'll ignore the 
+	      ;; code below.
+	      #+ignore
 	      (if* (> (incf error-count) 4)
 		 then (logmess "accept: too many errors, bailing")
 		      (return-from http-accept-thread nil)))))

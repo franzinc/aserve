@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: log.cl,v 1.18 2000/12/20 18:01:03 jkf Exp $
+;; $Id: log.cl,v 1.19 2000/12/29 15:57:49 jkf Exp $
 
 ;; Description:
 ;;   iserve's logging
@@ -99,7 +99,7 @@
   ;; log information from the proxy module
   ;;
   (brief-logmess 
-   (format nil "~a ~d ~a ~a ~s"
+   (format nil "~a ~d ~a ~a~@[ ~s~]"
 	   (or (getf (mp:process-property-list mp:*current-process*)
 		     'short-name)
 	       (mp:process-name mp:*current-process*))
