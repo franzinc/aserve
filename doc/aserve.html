@@ -350,7 +350,7 @@ header lines and thus minimizes network traffic. </p>
 <p>&nbsp;</p>
 
 <p><a name="f-publish-directory"></a><strong><font face="Courier New">(publish-directory
-&amp;key prefix host port destination remove server)</font></strong></p>
+&amp;key prefix host port destination remove server indexes)</font></strong></p>
 
 <p>This creates a mapping from all urls whose name begins with<strong> prefix</strong> to
 files stored in the directory specified by the destination.&nbsp;&nbsp; The <strong>host</strong>,
@@ -363,6 +363,11 @@ the remaining part of the request to the destination string.&nbsp; It then publi
 (using <strong>publish-file</strong> and computing the content-type from the file type).
 &nbsp;&nbsp; Next that <strong>file-entity </strong>is made to handle the request in the
 normal manner.</p>
+
+<p>If a request comes that maps to a directory rather than a file then AllegroServe tries
+to locate an index file for that directory.&nbsp; The <strong>indexes</strong> argument
+specifies a list of index files to search for.&nbsp; By default the list consists of two
+filenames &quot;index.html&quot; and &quot;index.htm&quot;.</p>
 
 <p>We plan to make a number of refinements to <strong>publish-directory</strong> including
 the ability to specify how deep in the directory structure it will look and also
