@@ -62,17 +62,17 @@ tutorial(5): </pre>
 
 <p>Now the web server is up and running.&nbsp;&nbsp; Let's assume that we're running
 AllegroServe on a machine named <strong>test.franz.com</strong>.&nbsp; If you now go to a
-web browser and ask for <a href="http://test.franz.com">http://test.franz.com</a>&nbsp;
+web browser and ask for <font color="#0080FF"><u><strong>http://test.franz.com</strong></u></font>&nbsp;
 you will contact this AllegroServe server and it will respond that whatever you asked for
-wasn't found on the server (since we haven't published any pages).&nbsp; You can also try <a
-href="http://test">http://test</a> and get the same result (although the response message
-will be slightly different).&nbsp; If you are running the web browser on test.franz.com as
-well you can ask for <a href="http://localhost">http://localhost</a> and get a similar
-&quot;not found&quot; response.&nbsp;&nbsp;&nbsp; This demonstrates that web servers are
-known by many names.&nbsp; If you choose to take advantage of that (creating what are
-known as <strong>Virtual Hosts</strong>) then AllegroServe will support you .&nbsp;
-However if you want to create web pages that are served by whatever name can be used to
-reach the server, then AllegroServe will allow you to do that as well.</p>
+wasn't found on the server (since we haven't published any pages).&nbsp; You can also try <font
+color="#0080FF"><u><strong>http://test</strong></u></font> and get the same result
+(although the response message will be slightly different).&nbsp; If you are running the
+web browser on test.franz.com as well you can ask for <font color="#0080FF"><u><strong>http://localhost</strong></u></font>
+and get a similar &quot;not found&quot; response.&nbsp;&nbsp;&nbsp; This demonstrates that
+web servers are known by many names.&nbsp; If you choose to take advantage of that
+(creating what are known as <strong>Virtual Hosts</strong>) then AllegroServe will support
+you .&nbsp; However if you want to create web pages that are served by whatever name can
+be used to reach the server, then AllegroServe will allow you to do that as well.</p>
 
 <p>Type <strong>:proc</strong> to Lisp and look at which Lisp lightweight processes are
 running:</p>
@@ -108,12 +108,11 @@ put some words in it, and then</p>
 #&lt;net.aserve::file-entity @ #x2076e0c2&gt;
 tutorial(31):</pre>
 
-<p>If you are running on Windows then the file will have a name like 
-c:\tmp\sample.txt&nbsp;&nbsp; When this file name is
-written in a Lisp string it would be &quot;c:\\tmp\\sample.txt&quot;
-due to the special nature of the backslash character.</p>
+<p>If you are running on Windows then the file will have a name like
+c:\tmp\sample.txt&nbsp;&nbsp; When this file name is written in a Lisp string it would be
+&quot;c:\\tmp\\sample.txt&quot; due to the special nature of the backslash character.</p>
 
-<p>Now if we ask a web browser for <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>
+<p>Now if we ask a web browser for <font color="#0080FF"><u><strong>http://test.franz.com:8000/foo</strong></u></font>
 we'll see the contents of the file in the web browser.&nbsp; Since we didn't specify a
 content-type in the call to <strong>publish-file</strong> the content-type will be
 determined by the &quot;<strong>txt</strong>&quot; file type, which is associated with the
@@ -121,9 +120,9 @@ determined by the &quot;<strong>txt</strong>&quot; file type, which is associate
 
 <p>Because we didn't specify a <strong>:host</strong> argument to <strong>publish-file </strong>AllegroServe
 will return this page to any browser regardless of the host name used to name the machine.
-&nbsp; So AllegroServe will respond to requests for <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>
-and <a href="http://test/foo">http://test:8000/foo</a> and <a href="http://localhost/foo">http://localhost:8000/foo</a>.
-&nbsp;&nbsp; </p>
+&nbsp; So AllegroServe will respond to requests for <font color="#0080FF"><u><strong>http://test.franz.com:8000/foo</strong></u></font>
+and <font color="#0080FF"><u><strong>http://test:8000/foo</strong></u></font> and <font
+color="#0080FF"><u><strong>http://localhost:8000/foo</strong></u></font>. &nbsp;&nbsp; </p>
 
 <p>If we do </p>
 
@@ -132,7 +131,7 @@ and <a href="http://test/foo">http://test:8000/foo</a> and <a href="http://local
 #&lt;net.aserve::file-entity @ #x2076e0c2&gt;
 tutorial(31):</pre>
 
-<p>Then AllegroServe will only respond to requests for <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>.
+<p>Then AllegroServe will only respond to requests for <font color="#0080FF"><u><strong>http://test.franz.com:8000/foo</strong></u></font>.
 &nbsp; If we do</p>
 
 <pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/sample.txt&quot; 
@@ -140,13 +139,13 @@ tutorial(31):</pre>
 #&lt;net.aserve::file-entity @ #x2076e0c2&gt;
 tutorial(31):</pre>
 
-<p>Then AllegroServe will only respond to <a href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a>
-and <a href="http://test/foo">http://test:8000/foo</a>.&nbsp;&nbsp;&nbsp; This type of
-restriction is useful if you want to create the illusion that a single machine is really a
-set of machines, each with its own set of web pages.&nbsp;&nbsp; Suppose that the machine <strong>test.franz.com</strong>
-also had the name <strong>sales.franz.com</strong>.&nbsp; You could publish two different
-ways to respond to the &quot;<strong>/foo</strong>&quot; url, depending on the host name
-specified in the request</p>
+<p>Then AllegroServe will only respond to <font color="#0080FF"><u><strong>http://test.franz.com:8000/foo
+</strong></u></font>and <font color="#0080FF"><u><strong>http://test:8000/foo</strong></u></font>.&nbsp;&nbsp;&nbsp;
+This type of restriction is useful if you want to create the illusion that a single
+machine is really a set of machines, each with its own set of web pages.&nbsp;&nbsp;
+Suppose that the machine <strong>test.franz.com</strong> also had the name <strong>sales.franz.com</strong>.&nbsp;
+You could publish two different ways to respond to the &quot;<strong>/foo</strong>&quot;
+url, depending on the host name specified in the request</p>
 
 <pre>tutorial(30): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/<strong>test</strong>-sample.txt&quot; 
                             :host &quot;<strong>test</strong>.franz.com&quot;)
@@ -155,9 +154,9 @@ tutorial(31): (publish-file :path &quot;/foo&quot; :file &quot;/tmp/<strong>sale
                             :host &quot;<strong>sales</strong>.franz.com&quot;)
 #&lt;net.aserve::file-entity @ #x2076e324&gt;</pre>
 
-<p>Now you will get different results if you ask for&nbsp; <a
-href="http://test.franz.com/foo">http://test.franz.com:8000/foo</a> and <a
-href="http://sales.franz.com/foo">http://sales.franz.com:8000/foo</a>. </p>
+<p>Now you will get different results if you ask for&nbsp;<font color="#0080FF"><u><strong>
+http://test.franz.com:8000/foo</strong></u></font> and <font color="#0080FF"><u><strong>http://sales.franz.com:8000/foo</strong></u></font>.
+</p>
 
 <h1>Publishing a computed page</h1>
 
@@ -301,7 +300,7 @@ the server are:
 
 <h2>form data in a query string</h2>
 
-<p>In a url like <a href="http://www.machine.com/foo/bar?name=joe&amp;age=34">http://www.machine.com/foo/bar?name=gen&amp;age=28</a>
+<p>In a url like <font color="#0080FF"><u><strong>http://www.machine.com/foo/bar?name=gen&amp;age=28</strong></u></font>
 the characters after the question mark are the <strong>query-string</strong>. &nbsp;&nbsp;
 The query string is <strong>not</strong> used by AllegroServe to determine the entity to
 handle the request.&nbsp; When the entity begins processing the request it can ask for the
@@ -542,9 +541,8 @@ significant byte, and that is what we test for in the following example:</p>
 </pre>
 
 <p>To see how this example works differently depending on whether the access is through
-the loopback network or the regular network, try accessing it via <a
-href="http://localhost:8000/local-secret">http://localhost:8000/local-secret</a> and <a
-href="http://test.franz.com:8000/local-secret">http://test.franz.com:8000/local-secret</a>
+the loopback network or the regular network, try accessing it via <font color="#0080FF"><u><strong>http://localhost:8000/local-secret</strong></u></font>
+and <font color="#0080FF"><u><strong>http://test.franz.com:8000/local-secret</strong></u></font>
 &nbsp; (where we are assuming that you are running on <strong>test-franz.com</strong>). </p>
 
 <h1>Multiple servers</h1>
