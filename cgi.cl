@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: cgi.cl,v 1.5 2001/10/17 22:32:44 jkf Exp $
+;; $Id: cgi.cl,v 1.6 2002/02/13 22:35:44 jkf Exp $
 
 ;; Description:
 ;;   common gateway interface (running external programs)
@@ -44,6 +44,7 @@
 			auth-type
 			(timeout 200)
 			error-output
+			env
 			)
   ;; program is a string naming a external command to run.
   ;; invoke the program after setting all of the environment variables
@@ -155,6 +156,18 @@
 					       (string (car head)))))
 			  (cdr head))
 		    envs)))
+
+    (dolist (header env)
+      (if* (not (and (consp header)
+		     (stringp (car header))
+		     (stringp (cdr header))))
+	 then (error "bad form for environment value: ~s" header))
+      (let ((ent (assoc (car header) envs :test #'equal)))
+	(if* ent
+	   then ; replace value with user specified value
+		(setf (cdr ent) (cdr header))
+	   else ; add new value
+		(push header envs))))
     
     ;; now to invoke the program
     ;; this requires acl6.1 on unix since this is the first version

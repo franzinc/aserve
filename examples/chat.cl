@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.16 2002/01/28 16:11:38 jkf Exp $
+;; $Id: chat.cl,v 1.17 2002/02/13 22:35:44 jkf Exp $
 
 ;; Description:
 ;;   aserve chat program
@@ -697,7 +697,13 @@
     
 	; success, so make it the official one
 	(ignore-errors (delete-file master-file))
-	(rename-file new-master-file master-file)))))
+	
+	#-(version>= 6 2 :pre-beta 11)
+	(rename-file new-master-file master-file)
+	
+	#+(version>= 6 2 :pre-beta 11)
+        (rename-file-raw new-master-file master-file)
+	))))
 
 
     

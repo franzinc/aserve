@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.134 2002/01/15 20:06:46 jkf Exp $
+;; $Id: main.cl,v 1.135 2002/02/13 22:35:44 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -51,6 +51,8 @@
    #:entity-plist
    #:failed-request
    #:form-urlencoded-to-query
+   #:function-authorizer ; class
+   #:function-authorizer-function
    #:get-basic-authorization
    #:get-cookie-values
    #:get-all-multipart-data
@@ -154,7 +156,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 21))
+(defparameter *aserve-version* '(1 2 22))
 
 (eval-when (eval load)
     (require :sock)

@@ -1,3 +1,10 @@
+2002-02-13  John Foderaro  <jkf@tiger.franz.com>
+1.2.22
+	* authorize.cl - add new authorizer: function-authorizer
+
+	* cgi.cl - run-cgi-program takes a :env arguemnt to allow
+	    additional environment variables to be specified.
+
 2002-01-15  John Foderaro  <jkf@tiger.franz.com>
 1.2.21
 	* main.cl - fix bug where the value of 

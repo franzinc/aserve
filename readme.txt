@@ -72,7 +72,7 @@ Notes:
 
     if you're running on a PC (or running as root on Unix) you can allocate 
     port 80, so you don't have to specify a port when running
-    the iserve:start function.
+    the net.aserve:start function.
 
 
 
