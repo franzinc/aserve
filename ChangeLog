@@ -1,3 +1,7 @@
+2004-08-31  Kevin Layer  <layer@gemini>
+
+	* makefile: use := instead of = with $(shell ...)
+
 2004-08-30  Kevin Layer  <layer@gemini>
 
 	* packages.cl: fix #+ before require of :streamc

@@ -1,11 +1,11 @@
-# $Id: makefile,v 1.11 2003/12/13 03:57:46 layer Exp $
+# $Id: makefile,v 1.11.38.1 2004/08/31 17:11:04 layer Exp $
 #
 # On Windows, this makefile requires the use of GNU make from Redhat
 # (http://sources.redhat.com/cygwin/).
 
 SHELL = sh
 
-on_windows = $(shell if test -d "c:/"; then echo yes; else echo no; fi)
+on_windows := $(shell if test -d "c:/"; then echo yes; else echo no; fi)
 
 ifndef mlisp
 ifeq ($(on_windows),yes)
