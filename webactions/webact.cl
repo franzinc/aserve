@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: webact.cl,v 1.8 2004/03/04 21:52:38 jkf Exp $
+;; $Id: webact.cl,v 1.9 2004/03/08 19:15:48 jkf Exp $
 
 
 
@@ -99,7 +99,7 @@
    
    ))
 
-(defparameter *webactions-version* "1.8")
+(defparameter *webactions-version* "1.9")
 	      
 (defvar *name-to-webaction* (make-hash-table :test #'equal))
 
@@ -143,7 +143,7 @@
 			     ))
 	(wa (or (gethash name *name-to-webaction*)
 		(make-instance 'webaction))))
-    
+
     (setf (directory-entity-access-file ent) access-file)
     
     (setf (webaction-name wa) name)
@@ -193,7 +193,8 @@
 		
     
     (setf (gethash name *name-to-webaction*) wa)
-    
+
+    (remove-old-webaction-pages wa server)
 
     ;; if we have an index page for the site, then redirect
     ;; the project-prefix to it
@@ -223,6 +224,17 @@
     
     ent))
 
+
+(defun remove-old-webaction-pages (wa server)
+  ;; unpublish all pages from the previous time this webaction-project
+  ;; was defined
+  
+  (map-entities #'(lambda (ent)
+		    
+		    (if* (eq (getf (entity-plist ent) 'webaction) wa)
+		       then :remove))
+		    
+		(find-locator :exact server)))
 
 (defun redirect-to (req ent dest)
   (with-http-response (req ent
