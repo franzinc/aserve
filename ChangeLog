@@ -1,3 +1,11 @@
+*******************************************************************************
+<version for this commit> (incf *aserve-version* in main.cl each commit)
+
+Fri May 26 22:42:12 PST 2000  Duane Rettig  <duane@beta>
+1.1.19
+	* makefile: set SHELL variable
+	* main.c: incf version
+	
 2000-05-16  John Foderaro  <jkf@tiger.franz.com>
 1.1.18	
 	* ! Non upward-compatiable change ! - the function
