@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.21 2000/10/19 21:37:39 jkf Exp $
+;; $Id: t-aserve.cl,v 1.22 2001/01/02 18:23:46 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -129,7 +129,7 @@
 
 (defun stop-proxy-running ()
   (if* *proxy-wserver*
-     then (shutdown *proxy-wserver*)
+     then (shutdown :server *proxy-wserver*)
 	  (setq *proxy-wserver* nil))
   (setq *x-proxy* nil))
 
@@ -1035,8 +1035,8 @@
       
 
 	  (ignore-errors (delete-file "aservetest.xx"))
-	  (shutdown  proxy-wserver)
-	  (shutdown  *wserver*))))))
+	  (shutdown  :server proxy-wserver)
+	  (shutdown  :server *wserver*))))))
 
     
     

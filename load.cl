@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.44 2000/12/29 15:57:49 jkf Exp $
+;; $Id: load.cl,v 1.45 2001/01/02 18:23:45 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -251,7 +251,7 @@
 	   *aserve-root*
 	   *aserve-root*
 	   *aserve-root*))
-  (run-shell-command "~/bin/sync-a-opensource"))
+  (run-shell-command "rsh cobweb bin/sync-a-opensource"))
 	   
 	    
   

@@ -1,5 +1,5 @@
 2001-01-02  jkf  <jkf@main.verada.com>
-
+1.1.37
 	* main.cl, proxy.cl - add the ability to save and restore
 	 the whole state of the proxy cache. (see docs for start
 	 and shutdown in the manual).
