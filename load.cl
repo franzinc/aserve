@@ -1,6 +1,6 @@
 ;; load in iServe
 ;;
-;; $Id: load.cl,v 1.12.2.2 2000/02/18 18:04:33 jkf Exp $
+;; $Id: load.cl,v 1.12.2.3 2000/02/18 18:13:49 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -28,7 +28,7 @@
       ))
 
 (defparameter *iserve-examples*
-    '("examples"))
+    '("examples/examples"))
 
 
 (with-compilation-unit  nil

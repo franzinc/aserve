@@ -1,4 +1,4 @@
-;; -*- mode: common-lisp; package: neoe -*-
+;; -*- mode: common-lisp; package: net.iserve.examples -*-
 ;;
 ;; examples.cl
 ;;
@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: examples.cl,v 1.1.2.1 2000/02/18 18:04:36 jkf Exp $
+;; $Id: examples.cl,v 1.1.2.2 2000/02/18 18:13:49 jkf Exp $
 
 ;; Description:
 ;;   neo examples
@@ -67,7 +67,7 @@
 			 ((:a :href "/getfile") "Client to server file transfer")
 			 :br
 			 ((:a :href "/missing-link") "Missing Link")
-			 "should get error"
+			 " should get an error when clicked"
 			 )
 		  
 			 )))))
@@ -156,7 +156,7 @@
 		   ; we're just reading it from a file in this example
 		   (let ((stream (request-reply-stream req)))
 		     (with-open-file (p (nth selector
-					     '("prfile9.jpg" "fresh.jpg"))
+					     '("examples/prfile9.jpg" "examples/fresh.jpg"))
 				      :element-type '(unsigned-byte 8))
 
 		       (setq selector (mod (1+ selector) 2))
