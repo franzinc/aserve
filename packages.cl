@@ -1,6 +1,7 @@
-(sys:defpatch "aserve" 1
-  "aserve version 1.2.25, various fixes from 1.2.24 released with 6.2;
-htmlgen fix :comment and :prin1-safe when html-print'ing."
+(sys:defpatch "aserve" 2
+  "v1: aserve version 1.2.25, various fixes from 1.2.24 released with 6.2;
+htmlgen fix :comment and :prin1-safe when html-print'ing;
+v2: aserve version 1.2.27, various fixes from 1.2.25."
   :type :system
   :post-loadable t)
 
@@ -29,7 +30,7 @@ htmlgen fix :comment and :prin1-safe when html-print'ing."
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: packages.cl,v 1.1.4.3 2003/01/30 17:56:05 layer Exp $
+;; $Id: packages.cl,v 1.1.4.4 2003/07/07 22:25:47 layer Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe
