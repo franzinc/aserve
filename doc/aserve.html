@@ -458,8 +458,8 @@ AllegroServe will create the correct kind of response stream.&nbsp;&nbsp; If <st
 was called to create the entity.</p>
 
 <p align="left">The <strong>headers</strong> argument is a list of conses, where the car
-is the header name (a string) and the cdr is the header value.&nbsp; These headers are
-added to the headers sent as part of this response.</p>
+is the header name (a keyword symbol) and the cdr is the header value.&nbsp; These headers
+are added to the headers sent as part of this response.</p>
 
 <p align="left">Within the <strong>body </strong>forms the code calls <strong>(request-reply-stream
 req)</strong> to obtain a stream to which it can write to supply the body of the response.</p>
@@ -480,11 +480,13 @@ of a form with&nbsp; a POST method.</p>
 <p><a name="f-header-slot-value"></a><strong><font face="Courier New">(header-slot-value
 request header-name)</font></strong></p>
 
-<p>Return the value given in the request for the given header-name (a string).
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The header-name string should be all lower case.&nbsp; If
-the header wasn't present in this request then nil will be returned.&nbsp;&nbsp; <strong>header-slot-value</strong>
-is a macro that will expand into a fast accessor if the <strong>header-name</strong> is a
-constant string.</p>
+<p>Return the value given in the request for the given header-name (a keyword symbol).
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If the header wasn't present in this request then nil will
+be returned.&nbsp;&nbsp; <strong>header-slot-value</strong> is a macro that will expand
+into a fast accessor if the <strong>header-name</strong> is a constant naming a known
+header slot</p>
+
+<p>I<em>n older versions of aserve the<strong> header-name</strong> was a string..</em></p>
 
 <p>&nbsp;</p>
 
@@ -607,12 +609,12 @@ request arrived.</p>
 <p><a name="f-request-reply-headers"></a><strong><font face="Courier New">(request-reply-headers
 request)</font></strong> - accessor - an alist of some of the headers to send out with the
 reply (other headers values are stored in specific slots of the request object).&nbsp;
-Each entry in the alist is a cons where the <strong>car</strong> is a string holding the
-header name and the <strong>cdr</strong> is the value (it is printed using the <strong>~a</strong>
-format directive). &nbsp;&nbsp; Typically <strong>request-reply-headers</strong> isn't
-used, instead the headers to be sent are passed as the <strong>:header</strong> argument
-to <strong>with-http-body</strong>, or <strong>(setf reply-header-slot-value)</strong> is
-called.</p>
+Each entry in the alist is a cons where the <strong>car</strong> is a keyword symbol
+holding the header name and the <strong>cdr</strong> is the value (it is printed using the
+<strong>~a</strong> format directive). &nbsp;&nbsp; Typically <strong>request-reply-headers</strong>
+isn't used, instead the headers to be sent are passed as the <strong>:header</strong>
+argument to <strong>with-http-body</strong>, or <strong>(setf reply-header-slot-value)</strong>
+is called.</p>
 
 <p><a name="f-request-reply-content-length"></a><strong><font face="Courier New">(request-reply-content-length
 request) </font></strong>&nbsp;&nbsp;&nbsp; - accessor -&nbsp; the value to send as the
