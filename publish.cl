@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.33.6.7.2.1 2002/06/17 18:29:03 layer Exp $
+;; $Id: publish.cl,v 1.33.6.7.2.2 2003/01/10 16:21:36 layer Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -2198,6 +2198,11 @@
 			(eq :param (caar res)))
 		 then ; the correct format, must decode pieces
 		      (mapcar #'(lambda (ent)
+				  ; sometimes a param isn't name2=val2;
+				  ; but is simply name2;.  pretend it
+				  ; was name2=;
+				  (if* (atom ent)
+				     then (setq ent (cons ent "")))
 				  (cons 
 				   (uridecode-string
 				    (car ent) :external-format external-format)

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.48.2.10.2.1 2002/06/17 18:29:03 layer Exp $
+;; $Id: main.cl,v 1.48.2.10.2.2 2003/01/10 16:21:36 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -33,130 +33,11 @@
 ;;-
 
 
-(defpackage :net.aserve
-  (:use :common-lisp :excl :net.html.generator)
-  (:export
-   #:authorize
-   #:authorizer
-   #:base64-decode
-   #:base64-encode
-   #:compute-strategy
-   #:computed-entity
-   ;; don't export, these should be private
-   ; #:debug-off		
-   ; #:debug-on			
-   #:denied-request
-   #:enable-proxy
-   #:ensure-stream-lock
-   #:entity-plist
-   #:failed-request
-   #:form-urlencoded-to-query
-   #:function-authorizer ; class
-   #:function-authorizer-function
-   #:get-basic-authorization
-   #:get-cookie-values
-   #:get-all-multipart-data
-   #:get-multipart-header
-   #:get-multipart-sequence
-   #:get-request-body
-   #:handle-request
-   #:handle-uri		; add-on component..
-   #:header-slot-value
-   #:http-request  	; class
-   #:locator		; class
-   #:location-authorizer  ; class
-   #:location-authorizer-patterns
-   #:map-entities
-   #:parse-multipart-header
-   #:password-authorizer  ; class
-   #:process-entity
-   #:publish
-   #:publish-file
-   #:publish-directory
-   #:publish-multi
-   #:publish-prefix
-   #:query-to-form-urlencoded
-   #:reply-header-slot-value 
-   #:run-cgi-program
-   #:set-basic-authorization
-   #:standard-locator
-   #:unpublish-locator
-   #:vhost
-   #:vhost-log-stream
-   #:vhost-error-stream
-   #:vhost-names
-   #:vhost-plist
 
-   #:request-method
-   #:request-protocol
-
-   #:request-protocol-string
-   #:request-query
-   #:request-query-value
-   #:request-raw-request
-   #:request-raw-uri
-   #:request-socket
-   #:request-uri
-   #:request-wserver
-   
-   #:request-reply-code
-   #:request-reply-date
-   #:request-reply-content-length
-   #:request-reply-content-type
-   #:request-reply-plist
-   #:request-reply-protocol-string
-   #:request-reply-strategy
-   #:request-reply-stream
-   
-   #:set-cookie-header
-   #:shutdown
-   #:split-into-words
-   #:start
-   #:uridecode-string
-   #:uriencode-string
-   #:unpublish
-   #:url-argument
-   #:url-argument-alist
-   #:with-http-response
-   #:with-http-body
-   
-   #:wserver
-   #:wserver-default-vhost
-   #:wserver-enable-chunking
-   #:wserver-enable-keep-alive
-   #:wserver-external-format
-   #:wserver-filters
-   #:wserver-locators
-   #:wserer-io-timeout
-   #:wserver-log-function
-   #:wserver-log-stream
-   #:wserver-response-timeout
-   #:wserver-socket
-   #:wserver-vhosts
-
-   #:*aserve-version*
-   #:*default-aserve-external-format*
-   #:*http-io-timeout*
-   #:*http-response-timeout*
-   #:*mime-types*
-   #:*response-accepted*
-   #:*response-bad-request*
-   #:*response-continue*
-   #:*response-created*
-   #:*response-found*
-   #:*response-internal-server-error*
-   #:*response-not-found*
-   #:*response-not-modified*
-   #:*response-ok*
-   #:*response-moved-permanently*
-   #:*response-see-other*
-   #:*response-temporary-redirect*
-   #:*response-unauthorized*
-   #:*wserver*))
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 23))
+(defparameter *aserve-version* '(1 2 25))
 
 (eval-when (eval load)
     (require :sock)
@@ -505,10 +386,10 @@
 (defclass vhost ()
   ((log-stream :accessor vhost-log-stream
 	       :initarg :log-stream
-	       :initform (ensure-stream-lock *standard-output*))
+	       :initform (ensure-stream-lock *initial-terminal-io*))
    (error-stream :accessor vhost-error-stream
 		 :initarg :error-stream
-		 :initform (ensure-stream-lock *standard-output*))
+		 :initform (ensure-stream-lock *initial-terminal-io*))
    (names :accessor vhost-names
 	  :initarg :names
 	  :initform nil)
@@ -1011,7 +892,9 @@ by keyword symbols and not by strings"
   ;; return the server object
   #+mswindows
   (declare (ignore setuid setgid))
-  
+  #-(version>= 6 2 beta) 
+  (declare (ignore ssl-password))
+
   (declare (ignore debug))  ; for now
 
   (if* debug-stream 
@@ -1325,6 +1208,7 @@ by keyword symbols and not by strings"
   (if* (typep c 'stream-error)
      then (or (eq (stream-error-identifier c) :connection-reset)
 	      #+unix (eq (stream-error-code c) 32) ; sigpipe
+	      #+aix (eq (stream-error-code c) 73) 
 	      )))
 
 	  
@@ -2059,7 +1943,7 @@ by keyword symbols and not by strings"
 				       (if* (and (eql (aref mpbuffer jj)
 						      #.(char-code #\return))
 						 (eql (aref mpbuffer (1+ jj))
-						      #.(char-code #\newline)))
+						      #.(char-code #\linefeed)))
 					  then (return-from scan-forward
 						 (values i :boundary (+ jj 2)))
 					elseif (and (eq (aref mpbuffer jj)
@@ -2757,7 +2641,7 @@ in get-multipart-sequence"))
 	    digit (- (char-code ch) #.(char-code #\0)))
       
       (case state
-	(:pre (if* (member ch '(#\space #\tab #\newline #\return) :test #'eq)
+	(:pre (if* (member ch '(#\space #\tab #\linefeed #\return) :test #'eq)
 		 then (incf i)
 		 else (setq state :number-first)))
 	(:number-first
@@ -2774,7 +2658,7 @@ in get-multipart-sequence"))
 	    else (setq state :post)))
 	
 	(:post 
-	 (if* (member ch '(#\space #\tab #\newline #\return) :test #'eq)
+	 (if* (member ch '(#\space #\tab #\linefeed #\return) :test #'eq)
 	    then (incf i)
 	    else (return-from string-to-number nil)))))))
 	

@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: macs.cl,v 1.10.8.4.14.1 2002/06/17 18:29:03 layer Exp $
+;; $Id: macs.cl,v 1.10.8.4.14.2 2003/01/10 16:21:36 layer Exp $
 
 ;; Description:
 ;;   useful internal macros
@@ -38,8 +38,6 @@
 
 ;; macros used by iserve
 
-(defpackage :net.aserve
-  (:use :common-lisp :excl :net.html.generator :net.uri))
 
 (in-package :net.aserve)
 

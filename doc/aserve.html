@@ -8,7 +8,7 @@
 <body>
 
 <h1 align="center">AllegroServe - A Web Application Server<br>
-<small><small><small>version <font face="Courier New">1.2.23</font></small></small></small></h1>
+<small><small><small>version <font face="Courier New">1.2.25</font></small></small></small></h1>
 
 <p align="left"><strong><small>copyright(c) 2000-2001. Franz Inc</small></strong></p>
 
@@ -852,7 +852,13 @@ responsibility of the code supplied as the <strong>body </strong>form of the mac
 &nbsp;&nbsp;&nbsp; In cases where there is no body to the response being sent it is still
 necessary to call <strong>with-http-body </strong>so that the other parts of the response
 are sent out, e.g.<font face="Courier New"> </font>at a minimum you should put<font
-face="Courier New"> (with-http-body (req ent)) </font>in the body of a with-http-response</p>
+face="Courier New"> (with-http-body (req ent)) </font>in the body of a with-http-response.</p>
+
+<p align="left"><em>The <strong>body </strong>forms may not be executed! </em> If the
+request is an http <strong>head</strong> request then the browser wants only the headers
+returned.&nbsp;&nbsp; The <strong>with-http-body </strong>macro will not evaulate the <strong>body</strong>
+forms.&nbsp;&nbsp; You must be aware of this and should never put code in the <strong>body
+</strong> form that absolutely must be executed when a request is given.</p>
 
 <p align="left">The <strong>headers</strong> argument is a list of conses, where the car
 is the header name (a keyword symbol) and the cdr is the header value.&nbsp; These headers
@@ -2560,8 +2566,8 @@ read on.</p>
   </tr>
   <tr>
     <td width="26%">vhost-error-stream</td>
-    <td width="57%">Unused by AllegroServe but applications may wish to store here a stream to
-    which to write a log of errors</td>
+    <td width="57%">Stream to which AllegroServe sends informational and error messages that
+    are generated during request processing.</td>
     <td width="17%"><strong>:error-stream</strong></td>
   </tr>
   <tr>

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.21.2.7.2.1 2002/06/17 18:29:03 layer Exp $
+;; $Id: client.cl,v 1.21.2.7.2.2 2003/01/10 16:21:36 layer Exp $
 
 ;; Description:
 ;;   http client code.
@@ -39,39 +39,11 @@
 
 
 
-(defpackage :net.aserve.client 
-  (:use :net.aserve :excl :common-lisp)
-  (:export 
-   #:client-request  ; class
-   #:client-request-close
-   #:client-request-cookies
-   #:client-request-headers
-   #:client-request-protocol
-   #:client-request-read-sequence
-   #:client-request-response-code
-   #:client-request-response-comment
-   #:client-request-socket
-   #:client-request-uri
-   #:client-response-header-value
-   #:cookie-item
-   #:cookie-item-expires
-   #:cookie-item-name
-   #:cookie-item-path
-   #:cookie-item-secure
-   #:cookie-item-value
-   #:cookie-jar     ; class
-   #:do-http-request
-   #:make-http-client-request
-   #:read-client-response-headers
-   ))
+
 
 
 
 (in-package :net.aserve.client)
-
-
-
-
 
 
 
@@ -119,7 +91,7 @@
 
 
 (defvar crlf (make-array 2 :element-type 'character
-			 :initial-contents '(#\return #\newline)))
+			 :initial-contents '(#\return #\linefeed)))
 
 (defmacro with-better-scan-macros (&rest body)
   ;; define the macros for scanning characters in a string
@@ -142,9 +114,9 @@
 		     (let ((thisch (schar ,buffer ,i)))
 		       (if* (eq thisch #\return)
 			  then (let ((ans (buf-substr start ,i ,buffer)))
-				 (incf ,i)  ; skip to newline
+				 (incf ,i)  ; skip to linefeed
 				 (return ans))
-			elseif (eq thisch #\newline)
+			elseif (eq thisch #\linefeed)
 			  then (return (buf-substr start ,i ,buffer))))
 		     (incf ,i)
 		     )))
@@ -465,14 +437,31 @@ or \"foo.com:8000\", not ~s" proxy))
     (if* accept
        then (net.aserve::format-dif :xmit
 				    sock "Accept: ~a~a" accept crlf))
+
+    ; content can be a nil, a single vector or a list of vectors.
+    ; canonicalize..
+    (if* (and content (atom content)) then (setq content (list content)))
     
     (if* content
-       then (typecase content
-	      ((array character (*)) nil)
-	      ((array (unsigned-byte 8) (*)) nil)
-	      (t (error "Illegal content array: ~s" content)))
+       then (let ((computed-length 0))
+	      (dolist (content-piece content)
+		(typecase content-piece
+		  ((array character (*))
+		   (if* (null content-length)
+		      then (incf computed-length 
+				 (native-string-sizeof 
+				  content-piece
+				  :external-format external-format))))
+		 
+		  ((array (unsigned-byte 8) (*)) 
+		   (if* (null content-length)
+		      then (incf computed-length (length content-piece))))
+		  (t (error "Illegal content array: ~s" content-piece))))
+	      
+	      (if* (null content-length)
+		 then (setq content-length computed-length))))
+    
 	    
-	    (setq content-length (length content)))
     
     (if* content-length
        then (net.aserve::format-dif :xmit
@@ -525,12 +514,11 @@ or \"foo.com:8000\", not ~s" proxy))
     ; the write.  
     (if* content
        then ; content can be a vector a list of vectors
-	    (if* (atom content) then (setq content (list content)))
 	    (dolist (cont content)
 	      (net.aserve::if-debug-action 
 	       :xmit
 	       (format net.aserve::*debug-stream*
-		       "client sending content of ~d bytes"
+		       "client sending content of ~d characters/bytes"
 		       (length cont)))
 	      (write-sequence cont sock)))
     
@@ -769,7 +757,7 @@ or \"foo.com:8000\", not ~s" proxy))
 
 (defun read-socket-line (socket buffer max)
   ;; read the next line from the socket.
-  ;; the line may end with a newline or a return, newline, or eof
+  ;; the line may end with a linefeed or a return, linefeed, or eof
   ;; in any case don't put that the end of line characters in the buffer
   ;; return the number of characters in the buffer which will be zero
   ;; for an empty line.
@@ -787,7 +775,7 @@ or \"foo.com:8000\", not ~s" proxy))
 			)
 	 elseif (eq ch #\return)
 	   thenret ; ignore
-	 elseif (eq ch #\newline)
+	 elseif (eq ch #\linefeed)
 	   then ; end of the line,
 		(return i)
 	 elseif (< i max)

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.8.4.8.2.1 2002/06/17 18:29:03 layer Exp $
+;; $Id: proxy.cl,v 1.8.4.8.2.2 2003/01/10 16:21:36 layer Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -592,7 +592,7 @@ cached connection = ~s~%" cond cached-connection))
 		    
 		(setf (ausb8 firstbuf ind) #.(char-int #\return))
 		(incf ind)
-		(setf (ausb8 firstbuf ind) #.(char-int #\newline))
+		(setf (ausb8 firstbuf ind) #.(char-int #\linefeed))
 		(incf ind)
 		    
 		    

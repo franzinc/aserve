@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.1.2.8.2.1 2002/06/17 18:29:03 layer Exp $
+;; $Id: chat.cl,v 1.1.2.8.2.2 2003/01/10 16:21:36 layer Exp $
 
 ;; Description:
 ;;   aserve chat program
@@ -613,8 +613,8 @@
 				then (if* (and (consp message)
 					       (eq :delete (car message)))
 					then (mapcar #'(lambda (num)
-							 (delete-chat-message chat
-									      num))
+							 (delete-chat-message
+							  chat num t nil))
 						     (cdr message))
 					     (setq did-delete t)
 					else (add-chat-message chat message)))))
@@ -1148,7 +1148,8 @@
 		(html 
 		 (:html
 		  (:head (:title "chat - "
-				 (:princ-safe (chat-name chat))))
+				 (:princ-safe (chat-name chat)))
+			 )
 		  
 		  ((:frameset :rows "*,160")
 		   ((:frame :src 
@@ -1243,7 +1244,12 @@
 
     (let ((delete (request-query-value "y" req)))
       (if* delete
-	 then (delete-chat-message chat (compute-integer-value delete))))
+	 then (delete-chat-message chat 
+				   (compute-integer-value delete)
+				   is-owner
+				   (and user
+					(user-handle user))
+				   )))
     
     (let ((upgrade (request-query-value "b" req)))
       (if* upgrade
@@ -1333,7 +1339,17 @@
 					       "rv"
 					       req)))
 			      (if* user then (user-handle user))
-			      (if* is-owner then qstring)))))))))))
+			      (if* is-owner then qstring)
+			      (format nil "~a&count=~d&secs=~d"
+				      (add-lurk
+				       req
+				       (add-reverse 
+					req
+					(add-user 
+					 req 
+					 (chat-query-string chat))))
+				      count 
+				      secs)))))))))))
 
 		     
 (defun chatenter (req ent)
@@ -1396,14 +1412,27 @@
 	(with-http-body (req ent)
 	  (html
 	   (:html
-	    ((:body :bgcolor 
+	    (:head
+	     :newline
+	     "<script>
+<!--
+function sf(){document.f.body.focus();}
+// -->
+</script>
+"
+	     :newline
+	     )
+	    ((:body :onload "sf()"
+		    :bgcolor 
 		    (if* to-users 
 		       then *bottom-frames-private*
 		       else *bottom-frames-bgcolor*))
 	     ((:form :action (concatenate 'string
 			       "chatenter?"
 			       qstring)
-		     :method "POST")
+		     :method "POST"
+		     :name "f"
+		     )
 	      (:center
 	       (if* (eq kind :multiline)
 		  then (html
@@ -1950,11 +1979,14 @@
   
 
 
-(defun delete-chat-message (chat messagenum)
+(defun delete-chat-message (chat messagenum is-owner handle)
   ;; remove the  message numbered messagenumy setting the to field to nil
   (mp:with-process-lock ((chat-message-lock chat))
     (let ((message (find-chat-message chat messagenum)))
-      (if* message
+      (if* (and message
+		(or is-owner ; owner can remove all
+		    (and handle
+			 (equal handle (message-handle message)))))
 	 then (setf (message-to message) nil)
 	      (push messagenum (chat-messages-deleted chat))))))
 
@@ -2084,7 +2116,7 @@
   
   
   
-(defun show-chat-info (chat count recent-first handle ownerp)
+(defun show-chat-info (chat count recent-first handle ownerp qstring)
   ;; show the messages for all and those private ones for handle
   ;; handle is only non-nil if this is a legit logged in handle
   (let ((message-next (chat-message-next chat))
@@ -2167,14 +2199,19 @@
 			       " "
 			       (:princ (message-dns message))
 			       " --> "
-			       (if* ownerp
+			       (if* (or ownerp
+					(and (message-real message)
+					     (equal (message-handle message)
+						    handle)))
 				  then (html
 					((:a :href 
 					     (format nil "chattop?y=~a&~a"
 						     (message-number message)
-						     ownerp))
-					 "Delete"))
-				       
+						     (or ownerp qstring)))
+					 "Delete")))
+			       
+			       (if* ownerp
+				  then
 				       (let ((user (and (message-real message)
 							(user-from-handle
 							 (message-handle message)))))
@@ -2956,7 +2993,7 @@
 	 (:body
 	  (:h1 "Transcript of "
 	       (:princ-safe (chat-name chat)))
-	  (show-chat-info chat (chat-message-next chat) nil nil nil)))))))
+	  (show-chat-info chat (chat-message-next chat) nil nil nil nil)))))))
 		     
 		     
 			 
@@ -3170,7 +3207,7 @@
 		 (*public-font-color* "#x000000") ; black
 		 )
 	     (show-chat-info chat (chat-message-next chat) nil 
-			     "bogushandle" nil))
+			     "bogushandle" nil nil))
 	   )))))))
 
 (defun redir-check (req ent chat before)

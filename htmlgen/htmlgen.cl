@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.8.6.5.2.1 2002/06/17 18:29:03 layer Exp $
+;; $Id: htmlgen.cl,v 1.8.6.5.2.2 2003/01/10 16:21:37 layer Exp $
 
 ;; Description:
 ;;   html generator
@@ -61,12 +61,13 @@
 							      print
 							      name-attr
 							      )))
-  key	; keyword naming this
+  key		; keyword naming this tag
   has-inverse	; t if the / form is used
-  macro  ; the macro to define this
-  special  ; if true then call this to process the keyword
-  print    ; function used to handle this in html-print
-  name-attr ; attribute symbols which can name this object for subst purposes
+  macro  	; the macro to define this
+  special       ; if true then call this to process the keyword and return
+                ; the macroexpansion
+  print         ; function used to handle this in html-print
+  name-attr     ; attribute symbols which can name this object for subst purposes
   )
 
 
@@ -319,22 +320,23 @@
 	
 		
 
-(defun html-print-list (list-of-forms stream)
+(defun html-print-list (list-of-forms stream &key unknown)
   ;; html print a list of forms
   (dolist (x list-of-forms)
-    (html-print-subst x nil stream)))
+    (html-print-subst x nil stream unknown)))
 
-(defun html-print-list-subst (list-of-forms subst stream)
+
+(defun html-print-list-subst (list-of-forms subst stream &key unknown)
   ;; html print a list of forms
   (dolist (x list-of-forms)
-    (html-print-subst x subst stream)))
+    (html-print-subst x subst stream unknown)))
 
 
-(defun html-print (form stream)
-  (html-print-subst form nil stream))
+(defun html-print (form stream &key unknown)
+  (html-print-subst form nil stream unknown))
 
 
-(defun html-print-subst (form subst stream)
+(defun html-print-subst (form subst stream unknown)
   ;; Print the given lhtml form to the given stream
   (assert (streamp stream))
     
@@ -352,7 +354,10 @@
 	 ent)
     (if* (keywordp possible-kwd)
        then (if* (null (setq ent (gethash possible-kwd *html-process-table*)))
-	       then (error "unknown html tag: ~s" possible-kwd)
+	       then (if* unknown
+		       then (return-from html-print-subst
+			      (funcall unknown form stream))
+		       else (error "unknown html tag: ~s" possible-kwd))
 	       else ; see if we should subst
 		    (if* (and subst 
 			      attrs 
@@ -367,13 +372,14 @@
 				 else (html-print-subst
 				       (cdr attrs)
 				       subst
-				       stream)))))
+				       stream
+				       unknown)))))
 				     
 	    (setq print-handler
 	      (html-process-print ent)))
     (if* (atom form)
        then (if* (keywordp form)
-	       then (funcall print-handler ent :set nil nil nil stream)
+	       then (funcall print-handler ent :set nil nil nil nil stream)
 	     elseif (stringp form)
 	       then (write-string form stream)
 	       else (princ form stream))
@@ -384,6 +390,7 @@
 		     (if* (consp (car form)) then (cdr (car form)))
 		     form 
 		     subst
+		     unknown
 		     stream)
        else (error "Illegal form: ~s" form))))
 
@@ -415,7 +422,7 @@
 		 then (setq alist (pop to-process))
 		 else (return))))))
 
-(defun html-standard-print (ent cmd args form subst stream)
+(defun html-standard-print (ent cmd args form subst unknown stream)
   ;; the print handler for the normal html operators
   (ecase cmd
     (:set ; just turn it on
@@ -446,7 +453,7 @@
 		       (format stream ">"))
 	  else (format stream "<~a>" (html-process-key ent)))
        (dolist (ff (cdr form))
-	 (html-print-subst ff subst stream)))
+	 (html-print-subst ff subst stream unknown)))
      (if* (html-process-has-inverse ent)
 	then ; end the form
 	     (format stream "</~a>" (html-process-key ent))))))
@@ -458,104 +465,136 @@
   
 					 
 		      
-      
+;; --  defining how html tags are handled. --
+;;
+;; most tags are handled in a standard way and the def-std-html
+;; macro is used to define such tags
+;;
+;; Some tags need special treatment and def-special-html defines
+;; how these are handled.  The tags requiring special treatment
+;; are the pseudo tags we added to control operations
+;; in the html generator.
+;; 
+;;
+;; tags can be found in three ways:
+;;  :br	    		- singleton, no attributes, no body
+;;  (:b "foo")          - no attributes but with a body
+;;  ((:a href="foo") "balh")  - attributes and body
+;;
   
   
 
 (defmacro def-special-html (kwd fcn print-fcn)
+  ;; kwd - the tag we're defining behavior for.
+  ;; fcn - function to compute the macroexpansion of a use of this
+  ;;       tag. args to fcn are: 
+  ;;		ent - html-process object holding info on this tag
+  ;;		args - list of attribute-values following tag
+  ;;		argsp - true if there is a body in this use of the tag
+  ;;		body - list of body forms.
+  ;; print-fcn - function to print an lhtml form with this tag 
+  ;;	    args to fcn are:
+  ;;		ent - html-process object holding info on this tag
+  ;;		cmd - one of :set, :unset, :full
+  ;;		args - list of attribute-value pairs
+  ;;		subst - subsitution list
+  ;;		unknown - function to call for unknown tags
+  ;;		stream - stream to write to
+  ;;		
   `(setf (gethash ,kwd *html-process-table*) 
      (make-html-process ,kwd nil nil ,fcn ,print-fcn nil)))
 
 
 (def-special-html :newline 
-    #'(lambda (ent args argsp body)
+    (excl:named-function html-newline-function
+      (lambda (ent args argsp body)
 	(declare (ignore ent args argsp))
 	(if* body
 	   then (error "can't have a body with :newline -- body is ~s" body))
 			       
-	`(terpri *html-stream*))
+	`(terpri *html-stream*)))
   
-  #'(lambda (ent cmd args form subst stream)
-      (declare (ignore args ent subst))
+  (excl:named-function html-newline-print-function
+    (lambda (ent cmd args form subst unknown stream)
+      (declare (ignore args ent unknown subst))
       (if* (eq cmd :set)
 	 then (terpri stream)
-	 else (error ":newline in an illegal place: ~s" form)))
-  )
-			       
+	 else (error ":newline in an illegal place: ~s" form)))))
 
-(def-special-html :princ 
-    #'(lambda (ent args argsp body)
+(def-special-html :princ
+    (excl:named-function html-princ-function
+      (lambda (ent args argsp body)
 	(declare (ignore ent args argsp))
 	`(progn ,@(mapcar #'(lambda (bod)
 			      `(princ-http ,bod))
-			  body)))
+			  body))))
   
-  #'(lambda (ent cmd args form subst stream)
-      (declare (ignore args ent subst))
+  (excl:named-function html-princ-print-function
+    (lambda (ent cmd args form subst unknown stream)
+      (declare (ignore args ent unknown subst))
       (assert (eql 2 (length form)))
       (if* (eq cmd :full)
 	 then (format stream "~a" (cadr form))
-	 else (error ":princ must be given an argument")))
-  )
+	 else (error ":princ must be given an argument")))))
 
 (def-special-html :princ-safe 
-    #'(lambda (ent args argsp body)
+    (excl:named-function html-princ-safe-function
+      (lambda (ent args argsp body)
 	(declare (ignore ent args argsp))
 	`(progn ,@(mapcar #'(lambda (bod)
 			      `(princ-safe-http ,bod))
-			  body)))
-  #'(lambda (ent cmd args form subst stream)
-      (declare (ignore args ent subst))
+			  body))))
+  (excl:named-function html-princ-safe-print-function
+    (lambda (ent cmd args form subst unknown stream)
+      (declare (ignore args ent unknown subst))
       (assert (eql 2 (length form)))
       (if* (eq cmd :full)
 	 then (emit-safe stream (format nil "~a" (cadr form)))
-	 else (error ":princ-safe must be given an argument"))))
+	 else (error ":princ-safe must be given an argument")))))
 
-(def-special-html :prin1 
-    #'(lambda (ent args argsp body)
+(def-special-html :prin1
+    (excl:named-function html-prin1-function
+      (lambda (ent args argsp body)
 	(declare (ignore ent args argsp))
 	`(progn ,@(mapcar #'(lambda (bod)
 			      `(prin1-http ,bod))
-			  body)))
-  #'(lambda (ent cmd args form subst stream)
-      (declare (ignore ent args subst))
+			  body))))
+  (excl:named-function html-prin1-print-function
+    (lambda (ent cmd args form subst unknown stream)
+      (declare (ignore ent args unknown subst))
       (assert (eql 2 (length form)))
       (if* (eq cmd :full)
 	 then (format stream "~s" (cadr form))
-	 else (error ":prin1 must be given an argument")))
-  
-  )
+	 else (error ":prin1 must be given an argument")))))
 
-
-(def-special-html :prin1-safe 
-    #'(lambda (ent args argsp body)
+(def-special-html :prin1-safe
+    (excl:named-function html-prin1-safe-function
+      (lambda (ent args argsp body)
 	(declare (ignore ent args argsp))
 	`(progn ,@(mapcar #'(lambda (bod)
 			      `(prin1-safe-http ,bod))
-			  body)))
-  #'(lambda (ent cmd args form stream)
-      (declare (ignore args ent))
+			  body))))
+  (excl:named-function html-prin1-safe-print-function
+    (lambda (ent cmd args form subst unknown stream)
+      (declare (ignore args ent subst unknown))
       (assert (eql 2 (length form)))
       (if* (eq cmd :full)
 	 then (emit-safe stream (format nil "~s" (cadr form)))
-	 else (error ":prin1-safe must be given an argument"))
-      )
-  )
-
+	 else (error ":prin1-safe must be given an argument")))))
 
 (def-special-html :comment
-  #'(lambda (ent args argsp body)
-      ;; must use <!--   --> syntax
-      (declare (ignore ent args argsp))
-      `(progn (write-string "<!--" *html-stream*)
-	      ,@body
-	      (write-string "-->" *html-stream*)))
-  
-  #'(lambda (ent cmd args form stream)
-      (declare (ignore ent cmd args))
-      (format stream "<!--~a-->" (cadr form))))
+    (excl:named-function html-comment-function
+      (lambda (ent args argsp body)
+	;; must use <!--   --> syntax
+	(declare (ignore ent args argsp))
+	`(progn (write-string "<!--" *html-stream*)
+		(html ,@body)
+		(write-string "-->" *html-stream*))))
+  (excl:named-function html-comment-print-function
+    (lambda (ent cmd args form subst unknown stream)
+      (declare (ignore ent cmd args subst unknown))
+      (format stream "<!--~a-->" (cadr form)))))
 
-      
 
 
 (defmacro def-std-html (kwd has-inverse name-attrs)
@@ -654,7 +693,7 @@
 (def-std-html :noframes t nil)
 (def-std-html :noscript t nil)
 
-(def-std-html :object  	nil nil)
+(def-std-html :object  	t nil)
 (def-std-html :ol  	t nil)
 (def-std-html :optgroup t nil)
 (def-std-html :option  	t nil)

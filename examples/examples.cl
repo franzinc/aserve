@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.10.6.8.2.1 2002/06/17 18:29:03 layer Exp $
+;; $Id: examples.cl,v 1.10.6.8.2.2 2003/01/10 16:21:37 layer Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -351,7 +351,6 @@
  :content-type "text/html"
  :function
  #'(lambda (req ent)
-     
      (let ((lookup (assoc "symbol" (request-query req) :test #'equal)))
        (with-http-response (req ent)
 	 (with-http-body (req ent)

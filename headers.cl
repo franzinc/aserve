@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.5.4.6.14.1 2002/06/17 18:29:03 layer Exp $
+;; $Id: headers.cl,v 1.5.4.6.14.2 2003/01/10 16:21:36 layer Exp $
 
 ;; Description:
 ;;   header parsing
@@ -440,7 +440,7 @@
 			       (return)
 			  else (incf i)))))
 	
-	    (1 ; skip to eol ( a newline in this case)
+	    (1 ; skip to eol ( a linefeed in this case)
 	     (if* (>= i end) then (return))
 	     (loop
 	       (setq ch (aref buff i))
@@ -457,7 +457,7 @@
 	     (if* (null beginhv) then (setq beginhv i))
 	     (loop
 	       (setq ch (aref buff i))
-	       (if* (eq ch #.(char-int #\newline))
+	       (if* (eq ch #.(char-int #\linefeed))
 		  then (incf i)
 		       (return))
 	       (incf i)
