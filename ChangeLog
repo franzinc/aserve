@@ -1,3 +1,15 @@
+2001-10-18  John Foderaro  <jkf@tiger.franz.com>
+
+	* The initial log stream (which is used then to initialize vhost
+	  log streams) is now *initial-terminal-io* and not
+	  *standard-output*.
+	* random messages (written by logmess) are now sent to the
+	  vhost-error-stream of the default-vhost of the server.
+	  This allows one to separate these random messages from the
+	  the request logs
+	 * logs of proxy activity is now sent to the vhost-error-stream
+	   of the default-vhost of the server.  we may rethink this later.
+
 2001-10-17  John Foderaro  <jkf@tiger.franz.com>
 
 	* cgi.cl: redo cgi so that it doesn't buffer data... also  

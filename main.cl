@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.116 2001/10/16 16:58:20 jkf Exp $
+;; $Id: main.cl,v 1.117 2001/10/18 21:27:52 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -379,7 +379,7 @@
     ;; place for log-function to store stream to log to if
     ;; it makes sense to do so.  
     :initarg :log-stream
-    :initform  t 	; initially to *standard-output*
+    :initform *initial-terminal-io*
     :accessor wserver-log-stream)
 
    (accept-hook

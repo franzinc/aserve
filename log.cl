@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: log.cl,v 1.20 2001/10/10 16:32:57 jkf Exp $
+;; $Id: log.cl,v 1.21 2001/10/18 21:27:52 jkf Exp $
 
 ;; Description:
 ;;   iserve's logging
@@ -45,7 +45,10 @@
 		       cmonth cday (mod cyear 100)
 		       chour cmin csec
 		       message)))
-      (write-sequence str (or *aserve-debug-stream* *initial-terminal-io*)))))
+      (write-sequence str 
+		      (vhost-error-stream
+		       (wserver-default-vhost
+			 *wserver*))))))
 
 (defmethod brief-logmess (message)
   ;; omit process name and month, day, year
@@ -55,7 +58,9 @@
 		       "~2,'0d:~2,'0d:~2,'0d - ~a~%"
 		       chour cmin csec
 		       message)))
-      (write-sequence str (or *aserve-debug-stream* *initial-terminal-io*)))))
+      (write-sequence str (vhost-error-stream
+			   (wserver-default-vhost
+			    *wserver*))))))
 
 
 
@@ -109,7 +114,9 @@
 	      then uri 
 	      else (net.uri:render-uri uri nil))
 	   extra))
-  (force-output (or *aserve-debug-stream* *initial-terminal-io*)))
+  (force-output (vhost-error-stream
+		 (wserver-default-vhost
+		  *wserver*))))
 
     
   
