@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.10 2000/03/27 20:47:48 jkf Exp $
+;; $Id: client.cl,v 1.11 2000/04/09 04:09:43 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -185,6 +185,7 @@
 			basic-authorization  ; (name . password)
 			keep-alive   ; if true, set con to keep alive
 			headers	    ; extra header lines, alist
+			user-agent
 			      )
   
   ;; send an http request and return the result as three values:
@@ -199,6 +200,7 @@
 	       :basic-authorization basic-authorization
 	       :keep-alive keep-alive
 	       :headers headers
+	       :user-agent user-agent
 	       )))
 
     (unwind-protect
@@ -294,6 +296,7 @@
 				     content-length 
 				     content
 				     headers
+				     user-agent
 				     )
   
    
@@ -320,24 +323,26 @@
 					 (or (net.uri:uri-port uri) 80))
 			  :format :bivalent))
     
-    (format sock "~a ~a ~a~a"
+    (net.iserve::format-dif :xmit sock "~a ~a ~a~a"
 	    (string-upcase (string method))
-	    (or (net.uri:uri-path uri) "/")
+	    (uri-path-etc uri)
 	    (string-upcase (string protocol))
 	    crlf)
 
     ; always send a Host header, required for http/1.1 and a good idea
     ; for http/1.0
     (if* (not (eql 80 port))
-       then (format sock "Host: ~a:~a~a" host port crlf)
-       else (format sock "Host: ~a~a" host crlf))
+       then (net.iserve::format-dif :xmit sock "Host: ~a:~a~a" host port crlf)
+       else (net.iserve::format-dif :xmit  sock "Host: ~a~a" host crlf))
     
     ; now the headers
     (if* keep-alive
-       then (format sock "Connection: Keep-Alive~a" crlf))
+       then (net.iserve::format-dif :xmit
+				    sock "Connection: Keep-Alive~a" crlf))
 
     (if* accept
-       then (format sock "Accept: ~a~a" accept crlf))
+       then (net.iserve::format-dif :xmit
+				    sock "Accept: ~a~a" accept crlf))
     
     (if* content
        then (typecase content
@@ -348,26 +353,42 @@
 	    (setq content-length (length content)))
     
     (if* content-length
-       then (format sock "Content-Length: ~s~a" content-length crlf))
+       then (net.iserve::format-dif :xmit
+				    sock "Content-Length: ~s~a" content-length crlf))
     
 	    
     (if* cookies 
        then (let ((str (compute-cookie-string uri
 					      cookies)))
 	      (if* str
-		 then (format sock "Cookie: ~a~a" str crlf))))
+		 then (net.iserve::format-dif :xmit
+					      sock "Cookie: ~a~a" str crlf))))
 
     (if* basic-authorization
-       then (format sock "Authorization: Basic ~a~a"
+       then (net.iserve::format-dif :xmit sock "Authorization: Basic ~a~a"
 		    (base64-encode
 		     (format nil "~a:~a" 
 			     (car basic-authorization)
 			     (cdr basic-authorization)))
 		    crlf))
     
+    (if* user-agent
+       then (if* (stringp user-agent)
+	       thenret
+	     elseif (eq :iserve user-agent)
+	       then (setq user-agent net.iserve::*iserve-version-string*)
+	     elseif (eq :netscape user-agent)
+	       then (setq user-agent "Mozilla/4.7 [en] (WinNT; U)")
+	     elseif (eq :ie user-agent)
+	       then (setq user-agent "Mozilla/4.0 (compatible; MSIE 5.01; Windows NT 5.0)")
+	       else (error "Illegal user-agent value: ~s" user-agent))
+	    (net.iserve::format-dif :xmit
+				    sock "User-Agent: ~a~a" user-agent crlf))
+    
     (if* headers
        then (dolist (header headers)
-	      (format sock "~a: ~a~a" (car header) (cdr header) crlf)))
+	      (net.iserve::format-dif :xmit sock "~a: ~a~a" 
+				      (car header) (cdr header) crlf)))
     
 
     (write-string crlf sock)  ; final crlf
@@ -390,6 +411,17 @@
       )))
 
 
+(defun uri-path-etc (uri)
+  ;; return the string form of the uri path, query and fragment
+  (let ((nuri (net.uri:copy-uri uri)))
+    (setf (net.uri:uri-scheme nuri) nil)
+    (setf (net.uri:uri-host nuri) nil)
+    (setf (net.uri:uri-port nuri) nil)
+    (if* (null (net.uri:uri-path nuri))
+       then (setf (net.uri:uri-path nuri) "/"))
+    
+    (net.uri:render-uri nuri nil)))
+    
     
 (defmethod read-client-response-headers ((creq client-request))
   ;; read the response and the headers

@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.27 2000/03/22 22:32:16 jkf Exp $
+;; $Id: publish.cl,v 1.28 2000/04/09 04:09:43 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -954,7 +954,7 @@
 		     (setq postfix (subseq (uri-path (request-uri req))
 					   (length (prefix ent))))))
 	 (newname))
-    (debug-format 10 "directory request for ~s~%" realname)
+    (debug-format :info "directory request for ~s~%" realname)
     
     ; we can't allow the brower to specify a url with 
     ; any ..'s in it as that would allow the browser to 
@@ -1035,7 +1035,7 @@
 		      (<= (last-modified ent) if-modified-since))
 	       then ; send back a message that it is already
 		    ; up to date
-		    (debug-format 10 "entity is up to date~%")
+		    (debug-format :info "entity is up to date~%")
 		    (setf (request-reply-code req) *response-not-modified*)
 		    (with-http-body (req ent)
 		      ;; force out the header
@@ -1053,7 +1053,7 @@
 	(keep-alive-possible
 	 (and (wserver-enable-keep-alive *wserver*)
 		      (>= (wserver-free-workers *wserver*) 2)
-		      (equalp "keep-alive" 
+		      (header-value-member "keep-alive" 
 			      (header-slot-value req "connection" )))))
     (if* (eq (request-method req) :head)
        then ; head commands are particularly easy to reply to
@@ -1096,7 +1096,7 @@
     
     ;;  save it
 
-    (debug-format 10 "strategy is ~s~%" strategy)
+    (debug-format :info "strategy is ~s~%" strategy)
     (setf (request-reply-strategy req) strategy)
     
     ))
@@ -1118,7 +1118,7 @@
 			      else '(:use-socket-stream)))
        else (setq strategy (call-next-method)))
     
-    (debug-format 10 "file strategy is ~s~%" strategy)
+    (debug-format :info "file strategy is ~s~%" strategy)
     (setf (request-reply-strategy req) strategy)))
 
 	    
@@ -1160,11 +1160,11 @@
       
       
       (if* send-headers
-	 then (dformat sock "~a ~d  ~a~a"
-		       (request-protocol-string req)
-		       (response-number code)
-		       (response-desc   code)
-		       *crlf*))
+	 then (format-dif :xmit sock "~a ~d  ~a~a"
+			  (request-reply-protocol-string req)
+			  (response-number code)
+			  (response-desc   code)
+			  *crlf*))
       
       (if* (and post-headers
 		(eq time :post)
@@ -1177,57 +1177,60 @@
       (if* (and send-headers
 		(not (eq (request-protocol req) :http/0.9)))
 	 then ; can put out headers
-	      (dformat sock "Date: ~a~a" 
-		       (universal-time-to-date (request-reply-date req))
-		       *crlf*)
+	      (format-dif :xmit sock "Date: ~a~a" 
+			  (universal-time-to-date (request-reply-date req))
+			  *crlf*)
 
 	      (if* (member :keep-alive strategy :test #'eq)
-		 then (dformat sock "Connection: Keep-Alive~aKeep-Alive: timeout=~d~a"
-			       *crlf*
-			       *read-request-timeout*
-			       *crlf*)
-		 else (dformat sock "Connection: Close~a" *crlf*))
+		 then (format-dif :xmit
+				  sock "Connection: Keep-Alive~aKeep-Alive: timeout=~d~a"
+				  *crlf*
+				  *read-request-timeout*
+				  *crlf*)
+		 else (format-dif :xmit sock "Connection: Close~a" *crlf*))
       
-	      (dformat sock "Server: Allegro-iServe/~a~a" 
-		       *iserve-version-string*
-		       *crlf*)
+	      (format-dif :xmit sock "Server: Allegro-iServe/~a~a" 
+			  *iserve-version-string*
+			  *crlf*)
       
 	      (if* (request-reply-content-type req)
-		 then (dformat sock "Content-Type: ~a~a" 
-			       (request-reply-content-type req)
-			       *crlf*))
+		 then (format-dif :xmit
+				  sock "Content-Type: ~a~a" 
+				  (request-reply-content-type req)
+				  *crlf*))
 
 	      (if* chunked-p
-		 then (dformat sock "Transfer-Encoding: Chunked~a"
-			       *crlf*))
+		 then (format-dif :xmit
+				  sock "Transfer-Encoding: Chunked~a"
+				  *crlf*))
 	      
 	      (if* (and (not chunked-p)
 			(request-reply-content-length req))
-		 then (dformat sock "Content-Length: ~d~a"
-			       (request-reply-content-length req)      
-			       *crlf*)
-		      (debug-format 10 
-				       "~d ~s - ~d bytes~%" 
-				       (response-number code)
-				       (response-desc   code)
-				       (request-reply-content-length req))
+		 then (format-dif :xmit sock "Content-Length: ~d~a"
+				  (request-reply-content-length req)      
+				  *crlf*)
+		      (debug-format :info
+				    "~d ~s - ~d bytes~%" 
+				    (response-number code)
+				    (response-desc   code)
+				    (request-reply-content-length req))
 	       elseif chunked-p
-		 then (debug-format 10 "~d ~s - chunked~%" 
-				       (response-number code)
-				       (response-desc   code)
-				       )
-		 else (debug-format 10 
-				       "~d ~s - unknown length~%" 
-				       (response-number code)
-				       (response-desc   code)
-				       ))
+		 then (debug-format :info "~d ~s - chunked~%" 
+				    (response-number code)
+				    (response-desc   code)
+				    )
+		 else (debug-format :info
+				    "~d ~s - unknown length~%" 
+				    (response-number code)
+				    (response-desc   code)
+				    ))
 	      
 	      (dolist (head (request-reply-headers req))
-		(dformat sock "~a: ~a~a"
-			 (car head)
-			 (cdr head)
-			 *crlf*))
-	      (dformat sock "~a" *crlf*))
+		(format-dif :xmit sock "~a: ~a~a"
+			    (car head)
+			    (cdr head)
+			    *crlf*))
+	      (format-dif :xmit sock "~a" *crlf*))
       
       (if* (and send-headers chunked-p (eq time :pre))
 	 then (force-output sock)

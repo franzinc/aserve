@@ -1,3 +1,13 @@
+2000-04-08    <jkf@DEEDEE>
+1.1.11
+	* make the debugging output feature based rather than
+	  numeric. see  net.iserve:debug-on
+	* properly do client queries
+	* use setfable reply-header-slot-value to read and set 
+	  headers for the reply that will be sent
+	* always send back HTTP/1.1 as our protocol
+
+	
 2000-03-27  John Foderaro  <jkf@tiger.franz.com>
 1.1.10
 	* add headers argument to do-http-request and make-http-client-request

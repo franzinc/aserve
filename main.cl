@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.30 2000/03/27 22:47:22 jkf Exp $
+;; $Id: main.cl,v 1.31 2000/04/09 04:09:43 jkf Exp $
 
 ;; Description:
 ;;   iserve's main loop
@@ -41,6 +41,8 @@
    #:base64-encode
    #:compute-strategy
    #:computed-entity
+   #:debug-off			;; to be documented
+   #:debug-on			;; to be documented
    #:decode-form-urlencoded
    #:denied-request
    #:failed-request
@@ -60,6 +62,7 @@
    #:publish
    #:publish-file
    #:publish-directory
+   #:reply-header-slot-value  ;; to be documented
    #:set-basic-authorization
    #:standard-locator
    #:unpublish-locator
@@ -78,6 +81,7 @@
    #:request-reply-content-length
    #:request-reply-content-type
    #:request-reply-plist
+   #:request-reply-protocol-string
    #:request-reply-strategy
    #:request-reply-stream
    
@@ -115,7 +119,7 @@
 
 (in-package :net.iserve)
 
-(defparameter *iserve-version* '(1 1 10))
+(defparameter *iserve-version* '(1 1 11))
 
 
 (provide :iserve)
@@ -129,29 +133,87 @@
 	    
 ;;;;;;;  debug support 
 
-(defvar *trap-errors* t)    ; have handler auto catch errors
+(defparameter *debug-all* nil)	; all of the debugging switches
+(defparameter *debug-log* nil)  ; all debugging switches that write info
+				; to the *debug-stream*
+(defparameter *debug-current*  nil)	; current switches set
 
-(defvar *ndebug* 0)         ; level for printing debugging info
-(defvar *dformat-level* 20)  ; debug level at which this stuff prints
+(defparameter *debug-stream* *initial-terminal-io*)
 
-(defmacro debug-format (level &rest args)
-  ;; do the format to *debug-io* if the level of this error
-  ;; is matched by the value of *ndebug*
-  `(if* (>= *ndebug* ,level)
-      then (format *initial-terminal-io* "~a: d> " (mp:process-name sys:*current-process*))
-	   (format *initial-terminal-io* ,@args)))
+(defmacro define-debug-kind (name class what)
+  `(progn (ecase ,class
+	    (:all (pushnew ,name *debug-all*))
+	    (:log (pushnew ,name *debug-log*)
+		  (pushnew ,name *debug-all*)))
+	  (setf (get ,name 'debug-description) ,what)))
 
-(defmacro dformat (&rest args)
+(define-debug-kind :notrap :all 
+  "If set than errors in handlers cause a break loop to be entered")
+
+(define-debug-kind :xmit   :log
+  "If set then most of the traffic between clients and servers are also sent to the debug stream")
+
+(define-debug-kind :info   :log
+  "General information")
+
+    
+
+(defun debug-on (&rest args)
+  ;; add the given debug kinds to the log list
+  (if* (null args)
+     then (note-debug-set)
+     else (dolist (arg args)
+	    (case arg
+	      (:all (setq *debug-current* *debug-all*))
+	      (:log (setq *debug-current*
+		      (union *debug-current* *debug-log*)))
+	      (t (pushnew arg *debug-current*))))))
+
+(defun debug-off (&rest args)
+  ;; turn off the debugging
+  (if* (null args)
+     then (note-debug-set)
+     else (dolist (arg args)
+	    (case arg
+	      (:all (setq *debug-current* nil))
+	      (:log (setq *debug-current*
+		      (set-difference *debug-current* *debug-log*)))
+	      (t (setq *debug-current* (remove arg *debug-current*)))))))
+
+(defun note-debug-set ()
+  ;; describe what debugging switches exist and if they are on
+  ;; and off
+  (dolist (kind *debug-all*)
+    (format t "~7s ~4a  ~a~%" 
+	    kind
+	    (if* (member kind *debug-current*)
+	       then "on"
+	       else "off")
+	    (get kind 'debug-description))))
+
+	    
+
+(defmacro debug-format (kind &rest args)
+  ;; do the format to *debug-stream* if the kind of this info
+  ;; is matched by the value of *debug-current*
+  `(if* (member ,kind *debug-current* :test #'eq)
+      then (format *debug-stream* "d> (~a): " (mp:process-name sys:*current-process*))
+	   (format *debug-stream* ,@args)))
+
+
+(defmacro format-dif (debug-key &rest args)
+  ;; do the format and also do the same format to the 
+  ;; debug stream if the given debug keyword is set
   ;; do the format and then send to *initial-terminal-io*
   `(progn (format ,@args)
-	  (if* (>= *ndebug* *dformat-level*)
-	     then (format *initial-terminal-io* "~a: " 
+	  (if* (member ,debug-key *debug-current* :test #'eq)
+	     then (format *debug-stream* "x>(~a): " 
 			  (mp:process-name sys:*current-process*))
-		  (format *initial-terminal-io* ,@(cdr args)))))
+		  (format *debug-stream* ,@(cdr args)))))
 
-(defmacro if-debug-action (&rest body)
+(defmacro if-debug-action (kind &rest body)
   ;; only do if the debug value is high enough
-  `(progn (if* (>= *ndebug* *dformat-level*)
+  `(progn (if* (member ,kind *debug-current* :test #'eq)
 	     then ,@body)))
 
 ;;;;;;;;;;; end debug support ;;;;;;;;;;;;
@@ -307,7 +369,8 @@
        ,(if* body 
 	   then `(compute-response-stream ,g-req ,g-ent))
        (if* ,g-headers
-	  then (setf (request-reply-headers ,g-req)
+	  then (bulk-set-reply-headers ,g-req ,g-headers)
+	       (setf (request-reply-headers ,g-req)
 		 (append ,g-headers (request-reply-headers ,g-req))))
        (send-response-headers ,g-req ,g-ent :pre)
        (if* (not (member :omit-body (request-reply-strategy ,g-req)))
@@ -347,11 +410,27 @@
 			"user-agent"
 			"content-length"))
 	  (push (list name   ;; string name
-		      (read-from-string name) ;; symbol name
+		      (read-from-string (format nil "reply-~a" name)) ;; symbol name
 		      ;; accessor name
 		      (read-from-string 
 			    (format nil "request-header-~a" name))) res))
-	res)))
+	res))
+  
+  (defparameter *fast-reply-headers*
+      ;; list of headers for the reply that at stored in slots of
+      ;; the http request object
+      (let (res)
+	(dolist (name '("date" 
+			"content-type"
+			"content-length"))
+	  (push (list name   ;; string name
+		      (read-from-string name) ;; symbol name
+		      ;; accessor name
+		      (read-from-string 
+			    (format nil "request-reply-~a" name))) res))
+	res))
+  
+  )
 
     
 	
@@ -380,6 +459,31 @@
 		 (if* (null ,genvar)
 		    then (push (setq ,genvar (cons ,name nil))
 			       (request-headers ,nobj)))
+		 (setf (cdr ,genvar) ,newval))))))
+
+(defmacro reply-header-slot-value (obj name)
+  ;; name is a string naming the header value (all lower case)
+  ;; retrive the slot's value from the http-request obj obj.
+  (let (ent)
+    (if* (setq ent (assoc name *fast-reply-headers* :test #'equal))
+       then ; has a fast accesor
+	    `(,(third ent) ,obj)
+       else ; must get it from the alist
+	    `(cdr (assoc ,name (request-reply-headers ,obj) :test #'equal)))))
+
+(defsetf reply-header-slot-value (obj name) (newval)
+  ;; set the header value regardless of where it is stored
+  (let (ent)
+    (if* (setq ent (assoc name *fast-reply-headers* :test #'equal))
+       then `(setf (,(third ent) ,obj) ,newval)
+       else (let ((genvar (gensym))
+		  (nobj (gensym)))
+	      `(let* ((,nobj ,obj)
+		      (,genvar (assoc ,name (request-reply-headers ,nobj) 
+				      :test #'equal)))
+		 (if* (null ,genvar)
+		    then (push (setq ,genvar (cons ,name nil))
+			       (request-reply-headers ,nobj)))
 		 (setf (cdr ,genvar) ,newval))))))
 
 (defmacro header-slot-value-integer (obj name)
@@ -439,7 +543,7 @@
     :initarg :protocol
     :reader request-protocol)
    
-   (protocol-string ;; string naming the protcol
+   (protocol-string ;; string naming the protcol requested
     :initarg :protocol-string
     :reader request-protocol-string)
    
@@ -509,7 +613,13 @@
    (reply-plist    ;; general stuff in a property list form
     :initform nil
     :accessor request-reply-plist)
-   
+
+   (reply-protocol-sring
+    ;; A web server announces the highest minor level of the 
+    ;; major level of the protocol that was requested by the client.
+    ;; Thus for now we're always http/1.1
+    :initform "HTTP/1.1"
+    :accessor request-reply-protocol-string)
    )
   
   
@@ -562,14 +672,12 @@
   #+mswindows
   (declare (ignore setuid setgid))
   
+  (declare (ignore debug))  ; for now
 
   (if* (eq server :new)
      then (setq server (make-instance 'wserver)))
   
   
-  (if* (and debug (numberp debug))
-     then (setq *ndebug* debug))
-
   ; shut down existing server
   (shutdown server) 
   
@@ -677,7 +785,7 @@
 
     (let ((sock (car (mp:process-run-reasons sys:*current-process*))))
       (restart-case
-	  (if* *trap-errors*
+	  (if* (not (member :notrap *debug-current* :test #'eq))
 	     then (handler-case (process-connection sock)
 		    (error (cond)
 		      (logmess (format nil "~s: got error ~a~%" 
@@ -783,7 +891,7 @@
 	;; get first command
 	(loop
 	  (mp:with-timeout (*read-request-timeout* 
-			    (debug-format 5 "request timed out on read~%")
+			    (debug-format :info "request timed out on read~%")
 			    ; this is too common to log, it happens with
 			    ; every keep alive socket when the user stops
 			    ; clicking
@@ -803,7 +911,7 @@
 				 (request-reply-strategy req)
 				 :test #'eq)
 		       then ; continue to use it
-			    (debug-format 10 "request over, keep socket alive~%")
+			    (debug-format :info "request over, keep socket alive~%")
 			    (force-output sock)
 		       else (return))))))
     (ignore-errors (close sock))))
@@ -834,12 +942,12 @@
 	       then ; eof or error before crlf
 		    (return-from read-http-request nil))
       
-	    (if* *ndebug* 
-	       then (debug-format  5 "got line of size ~d: " end)
-		    (if-debug-action
-		     (dotimes (i end) (write-char (schar buffer i) 
-						  *initial-terminal-io*))
-		     (terpri *initial-terminal-io*) (force-output *initial-terminal-io*)))
+	    
+	    (debug-format  :info "got line of size ~d: " end)
+	    (if-debug-action :info
+			     (dotimes (i end) (write-char (schar buffer i) 
+							  *initial-terminal-io*))
+			     (terpri *initial-terminal-io*) (force-output *initial-terminal-io*))
       
 	    (if* (not (eql 0 end))
 	       then (return) ; out of loop
@@ -869,7 +977,7 @@
 	    
 	    (if* (and (not (eq protocol :http/0.9))
 		      (null (read-request-headers req sock buffer)))
-	       then (debug-format 5 "no headers, ignore~%")
+	       then (debug-format :info "no headers, ignore~%")
 		    (return-from read-http-request nil))
 	    
 	    ; insert the host name and port into the uri
@@ -1358,7 +1466,7 @@
     (loop
       (let ((ch (read-char sock nil :eof)))
 	(if* (eq ch :eof)
-	   then (debug-format 20 "eof on socket~%")
+	   then (debug-format :info"eof on socket~%")
 		(free-request-buffer buffer)
 		(return-from read-sock-line nil))
       
@@ -1370,8 +1478,9 @@
 		
 		; debug output
 		; dump out buffer
-		(debug-format *dformat-level* "read on socket: ")
-		(if-debug-action (dotimes (i start)
+		(debug-format :info "read on socket: ")
+		(if-debug-action :info
+				 (dotimes (i start)
 				   (write-char (schar buffer i) *initial-terminal-io*))
 				 (terpri *initial-terminal-io*))
 		;; end debug
@@ -1668,6 +1777,29 @@
   ;; This must be called after with-http-response and before
   ;; with-http-body
   (setq realm (string realm))
-  (push `("WWW-Authenticate" . ,(format nil "Basic realm=~s" realm))
-	(request-reply-headers req)))
+  (setf (reply-header-slot-value req "www-authenticate")
+    (format nil "Basic realm=~s" realm)))
+    
 
+
+;=======
+
+(defun bulk-set-reply-headers (req headers)
+  ;; given an alist list of headers to set, set the header info
+  ;; in the correct place (given fast vrs slow headers)
+  (let ((fast-headers *fast-reply-headers*)
+	(current-headers (request-reply-headers req)))
+    (dolist (header headers)
+      (let ((this (car header))
+	    (ent))
+	(if* (setq ent (assoc this fast-headers :test #'equal))
+	   then ; a fast one
+		(setf (slot-value req (second ent)) (cdr header))
+	   else ; a slow one
+		(if* (null (setq ent (assoc this 
+					    current-headers :test #'equal)))
+		   then ; not present yet
+			(push (setq ent (cons this nil)) current-headers))
+		(setf (cdr ent) (cdr header)))))
+    (setf (request-reply-headers req) current-headers)))
+	
