@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.139 2002/08/09 22:21:45 jkf Exp $
+;; $Id: main.cl,v 1.140 2002/09/06 17:12:15 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1208,6 +1208,7 @@ by keyword symbols and not by strings"
   (if* (typep c 'stream-error)
      then (or (eq (stream-error-identifier c) :connection-reset)
 	      #+unix (eq (stream-error-code c) 32) ; sigpipe
+	      #+aix (eq (stream-error-code c) 73) 
 	      )))
 
 	  

@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.16 2002/08/09 22:21:46 jkf Exp $
+;; $Id: htmlgen.cl,v 1.17 2002/09/06 17:12:15 jkf Exp $
 
 ;; Description:
 ;;   html generator
@@ -319,22 +319,23 @@
 	
 		
 
-(defun html-print-list (list-of-forms stream)
+(defun html-print-list (list-of-forms stream &key unknown)
   ;; html print a list of forms
   (dolist (x list-of-forms)
-    (html-print-subst x nil stream)))
+    (html-print-subst x nil stream unknown)))
 
-(defun html-print-list-subst (list-of-forms subst stream)
+
+(defun html-print-list-subst (list-of-forms subst stream &key unknown)
   ;; html print a list of forms
   (dolist (x list-of-forms)
-    (html-print-subst x subst stream)))
+    (html-print-subst x subst stream unknown)))
 
 
-(defun html-print (form stream)
-  (html-print-subst form nil stream))
+(defun html-print (form stream &key unknown)
+  (html-print-subst form nil stream unknown))
 
 
-(defun html-print-subst (form subst stream)
+(defun html-print-subst (form subst stream unknown)
   ;; Print the given lhtml form to the given stream
   (assert (streamp stream))
     
@@ -352,7 +353,9 @@
 	 ent)
     (if* (keywordp possible-kwd)
        then (if* (null (setq ent (gethash possible-kwd *html-process-table*)))
-	       then (error "unknown html tag: ~s" possible-kwd)
+	       then (if* unknown
+		       then (funcall unknown form stream)
+		       else (error "unknown html tag: ~s" possible-kwd))
 	       else ; see if we should subst
 		    (if* (and subst 
 			      attrs 
@@ -367,7 +370,8 @@
 				 else (html-print-subst
 				       (cdr attrs)
 				       subst
-				       stream)))))
+				       stream
+				       unknown)))))
 				     
 	    (setq print-handler
 	      (html-process-print ent)))
@@ -384,6 +388,7 @@
 		     (if* (consp (car form)) then (cdr (car form)))
 		     form 
 		     subst
+		     unknown
 		     stream)
        else (error "Illegal form: ~s" form))))
 
@@ -415,7 +420,7 @@
 		 then (setq alist (pop to-process))
 		 else (return))))))
 
-(defun html-standard-print (ent cmd args form subst stream)
+(defun html-standard-print (ent cmd args form subst unknown stream)
   ;; the print handler for the normal html operators
   (ecase cmd
     (:set ; just turn it on
@@ -446,7 +451,7 @@
 		       (format stream ">"))
 	  else (format stream "<~a>" (html-process-key ent)))
        (dolist (ff (cdr form))
-	 (html-print-subst ff subst stream)))
+	 (html-print-subst ff subst stream unknown)))
      (if* (html-process-has-inverse ent)
 	then ; end the form
 	     (format stream "</~a>" (html-process-key ent))))))
@@ -475,8 +480,8 @@
 			       
 	`(terpri *html-stream*))
   
-  #'(lambda (ent cmd args form subst stream)
-      (declare (ignore args ent subst))
+  #'(lambda (ent cmd args form subst unknown stream)
+      (declare (ignore args ent unknown subst))
       (if* (eq cmd :set)
 	 then (terpri stream)
 	 else (error ":newline in an illegal place: ~s" form)))
@@ -490,8 +495,8 @@
 			      `(princ-http ,bod))
 			  body)))
   
-  #'(lambda (ent cmd args form subst stream)
-      (declare (ignore args ent subst))
+  #'(lambda (ent cmd args form subst unknown stream)
+      (declare (ignore args ent unknown subst))
       (assert (eql 2 (length form)))
       (if* (eq cmd :full)
 	 then (format stream "~a" (cadr form))
@@ -504,8 +509,8 @@
 	`(progn ,@(mapcar #'(lambda (bod)
 			      `(princ-safe-http ,bod))
 			  body)))
-  #'(lambda (ent cmd args form subst stream)
-      (declare (ignore args ent subst))
+  #'(lambda (ent cmd args form subst unknown stream)
+      (declare (ignore args ent unknown subst))
       (assert (eql 2 (length form)))
       (if* (eq cmd :full)
 	 then (emit-safe stream (format nil "~a" (cadr form)))
@@ -517,8 +522,8 @@
 	`(progn ,@(mapcar #'(lambda (bod)
 			      `(prin1-http ,bod))
 			  body)))
-  #'(lambda (ent cmd args form subst stream)
-      (declare (ignore ent args subst))
+  #'(lambda (ent cmd args form subst unknown stream)
+      (declare (ignore ent args unknown subst))
       (assert (eql 2 (length form)))
       (if* (eq cmd :full)
 	 then (format stream "~s" (cadr form))
@@ -533,8 +538,8 @@
 	`(progn ,@(mapcar #'(lambda (bod)
 			      `(prin1-safe-http ,bod))
 			  body)))
-  #'(lambda (ent cmd args form stream)
-      (declare (ignore args ent))
+  #'(lambda (ent cmd args form unknown stream)
+      (declare (ignore args ent unknown))
       (assert (eql 2 (length form)))
       (if* (eq cmd :full)
 	 then (emit-safe stream (format nil "~s" (cadr form)))
@@ -551,8 +556,8 @@
 	      (html ,@body)
 	      (write-string "-->" *html-stream*)))
   
-  #'(lambda (ent cmd args form stream)
-      (declare (ignore ent cmd args))
+  #'(lambda (ent cmd args form unknown stream)
+      (declare (ignore ent cmd args unknown))
       (format stream "<!--~a-->" (cadr form))))
 
       

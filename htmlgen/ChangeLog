@@ -1,3 +1,7 @@
+2002-09-06  John Foderaro  <jkf@tiger.franz.com>
+
+	* add hook to catch when unknonwn html tags are emitted
+
 2002-01-25  John Foderaro  <jkf@tiger.franz.com>
 
 	* the html macro will now macroexpand forms it sees before
