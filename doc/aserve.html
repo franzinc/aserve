@@ -8,7 +8,7 @@
 <body>
 
 <h1 align="center">AllegroServe - A Web Application Server<br>
-<small><small><small>version <font face="Courier New">1.2.21</font></small></small></small></h1>
+<small><small><small>version <font face="Courier New">1.2.22</font></small></small></small></h1>
 
 <p align="left"><strong><small>copyright(c) 2000-2001. Franz Inc</small></strong></p>
 
@@ -62,6 +62,7 @@
 &nbsp; <a href="#f-set-basic-authorization">set-basic-authorization</a><br>
 &nbsp; <a href="#c-password-authorizer">password-authorizer</a><br>
 &nbsp; <a href="#c-location-authorizer">location-authorizer</a></font><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <a href="#c-function-authorizer"><font face="Courier New">function-authorizer</font></a><br>
 <a href="#cookies">Cookies</a><br>
 <font face="Courier New">&nbsp; <a href="#f-set-cookie-header">set-cookie-header</a><br>
 &nbsp; <a href="#f-get-cookie-values">get-cookie-values</a></font><br>
@@ -1059,7 +1060,7 @@ ent program &amp;key path-info path-translated<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 script-name query-string <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-auth-type timeout error-output)</strong></font></p>
+auth-type timeout error-output env)</strong></font></p>
 
 <p>In response to an http request, this runs <strong>program</strong> which must be a
 string naming an exectuable program or script followed optionally by command line
@@ -1074,7 +1075,13 @@ automatically.&nbsp; <strong>path-info</strong> specifies the PATH_INFO environm
 variable, and similarly for<strong> path-translated, script-name, query-string</strong>
 and <strong>auth-type.</strong>&nbsp;&nbsp; If <strong>query-string</strong> is <em>not</em>
 given and the <strong>uri</strong> that invoked this request contains a query part then
-that query part is passed in the QUERY_STRING environment variable.</p>
+that query part is passed in the QUERY_STRING environment variable.&nbsp;&nbsp; If you
+wish to add or modify the environment variables set for the cgi process you can specify a
+value for <strong>env.&nbsp; </strong>The value of <strong>env</strong> should be a list
+of conses, the car of each cons containing the environment variable name (a string) and
+the cdr of each cons containing the environment variable value (a string).&nbsp;&nbsp; <strong>env</strong>
+is checked after all the standard environment variables are computed and the value given
+in <strong>env</strong> will override the value computed automatically.</p>
 
 <p>cgi programs send their result to standard output (file descriptor 1 on Unix).&nbsp; If
 they encounter problems they often send informative messages to standard error (file
@@ -1468,9 +1475,9 @@ and the password is <strong>bar</strong>.</p>
 
 <p>If an entity has an associated <strong>authorizer</strong> object, then before that
 entity's response function is run the authorizer is tested to see if&nbsp; it will accept
-or deny the current request.&nbsp;&nbsp;&nbsp; AllegroServe supplies two interesting
-subclasses of <strong>authorizer</strong> and users are free to add their own subclasses
-to support their own authorization needs.&nbsp;&nbsp; </p>
+or deny the current request.&nbsp;&nbsp;&nbsp; AllegroServe supplies three &nbsp;
+interesting subclasses of <strong>authorizer</strong> and users are free to add their own
+subclasses to support their own authorization needs.&nbsp;&nbsp; </p>
 
 <p>The protocol followed during authorization is this: 
 
@@ -1617,6 +1624,26 @@ so that anything not matching the preceding patterns will be denied.</p>
                        &quot;You made it to the secret page&quot;))))))
 
 </pre>
+
+<p><strong><a name="c-function-authorizer"></a>function-authorizer </strong>&nbsp; [class]</p>
+
+<p>This authorizer contains a function provided by the user which is used to test if the
+request is authorized.&nbsp;&nbsp; The function take three arguments, the http-request
+object, the entity and the authorizer object.&nbsp;&nbsp; It must return one of the four
+value that the <strong>authorize</strong> function returns, namely <strong>t, nil :deny</strong>
+or <strong>:done.</strong></p>
+
+<p>A function-authorizer is created as follows</p>
+
+<pre>(make-instance 'function-authorizer
+    :function #'(lambda (req ent auth)
+                          t  ; always authorize
+                 ))</pre>
+
+<p>The function slot can be set using (setf function-authorizer-function) if you wish to
+change it after the authorizer has been created.</p>
+
+<p>&nbsp;</p>
 
 <h2><a name="cookies"></a>Cookies</h2>
 
