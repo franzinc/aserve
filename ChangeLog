@@ -1,3 +1,8 @@
+2000-07-31  jkf  <jkf@main.verada.com>
+
+	*  main.cl: if a multipart-mixed body was being sent then
+	    note that the request-body has been grabbed.
+
 2000-07-25  jkf  <jkf@main.verada.com>
 
 	*  example/chat.cl - enhanced to support logging into the chat

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.21 2000/07/15 18:21:11 jkf Exp $
+;; $Id: client.cl,v 1.22 2000/08/01 01:19:01 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -677,7 +677,7 @@
 						net.aserve::*debug-stream*
 						:start start
 						:end
-						(+ start ans)))
+						ans))
 			      (setf (client-request-bytes-left creq)
 				(- bytes-left (- ans start)))
 			      ans)))
