@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.65 2001/11/05 22:14:14 jkf Exp $
+;; $Id: publish.cl,v 1.66 2001/11/06 01:03:14 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -1607,7 +1607,8 @@
 				 (incf total-size size)
 				 (setf (multi-item-cache item) contents)
 				 (setf (multi-item-last-modified item) fwd)
-				 (setq max-fwd (max max-fwd fwd))))
+				 (if* max-fwd
+				    then (setq max-fwd (max max-fwd fwd)))))
 			     t)
 			    )
 		    then ; failed to read, give up
