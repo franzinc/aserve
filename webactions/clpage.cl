@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: clpage.cl,v 1.6 2004/03/04 22:02:45 jkf Exp $
+;; $Id: clpage.cl,v 1.7 2004/06/09 21:50:58 jkf Exp $
 
 
 (eval-when (compile load eval) (require :aserve))
@@ -322,6 +322,7 @@
 	(chcount 0)
 	(ch)
 	(res)
+	(lasttag)
 	(backbuffer (make-array 10 :element-type 'character
 				:initial-element #\space))
 	(backindex 0))
@@ -361,7 +362,8 @@
 	  (incf chcount)
 	  (if* (eq ch #\<)
 	     then 
-		  (setq res (parse-clp-tag p filename))
+		  (multiple-value-setq  (res lasttag)
+		    (parse-clp-tag p filename))
 		  ;(format t "res is ~s~%" res)
 		  (if* res
 		     then (savestring p pos-start 
@@ -371,7 +373,10 @@
 				chstart chcount))
 	   elseif (eq ch #\")
 	     then (if* (or (match-buffer backbuffer backindex "=ferh")
-			   (match-buffer backbuffer backindex "=noitca"))
+			   (match-buffer backbuffer backindex "=noitca")
+			   (and (equalp lasttag "frame")
+				(match-buffer backbuffer backindex "=crs"))
+			   )
 		     then (savestring p pos-start (- chcount chstart))
 			  ; scan for tag name
 			  (let ((savepos (file-position p)))
@@ -431,16 +436,17 @@
 (defun parse-clp-tag (p filename)
   ;; just read a <.. now see if there's a clp tag to read
   ;;
-  (macrolet ((no-tag-found ()
+  (macrolet ((no-tag-found (tag)
 	       `(progn (file-position p start-pos) ; restore position
-		       (return-from parse-clp-tag nil))))
+		       (return-from parse-clp-tag 
+			 (values nil ,tag)))))
     
     (let ((start-pos (file-position p))
 	  (chars))
       (loop
 	(let ((ch (read-char p nil nil)))
 	  (if* (null ch)
-	     then (no-tag-found))
+	     then (no-tag-found nil))
 	
 	  (if* (member ch *clp-end-tagname*)
 	     then ; seen end of tag
@@ -470,7 +476,7 @@
 					     then 
 						  (return-from parse-clp-tag
 						    clptag))))))
-		      (no-tag-found)))
+		      (no-tag-found tag)))
 	     else (push ch chars)))))))
 			
 	
