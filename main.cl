@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.119 2001/10/19 21:25:42 jkf Exp $
+;; $Id: main.cl,v 1.120 2001/10/24 17:39:59 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -147,7 +147,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 13))
+(defparameter *aserve-version* '(1 2 14))
 
 (eval-when (eval load)
     (require :sock)
@@ -1244,17 +1244,21 @@ by keyword symbols and not by strings"
 	    (if* (not (member :notrap *debug-current* :test #'eq))
 	       then (handler-case (process-connection sock)
 		      (error (cond)
-			(logmess 
-			 (format nil "~agot error ~a~%" 
-				 (if* *worker-request*
-				    then (format 
-					  nil 
-					  "while processing command ~s~%"
-					  (request-raw-request 
-					   *worker-request*))
-				    else "")
-				 cond
-				 ))))
+			(if* (and (typep cond 'socket-error)
+				  (eq (stream-error-identifier cond)
+				      :connection-reset))
+			   thenret ; don't print these errors,
+			   else (logmess 
+				 (format nil "~agot error ~a~%" 
+					 (if* *worker-request*
+					    then (format 
+						  nil 
+						  "while processing command ~s~%"
+						  (request-raw-request 
+						   *worker-request*))
+					    else "")
+					 cond
+					 )))))
 	       else ; in debugging mode where we don't ignore errors
 		    ; still, we want to ignore connection-reset-by-peer
 		    ; since they are often not errors

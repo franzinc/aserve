@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.52 2001/10/16 18:27:47 jkf Exp $
+;; $Id: load.cl,v 1.53 2001/10/24 17:39:59 jkf Exp $
 ;;
 
 (defvar *loadswitch* :compile-if-needed)
@@ -43,6 +43,15 @@
       "load.cl"
       "test/t-aserve.cl"
       "test/server.pem"
+      "test/testdir/suba/subsuba/foo.html"
+      "test/testdir/suba/access.cl"
+      "test/testdir/suba/foo.html"
+      "test/testdir/access.cl"
+      "test/testdir/aaa.foo"
+      "test/testdir/bbb.ign"
+      "test/testdir/ccc.html"
+      "test/testdir/subb/access.cl"
+      "test/testdir/subb/foo.html"
       "examples/cgitest.sh"
       "doc/aserve.html"
       "doc/tutorial.html"
@@ -149,6 +158,13 @@
 	   *aserve-root*
 	   *aserve-root*
 	   ))
+  
+  (run-shell-command 
+   (format nil "mkdir ~aaserve-dist/test/testdir ~aaserve-dist/test/testdir/suba ~aaserve-dist/test/testdir/subb"
+	   *aserve-root*
+	   *aserve-root*
+	   *aserve-root*
+	   ))
    
   (copy-files-to *aserve-files* "aserve.fasl" :root *aserve-root*)
   
@@ -227,6 +243,25 @@
 	   *aserve-root*
 	   dist-name
 	   
+	   *aserve-root*
+	   dist-name
+	   
+	   ))
+  (run-shell-command 
+   (format nil "mkdir ~aaserve-src/~a/test/testdir ~aaserve-src/~a/test/testdir/suba ~aaserve-src/~a/test/testdir/subb"
+	   *aserve-root*
+	   dist-name
+	   
+	   *aserve-root*
+	   dist-name
+	   
+	   *aserve-root*
+	   dist-name
+	   
+	   ))
+  
+  (run-shell-command 
+   (format nil "mkdir ~aaserve-src/~a/test/testdir/suba/subsuba"
 	   *aserve-root*
 	   dist-name
 	   

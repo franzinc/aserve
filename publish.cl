@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.60 2001/10/19 21:25:42 jkf Exp $
+;; $Id: publish.cl,v 1.61 2001/10/24 17:39:59 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -71,8 +71,9 @@
    (content-type :initarg :content-type
 		 :reader content-type
 		 :initform nil)
-   
-   (authorizer  :initarg :authorizer  ; authorizer object, if any
+
+   ; can be a single object or a list of objects
+   (authorizer  :initarg :authorizer  
 		:accessor entity-authorizer
 		:initform nil)
    
@@ -143,6 +144,19 @@
    (publisher :initarg :publisher
 	      :initform nil
 	      :accessor directory-entity-publisher)
+   
+   ; if non-nil the name of the file to look for in directories to
+   ; personalize the creation of file entities
+   (access-file :initarg :access-file
+		:initform nil
+		:accessor directory-entity-access-file)
+   
+   ; internal slot used to cache the files we've read
+   ; is a list of
+   ; (whole-access-filename last-write-dat cached-value)
+   ;
+   (access-file-cache :initform nil
+		      :accessor directory-entity-access-file-cache)
    )
   )
 
@@ -584,6 +598,7 @@
 			       (timeout #+io-timeout #.(* 100 24 60 60)
 					#-io-timeout nil)
 			       publisher
+			       access-file
 			       )
   
   ;; make a whole directory available
@@ -606,6 +621,7 @@
 	       :filter filter
 	       :timeout timeout
 	       :publisher publisher
+	       :access-file access-file
 	       )))
     
     (dolist (entpair (locator-info locator))
@@ -835,54 +851,70 @@
     (let ((ent (standard-locator req locator)))
       (if* ent
 	 then ; check if it is authorized
-	      (let ((authorizer (entity-authorizer ent)))
-		(if* authorizer
-		   then (let ((result (authorize authorizer req ent)))
-			  (if* (eq result t)
-			     then (if* (process-entity req ent)
-				     then (return-from handle-request))
-			   elseif (eq result :done)
-			     then ; already responsed
-				  (return-from handle-request nil)
-			   elseif (eq result :deny)
-			     then ; indicate denied request
-				  (denied-request req)
-				  (return-from handle-request nil))
-			  ; the nil case falls through and will return
-			  ; failed request
-			  )
-		   else ; no authorizer, let anyone access
-			(if* (process-entity req ent)
-			   then (return-from handle-request))
-			)))))
+	      (if* (authorize-and-process req ent)
+		 then (return-from handle-request)))))
   
   ; no handler
   (failed-request req)
 		       
   )
 
+(defun authorize-and-process (req ent)
+  ;; check for authorization need and process or send back 
+  ;; a message why it failed
+  ;; if we actually http responded return  true, else return nil
+  ;;
+  ;; all authorizers must succeed for it to succeed
+  
+  (let ((authorizers (entity-authorizer ent)))
+    
+    (if* (and authorizers (atom authorizers))
+       then (setq authorizers (list authorizers)))
+    
+    (dolist (authorizer authorizers)
+      (let ((result (authorize authorizer req ent)))
+	(if* (eq result t)
+	   thenret ; ok so far, but keep checking
+	 elseif (eq result :done)
+	   then ; already responsed
+		(return-from authorize-and-process t)
+	 elseif (eq result :deny)
+	   then ; indicate denied request
+		(denied-request req)
+		(return-from authorize-and-process t)
+	   else ; failed to authorize
+		(return-from authorize-and-process nil))))
+    
+    ; all authorization ok. try to run it and return the 
+    ; value representing its exit status
+    (process-entity req ent)))
+    
+    
+  
+  
 (defmethod failed-request ((req http-request))
   ;; generate a response to a request that we can't handle
   (let ((entity (wserver-invalid-request *wserver*)))
     (if* (null entity)
-       then (setq entity (make-instance 'computed-entity
-			   :function #'(lambda (req ent)
-					 (with-http-response 
-					     (req ent
-						  :response *response-not-found*)
-					   (with-http-body (req ent)
-					     (html 
-					      (:head (:title "404 - NotFound")
-						     (:body
-						      (:h1 "Not Found")
-						      "The request for "
-						      (:princ-safe 
-						       (render-uri 
-							(request-uri req)
-							nil
-							))
-						      " was not found on this server."))))))
-			   :content-type "text/html"))
+       then (setq entity 
+	      (make-instance 'computed-entity
+		:function #'(lambda (req ent)
+			      (with-http-response 
+				  (req ent
+				       :response *response-not-found*)
+				(with-http-body (req ent)
+				  (html 
+				   (:head (:title "404 - NotFound")
+					  (:body
+					   (:h1 "Not Found")
+					   "The request for "
+					   (:princ-safe 
+					    (render-uri 
+					     (request-uri req)
+					     nil
+					     ))
+					   " was not found on this server."))))))
+		:content-type "text/html"))
 	    (setf (wserver-invalid-request *wserver*) entity))
     (process-entity req entity)))
 
@@ -1104,19 +1136,31 @@
 		     (setq postfix (subseq (uri-path (request-uri req))
 					   (length (prefix ent))))))
 	 (redir-to)
+	 (info)
+	 (forbidden)
 	 )
     (debug-format :info "directory request for ~s~%" realname)
     
     ; we can't allow the brower to specify a url with 
     ; any ..'s in it as that would allow the browser to 
     ; search outside the tree that's been published
-    (if* (match-regexp "\\.\\.[\\/]" postfix)
+    (if* (or #+mswindows (position #\\ postfix) ; don't allow windows dir sep
+	     (match-regexp "\\.\\.[\\/]" postfix))
        then ; contains ../ or ..\  
 	    ; ok, it could be valid, like foo../, but that's unlikely
+	    ; Also on Windows don't allow \ since that's a directory sep
+	    ; and user should be using / in http paths for that.
 	    (return-from process-entity nil))
     
     (if* sys:*tilde-expand-namestrings*
        then (setq realname (excl::tilde-expand-unix-namestring realname)))
+    
+    (multiple-value-setq (info forbidden)
+      (read-access-files ent realname postfix))
+    
+    (if* forbidden
+       then ; give up right away.
+	    (return-from process-entity nil))
     
     (let ((type (excl::filesys-type realname)))
       (if* (null type)
@@ -1156,32 +1200,216 @@
 			       redir-to))
 			     
 		(with-http-body (req ent))))
+     elseif (and info (file-should-be-ignored-p realname info))
+       then ; we should ignore this file
+	    (return-from process-entity nil)
      elseif (and (directory-entity-filter ent)
-		 (funcall (directory-entity-filter ent) req ent realname))
+		 (funcall (directory-entity-filter ent) req ent 
+			  realname info))
        thenret ; processed by the filter
        else ;; ok realname is a file.
 	    ;; create an entity object for it, publish it, and dispatch on it
-
-	    (process-entity req 
-			    (funcall 
-			     (or (directory-entity-publisher ent)
-				 #'standard-directory-entity-publisher)
+	    (return-from process-entity
+	      (authorize-and-process 
+	       req 
+	       (funcall 
+		(or (directory-entity-publisher ent)
+		    #'standard-directory-entity-publisher)
 				       
-			     req ent realname)))
+		req ent realname info))))
 					   
     t))
 
     
-(defun standard-directory-entity-publisher (req ent realname)
+(defun standard-directory-entity-publisher (req ent realname info)
   ;; the default publisher used when directory entity finds
   ;; a file it needs to publish
-  (publish-file :path (uri-path (request-uri req))
-		:host (host ent)
-		:file realname
-		:authorizer (entity-authorizer ent)
-		:timeout (entity-timeout ent)))
+  
+  ; check to see if there is an applicable mime type
+  (let ((posdot (position #\. realname :from-end t))
+	content-type
+	local-authorizer
+	pswd-authorizer
+	ip-authorizer
+	)
+    (if* (and posdot
+	      (>= posdot (or (position #\/ realname :from-end t) 0)))
+       then ; we have a file type
+	    (let ((type (subseq realname (1+ posdot))))
+	      ; check for matches in the local table 
+	      (let ((mime (assoc :mime info :test #'eq)))
+		(if* mime
+		   then (dolist (pat (getf (cdr mime) :types))
+			  (if* (member type (cdr pat) :test #'equalp)
+			     then (setq content-type (car pat))
+				  (return)))))))
+    
+    ; look for authorizer
+    (let ((ip (assoc :ip info :test #'eq)))
+      (if* ip
+	 then (setq ip-authorizer 
+		(make-instance 'location-authorizer 
+		  :patterns (getf (cdr ip) :patterns)))))
+    
+    ; only one of ip and pswd allowed
+    (let ((pswd (assoc :password info :test #'eq)))
+      (if* pswd
+	 then (setq pswd-authorizer
+		(make-instance 'password-authorizer
+		  :realm (getf (cdr pswd) :realm)
+		  :allowed (getf (cdr pswd) :allowed)))))
+
+    ; check password second
+    (if* pswd-authorizer
+       then (setq local-authorizer (list pswd-authorizer)))
+    
+    (if* ip-authorizer
+       then (push ip-authorizer local-authorizer))
+    
+
+    ; now publish a file with all the knowledge
+    (publish-file :path (uri-path (request-uri req))
+		  :host (host ent)
+		  :file realname
+		  :authorizer (or local-authorizer
+				  (entity-authorizer ent))
+		  :content-type content-type
+		  :timeout (entity-timeout ent))))
       
+
+
+(defun read-access-files (ent realname postfix)
+  ;; read and cache all access files involved in this access
+  ; realname is the whole name of the file. Postfix is the part
+  ; added by the uri and thus represents the part of the uri we
+  ; need to scan for access files
+  
+  (let ((access-file (directory-entity-access-file ent))
+	info
+	pos
+	file-write-date
+	root)
+    
+    (if* (null access-file) then (return-from read-access-files nil))
+    
+    ; simplify by making '/' the directory separator on windows too
+    #+mswindows
+    (if* (position #\\ realname)
+       then (setq realname (substitute #\/ #\\ realname)))
+  
+    ; search for slash ending root dir
+    (setq pos (position #\/ realname
+			:from-end t
+			:end (- (length realname) (length postfix))))
+    (loop 
+      (if* (null pos) 
+	 then (setq root "./")
+	      (setq pos 1)
+	 else (setq root (subseq realname 0 (1+ pos))))
+    
+      (let ((aname (concatenate 'string root access-file)))
+	(if* (setq file-write-date (excl::file-write-date aname))
+	   then ; access file exists
+		(let ((entry (assoc aname 
+				    (directory-entity-access-file-cache ent)
+				    :test #'equal)))
+		  (if* (null entry)
+		     then (setq entry (list aname
+					    0
+					    nil))
+			  (push entry (directory-entity-access-file-cache ent)))
+		  (if* (> file-write-date (cadr entry))
+		     then ; need to refresh
+			  (setf (caddr entry) (read-access-file-contents aname)))
+		
+		  ; put new info at the beginning of the info list
+		  (setq info (append (caddr entry) info)))))
+    
+      ; see if we have to descend a directory level
+      (setq pos (position #\/ realname :start (1+ pos)))
+    
+      (if* pos
+	 then ; we must go down a directory level
+	      ; see if that's ok
+	      (if* (getf (cdr (assoc :subdirectories info :test #'eq))
+			 :block)
+		 then ; can't descend, so this access is forbidden
+		      (return-from read-access-files (values nil :forbidden)))
+	    
+	      ; we can descend.. remove properties that don't get
+	      ; inherited
+	      (let (remove)
+		(dolist (inf info)
+		  (if* (null (getf (cdr inf) :inherit t))
+		     then (push inf remove)))
+		(if* remove
+		   then (dolist (rem remove)
+			  (setq info (remove rem info)))))
+	 else ; no more dirs to check
+	      (return-from read-access-files info)))))
+
+
+(defun read-access-file-contents (filename)
+  ;; read and return the contents of the access file.
+  ;;
+  (handler-case 
+      (with-open-file (p filename)
+	(with-standard-io-syntax
+	  (let ((*read-eval* nil) ; disable #. and #,
+		(eof (cons nil nil)))
+	    (let (info)
+	      (loop (let ((inf (read p nil eof)))
+		      (if* (eq eof inf)
+			 then (return))
+		      (push inf info)))
+	      info))))
+    (error (c)
+      (logmess (format nil
+		       "reading access file ~s resulted in error ~a" 
+		       filename c))
+      nil)))
+		
+   
+	    
+(defun file-should-be-ignored-p (filename info)
+  ;; given access info check to see if the given filename
+  ;; should be ignored.
+  ; look for the first :files item
+  (let ((entry (assoc :files info :test #'eq))
+	tailfilename)
+    (if* entry
+       then (let ((pos (position #\/ filename :from-end t)))
+	      (if* (null pos)
+		 then (setq tailfilename filename)
+		 else (setq tailfilename (subseq filename (1+ pos)))))
 		      
+	    (let ((allow (getf (cdr entry) :allow entry)))
+	      (if* (eq allow entry)
+		 thenret ; wasn't present, so we assume "*" is allowed
+		 else ; must check against the allow
+		      (if* (atom allow) then (setq allow (list allow)))
+		      (dolist (all allow 
+				; no match, not allowed
+				(return-from file-should-be-ignored-p t))
+				
+			(if* (match-regexp all tailfilename :return nil)
+			   then (return)))))
+	    (let ((ignore (getf (cdr entry) :ignore entry)))
+	      (if* (eq ignore entry)
+		 thenret ; no ignores, so it's allowed
+		 else (if* (atom ignore) then (setq ignore (list ignore)))
+		      (dolist (ign ignore)
+			(if* (match-regexp ign tailfilename :return nil)
+			   then ; matches, not allowed
+				(return-from file-should-be-ignored-p t))))))
+    nil ; should not be ignored
+				
+    ))
+    
+    
+  
+  
+  
 		      
 	      
 	      

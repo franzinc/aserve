@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.35 2001/10/19 21:25:42 jkf Exp $
+;; $Id: t-aserve.cl,v 1.36 2001/10/24 17:39:59 jkf Exp $
 
 ;; Description:
 ;;   test iserve
@@ -1122,77 +1122,156 @@
 	(prefix-dns   (format nil "http://~a:~a" 
 			      (long-site-name)
 			      port))
+	(test-dir)
 	(step 0))
+    
     (multiple-value-bind (ok whole dir)
 	(match-regexp "\\(.*[/\\]\\).*" (namestring *aserve-load-truename*))
       (declare (ignore whole))
       (if* (not ok) 
 	 then (error "can't find the server.pem directory"))
       
+      (setq test-dir dir))
+      
 	
-      (publish-directory :prefix "/test-pd/"
-			 :destination dir
-			 :filter #'(lambda (req ent filename)
-				     (declare (ignore ent))
-				     (test t
-					   (values 
-					    (match-regexp "server.pem"
-							  filename))
-					   :test #'equal)
-				     (case step
-				       (0 (failed-request req)
-					  t)
-				       (1 nil))))
+    (publish-directory :prefix "/test-pd/"
+		       :destination test-dir
+		       :filter #'(lambda (req ent filename info)
+				   (declare (ignore ent info))
+				   (test t
+					 (values 
+					  (match-regexp "server.pem"
+							filename))
+					 :test #'equal)
+				   (case step
+				     (0 (failed-request req)
+					t)
+				     (1 nil))))
       
-      ; in step 0 we have the filter return a 404 code
-      (test 404 (values2 
-		 (x-do-http-request (format nil "~a/test-pd/server.pem" 
-					    prefix-local))))
+    ; in step 0 we have the filter return a 404 code
+    (test 404 (values2 
+	       (x-do-http-request (format nil "~a/test-pd/server.pem" 
+					  prefix-local))))
       
-      ; in step 1 we have it return the actual file
-      (setq step 1)
-      (test 200 (values2
-		 (x-do-http-request (format nil "~a/test-pd/server.pem"
-					    prefix-local))))
+    ; in step 1 we have it return the actual file
+    (setq step 1)
+    (test 200 (values2
+	       (x-do-http-request (format nil "~a/test-pd/server.pem"
+					  prefix-local))))
       
-      ; remove entry so subsequent tests won't see it
-      (publish-file :path "/test-pd/server.pem" :remove t)
+    ; remove entry so subsequent tests won't see it
+    (publish-file :path "/test-pd/server.pem" :remove t)
       
-      ; remove directory publish and see if that worked
-      (publish-directory :prefix "/test-pd/" :remove t)
+    ; remove directory publish and see if that worked
+    (publish-directory :prefix "/test-pd/" :remove t)
       
-      ; now it shouldn't exist
-      (test 404 (values2 
-		 (x-do-http-request (format nil "~a/test-pd/server.pem" 
-					    prefix-local))))
+    ; now it shouldn't exist
+    (test 404 (values2 
+	       (x-do-http-request (format nil "~a/test-pd/server.pem" 
+					  prefix-local))))
       
-      ; test publish directory with virtual hosts
-      (publish-directory :prefix "/test-foo/"
-			 :destination dir
-			 :host "localhost")
-      ; so it will work with localhost
-      (test 200 (values2
-		 (x-do-http-request (format nil "~a/test-foo/server.pem"
-					    prefix-local))))
+    ; test publish directory with virtual hosts
+    (publish-directory :prefix "/test-foo/"
+		       :destination test-dir
+		       :host "localhost")
+    ; so it will work with localhost
+    (test 200 (values2
+	       (x-do-http-request (format nil "~a/test-foo/server.pem"
+					  prefix-local))))
       
-      ; but not the dns name
-      (test 404 (values2
-		 (x-do-http-request (format nil "~a/test-foo/server.pem"
-					    prefix-dns))))
-      ; remove all refs
-      (publish-directory :prefix "/test-foo/"
-			 :host "localhost"
-			 :remove t)
-      (publish-file :path "/test-foo/server.pem" 
-		    :host "localhost"
-		    :remove t)
+    ; but not the dns name
+    (test 404 (values2
+	       (x-do-http-request (format nil "~a/test-foo/server.pem"
+					  prefix-dns))))
+    ; remove all refs
+    (publish-directory :prefix "/test-foo/"
+		       :host "localhost"
+		       :remove t)
+    (publish-file :path "/test-foo/server.pem" 
+		  :host "localhost"
+		  :remove t)
       
-      ; now doesn't exist
-      (test 404 (values2
-		 (x-do-http-request (format nil "~a/test-foo/server.pem"
-					    prefix-local))))
-      
-      )))
+    ; now doesn't exist
+    (test 404 (values2
+	       (x-do-http-request (format nil "~a/test-foo/server.pem"
+					  prefix-local))))
+
+    ;; now try using the access control
+    (publish-directory :prefix "/acc-test/"
+		       :destination (concatenate 'string test-dir "testdir/")
+		       :access-file "access.cl")
+    
+    
+    ; forbidden to access this file
+    (test 404
+	  (values2 (x-do-http-request (format nil "~a/acc-test/access.cl"
+					      prefix-local
+					      ))))
+    
+    ; and this file
+    (test 404
+	  (values2 (x-do-http-request (format nil "~a/acc-test/bbb.ign"
+					      prefix-local))))
+    
+    ; but this one is ok, and has content type specified by access file
+    (multiple-value-bind (res code headers)
+	(x-do-http-request (format nil "~a/acc-test/aaa.foo"
+				   prefix-local))
+      (declare (ignore res))
+      (test 200 code)
+      (test "foo/bar" (cdr (assoc :content-type headers :test #'eq)) 
+	    :test #'equal))
+    
+    ; test getting mime type from the standard place since it isn't
+    ; specified
+    (multiple-value-bind (res code headers)
+	(x-do-http-request (format nil "~a/acc-test/ccc.html"
+				   prefix-local))
+      (declare (ignore res))
+      (test 200 code)
+      (test "text/html" (cdr (assoc :content-type headers :test #'eq)) 
+	    :test #'equal))
+    
+    ; test blocking via ip address, can't access if not using localhost
+    (test 404 (values2 (x-do-http-request (format nil "~a/acc-test/ccc.html"
+						  prefix-dns))))
+    
+    
+    ; now down a directory the ip restriction isn't inherited
+    (test 200 (values2 (x-do-http-request 
+			(format nil "~a/acc-test/suba/foo.html" prefix-dns))))
+    (test 200 (values2 (x-do-http-request 
+			(format nil "~a/acc-test/suba/foo.html" prefix-local))))
+    ; this is blocked since we only match files named 'foo'
+    (test 404 (values2 (x-do-http-request 
+			(format nil "~a/acc-test/suba/access.cl" prefix-local))))
+    
+    ; and we can't go down another directory level since that's blocked
+    (test 404 (values2 (x-do-http-request 
+			(format nil "~a/acc-test/suba/subsuba/foo.html" prefix-local))))
+    
+    ;; now try password and ip authorized
+    ; no password
+    (test 401 (values2 (x-do-http-request 
+			(format nil "~a/acc-test/subb/foo.html"
+				prefix-local))))
+    
+    ; wrong ip but password ok
+    (test 404 (values2 (x-do-http-request 
+			(format nil "~a/acc-test/subb/foo.html"
+				prefix-dns)
+			:basic-authorization '("joe"  . "eoj")
+			)))
+    
+    ; good password and ip
+    (test 200 (values2 (x-do-http-request 
+			(format nil "~a/acc-test/subb/foo.html"
+				prefix-local)
+			:basic-authorization '("joe"  . "eoj")
+			)))
+    
+    
+    ))
 
 
 ;; publish-multi tests

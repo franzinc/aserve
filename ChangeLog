@@ -1,3 +1,10 @@
+2001-10-24  John Foderaro  <jkf@tiger.franz.com>
+1.2.14
+	* added access files for publish-directory.  These allow
+	  .htaccess-like controlling of what publish-directory publishes.
+>>>	* incompatible change: added an extra argument to the 
+	  publish-directory filter function and publisher functions.
+
 2001-10-19  John Foderaro  <jkf@tiger.franz.com>
 1.2.13
 	* added publish-multi 
