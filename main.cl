@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.69 2000/09/13 23:58:42 jkf Exp $
+;; $Id: main.cl,v 1.70 2000/09/16 17:38:28 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -807,6 +807,7 @@ by keyword symbols and not by strings"
 		   setuid
 		   setgid
 		   proxy
+		   cache       ; enable proxy cache
 		   debug-stream  ; stream to which to send debug messages
 		   )
   ;; -exported-
@@ -833,6 +834,10 @@ by keyword symbols and not by strings"
 
   (if* proxy 
      then (enable-proxy :server server))
+  
+  (if* cache
+     then (create-proxy-cache :server server))
+  
 
   
   (let* ((main-socket (socket:make-socket :connect :passive

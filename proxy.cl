@@ -469,6 +469,12 @@
   ;; proxy cache
   table		; hash table mapping to pcache-ent objects
   file		; file in which to store the cache info
+  (probes 0)	; cache problems
+  (hits	  0)	; number of times we could send something from the cache
+  (items  0)	; total number of objects cached
+  (bytes  0)	; total number of bytes cached
+  (memory 0)	; total number of bytes in memory
+  (disk	  0)	; bytes written to disk
   )
 
 (defstruct pcache-ent
@@ -489,9 +495,9 @@
 
 
   
-(defun create-proxy-cache (&key (wserver *wserver*))
+(defun create-proxy-cache (&key (server *wserver*))
   ;; create a cache for the proxy
-  (setf (wserver-pcache wserver)
+  (setf (wserver-pcache server)
     (make-pcache 
      :table (make-hash-table :test #'equal))))
 
@@ -508,6 +514,8 @@
 	      (proxy-request req ent)))
 
     (logmess (format nil "cache: look for ~a~%" (net.uri:render-uri (request-raw-uri req) nil)))
+    
+    (mp:without-scheduling (incf (pcache-probes pcache)))
     
     (dolist (pcache-ent
 		(gethash (net.uri:render-uri (request-raw-uri req) nil) 
@@ -526,7 +534,9 @@
 			    (response-is-young-enough 
 			     (pcache-ent-last-modified pcache-ent)
 			     (request-header-block req)))
-		     then (send-cached-response req pcache-ent)
+		     then (mp:without-scheduling
+			    (incf (pcache-hits pcache)))
+			  (send-cached-response req pcache-ent)
 			  (return))
 		; cleanup
 		(unlock-pcache-ent pcache-ent))))))
@@ -627,6 +637,12 @@
 	      (push pcache-ent
 		    (gethash (net.uri:render-uri (request-raw-uri req) nil) 
 			     (pcache-table pcache)))
+	      (mp:without-scheduling
+		(incf (pcache-items pcache))
+		(if* body-length
+		   then
+			(incf (pcache-bytes pcache) body-length)
+			(incf (pcache-memory pcache) body-length)))
 	      t))))
 
 	    
