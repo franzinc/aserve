@@ -522,6 +522,14 @@ value) then the query string in the uri is checked.&nbsp; If <strong>post</stron
 (and true is the default value) and if the request is a POST then the body of the post
 form will be decoded for query values.</p>
 
+<p>A query is normally a set of names and values.&nbsp; <br>
+<strong>http://foo.com/bar?a=3&amp;b=4 </strong>yields a query alist <strong>((&quot;a&quot;
+. &quot;3&quot;) (&quot;b&quot; . &quot;4&quot;)). </strong><br>
+If a name doesn't have an associated value then the value in the alist is the empty
+string.&nbsp;<br>
+<strong>http://foo.com/bar?a&amp;b=&amp;c=4</strong> &nbsp; yields a query alist <strong>((&quot;a&quot;
+. &quot;&quot;) (&quot;b&quot; . &quot;&quot;) (c . &quot;4&quot;))</strong></p>
+
 <p>.&nbsp;&nbsp; </p>
 
 <p><a name="f-request-query-value"></a><font face="Courier New"><strong>(request-query-value
@@ -532,6 +540,10 @@ keys and values, with a call to <strong>assoc</strong> to search for the specifi
 finally with a call to <strong>cdr</strong> to return just the value from the assoc list
 entry.&nbsp; The <strong>test</strong> argument is the function to be used to test the
 given key against the keys in the assoc list. It defaults to <strong>#'equal</strong>. </p>
+
+<p>If the given key is <em>not</em> present in the query <strong>nil</strong> is returned.
+&nbsp; If the given key <em>is</em> present in the query but doesn't have an associated
+value then the empty string is returned.</p>
 
 <hr>
 
