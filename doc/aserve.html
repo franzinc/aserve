@@ -301,8 +301,8 @@ an entity assigned, the old entity is replaced by the new entity.</p>
 
 <p><a name="f-publish-file"></a><strong><font face="Courier New">(publish-file &amp;key
 path host port&nbsp; file content-type class preload cache-p remove <br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; authorizer
-server timeout)</font></strong></p>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+authorizer server timeout)</font></strong></p>
 
 <p>This creates an entity that will return the contents of a file on the disk in response
 to a request.&nbsp;&nbsp; The <strong>url</strong> and <strong>file</strong>&nbsp; must be
@@ -371,18 +371,24 @@ header lines and thus minimizes network traffic. </p>
 <p><a name="f-publish-directory"></a><strong><font face="Courier New">(publish-directory
 &amp;key prefix host port destination remove authorizer server <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-indexes filter timeout publisher)</font></strong></p>
+indexes filter timeout publisher access-file)</font></strong></p>
 
-<p>This creates a mapping from all urls whose name begins with<strong> prefix</strong> to
-files stored in the directory specified by the destination.&nbsp;&nbsp; The <strong>host</strong>,
-<strong>port, remove, authorizer </strong>and <strong>server</strong> arguments are as
-described above for <strong>publish.</strong> &nbsp;&nbsp;&nbsp;&nbsp; The <strong>timeout</strong>
-argument defaults as described in <strong>publish-file</strong>. When a request comes in
-for which there isn't an entity that matches it exactly,&nbsp; AllegroServe checks to see
-if a prefix of the request matches the request.&nbsp; If so, and if the resulting entity
-is a <strong>directory-entity</strong> as created by this function, then it strips the
-prefix off the given request and appends the remaining part of the request to the
-destination string.&nbsp; It then publishes that (normally using <strong>publish-file</strong>
+<p><strong>publish-directory</strong> is used to publish a complete directory tree of
+files.&nbsp; This is similar to how web servers such as Apache publish files. &nbsp;
+AllegroServe publishes the files in&nbsp; the directory tree in a <em>lazy</em>
+manner.&nbsp;&nbsp; As files in the tree are referenced by client requests entities are
+created and published.&nbsp; </p>
+
+<p><strong>publish-directory</strong> creates a mapping from all urls whose name begins
+with<strong> prefix</strong> to files stored in the directory specified by the <strong>destination</strong>.&nbsp;&nbsp;
+The <strong>host</strong>, <strong>port, remove, authorizer </strong>and <strong>server</strong>
+arguments are as described above for <strong>publish.</strong> &nbsp;&nbsp;&nbsp;&nbsp;
+The <strong>timeout</strong> argument defaults as described in <strong>publish-file</strong>.
+When a request comes in for which there isn't an entity that matches it exactly,&nbsp;
+AllegroServe checks to see if a prefix of the request has been registered.&nbsp; If so,
+and if the resulting entity is a <strong>directory-entity</strong> as created by this
+function, then it strips the prefix off the given request and appends the remaining part
+of the request to the destination string.&nbsp; It then publishes that (normally using <strong>publish-file</strong>
 and computing the content-type from the file type). &nbsp;&nbsp; Next that <strong>file-entity
 </strong>is made to handle the request in the normal manner.</p>
 
@@ -391,11 +397,12 @@ to locate an index file for that directory.&nbsp; The <strong>indexes</strong> a
 specifies a list of index files to search for.&nbsp; By default the list consists of two
 filenames &quot;index.html&quot; and &quot;index.htm&quot;.</p>
 
-<p>The valueof the <strong>filter </strong>argument is a function of three values: <strong>req</strong>
-<strong>ent</strong> and&nbsp; <strong>filename</strong>.&nbsp; <strong>req</strong> and <strong>ent</strong>
-are the request and entity objects that describe the current client request.
-&nbsp;&nbsp;&nbsp; <strong>filename</strong> is the name of a known file on the current
-machine which&nbsp; is being requested by the current request.</p>
+<p>The valueof the <strong>filter </strong>argument is a function of four values: <strong>req</strong>
+<strong>ent</strong>&nbsp; <strong>filename</strong> and <strong>info</strong>.&nbsp; <strong>req</strong>
+and <strong>ent</strong> are the request and entity objects that describe the current
+client request. &nbsp;&nbsp;&nbsp; <strong>filename</strong> is the name of a known file
+on the current machine which&nbsp; is being requested by the current request.&nbsp; <strong>info</strong>
+is the list of access information for this file.</p>
 
 <p>If the filter returns <strong>nil</strong> then the normal operation&nbsp; is done by
 the directory-entity handler: the selected file is published and then the request to
@@ -414,22 +421,135 @@ when a request comes that's handled by the <strong>directory-entity </strong>and
 located on the disk that matches the incoming <strong>url</strong>.&nbsp;&nbsp; Nomally a <strong>publish-file</strong>
 is done to add that file.&nbsp; You may want to publish some other kind of entity to
 represent that file.&nbsp; The <strong>publisher</strong> argument, if non-nil, must be a
-function of three arguments:&nbsp; <strong>req ent filename</strong>.&nbsp; The filename
-is a string naming the file that's been matched with the request.&nbsp;&nbsp; The <strong>publisher</strong>
+function of&nbsp; four arguments:&nbsp; <strong>req ent filename</strong> <strong>info</strong>.&nbsp;
+The filename is a string naming the file that's been matched with the request.&nbsp;&nbsp;
+<strong>info</strong> is the list of access information for this file.&nbsp; The <strong>publisher</strong>
 function must return an entity to be processed to send back a response.&nbsp;&nbsp; The <strong>publisher</strong>
-function may wish to publish that entity but it need not do so.&nbsp; The default <strong>publisher</strong>
-function is:</p>
+function may wish to publish that entity but it need not do so.</p>
 
-<pre>(defun standard-directory-entity-publisher (req ent realname)
-  ;; the default publisher used when directory entity finds
-  ;; a file it needs to publish
-  (publish-file :path (uri-path (request-uri req))
-		:host (host ent)
-		:file realname
-		:authorizer (entity-authorizer ent)
-		:timeout (entity-timeout ent)))
-      
-		      </pre>
+<p>&nbsp;</p>
+
+<h3>Directory Access Files</h3>
+
+<p>When files are accessed and automatically published you may with to set some of the
+parameters of the entity that is published. As mentioned above you can defined a <strong>publisher</strong>
+function that has complete control in publishing the entity.&nbsp; A less powerful but
+easier to use alternative is to place <em>access files </em>in the directory tree being
+published.&nbsp;&nbsp; An access file specifies information that you want passed to the
+publisher function.&nbsp; You can modify these access files while the directory tree is
+published and their latest values will be used for publishing subsequent files.
+&nbsp;&nbsp; This is similar to they way Apache controls its publishing with <strong>.htaccess</strong>
+files.&nbsp; </p>
+
+<p>The name of an access file in AllegroServe is controlled by the <strong>:access-file</strong>
+argument to <strong>publish-directory.</strong>&nbsp;&nbsp; We'll assume the name chosen
+is <strong>access.cl</strong> in this document.&nbsp;&nbsp;&nbsp;When a file is about to
+be published all access files from the <strong>destination</strong> directory all the way
+down to the directory containing the file to be published are read and used.&nbsp; For
+example if the <strong>destination</strong> in a <strong>publish-directory </strong>was
+given as &quot;/home/joe/html/&quot; and an http request comes in which references the
+file &quot;/home/joe/html/pics/archive/foo.jpg&quot;&nbsp; then AllegroServe will check
+for access files at all of these locations and in this order 
+
+<ul>
+  <li>/home/joe/html/access.cl</li>
+  <li>/home/joe/html/pics/access.cl</li>
+  <li>/home/joe/html/pics/archive/access.cl</li>
+</ul>
+
+<p>The information is collected as successive access files are read.&nbsp; The new
+information is placed before the existing information thus causing subdirectory &nbsp;
+access files to possibly shadow information in access files in directories above it.&nbsp;
+Also superdirectory access file information is automatically eliminated if it isn't marked
+as being <em>inherited<strong>.&nbsp; </strong></em></p>
+
+<p>The <strong>publisher </strong>function receives the collected information and can do
+with it what it wishes.&nbsp; We'll describe what the built-in publisher function does
+with the information.</p>
+
+<p>When we speak of <em>information<strong> </strong></em>in access files we are purposely
+being vague.&nbsp;&nbsp; We define what information must look like and what the standard
+publisher function does with certain information but we allow users to define their own
+kinds of information and use that in their own publisher function.</p>
+
+<p>Each access file consists of zero or more Lisp forms (and possibly lisp style
+comments).&nbsp; Each form is&nbsp; a list beginning with a keyword symbol and then
+followed by a property-list-like sequence of &nbsp; keywords and values.&nbsp;&nbsp;
+Nothing in the form is evaluated. &nbsp;&nbsp;&nbsp; The form cannot contain #. or #,.
+macros.</p>
+
+<p>One&nbsp; information form is used by AllegroServe itself:</p>
+
+<p><strong>(:subdirectories :block t)</strong></p>
+
+<p>If this appears in an access file then no subdirectories of this directory will be
+searched for files.&nbsp; This prunes the directory tree at this directory.</p>
+
+<p>These other information forms are used by the standard publisher function. &nbsp;&nbsp;
+Each takes an <strong>:inherit</strong> argument which defaults to true. &nbsp; If set to <strong>nil</strong>
+then this means that this information will not apply to files found in subdirectories.</p>
+
+<table border="1" width="100%">
+  <tr>
+    <th width="15%">name</th>
+    <th width="17%">args</th>
+    <th width="68%">meaning</th>
+  </tr>
+  <tr>
+    <td width="15%"><strong>:ip</strong></td>
+    <td width="17%"><strong>:patterns <br>
+    :inherit</strong></td>
+    <td width="68%">specifies a location-authorizer restriction on which machines can see
+    published files.&nbsp; The value of the <strong>:patterns</strong> argument has the same
+    form as the <strong>:patterns</strong> slot of a location-authorizer.</td>
+  </tr>
+  <tr>
+    <td width="15%"><strong>:password</strong></td>
+    <td width="17%"><strong>:realm<br>
+    :allowed<br>
+    :inherit</strong></td>
+    <td width="68%">specifies a password-authorizer restriction on access to published files.
+    &nbsp; See the password-authorizer documentation for a description of the <strong>:realm</strong>
+    and <strong>:allowed</strong> arguments</td>
+  </tr>
+  <tr>
+    <td width="15%"><strong>:files</strong></td>
+    <td width="17%"><strong>:allow<br>
+    :ignore<br>
+    :inherit</strong></td>
+    <td width="68%">specifies which files are visible to be published.&nbsp; To be visible a
+    file must be allowed and not ignored.&nbsp; Allowed and ignored are lists of regular
+    expressions.&nbsp;&nbsp; The default value of <strong>:allow</strong> is (&quot;*&quot;)
+    which matches everything.&nbsp;&nbsp; The default value of<strong> :ignore</strong> is nil
+    which matches nothing.</td>
+  </tr>
+  <tr>
+    <td width="15%"><strong>:mime</strong></td>
+    <td width="17%"><strong>:types<br>
+    :inherit</strong></td>
+    <td width="68%">specifies which mime types are to be associated with which file types.
+    &nbsp; This list takes precedence over the built-in list inside AllegroServe.&nbsp; :types
+    is a list of mime specifiers.&nbsp;&nbsp; A mime specifier is a list beginning with a
+    string giving the mime type followed by the files types that should map to that mime type</td>
+  </tr>
+</table>
+
+<p>Here is a sample access file:</p>
+
+<p><font face="Courier New">; only connections to localhost will be able to access the
+files<br>
+(:ip :patterns ((:accept &quot;127.1&quot;) :deny))&nbsp;&nbsp;&nbsp; <br>
+(:password :realm &quot;mysite&quot; <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :allowed ((&quot;joe&quot; .
+&quot;mypassword&quot;)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (&quot;sam&quot;
+. &quot;secret&quot;)) <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :inherit nil) ; doesn't apply
+to subdirectories<br>
+; publish html and cgi files, but not those beginning with a period<br>
+(:files :allow (&quot;\\.html$&quot; &quot;\\.cgi$&quot;) :ignore (&quot;^\\.&quot;)) <br>
+(:mime :types ((&quot;text/jil&quot; &quot;jil&quot; &quot;jlc&quot;) (&quot;text/c&quot;
+&quot;c&quot; &quot;cc&quot;)))</font></p>
 
 <p>&nbsp;</p>
 
@@ -471,7 +591,7 @@ conputation is required each time the page is requested.&nbsp;&nbsp;&nbsp; </p>
 <p>The <strong>host, port, content-type, class, remove, server authorizer </strong>and<strong>
 timeout</strong> arguments are the same as those of the other publish functions.
 &nbsp;&nbsp; The <strong>items </strong>argument is unique to <strong>publish-multi</strong>
-and is a list of zero or more of the following objects
+and is a list of zero or more of the following objects 
 
 <ul>
   <li>string or pathname - this is a reference to a file on the server.&nbsp; This item
@@ -490,8 +610,8 @@ and is a list of zero or more of the following objects
     array of unsigned-byte 8 by using <strong>(string-to-octets string :null-terminate nil).
     &nbsp;&nbsp; </strong>The cached-value argument to the function will be <strong>nil</strong>
     or an unsigned-byte 8 array.</li>
-  <li><strong>(:string</strong> string<strong>) - </strong> this item supplies the given
-    string to the web page.</li>
+  <li><strong>(:string</strong> string<strong>) - </strong>this item supplies the given string
+    to the web page.</li>
 </ul>
 
 <p>Here's an example where we create a page from a fixed header and trailer page with a
