@@ -1,3 +1,11 @@
+2000-11-06  Kevin Layer  <layer@ultra>
+
+	* log.cl: make logmess a method, so I can define an after method
+	on it in my own code
+	* main.cl: maybe-universal-time-to-date and
+	universal-time-to-date: take time-zone optional argument, so my
+	redefined version of log-request can specify the local time zone
+
 2000-10-31  John Foderaro  <jkf@tiger.franz.com>
 1.1.34
 	* add to the list of characters to escape in form-urlencoding

@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: log.cl,v 1.16 2000/10/26 05:28:37 jkf Exp $
+;; $Id: log.cl,v 1.17 2000/11/06 21:24:38 layer Exp $
 
 ;; Description:
 ;;   iserve's logging
@@ -36,7 +36,7 @@
 
 (defvar *enable-logging* t) ; to turn on/off the standard logging method
 
-(defun logmess (message)
+(defmethod logmess (message)
   (multiple-value-bind (csec cmin chour cday cmonth cyear)
       (decode-universal-time (get-universal-time))
     (let ((str (format nil

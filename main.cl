@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.83 2000/11/06 17:20:34 jkf Exp $
+;; $Id: main.cl,v 1.84 2000/11/06 21:24:38 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -2121,44 +2121,45 @@ in get-multipart-sequence"))
     
      
 
-(defun maybe-universal-time-to-date (ut-or-string)
+(defun maybe-universal-time-to-date (ut-or-string &optional (time-zone 0))
   ;; given a ut or a string, only do the conversion on the string
   (if* (stringp ut-or-string) 
      then ut-or-string
-     else (universal-time-to-date ut-or-string)))
+     else (universal-time-to-date ut-or-string time-zone)))
 
-(defvar *saved-ut-to-date* nil)
-    
-(defun universal-time-to-date (ut)
+(defparameter *saved-ut-to-date* nil)
+
+(defun universal-time-to-date (ut &optional (time-zone 0))
   ;; convert a lisp universal time to rfc 1123 date
   ;;
   (let ((cval *saved-ut-to-date*))
-    (if* (eql ut (car cval))
+    (if* (and (eql ut (caar cval))
+	      (eql time-zone (cdar cval)))
        then ; turns out we often repeatedly ask for the same conversion
 	    (cdr cval)
        else
 	    (let ((*print-pretty* nil))
 	      (multiple-value-bind
-		  (sec min hour date month year day-of-week dsp time-zone)
-		  (decode-universal-time ut 0)
-		(declare (ignore time-zone dsp))
-		(let ((ans (format nil "~a, ~2,'0d ~a ~d ~2,'0d:~2,'0d:~2,'0d GMT"
-				   (svref
-				    '#("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun")
-				    day-of-week)
-				   date
-				   (svref
-				    '#(nil "Jan" "Feb" "Mar" "Apr" "May" "Jun"
-				       "Jul" "Aug" "Sep" "Oct" "Nov" "Dec")
-				    month
-				    )
-				   year
-				   hour
-				   min
-				   sec)))
-		  (setf *saved-ut-to-date* (cons ut ans))
-		  ans
-		  ))))))
+		  (sec min hour date month year day-of-week dsp tz)
+		  (decode-universal-time ut time-zone)
+		(declare (ignore tz dsp))
+		(let ((ans
+		       (format
+			nil
+			"~a, ~2,'0d ~a ~d ~2,'0d:~2,'0d:~2,'0d~@[ GMT~]"
+			(svref '#("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun")
+			       day-of-week)
+			date
+			(svref '#(nil "Jan" "Feb" "Mar" "Apr" "May" "Jun"
+				  "Jul" "Aug" "Sep" "Oct" "Nov" "Dec")
+			       month)
+			year
+			hour
+			min
+			sec
+			(= 0 time-zone))))
+		  (setf *saved-ut-to-date* (cons (cons ut time-zone) ans))
+		  ans))))))
 
 
 
