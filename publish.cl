@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: publish.cl,v 1.23.2.1 2000/02/08 19:48:37 jkf Exp $
+;; $Id: publish.cl,v 1.23.2.2 2000/03/02 14:17:16 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -380,7 +380,10 @@
      then (setq locator (find-locator :exact server)))
   
   (let ((ent (make-instance (or class 'computed-entity)
-	       :host host
+	       :host (if* host
+			then (if* (atom host)
+				then (list host)
+				else host))
 	       :port port
 	       :path path
 	       :function function
@@ -402,7 +405,11 @@
   (if* (null locator) 
      then (setq locator (find-locator :exact server)))
   
-  (let (ent got)
+  (let (ent got
+	(c-type (or content-type
+		    (gethash (pathname-type (pathname file))
+			     *mime-types*)
+		    "application/octet-stream")))
     (if* preload
        then ; keep the content in core for fast display
 	    (with-open-file (p file :element-type '(unsigned-byte 8))
@@ -417,22 +424,28 @@
 			       size
 			       got))
 		(setq ent (make-instance (or class 'file-entity)
-			    :host host
+			    :host (if* (atom host)
+				     then (list host)
+				     else host)
 			    :port port
 			    :path path
 			    :file file
-			    :content-type content-type
+			    :content-type c-type
+			    
 			    :contents  guts
 			    :last-modified lastmod
 			    :cache-p cache-p
 			    :ssi     ssi
 			    ))))
        else (setq ent (make-instance (or class 'file-entity)
-			:host host
+			:host (if* host 
+				 then (if* (atom host)
+					 then (list host)
+					 else host))
 			:port port
 			:path path
 			:file file
-			:content-type content-type
+			:content-type c-type
 			:cache-p cache-p
 			:ssi ssi
 			)))
@@ -459,7 +472,10 @@
   (push (cons prefix (make-instance 'directory-entity 
 		       :directory destination
 		       :prefix prefix
-		       :host host
+		       :host (if* host 
+				 then (if* (atom host)
+					 then (list host)
+					 else host))
 		       :port port
 		       ))
 	(locator-info locator)))
@@ -490,17 +506,21 @@
     (if* (null entity)
        then (setq entity (make-instance 'computed-entity
 			   :function #'(lambda (req ent)
-				     (with-http-response 
-					 (req ent
-					      :response *response-not-found*)
-				       (with-http-body (req ent)
-					 (html "The request for "
-					       (:princ-safe 
-						(render-uri 
-						 (request-uri req)
-						 nil
-						 ))
-					       " was not found on this server."))))
+					 (with-http-response 
+					     (req ent
+						  :response *response-not-found*)
+					   (with-http-body (req ent)
+					     (html 
+					      (:head (:title "404 - NotFound")
+						     (:body
+						      (:h1 "Not Found")
+						      "The request for "
+						      (:princ-safe 
+						       (render-uri 
+							(request-uri req)
+							nil
+							))
+						      " was not found on this server."))))))
 			   :content-type "text/html"))
 	    (setf (wserver-invalid-request *wserver*) entity))
     (process-entity req entity)))
@@ -518,9 +538,10 @@
        then (let ((entity-host (host entity)))
 	      (if* entity-host
 		 then ; must do a host match
-		      (let ((req-host (host req)))
+		      (let ((req-host (request-header-host req)))
 			(if* req-host 
-			   then (if* (equal req-host entity-host)
+			   then (if* (member req-host entity-host
+					     :test #'equalp)
 				   then entity)
 			   else ; no host given, don't do it
 				nil))
@@ -623,8 +644,15 @@
 		      (declare (dynamic-extent buffer))
 		      
 		      (setf (last-modified ent) lastmod)
+		      
 		      (with-http-response (req ent)
 
+			;; control will not reach here if the request
+			;; included an if-modified-since line and if
+			;; the lastmod value we just calculated shows
+			;; that the file hasn't changed since the browser
+			;; last grabbed it.
+			
 			(setf (request-reply-content-length req) size)
 			(push (cons "Last-Modified"
 				    (universal-time-to-date 
@@ -764,7 +792,7 @@
      elseif (and  ;; assert: get command
 	     (wserver-enable-chunking *wserver*)
 	     (eq (request-protocol req) :http/1.1)
-	     (null (content-length ent)))
+	     (null (request-header-content-length ent)))
        then (setq strategy '(:chunked :use-socket-stream))
        else ; can't chunk, let's see if keep alive is requested
 	    (if* (and (wserver-enable-keep-alive *wserver*)

@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: main.cl,v 1.19.2.1 2000/02/08 19:48:37 jkf Exp $
+;; $Id: main.cl,v 1.19.2.2 2000/03/02 14:17:16 jkf Exp $
 
 ;; Description:
 ;;   neo's main loop
@@ -79,8 +79,9 @@
    #:wserver-log-function
    #:wserver-log-stream
    #:wserver-socket
-   
-   #:*neo-version*
+
+   #:*iserve-version*
+   #:*mime-types*
    #:*response-ok*
    #:*response-created*
    #:*response-accepted*
@@ -123,6 +124,12 @@
 
 ;;;;;;;;;;; end debug support ;;;;;;;;;;;;
 
+
+;; foreign function imports
+#+unix
+(ff:def-foreign-call (setuid "setuid") ((x :int)) :returning :int)
+#+unix
+(ff:def-foreign-call (setgid "setgid") ((x :int)) :returning :int)
 
 
 
@@ -301,7 +308,11 @@
 			"host"
 			"user-agent"
 			"content-length"))
-	  (push (cons name (read-from-string name)) res))
+	  (push (list name   ;; string name
+		      (read-from-string name) ;; symbol name
+		      ;; accessor name
+		      (read-from-string 
+			    (format nil "request-header-~a" name))) res))
 	res)))
 
     
@@ -314,7 +325,7 @@
   (let (ent)
     (if* (setq ent (assoc name *fast-headers* :test #'equal))
        then ; has a fast accesor
-	    `(,(cdr ent) ,obj)
+	    `(,(third ent) ,obj)
        else ; must get it from the alist
 	    `(cdr (assoc ,name (request-headers ,obj) :test #'equal)))))
 
@@ -322,7 +333,7 @@
   ;; set the header value regardless of where it is stored
   (let (ent)
     (if* (setq ent (assoc name *fast-headers* :test #'equal))
-       then `(setf (,(cdr ent) ,obj) ,newval)
+       then `(setf (,(third ent) ,obj) ,newval)
        else (let ((genvar (gensym))
 		  (nobj (gensym)))
 	      `(let* ((,nobj ,obj)
@@ -352,10 +363,10 @@
       ;; generate a list of slot descriptors for all of the 
       ;; fast header slots
       (dolist (head *fast-headers*)
-	(push `(,(cdr head) :accessor ,(cdr head) 
+	(push `(,(third head) :accessor ,(third head) 
 			    :initform nil
 			    :initarg
-			    ,(intern (symbol-name (cdr head)) :keyword))
+			    ,(intern (symbol-name (second head)) :keyword))
 	      res))
       res))
    
@@ -503,6 +514,8 @@
 		   (keep-alive t)
 		   (server *wserver*)
 		   debug      ; set debug level
+		   setuid
+		   setgid
 		   )
   ;; -exported-
   ;;
@@ -527,6 +540,11 @@
 					  :local-port port
 					  :reuse-address t
 					  :format :bivalent)))
+
+    #+unix
+    (progn
+      (if* (fixnump setgid) then (setgid setgid))
+      (if* (fixnump setuid) then (setuid setuid)))
     
     (setf (wserver-socket server) main-socket)
     (setf (wserver-terminal-io server) *terminal-io*)
@@ -601,7 +619,7 @@
      #'http-accept-thread)))
 
 (defun make-worker-thread ()
-  (let* ((name (format nil "ht~d" (incf *thread-index*)))
+  (let* ((name (format nil "~d-iserve-worker" (incf *thread-index*)))
 	 (proc (mp:make-process :name name
 				:initial-bindings
 				`((*wserver*  . ',*wserver*)
@@ -806,7 +824,7 @@
 		    (return-from read-http-request nil))
 	    
 	    ; insert the host name and port into the uri
-	    (let ((host (header-slot-value req "host")))
+	    (let ((host (request-header-host req)))
 	      (if* host
 		 then (let ((colonpos (find-it #\: host 0 (length host)))
 			    (uri (request-uri req))
@@ -864,7 +882,7 @@
   ;; http/1.1 offers up the chunked transfer encoding
   ;; we can't handle that at present...
   (declare (ignore sock)) ; but they are passed to the next method
-  (if* (equalp "chunked" (transfer-encoding req))
+  (if* (equalp "chunked" (request-header-transfer-encoding req))
      then (with-http-response (*response-not-implemented*
 			       req "text/html" :close t)
 	    (format (response req) "chunked transfer is not supported yet"))
@@ -890,7 +908,7 @@
   ;;      then we read what follows and assumes that the body
   ;;	  (this is the http/0.9 behavior).
   ;;
-  (let ((cl (content-length req)))
+  (let ((cl (request-header-content-length req)))
     (if* cl
        then (let ((len (content-length-value req))
 		  (ret))
@@ -902,7 +920,7 @@
 		   else (setf (body req) ret)
 			t)))
        else ; no content length
-	    (if* (not (equalp (connection req) "keep-alive"))
+	    (if* (not (equalp (request-header-connection req) "keep-alive"))
 	       then (call-next-method) ; do the 0.9 thing
 	       else ; there is no body
 		    t))))

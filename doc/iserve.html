@@ -60,7 +60,7 @@ and after you start the server.</p>
 server running.</p>
 
 <p><strong><font face="Courier New">(start &amp;key port listeners chunking keep-alive
-server debug)</font></strong></p>
+server setuid setgid debug)</font></strong></p>
 
 <p>If no arguments are given then <strong>start</strong>&nbsp; starts a multi-threaded web
 server on port 80, which is the standard web server port.&nbsp;&nbsp;&nbsp; If you are
@@ -94,6 +94,15 @@ you only need be concerned with <strong>:port</strong> and <strong>:listeners.
     which denotes&nbsp; a particular instance of a web server.&nbsp;&nbsp; This is for support
     of running multiple independent web servers in the same lisp image.&nbsp; This will be
     described in a later section (eventually).</li>
+  <li>setuid -- after opening the port, change the user id of this process to the given number
+    (only numbers are allowed, not names).&nbsp; This will only have an effect on Unix and it
+    will only succeed if the current user id is <strong>root</strong>.&nbsp;&nbsp; You would
+    want to use this argument if you plan on opening port <strong>80</strong> on Unix, as you
+    would have to start the server as <strong>root</strong> but then would want to change the
+    user id to an account with fewer priviledges before allowing possibly malicious people to
+    connect to it.</li>
+  <li>setgid -- after opening the port, change the group&nbsp; id of this process to the given
+    number (only numbers are allowed, not names).&nbsp; This will only have an effect on Unix</li>
   <li>debug -- if given a number this will print debugging messages whose associated codes are
     this number or less.&nbsp;&nbsp;&nbsp; This is really an internal switch and may be
     removed in future versions.</li>
@@ -178,20 +187,25 @@ optional too in the future).&nbsp; The arguments have these meanings:
     is specified as true.</li>
   <li><strong>content-type</strong> -- A string describing the content of the file.&nbsp; This
     often referred to as the MIME type of the file.&nbsp; An example is &quot;text/html&quot;
-    to describe an html file.</li>
+    to describe an html file.&nbsp; If a content-type value is not provided, then iServe
+    checks the pathname-type in the&nbsp; *mime-types* hash table to see if there is a
+    content-type associated with this pathname-type.&nbsp; If it fails to find a content-type
+    then it uses the type &quot;application/octet-stream&quot;.&nbsp; </li>
   <li><strong>class</strong> -- a Clos class name or class object to be used to hold this
     entity.&nbsp; The class must be a subclass of&nbsp; <strong>file-entity</strong>.
     &nbsp;&nbsp; </li>
-  <li><strong>preload</strong> --if true it instructs <strong>neo</strong> to read the
+  <li><strong>preload</strong> --if true it instructs <strong>iServe</strong> to read the
     contents of the file in immediately and store it in a lisp object.&nbsp; This will speed
-    up the reponse to this request.</li>
+    up the response to this request.&nbsp; However note that if the file changes on the disk
+    after it has been preloaded, this change will <strong>not </strong>be seen until<strong>
+    &nbsp; publish-file </strong>is called again<strong>.</strong></li>
   <li><strong>server</strong> -- if this entity should only be served by a particular server,
     then this specifies which server.&nbsp;&nbsp; See the section (to be written) on running
     multiple servers in the same Lisp process.</li>
 </ul>
 
 <p>The function that handles requests for files will respond correctly to <strong>If-Modified-Since</strong>
-header lines and thus minimize network traffic. </p>
+header lines and thus minimizes network traffic. </p>
 
 <p>Example: </p>
 

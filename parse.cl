@@ -18,7 +18,7 @@
 ;; Commercial Software developed at private expense as specified in
 ;; DOD FAR Supplement 52.227-7013 (c) (1) (ii), as applicable.
 ;;
-;; $Id: parse.cl,v 1.14.2.1 2000/02/08 19:48:37 jkf Exp $
+;; $Id: parse.cl,v 1.14.2.2 2000/03/02 14:17:16 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -198,7 +198,7 @@
 	(dolist (head *fast-headers*)
 	  (push (cons
 		 (dual-caseify (concatenate 'string (car head) ":"))
-		 (cdr head))
+		 (third head))
 		res))
 	res))
       
