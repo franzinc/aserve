@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.31 2002/04/10 21:36:29 jkf Exp $
+;; $Id: examples.cl,v 1.32 2002/04/10 21:38:23 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -152,7 +152,7 @@
 			  ", "
 			  ((:a :href "cgi3") "set status to unauthorized request"))
 			 :hr
-			 ((:img :src "aservepowered.gif")) " <-- feel free to use this image on your AllegroServe web site"
+			 ((:img :src "aservepowered.gif")) " <-- feel free to use this image on your AllegroServe-based web site"
 			 ))))))
 			     
 
