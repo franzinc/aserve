@@ -1,3 +1,7 @@
+2003-12-23  John Foderaro  <jkf@tiger.franz.com>
+1.2.34
+	*  fix typo in exports wserver-io-timeout
+
 2003-12-12  Kevin Layer  <layer@relay.known.net>
 
 	* makefile: set base version to 6.2

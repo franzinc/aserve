@@ -24,7 +24,7 @@
 ;;
 
 ;;
-;; $Id: decode.cl,v 1.18 2003/09/24 14:46:00 jkf Exp $
+;; $Id: decode.cl,v 1.19 2003/12/23 17:53:35 jkf Exp $
 
 ;; Description:
 ;;   decode/encode code
@@ -581,6 +581,16 @@
       (setf (schar arr 62) #\+)
       (setf (schar arr 63) #\/)
       arr))
+
+;; note:  12/5/03
+;; beginning in acl 6.2 patch excl.003 there are more efficient built-in 
+;; functions for doing this conversion:
+;;  excl:string-to-base64-string	[encode]
+;;  excl:base64-string-to-string        [decode]
+;;
+;; At some future point we'll make use of these functions in AllegroServe
+;; and drop the functions below.
+;;
 
 
 (defun base64-decode (string)
