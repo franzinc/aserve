@@ -1,3 +1,8 @@
+2003-12-08  John Foderaro  <jkf@tiger.franz.com>
+1.5
+	* add :reap-hook-function to webaction-project so that you 
+	can manage sessions about to be reaped.
+
 2003-12-08    <jkf@main.verada.com>
 
 	* set the prefix and suffix values for a websession key

@@ -23,7 +23,7 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-;; $Id: websession.cl,v 1.3 2003/12/08 14:17:49 jkf Exp $
+;; $Id: websession.cl,v 1.4 2003/12/08 16:56:14 jkf Exp $
 
 (in-package :net.aserve)
 
@@ -50,6 +50,10 @@
 	    :accessor sm-lifetime
 	    :initform #.(* 5 60 60) ; five hours
 	    )
+   
+   (reap-hook-function  :initarg :reap-hook-function
+			:accessor sm-reap-hook-function
+			:initform nil)
    
    (cookie-name :initarg :cookie-name
 		:initform "webaction"
@@ -175,12 +179,17 @@
 (defun reap-unused-sessions (sm)
   (let ((now (excl::cl-internal-real-time))
 	(lifetime (sm-lifetime sm))
+	(reap-fcn (sm-reap-hook-function sm))
 	(toreap))
     (maphash #'(lambda (id websession)
 		 (declare (ignore id))
 		 (if* (> now
 			 (+ (websession-lastref websession) lifetime))
-		    then (push websession toreap)))
+		    then (if* (and reap-fcn
+				   (funcall reap-fcn websession))
+			    then ; keep around this session longer
+				 (setf (websession-lastref websession) now)
+			    else (push websession toreap))))
 	     (sm-websessions sm))
   
     (dolist (websession toreap)
