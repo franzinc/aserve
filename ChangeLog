@@ -1,3 +1,12 @@
+2001-11-05    <jkf@main.verada.com>
+
+	* log.cl - write to log files under the protection of a process
+	  lock found on the stream-property-list of the stream associated
+	  with the :lock indicator.  If no such lock is found, write
+	  to the streame anyway.
+	* examples/chat.cl - improve the speed of deleting messages by
+	  binary searching the existing messages.
+
 2001-10-31  John Foderaro  <jkf@tiger.franz.com>
 1.2.15
 	* start now takes a host argument to allow you to bind the server

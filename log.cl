@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: log.cl,v 1.21 2001/10/18 21:27:52 jkf Exp $
+;; $Id: log.cl,v 1.22 2001/11/05 22:01:25 jkf Exp $
 
 ;; Description:
 ;;   iserve's logging
@@ -87,15 +87,27 @@
 			      (request-socket req))))
 	
 		(stream (vhost-log-stream
-			 (request-vhost req))))
-    
-	    (format stream
-		    "~a - - [~a] ~s ~s ~s~%"
-		    (socket:ipaddr-to-dotted ipaddr)
-		    (maybe-universal-time-to-date time)
-		    (request-raw-request req)
-		    code
-		    (or length -1)))))
+			 (request-vhost req)))
+		(lock))
+
+	    (macrolet ((do-log ()
+			 '(progn (format stream
+				  "~a - - [~a] ~s ~s ~s~%"
+				  (socket:ipaddr-to-dotted ipaddr)
+				  (maybe-universal-time-to-date time)
+				  (request-raw-request req)
+				  code
+				  (or length -1))
+			   (force-output stream))))
+			 
+	      (if* (streamp stream)
+		 then (setq lock (getf (excl::stream-property-list stream) 
+				       :lock)))
+	    
+	      (if* lock
+		 then (mp:with-process-lock (lock)
+			(do-log))
+		 else (do-log))))))
 
 	    	
     

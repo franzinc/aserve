@@ -22,7 +22,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.12 2001/07/18 19:05:12 jkf Exp $
+;; $Id: chat.cl,v 1.13 2001/11/05 22:01:25 jkf Exp $
 
 ;; Description:
 ;;   aserve chat program
@@ -118,6 +118,8 @@
 (defvar *top-frame-alink-color*)
 
 (defvar *background-image* nil)
+
+(defvar *message-id-hook* nil) ; if true it can contribute to the messsage line
 
 (defvar *max-active-time* #.(* 2 60)) ; after 2 minutes no longer active
 
@@ -423,7 +425,6 @@
      then (error "must specify :home value as a string naming a directory (no trailing slash)"))
   
   (setq *chat-home* home)
-  
   
   
   (setq *master-controller* nil)
@@ -1560,7 +1561,9 @@
 		    then (mapcar #'user-handle to-users)
 		    else t)
 	     :real (if* user then t else nil)
-	     :time (compute-chat-date ut)
+	     :time (let ((time (compute-chat-date ut)))
+		     (if* *message-id-hook*
+			then (funcall *message-id-hook* time)))
 	     :ut   ut
 	     :body (if* link
 		      then (cons link cvted-body)
@@ -1629,15 +1632,37 @@
 (defun find-chat-message (chat number)
   ;; find the message with the given number
   (let* ((messages (chat-messages chat))
-	 (len (and messages (length messages))))
+	 (len (and messages (chat-message-next chat)))
+	 (bottom 0)
+	 (top (and len (1- len)))
+	 )
     (if* messages
        then ; find first message
-	    (dotimes (i len)
-	      (let ((message (svref messages i)))
-		(if* (null message)
-		   then (return nil)
-		 elseif (eql (message-number message) number)
-		   then (return message)))))))
+	    ; do binary search
+	    #+ignore (format t "Want message ~s~%" number)
+	    (loop
+	      (if* (> bottom top)
+		 then (return nil) ; no message found
+		 else (let ((try (truncate (+ top bottom) 2)))
+			 #+ignore (format t "try ~d (~d -> ~d)~%"
+				try bottom top)
+			(let ((message (svref messages try)))
+			  (if* message
+			     then #+ignore (format t "try msg num is ~s~%" 
+					  (message-number message))
+				  (if* (eql (message-number message) number)
+				     then  #+ignore (format t "**found~%")
+					  (return message)
+				   elseif (< (message-number message)
+					     number)
+				     then ; in top quadrant
+					  (setq bottom 
+					    (max (1+ bottom) try))
+				     else (setq top 
+					    (min (1- top) try)))
+			     else (warn "Null chat message at ~d"
+					try)
+				  (return nil)))))))))
 		      
 
 (defun show-message-p (message handle)
@@ -1876,6 +1901,8 @@
 			     ))))))
 	     
     ))
+
+
 
 
 (defun chatlogin (req ent)
