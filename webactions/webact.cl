@@ -3,7 +3,7 @@
 ;; webaction.cl
 ;; framework for building dynamic web sites
 ;;
-;; copyright (c) 2003-2004 Franz Inc, Oakland, CA - All rights reserved.
+;; copyright (c) 2003-2005 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: webact.cl,v 1.14 2005/03/12 03:39:02 jkf Exp $
+;; $Id: webact.cl,v 1.15 2005/12/08 21:19:04 layer Exp $
 
 
 

@@ -2,7 +2,7 @@
 ;;
 ;; packages.cl
 ;;
-;; copyright (c) 1986-2002 Franz Inc, Berkeley, CA  - All rights reserved.
+;; copyright (c) 1986-2005 Franz Inc, Berkeley, CA  - All rights reserved.
 ;; copyright (c) 2002-2004 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: packages.cl,v 1.8 2005/02/21 23:28:52 jkf Exp $
+;; $Id: packages.cl,v 1.9 2005/12/08 21:19:04 layer Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe

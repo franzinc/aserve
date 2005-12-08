@@ -2,7 +2,7 @@
 ;;
 ;; macs.cl
 ;;
-;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA  - All rights reserved.
+;; copyright (c) 1986-2005 Franz Inc, Berkeley, CA  - All rights reserved.
 ;; copyright (c) 2000-2004 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: macs.cl,v 1.19 2004/11/18 22:44:50 jkf Exp $
+;; $Id: macs.cl,v 1.20 2005/12/08 21:19:04 layer Exp $
 
 ;; Description:
 ;;   useful internal macros

@@ -2,7 +2,7 @@
 ;;
 ;; urian.cl
 ;;
-;; copyright (c) 1986-2000 Franz Inc, Berkeley, CA  - All rights reserved.
+;; copyright (c) 1986-2005 Franz Inc, Berkeley, CA  - All rights reserved.
 ;; copyright (c) 2000-2004 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: urian.cl,v 1.6 2004/01/16 19:31:14 layer Exp $
+;; $Id: urian.cl,v 1.7 2005/12/08 21:19:04 layer Exp $
 
 ;; Description:
 ;;   urian example
