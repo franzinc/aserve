@@ -162,7 +162,7 @@ A user accessing this page would see something like this in his browser:<br>
 
 <br>
 
-<pre>You are using this browser: Netscape 4.01<br>How do you like it?</pre>
+<pre>You are using this browser: Firefox 1.5<br>How do you like it?</pre>
 
 <br>
 
@@ -185,8 +185,7 @@ sent back to the browser. &nbsp; For example<br>
 This clp file fragment checks to see if the session state has a
 variable
 named winner defined and if it does it includes the appropriate text.
-&nbsp;If winner is not defined then<br>
-
+&nbsp;If winner is not defined then
 it includes the loser message. &nbsp; &nbsp;The clp_ifdef and
 clp_ifndef
 functions are supplied with AllegroServe.<br>
@@ -228,7 +227,7 @@ tags and from tags that are neither clp tags nor valid html tags.
 &nbsp;
 The parser may encounter a clp tag referencing a clp function that's
 not
-yet defined (in Lisp we don't require that function be defined before
+yet defined (in Lisp we don't require that a function be defined before
 we'll recognize a call to that function). &nbsp; The problem then is
 determining whether a given tag in the file is a call to a clp function
 or
@@ -286,7 +285,7 @@ text that appears between the start and end tags in the clp file.
 &nbsp;A clp function is not supposed to examine the value of <span style="font-weight: bold;">body. &nbsp;</span>It should do one of two
 things with <span style="font-weight: bold;">body</span>. &nbsp;It can
 just ignore the value in which case the text and calls to clp
-functions&nbsp; between the start and end tags is ignored and not sent
+functions&nbsp; between the start and end tags are ignored and not sent
 as part of the response to the web browser. &nbsp; Alternatively it can
 cause the <span style="font-weight: bold;">body</span> to be sent back
 as part of the response by calling <span style="font-weight: bold;">(emit-clp-entity
@@ -358,7 +357,7 @@ pieces are these:<br>
 <ol>
 
   <li>Model - this is the &nbsp;code that implements the data objects
-being manipulated by users of the web site. &nbsp;In a online store the
+being manipulated by users of the web site. &nbsp;In an online store the
 model includes the notions of a shopping cart and orders and so on.
 &nbsp; &nbsp;This is the code that must be written specifically for the
 objects being modeled.</li>
@@ -433,7 +432,7 @@ are treated specially.<br>
 <span style="font-weight: bold;">clp-suffixes</span> - &nbsp;a list of
 strings naming the suffixes of files, which if found inside the
 project,
-are assume to be clp files. &nbsp; By default the value of clp-suffixes
+are assumed to be clp files. &nbsp; By default the value of clp-suffixes
 is a list of the string "clp". &nbsp; You may wish to add "htm" or
 "html" to this list if you want those files to be parsed as clp files
 when referenced inside this project.<br>
@@ -482,7 +481,7 @@ session is about to be destroyed due to no reference to this session
 for the session-lifetime.&nbsp;&nbsp; If this function returns a
 non-nil value then the session will <span style="font-style: italic;">not</span>
 be reaped and instead the session will be treated as if it was just
-reference and thus it wil be kept alive for another
+reference and thus it will be kept alive for another
 session-lifetime.&nbsp;&nbsp; One common use for this function is to
 deallocate objects associated with the session that won't be recovered
 by the Lisp garbage collector when the session is garbage collected.<br>
@@ -604,9 +603,9 @@ name"&nbsp; item* [ (:flag1 value1&nbsp; ... ...)
 
 <br>
 
-In our psuedo-bnf, the '*' means zero or more occurances.&nbsp; The
+In our psuedo-bnf, the '*' means zero or more occurrences.&nbsp; The
 square brackets mean
-zero or one occurance.<br>
+zero or one occurrence.<br>
 
 <br>
 
@@ -618,7 +617,7 @@ send back to the browser or a symbolic page name.<br>
 <br>
 
 An action function may modify the Model behind the website and then it
-returns either&nbsp; a string naming a symbolic page name, as string
+returns either&nbsp; a string naming a symbolic page name, as a string
 naming a file to send back to the browser,&nbsp; or the keyword symbol<span style="font-weight: bold;"> :continue</span> meaning go on to the next
 item in the map entry.<br>
 
@@ -969,7 +968,7 @@ entry:<br>
 Prefix map entries are the last ones considered when Webactions looks
 for a map entry to handle a symbolic page name.&nbsp; Webactions first
 looks for a specific symbolic page name entry.&nbsp;&nbsp;&nbsp; Then
-Webactions see if the symbolic page name names an actual file in the
+Webactions sees if the symbolic page name names an actual file in the
 project directory.&nbsp; And finally if those first two searches fail
 to find a map entry, Webactions looks for a prefix entry.<br>
 
@@ -990,7 +989,7 @@ To continue our example above if there were also a map entry<br>
 
 <br>
 
-then this this url<br>
+then this url<br>
 
 <br>
 
@@ -1018,7 +1017,7 @@ entry.<br>
 <br>
 
 We'll show two important uses for prefix map entries.&nbsp; The first
-is that you can catch references to non-existent symbolic pages names
+is that you can catch references to non-existent symbolic page names
 and return a nicer error message than the standard one AllegroServe
 returns.&nbsp;&nbsp; The map entry<br>
 
@@ -1027,7 +1026,7 @@ returns.&nbsp;&nbsp; The map entry<br>
 <span style="font-family: monospace;">("" handle-undefined-page
 (:prefix t))<br>
 <br>
-</span>will catch all symbolic pages references that don't have a
+</span>will catch all symbolic page references that don't have a
 handler.&nbsp; You'll want to list this entry before any other prefix
 entry in the map since you want this entry to be checked last.<br>
 
@@ -1084,7 +1083,7 @@ still you must handle it in some way.<br>
 <br>
 
 One way to handle this is that whenever a POST is done the webserver
-processes the posted data and then return a Redirect response to the
+processes the posted data and then returns a Redirect response to the
 browser which then does a GET of the page that's the target of the
 redirect.&nbsp;&nbsp; Thus the user ends up looking at a page that was
 fetched with a GET, and thus IE will have no problem returning to this
@@ -1100,8 +1099,8 @@ You can specify this behavior in a map entry in this way<br>
 
 <br>
 
-The redirect flag say that rather than simply return the contents of
-showresult.clp to the browser, instead Webactions will return a
+The redirect flag says that rather than simply return the contents of
+showresult.clp to the browser, Webactions will return a
 Redirect response to the browser which will then fetch "showresult.clp".<br>
 
 The consequence of this redirect is that clp functions invoked by
@@ -1179,7 +1178,7 @@ holds a pointer to a webaction object.<br>
 <span style="font-weight: bold;">webaction</span> - An instance of this
 class contains the information on a webaction project. &nbsp;It
 contains
-the information passed as arguments to webaction-project as well as a a
+the information passed as arguments to webaction-project as well as a
 websession-master instance if sessions are to be maintained.<br>
 
 <br>
@@ -1416,7 +1415,7 @@ request then the value is retrieved from the request variables.
 the location is session then the values are retrieved from the session
 variables. &nbsp; &nbsp;If <span style="font-weight: bold;">safe</span>
 is given then the value will be printed in such a way to escape any
-characters that would be interpreted as html &nbsp;(e.g as <span style="font-family: monospace;">(html (:princ-safe xxx))</span> would
+characters that would be interpreted as html &nbsp;(e.g. as <span style="font-family: monospace;">(html (:princ-safe xxx))</span> would
 print the value).<br>
 
 Example:<br>
@@ -1465,7 +1464,7 @@ stream. &nbsp; &nbsp;The value yyy should be an integer value.<br>
 &lt;clp_ifeq name="xxx" value="yyy" [query | request | session]&gt;</span><span style="font-family: courier new,courier,monospace;">body</span><span style="font-weight: bold; font-family: courier new,courier,monospace;">&lt;/clp_ifeq&gt;<br>
 <br>
 </span>If the value of the variable xxx found at the given location is
-eql to the value yyy then the body will be emitted to the html
+not eql to the value yyy then the body will be emitted to the html
 stream.
 &nbsp; &nbsp;The value yyy should be an integer value.<br>
 
@@ -1555,7 +1554,7 @@ Example:<br>
 <pre>&lt;select name="color"&gt;<br>&lt;clp_options name="defcolor" session&gt;<br>"blue" "green" "yellow"<br>"red" "purple" "gold"<br>&lt;/clp_options&gt;<br>&lt;/select&gt;<br><br><br></pre>
 
 <span style="font-weight: bold; font-family: courier new,courier,monospace;">&lt;clp_select
-<span style="font-style: italic;">args</span>&gt;</span><span style="font-family: courier new,courier,monospace;">body</span><span style="font-weight: bold; font-family: courier new,courier,monospace;">&lt;/clp_select&gt;</span><br>
+<span style="font-style: italic;">args</span>&gt;</span><span style="font-family: courier new,courier,monospace;">body</span><span style="font-weight: bold; font-family: courier new,courier,monospace;">&lt;/clp_select&gt;</span><br><br>
 
 This&nbsp; function simply emits a select form: &lt;<span style="font-weight: bold;">select</span> <span style="font-style: italic;">args</span>&gt;body&lt;/<span style="font-weight: bold;">select</span>&gt;.&nbsp;&nbsp;&nbsp;&nbsp;
 The reason for using <span style="font-weight: bold;">clp_select</span>
@@ -1622,7 +1621,7 @@ in the location specified <span style="font-weight: bold;">(query,</span>
 that value in red in the html being returned as part of the
 request.&nbsp; &nbsp;If <span style="font-weight: bold;">clear</span>
 is
-given then set the valueof variable <span style="font-weight: bold;">xxx</span>&nbsp;
+given then set the value of variable <span style="font-weight: bold;">xxx</span>&nbsp;
 to nil. &nbsp; This is commonly used to display error messages on a
 page, such as when a form wasn't filled out correctly and you're
 redisplaying the page and asking the user to try again. &nbsp; The
