@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.27 2005/12/08 21:19:04 layer Exp $
+;; $Id: headers.cl,v 1.28 2006/03/24 20:47:06 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -136,7 +136,7 @@
 	("Expect" :p :nf :mx)
 	("Expires"             :nf   :p  nil)
 	("From"                :p    :nf :mp)  ; mp?
-	("Host"                :p    :nf :mx)
+	("Host"                :np   :nf :mx)
 	("If-Match"            :p    :nf :mx)
 	("If-Modified-Since"   :p    :n   nil)
 	("If-None-Match"       :p    :nf :mx)

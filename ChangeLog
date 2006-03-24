@@ -1,3 +1,7 @@
+2006-03-24    <jkf@max.verada.com>
+
+	* proxy.cl - create appropriate Host header.
+
 2005-03-06  John Foderaro  <jkf@max.verada.com>
 
 	* client.cl - handle single line set-cookie lines that end in a semicolon

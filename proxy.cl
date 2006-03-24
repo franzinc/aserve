@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: proxy.cl,v 1.46 2005/12/08 21:19:04 layer Exp $
+;; $Id: proxy.cl,v 1.47 2006/03/24 20:47:06 jkf Exp $
 
 ;; Description:
 ;;   aserve's proxy and proxy cache
@@ -444,14 +444,17 @@ cached connection = ~s~%" cond cached-connection))
 	    ;(logmess "outbuf now")
 	    ;(dump-header-block outbuf *initial-terminal-io*)
 	    
-	    ; send host header if it isn't already there
-	    (if* (null (header-buffer-values (request-header-block req) :host))
-	       then ; no host given
-		    (insert-header outbuf :host
-				   (if* port
-				      then (format nil "~a:~d"
-						   host port)
-				      else host)))
+	    ; send host header 
+	    (let ((host (or (request-header-host req)
+			    (header-buffer-header-value
+			     (request-header-block req) :host)
+			    (if* port
+			       then (format nil "~a:~d"
+					    host port)
+			       else host))))
+	      (insert-header outbuf :host host))
+			     
+	    
 	    (dolist (header (request-headers req))
 	      
 	      (insert-non-standard-header outbuf (car header) (cdr header)))
