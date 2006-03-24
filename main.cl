@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.169 2005/12/08 21:19:04 layer Exp $
+;; $Id: main.cl,v 1.170 2006/03/24 20:50:58 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1634,8 +1634,37 @@ by keyword symbols and not by strings"
 			       elseif ch
 				 then (unread-char ch (request-socket
 						       req)))))
-				      
-				      
+		   elseif (equalp "chunked" (header-slot-value req
+							       :transfer-encoding))
+		     then ; chunked body
+			  (socket:socket-control (request-socket req)
+						 :input-chunking t)
+			  
+			  (with-timeout-local
+			      (*read-request-body-timeout* nil)
+			    (let ((ans (make-array 
+					2048 
+					:element-type 'character
+					:fill-pointer 0))
+				  (sock (request-socket req))
+				  (ch))
+			      (handler-case 
+				  (loop (if* (eq :eof 
+						 (setq ch
+						   (read-char 
+						    sock nil :eof)))
+					   then ; should never happen
+						(return  ans)
+					   else (vector-push-extend
+						 ch ans)))
+				(excl::socket-chunking-end-of-file
+				    (cond)
+				  (declare (ignore cond))
+				  (socket:socket-control (request-socket req)
+							 :input-chunking nil)
+				  ans))))
+
+			  
 		     else	; no content length given
 			  
 			  (if* (equalp "keep-alive" 

@@ -1,5 +1,8 @@
 2006-03-24    <jkf@max.verada.com>
 
+	* main.cl - handle a client request that includes a chunked body.
+	 (not tested yet since I can't find a client making such a request).
+
 	* proxy.cl - create appropriate Host header.
 
 2005-03-06  John Foderaro  <jkf@max.verada.com>
