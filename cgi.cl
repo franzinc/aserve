@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: cgi.cl,v 1.11 2005/12/08 21:19:04 layer Exp $
+;; $Id: cgi.cl,v 1.12 2006/03/29 21:02:10 jkf Exp $
 
 ;; Description:
 ;;   common gateway interface (running external programs)
@@ -46,6 +46,7 @@
 			(timeout 200)
 			error-output
 			env
+			terminate
 			)
   ;; program is a string naming a external command to run.
   ;; invoke the program after setting all of the environment variables
@@ -58,6 +59,9 @@
   ;;   :output - mix in the error output with the output
   ;;   function - call function when input's available from the error 
   ;;		stream
+  
+  (declare (ignorable terminate)) ; not used in Windows
+  
   (let ((envs (list '("GATEWAY_INTERFACE" . "CGI/1.1")
 		    `("SERVER_SOFTWARE" 
 		      . ,(format nil "AllegroServe/~a"
@@ -218,9 +222,29 @@
 	(if* from-script-error-stream
 	   then (ignore-errors (close from-script-error-stream)))
 	(if* pid
-	   then ;; it may be bad to wait here...
-		(mp:with-timeout (60) ; ok w-t
-		  (sys:reap-os-subprocess :pid pid :wait t)))))))
+	   then ;; wait for process to die
+		(if* (null (sys:reap-os-subprocess :pid pid :wait nil))
+		   then ; not ready to die yet, but someone 
+			; should wait for it to die while we return
+			#+unix 
+			(if* terminate
+			   then ; forceably kill
+				(progn (unix-kill pid 15) ; sigterm
+				       (sleep 2) ; give it a chance to die
+				       (if* (sys:reap-os-subprocess :pid pid :wait nil)
+					  then (setq pid nil) ; indicate killed
+					  else (unix-kill pid 9) ; kill
+					       )))
+				       
+			(if* pid
+			   then ; must have someone wait for the death
+				(mp::process-run-function "reaper"
+				  #'(lambda () 
+				      (dotimes (i 10)
+					(sleep (+ 2 (* i 10)))
+					(if* (sys:reap-os-subprocess :pid pid
+								     :wait nil)
+					   then (return))))))))))))
 
 
 (defun read-script-data (req ent stream error-stream error-fcn timeout)

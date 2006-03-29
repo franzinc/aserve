@@ -1,3 +1,7 @@
+2006-03-29  John Foderaro  <jkf@tiger.franz.com>
+1.2.44
+	* cgi.cl - add terminate argument to run-cgi-program
+
 2006-03-24    <jkf@max.verada.com>
 
 	* main.cl - handle a client request that includes a chunked body.

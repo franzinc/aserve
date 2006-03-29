@@ -6,8 +6,8 @@
 </head>
 <body>
 <h1 align="center">AllegroServe - A Web Application Server<br>
-<small><small><small>version <font face="Courier New">1.2.43</font></small></small></small></h1>
-<p align="left"><strong><small>copyright(c) 2000-2005. Franz Inc</small></strong></p>
+<small><small><small>version <font face="Courier New">1.2.44</font></small></small></small></h1>
+<p align="left"><strong><small>copyright(c) 2000-2006. Franz Inc</small></strong></p>
 <h2 align="left">Table of Contents</h2>
 <p align="left"><a href="#introduction">Introduction</a><br>
 <a href="#running-AllegroServe">Running AllegroServe</a><br>
@@ -1394,7 +1394,7 @@ ent program &amp;key path-info path-translated<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 script-name query-string <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-auth-type timeout error-output env)</strong></font></p>
+auth-type timeout error-output env terminate)</strong></font></p>
 <p>In response to an http request, this runs <strong>program</strong>
 which must be a
 string naming an exectuable program or script followed optionally by
@@ -1437,7 +1437,12 @@ string).&nbsp;&nbsp; <strong>env</strong> is checked after all the
 standard environment
 variables are computed and the value given in <strong>env</strong>
 will override the value
-computed automatically.</p>
+computed automatically.&nbsp; On Unix if <span
+ style="font-weight: bold;">terminate</span> is true then after the cgi
+program finishes responding (or the timeout period expires) the cgi
+program will be forceably killed (first with SIGTERM and then SIGKILL)
+if remains alive.<br>
+</p>
 <p>cgi programs send their result to standard output (file descriptor 1
 on Unix).&nbsp; If
 they encounter problems they often send informative messages to
@@ -2266,6 +2271,8 @@ uri
 content content-type query format cookies <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 redirect redirect-methods basic-authorization<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+digest-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 keep-alive headers proxy user-agent external-format ssl<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
