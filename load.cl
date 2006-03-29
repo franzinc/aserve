@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.64 2004/08/27 18:14:50 layer Exp $
+;; $Id: load.cl,v 1.65 2006/03/29 21:55:59 jkf Exp $
 ;;
 
 ;
@@ -283,7 +283,7 @@
 	   aserve-version-name)
    :show-window :hide)
   (run-shell-command 
-   (format nil "cp ~aaserve-src/~a.tgz /net/cobweb/home/ftp/pub/aserve"
+   (format nil "cp ~aaserve-src/~a.tgz /fi/ftp/pub/aserve"
 	   *aserve-root*
 	   aserve-version-name)
    :show-window :hide))
@@ -291,7 +291,7 @@
 (defun publish-docs ()
   ;; copy documentation to the external web site
   (run-shell-command
-   (format nil "cp ~adoc/htmlgen.html ~adoc/aserve.html ~adoc/tutorial.html /net/cobweb/www/opensource/devel/www/aserve"
+   (format nil "cp ~adoc/htmlgen.html ~adoc/aserve.html ~adoc/tutorial.html /fi/www/sites/opensource/devel/www/aserve"
 	   *aserve-root*
 	   *aserve-root*
 	   *aserve-root*)

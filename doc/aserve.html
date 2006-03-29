@@ -2276,7 +2276,7 @@ digest-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 keep-alive headers proxy user-agent external-format ssl<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-skip-body)</font></strong></p>
+skip-body timeout)</font></strong></p>
 <p>Sends a request to <strong>uri</strong> and returns four values: </p>
 <ol>
   <li>The body of the response.&nbsp; If there is no body the empty
@@ -2489,6 +2489,22 @@ do-http-request.&nbsp; If skip-body is not a function and if its value
 is true then reading the body is skipped and <strong>nil</strong>
 returned in its place.</td>
     </tr>
+    <tr>
+      <td style="vertical-align: top;">timeout<br>
+      </td>
+      <td style="vertical-align: top;">nil<br>
+      </td>
+      <td style="vertical-align: top;">If given this is the number of
+seconds this function will block waiting to write or read to the socket
+connected to the web server.&nbsp;&nbsp; If an I/O request blocks for
+more than timeout seconds an error of class <span
+ style="font-weight: bold;">socket-error</span> is signalled and the
+function <span style="font-weight: bold;">stream-error-identifier</span>
+on the error condition object will return <span
+ style="font-weight: bold;">:read-timeout</span> or <span
+ style="font-weight: bold;">:write-timeout</span>.<br>
+      </td>
+    </tr>
   </tbody>
 </table>
 <p>&nbsp;</p>
@@ -2672,7 +2688,7 @@ basic-authorization digest-authorization query<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 content content-type content-length<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-user-agent external-format ssl)</font></strong></p>
+user-agent external-format ssl timeout)</font></strong></p>
 <p>This function connects to the web server indicated by the <strong>uri</strong>
 and
 sends the request.&nbsp;&nbsp; The arguments are the same as those for <strong>do-http-request</strong>

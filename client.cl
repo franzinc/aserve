@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.48 2005/12/08 21:19:04 layer Exp $
+;; $Id: client.cl,v 1.49 2006/03/29 21:55:59 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -208,6 +208,7 @@
 			(external-format *default-aserve-external-format*)
 			ssl		; do an ssl connection
 			skip-body ; fcn of request object
+			timeout  
 			
 			;; internal
 			recursing-call ; true if we are calling ourself
@@ -232,6 +233,7 @@
 	       :user-agent user-agent
 	       :external-format external-format
 	       :ssl ssl
+	       :timeout timeout
 	       )))
 
     (unwind-protect
@@ -387,9 +389,12 @@
 				     (external-format 
 				      *default-aserve-external-format*)
 				     ssl
+				     timeout
 				     )
   
 
+  (declare (ignorable timeout))
+  
   (let (host sock port fresh-uri scheme-default-port)
     ;; start a request 
   
@@ -457,6 +462,14 @@ or \"foo.com:8000\", not ~s" proxy))
        then (schedule-finalization 
 	     sock 
 	     #'net.aserve::check-for-open-socket-before-gc))
+    
+    #+io-timeout
+    (if* (integerp timeout)
+       then (socket:socket-control 
+		 sock 
+		 :read-timeout timeout
+		 :write-timeout timeout))
+	    
     
     (if* query
        then (case method
