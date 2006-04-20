@@ -6,7 +6,7 @@
 </head>
 <body>
 <h1 align="center">AllegroServe - A Web Application Server<br>
-<small><small><small>version <font face="Courier New">1.2.44</font></small></small></small></h1>
+<small><small><small>version <font face="Courier New">1.2.45</font></small></small></small></h1>
 <p align="left"><strong><small>copyright(c) 2000-2006. Franz Inc</small></strong></p>
 <h2 align="left">Table of Contents</h2>
 <p align="left"><a href="#introduction">Introduction</a><br>
@@ -2274,7 +2274,9 @@ redirect redirect-methods basic-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 digest-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-keep-alive headers proxy user-agent external-format ssl<br>
+keep-alive headers proxy proxy-basic-authorization<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+user-agent external-format ssl<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 skip-body timeout)</font></strong></p>
 <p>Sends a request to <strong>uri</strong> and returns four values: </p>
@@ -2449,6 +2451,15 @@ web server is listening on port 8000 rather than 80.&nbsp;&nbsp;
 Proxying web servers are often used when clients are behind firewalls
 that prevent direct access to the internet. &nbsp; Another use is to
 centralize the page cache for a group of clients.</td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">proxy-basic-authorization<br>
+      </td>
+      <td style="vertical-align: top;">nil<br>
+      </td>
+      <td style="vertical-align: top;">a cons of ("name" . "password")
+used to authenticate this request to the proxy being used.<br>
+      </td>
     </tr>
     <tr>
       <td width="22%">user-agent</td>
@@ -2682,7 +2693,7 @@ secure connection.</td>
  face="Courier New">(make-http-client-request
 uri &amp;key method protocol keep-alive<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-accept cookies headers proxy<br>
+accept cookies headers proxy proxy-basic-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 basic-authorization digest-authorization query<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
