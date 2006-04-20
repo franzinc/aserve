@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.49 2006/03/29 21:55:59 jkf Exp $
+;; $Id: client.cl,v 1.50 2006/04/20 00:12:54 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -204,6 +204,7 @@
 			keep-alive   ; if true, set con to keep alive
 			headers	    ; extra header lines, alist
 			proxy	    ; naming proxy server to access through
+			proxy-basic-authorization  ; (name . password)
 			user-agent
 			(external-format *default-aserve-external-format*)
 			ssl		; do an ssl connection
@@ -230,6 +231,7 @@
 	       :keep-alive keep-alive
 	       :headers headers
 	       :proxy proxy
+	       :proxy-basic-authorization proxy-basic-authorization
 	       :user-agent user-agent
 	       :external-format external-format
 	       :ssl ssl
@@ -385,6 +387,7 @@
 				     query
 				     headers
 				     proxy
+				     proxy-basic-authorization
 				     user-agent
 				     (external-format 
 				      *default-aserve-external-format*)
@@ -556,6 +559,14 @@ or \"foo.com:8000\", not ~s" proxy))
 				     (format nil "~a:~a" 
 					     (car basic-authorization)
 					     (cdr basic-authorization)))
+				    crlf))
+    
+    (if* proxy-basic-authorization
+       then (net.aserve::format-dif :xmit sock "Proxy-Authorization: Basic ~a~a"
+				    (base64-encode
+				     (format nil "~a:~a" 
+					     (car proxy-basic-authorization)
+					     (cdr proxy-basic-authorization)))
 				    crlf))
     
     (if* (and digest-authorization

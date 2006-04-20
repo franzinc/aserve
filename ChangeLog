@@ -1,3 +1,9 @@
+2006-04-19  John Foderaro  <jkf@tiger.franz.com>
+1.2.45
+	* client.cl: added :proxy-basic-authorization to 
+	do-http-request so you can give your basic credentials to a
+	proxy
+
 2006-03-29  John Foderaro  <jkf@tiger.franz.com>
 1.2.44
 	* cgi.cl - add terminate argument to run-cgi-program
