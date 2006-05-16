@@ -1,3 +1,7 @@
+2006-05-16  Kevin Layer  <layer@gemini>
+
+	* packages.cl: add defpatch for 8.0
+
 2006-04-19  John Foderaro  <jkf@tiger.franz.com>
 1.2.45
 	* client.cl: added :proxy-basic-authorization to 

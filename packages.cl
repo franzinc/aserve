@@ -1,3 +1,9 @@
+#+(version= 8 0)
+(sys:defpatch "aserve" 1
+  "version 1.2.45"
+  :type :system
+  :post-loadable t)
+
 ;; -*- mode: common-lisp; package: net.aserve -*-
 ;;
 ;; packages.cl
@@ -24,7 +30,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: packages.cl,v 1.9 2005/12/08 21:19:04 layer Exp $
+;; $Id: packages.cl,v 1.10 2006/05/16 20:35:21 layer Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe
