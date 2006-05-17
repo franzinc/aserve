@@ -1,8 +1,3 @@
-2006-05-17  Kevin Layer  <layer@gemini>
-
-	* main.cl: add provide that gives the module version, if the lisp
-	  supports it
-
 2006-05-16  Kevin Layer  <layer@gemini>
 
 	* packages.cl: add defpatch for 8.0
