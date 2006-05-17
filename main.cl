@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.172 2006/04/20 00:12:54 jkf Exp $
+;; $Id: main.cl,v 1.173 2006/05/17 20:28:44 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -46,7 +46,9 @@
     #+(version>= 6) (require :acldns) ; not strictly required but this is preferred
 )
 
-(provide :aserve)
+(provide :aserve
+	 ;; 2.0 == 1.2.45
+	 #+module-versions 2.0)
 
 (defparameter *aserve-version-string*
     ;; for when we need it in string format
