@@ -25,7 +25,7 @@
 ;;
 
 ;;
-;; $Id: htmlgen.cl,v 1.25 2005/12/08 21:19:04 layer Exp $
+;; $Id: htmlgen.cl,v 1.26 2006/05/25 02:28:32 jkf Exp $
 
 ;; Description:
 ;;   html generator
@@ -629,7 +629,7 @@
 (def-std-html :blockquote  t nil)
 (def-std-html :body      t nil)
 (def-std-html :br       nil nil)
-(def-std-html :button   nil nil)
+(def-std-html :button   t nil)
 
 (def-std-html :caption  t nil)
 (def-std-html :center   t nil)
