@@ -1,3 +1,8 @@
+2006-06-07    <jkf@max.verada.com>
+
+	* accept a bogus first response line that doesn't include
+	  the space after the response code.
+
 2006-05-16  Kevin Layer  <layer@gemini>
 
 	* packages.cl: add defpatch for 8.0
