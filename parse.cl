@@ -26,7 +26,7 @@
 ;;
 
 ;;
-;; $Id: parse.cl,v 1.40 2005/12/08 21:19:04 layer Exp $
+;; $Id: parse.cl,v 1.41 2006/06/08 00:28:48 jkf Exp $
 
 ;; Description:
 ;;   parsing and encoding code  
@@ -355,12 +355,13 @@
 (defun header-value-member (val parsed-value)
   ;; test to see if the given value is a member of the list
   ;; of values in the parsed value.  parse the value if needed
-  (setq parsed-value (ensure-value-parsed parsed-value))
-  (dolist (par parsed-value)
-    (if* (consp par)
-       then (setq par (cadr par)))
-    (if* (equalp val par)
-       then (return t))))
+  (if* parsed-value
+     then (setq parsed-value (ensure-value-parsed parsed-value))
+	  (dolist (par parsed-value)
+	    (if* (consp par)
+	       then (setq par (cadr par)))
+	    (if* (equalp val par)
+	       then (return t)))))
 
 (defun ensure-value-parsed (str &optional singlep)
   ;; parse the header value if it hasn't been parsed.
