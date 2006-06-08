@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.83 2005/12/08 21:19:04 layer Exp $
+;; $Id: publish.cl,v 1.84 2006/06/08 00:29:51 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -2057,6 +2057,7 @@
 	     (extra-headers (request-reply-headers req))
 	     (post-headers (member :post-headers strategy :test #'eq))
 	     (content)
+	     (*print-readably* nil) ; set by w-s-io-syntax and not desired
 	     (chunked-p (member :chunked strategy :test #'eq))
 	     (code (request-reply-code req))
 	     (send-headers
