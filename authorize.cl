@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: authorize.cl,v 1.9 2005/12/08 21:19:04 layer Exp $
+;; $Id: authorize.cl,v 1.10 2006/06/29 17:42:55 jkf Exp $
 
 ;; Description:
 ;;   classes and functions for authorizing access to entities
@@ -75,6 +75,7 @@
     ;; valid name/password not given, ask for it 
     (with-http-response (req *dummy-computed-entity* 
 			     :response *response-unauthorized*
+			     :content-type "text/html"
 			     :format :text)
       (set-basic-authorization req
 			       (password-authorizer-realm auth))

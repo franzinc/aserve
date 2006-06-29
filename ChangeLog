@@ -1,3 +1,8 @@
+2006-06-29    <jkf@max.verada.com>
+
+	* add content type of "text/html" when sending the
+	  response not authorized message
+
 2006-06-07    <jkf@max.verada.com>
 
 	* accept a bogus first response line that doesn't include
