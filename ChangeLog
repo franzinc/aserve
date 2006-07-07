@@ -1,5 +1,5 @@
 2006-06-29    <jkf@max.verada.com>
-
+1.2.46
 	* add content type of "text/html" when sending the
 	  response not authorized message
 
