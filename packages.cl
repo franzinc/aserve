@@ -1,12 +1,14 @@
 #+(version= 8 0)
-(sys:defpatch "aserve" 1
-  "version 1.2.45"
+(sys:defpatch "aserve" 2
+  "v1: version 1.2.45;
+v2: version 1.2.46"
   :type :system
   :post-loadable t)
 
 #+(version= 7 0)
-(sys:defpatch "aserve" 2
-  "v2: version 1.2.45"
+(sys:defpatch "aserve" 3
+  "v2: version 1.2.45;
+v3: version 1.2.46"
   :type :system
   :post-loadable t)
 
@@ -36,7 +38,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: packages.cl,v 1.11 2006/05/26 04:58:50 layer Exp $
+;; $Id: packages.cl,v 1.12 2006/07/14 15:05:22 layer Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe
