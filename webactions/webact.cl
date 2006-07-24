@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: webact.cl,v 1.15 2005/12/08 21:19:04 layer Exp $
+;; $Id: webact.cl,v 1.16 2006/07/24 18:54:34 jkf Exp $
 
 
 
@@ -520,7 +520,8 @@
   ;; websession is non-nil.
   ;;
   (let (pos sessid sm)
-    (if* (and (eq #\~ (aref following 0))
+    (if* (and (> (length following) 0)
+	      (eq #\~ (aref following 0))
 	      (setq pos (position #\~ following :start 1))
 	      (> (length following) (1+ pos))
 	      (eql #\/ (aref following (1+ pos)))

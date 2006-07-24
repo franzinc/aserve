@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.28 2006/03/24 20:47:06 jkf Exp $
+;; $Id: headers.cl,v 1.29 2006/07/24 18:54:34 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -739,7 +739,7 @@
 		   
     (free-sresource *header-index-sresource* ans)
 		   
-    headers))
+    (nreverse headers)))
 
 (defun listify-parsed-header-block (buff)
   ;; the header block buff has been parsed.

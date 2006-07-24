@@ -468,6 +468,40 @@ action functions are operations on the Model. &nbsp; &nbsp;An action
 function should not generate any html, that's the responsibility of the
 View code. <br>
 <br>
+<h3>Action and View functions</h3>
+When processing a request user-written functions may be called to
+either specify the control flow through the webaction project or to
+display html.&nbsp; We refer to the former as <span
+ style="font-style: italic;">action functions</span> and to the latter
+as <span style="font-style: italic;">view functions</span>.&nbsp;&nbsp;&nbsp;&nbsp;
+We make the distinction between action and view to make the roles of
+these functions clear with in the MVC framework.&nbsp; Webactions does
+not know nor need to know the role of the user defined functions it
+calls.&nbsp;&nbsp; Webactions simply calls the function and responds in
+a certain way to the value returned by the user defined functions.<br>
+<br>
+Both action and view functions are passed the standard two
+arguments:&nbsp; a request object and&nbsp; an entity object.<br>
+At the time these functions are called it's <span
+ style="font-weight: bold;">not</span> possible to immediately emit
+html as with-http-response and with-http-body&nbsp; have not been
+done.&nbsp;&nbsp;&nbsp; <br>
+The action function will return one of three values<br>
+<ul>
+  <li>a string giving the symbolic page name to jump to.</li>
+  <li>a string naming a file name whose contents are to be sent to the
+browser</li>
+  <li>the symbol :continue meaning process the next item in the map
+clause</li>
+</ul>
+<br>
+A view function will call with-http-response and with-http-body and
+will send a response back to the web server (possibly using the html
+macro).<br>
+A view function returns <span style="font-weight: bold;">nil </span>indicating
+that a response has been sent back to the http client and no further
+processing should be done by webactions for this request.<br>
+<br>
 <h3>Maps</h3>
 The <span style="font-weight: bold;">map</span> argument
 specifies
