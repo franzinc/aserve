@@ -1,7 +1,7 @@
 2006-12-20  Kevin Layer  <layer@gemini.franz.com>
 1.2.48
 
-    Changes to handle "204 No Content" from Vebjorn Ljosa
+    rfe6669: Changes to handle "204 No Content" from Vebjorn Ljosa
     <ljosa-franz-opensource@ljosa.com>.  Handling 204 responses is
     important because some web services (e.g., Amazon.com's "Simple
     Storage Service," S3) use them.
