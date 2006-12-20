@@ -38,7 +38,7 @@ v3: version 1.2.47."
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: packages.cl,v 1.14 2006/08/09 21:13:53 layer Exp $
+;; $Id: packages.cl,v 1.15 2006/12/20 20:51:21 layer Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe
@@ -167,6 +167,7 @@ v3: version 1.2.47."
    #:*http-response-timeout*
    #:*mime-types*
    #:*response-accepted*
+   #:*response-no-content*
    #:*response-bad-request*
    #:*response-continue*
    #:*response-created*

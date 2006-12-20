@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.51 2006/06/08 00:42:43 jkf Exp $
+;; $Id: client.cl,v 1.52 2006/12/20 20:51:21 layer Exp $
 
 ;; Description:
 ;;   http client code.
@@ -283,11 +283,13 @@
 		  
 		  
 	  
-	  (if* (and (null new-location) 
-		    ; not called when redirecting
-		    (if* (functionp skip-body)
-		       then (funcall skip-body creq)
-		       else skip-body))
+	  (if* (or (and (null new-location) 
+					; not called when redirecting
+			(if* (functionp skip-body)
+			     then (funcall skip-body creq)
+			     else skip-body))
+		   (= (client-request-response-code creq)
+		      #.(net.aserve::response-number *response-no-content*)))
 	     then
 		  (return-from do-http-request
 		    (values 

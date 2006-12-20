@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.176 2006/07/24 18:54:34 jkf Exp $
+;; $Id: main.cl,v 1.177 2006/12/20 20:51:21 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -38,7 +38,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 47))
+(defparameter *aserve-version* '(1 2 48))
 
 (eval-when (eval load)
     (require :sock)
@@ -832,6 +832,7 @@ by keyword symbols and not by strings"
 (defparameter *response-ok* (make-resp 200 "OK"))
 (defparameter *response-created* (make-resp 201 "Created"))
 (defparameter *response-accepted* (make-resp 202 "Accepted"))
+(defparameter *response-no-content* (make-resp 204 "No Content"))
 (defparameter *response-partial-content*
     (make-resp 206 "Partial Content"))
 (defparameter *response-moved-permanently* (make-resp 301 "Moved Permanently"))
@@ -854,6 +855,7 @@ by keyword symbols and not by strings"
 	  *response-ok*
 	  *response-created*
 	  *response-accepted*
+	  *response-no-content*
 	  *response-moved-permanently*
 	  *response-found*
 	  *response-see-other*
