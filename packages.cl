@@ -39,7 +39,7 @@ v4: version 1.2.48, handle HTTP `204 No Content'."
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: packages.cl,v 1.16 2006/12/20 20:52:51 layer Exp $
+;; $Id: packages.cl,v 1.17 2006/12/22 21:11:58 jkf Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe
@@ -174,6 +174,8 @@ v4: version 1.2.48, handle HTTP `204 No Content'."
    #:*response-created*
    #:*response-found*
    #:*response-internal-server-error*
+   #:*response-no-content*
+   #:*response-non-authoritative-information*
    #:*response-not-found*
    #:*response-not-modified*
    #:*response-ok*

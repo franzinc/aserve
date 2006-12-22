@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.85 2006/07/24 18:54:34 jkf Exp $
+;; $Id: publish.cl,v 1.86 2006/12/22 21:11:58 jkf Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -2102,7 +2102,8 @@
 		   then ; must do ext format conversion now
 			; so we can compute the length
 			(setq content
-			  (string-to-octets content :external-format sos-ef)))
+			  (string-to-octets content :external-format sos-ef
+					    :null-terminate nil)))
 	      
 		(setf (request-reply-content-length req) (length content)))
       	

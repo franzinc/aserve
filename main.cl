@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.177 2006/12/20 20:51:21 layer Exp $
+;; $Id: main.cl,v 1.178 2006/12/22 21:11:58 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -38,7 +38,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 48))
+(defparameter *aserve-version* '(1 2 49))
 
 (eval-when (eval load)
     (require :sock)
@@ -832,6 +832,8 @@ by keyword symbols and not by strings"
 (defparameter *response-ok* (make-resp 200 "OK"))
 (defparameter *response-created* (make-resp 201 "Created"))
 (defparameter *response-accepted* (make-resp 202 "Accepted"))
+(defparameter *response-non-authoritative-information*
+    (make-resp 203 "Non-Authoritative Information"))
 (defparameter *response-no-content* (make-resp 204 "No Content"))
 (defparameter *response-partial-content*
     (make-resp 206 "Partial Content"))

@@ -1,3 +1,11 @@
+2006-12-22  John Foderaro  <jkf@tiger.franz.com>
+1.2.49
+	* when response needed a string output stream and 
+	 also specified an external format we would 
+	 incorrectly add a null to the end of the response
+
+	* ignore body for *response-not-modified* as well
+
 2006-12-20  Kevin Layer  <layer@gemini.franz.com>
 1.2.48
 
