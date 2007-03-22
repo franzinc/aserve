@@ -6,7 +6,7 @@
 </head>
 <body>
 <h1 align="center">AllegroServe - A Web Application Server<br>
-<small><small><small>version <font face="Courier New">1.2.47</font></small></small></small></h1>
+<small><small><small>version <font face="Courier New">1.2.50</font></small></small></small></h1>
 <p align="left"><strong><small>copyright(c) 2000-2006. Franz Inc</small></strong></p>
 <h2 align="left">Table of Contents</h2>
 <p align="left"><a href="#introduction">Introduction</a><br>
@@ -175,7 +175,9 @@ debug proxy proxy-proxy
 cache restore-cache accept-hook ssl ssl-password<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 os-processes
-external-format)</font></strong></p>
+external-format<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+ssl-key ssl-password ca-file ca-directory verify max-depth)</font></strong></p>
 <p>If no arguments are given then <strong>start</strong>&nbsp; starts
 a multi-threaded web
 server on port 80, which is the standard web server
@@ -287,6 +289,20 @@ different processes do <strong>not</strong> share a common Lisp heap..
   <li>external-format - If given it should name the value to which
 *default-aserve-external-format* should be bound to when requests are
 processed.&nbsp; The default value is<strong> :latin1-base</strong></li>
+  <li>ssl-key, ssl-password, ca-file, ca-directory, verify and max
+depth - these values are passed to <span style="font-weight: bold;">make-ssl-server-stream</span>
+(documented with the ACL documentation) should the <span
+ style="font-weight: bold;">ssl</span> argument be given.&nbsp;&nbsp; <span
+ style="font-weight: bold;">ssl-key</span> is passed as the value of
+the <span style="font-weight: bold;">:key</span> argument and <span
+ style="font-weight: bold;">ssl-password</span> is passed as the value
+of the <span style="font-weight: bold;">:certificate-password</span>
+argument to <span style="font-weight: bold;">make-ssl-server-stream</span>.&nbsp;&nbsp;&nbsp;
+These value are only used in a fully patched ACL 8.0 (or newer).&nbsp;
+In older versions of ACL these values are ignored.&nbsp; By specifiying
+these values you can have more control on how the server does SSL
+certificate managment.<br>
+  </li>
 </ul>
 <p>&nbsp;</p>
 <h2><a name="shutting-down-the-server"></a>Shutting down the server</h2>
@@ -2278,7 +2294,10 @@ keep-alive headers proxy proxy-basic-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 user-agent external-format ssl<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-skip-body timeout)</font></strong></p>
+skip-body timeout<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+certificate key certificate-password ca-file ca-directory verify
+max-depth)</font></strong></p>
 <p>Sends a request to <strong>uri</strong> and returns four values: </p>
 <ol>
   <li>The body of the response.&nbsp; If there is no body the empty
@@ -2514,6 +2533,21 @@ function <span style="font-weight: bold;">stream-error-identifier</span>
 on the error condition object will return <span
  style="font-weight: bold;">:read-timeout</span> or <span
  style="font-weight: bold;">:write-timeout</span>.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">certificate, key,<br>
+certificate-password, ca-file,<br>
+ca-directory, verify, max-depth<br>
+      </td>
+      <td style="vertical-align: top;">nil<br>
+      </td>
+      <td style="vertical-align: top;">These values are passed as the
+arguments to make-ssl-client-stream (documented in the ACL
+documentation).&nbsp; Specifying these values is optional but it does
+give you control of the client's SSL certificate management.<br>
+These values are used in a fully patched ACL 8.0 (or newer).&nbsp; In
+older versions of ACL they are ignored.<br>
       </td>
     </tr>
   </tbody>
