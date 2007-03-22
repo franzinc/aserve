@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.53 2006/12/22 21:11:58 jkf Exp $
+;; $Id: client.cl,v 1.54 2007/03/22 16:44:42 layer Exp $
 
 ;; Description:
 ;;   http client code.
@@ -212,7 +212,14 @@
 			(external-format *default-aserve-external-format*)
 			ssl		; do an ssl connection
 			skip-body ; fcn of request object
-			timeout  
+			timeout
+			certificate
+			key
+			certificate-password
+			ca-file
+			ca-directory
+			verify
+			max-depth
 			
 			;; internal
 			recursing-call ; true if we are calling ourself
@@ -239,6 +246,13 @@
 	       :external-format external-format
 	       :ssl ssl
 	       :timeout timeout
+	       :certificate certificate
+	       :key key
+	       :certificate-password certificate-password
+	       :ca-file ca-file
+	       :ca-directory ca-directory
+	       :verify verify
+	       :max-depth max-depth
 	       )))
 
     (unwind-protect
@@ -403,10 +417,18 @@
 				      *default-aserve-external-format*)
 				     ssl
 				     timeout
+				     certificate
+				     key
+				     certificate-password
+				     ca-file
+				     ca-directory
+				     verify
+				     max-depth
 				     )
   
 
-  (declare (ignorable timeout))
+  (declare (ignorable timeout certificate key certificate-password ca-file 
+		      ca-directory verify max-depth))
   
   (let (host sock port fresh-uri scheme-default-port)
     ;; start a request 
@@ -462,8 +484,20 @@ or \"foo.com:8000\", not ~s" proxy))
 					     
 				  ))
 	    (if* ssl
-	       then (setq sock
-		      (funcall 'socket::make-ssl-client-stream sock)))
+	       then #+(version>= 8 0)
+		    (setq sock
+		      (funcall 'socket::make-ssl-client-stream sock 
+			       :certificate certificate
+			       :key key
+			       :certificate-password certificate-password
+			       :ca-file ca-file
+			       :ca-directory ca-directory
+			       :verify verify
+			       :max-depth max-depth))
+		    #-(version>= 8 0)
+		    (setq sock
+		      (funcall 'socket::make-ssl-client-stream sock))
+		    )
 	    )
 
     #+(and allegro (version>= 6 0))

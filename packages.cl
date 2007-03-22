@@ -1,9 +1,10 @@
 #+(version= 8 0)
-(sys:defpatch "aserve" 4
+(sys:defpatch "aserve" 5
   "v1: version 1.2.45;
 v2: version 1.2.46;
 v3: version 1.2.47;
-v4: version 1.2.48, handle HTTP `204 No Content'."
+v4: version 1.2.48, handle HTTP `204 No Content';
+v5: version 1.2.50, Enhanced SSL client/server support."
   :type :system
   :post-loadable t)
 
@@ -39,7 +40,7 @@ v4: version 1.2.48, handle HTTP `204 No Content'."
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: packages.cl,v 1.17 2006/12/22 21:11:58 jkf Exp $
+;; $Id: packages.cl,v 1.18 2007/03/22 16:44:42 layer Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe

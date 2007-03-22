@@ -1,3 +1,13 @@
+2007-03-21  Ahmon Dancy  <dancy@dancy>
+1.2.50
+	
+	* rfe6834: SSL peer verification support.  Also, 'start' function
+	now allows the SSL certificate key file to be specified separately
+	from the certificate.
+
+	* bug16677: aserve could leak file descriptors if SSL (https)
+	connection fails.  
+
 2006-12-22  John Foderaro  <jkf@tiger.franz.com>
 1.2.49
 	* when response needed a string output stream and 
