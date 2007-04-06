@@ -1,3 +1,8 @@
+2007-04-06  Kevin Layer  <layer@gemini.franz.com>
+
+	* makefile: make default lisp in the presence of ../dcl.dxl be
+	  that; add `test' rule
+
 2007-03-27  Charles A. Cox  <cox@gemini.franz.com>
 
 	* examples/urian.cl: spr31997 suggestion
