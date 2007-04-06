@@ -2,6 +2,7 @@
 
 	* makefile: make default lisp in the presence of ../dcl.dxl be
 	  that; add `test' rule
+	* test/t-aserve.cl: allow to be run from this directory
 
 2007-03-27  Charles A. Cox  <cox@gemini.franz.com>
 

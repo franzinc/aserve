@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.53 2005/12/08 21:19:04 layer Exp $
+;; $Id: t-aserve.cl,v 1.54 2007/04/06 21:55:39 layer Exp $
 
 ;; Description:
 ;;   test iserve
@@ -42,6 +42,13 @@
   )
 
 (in-package :net.aserve.test)
+
+(eval-when (compile eval load)
+  (defvar *aserve-examples-directory*
+      (or (probe-file "aserve/examples/")
+	  (probe-file "examples/")
+	  (error "Could not find the aserve examples directory.")))
+  )
 
 ; set to nil before loading the test to prevent the test from auto-running
 (defvar user::*do-aserve-test* t)
@@ -1545,19 +1552,27 @@
     (publish :path "/cgi-0"
 	     :function #'(lambda (req ent)
 			   (net.aserve:run-cgi-program 
-			    req ent "sh aserve/examples/cgitest.sh")))
+			    req ent
+			    #.(format nil "sh ~acgitest.sh"
+				      *aserve-examples-directory*))))
     (publish :path "/cgi-1"
 	     :function #'(lambda (req ent)
 			   (net.aserve:run-cgi-program 
-			    req ent "sh aserve/examples/cgitest.sh 1")))
+			    req ent
+			    #.(format nil "sh ~acgitest.sh 1"
+				      *aserve-examples-directory*))))
     (publish :path "/cgi-2"
 	     :function #'(lambda (req ent)
 			   (net.aserve:run-cgi-program 
-			    req ent "sh aserve/examples/cgitest.sh 2")))
+			    req ent
+			    #.(format nil "sh ~acgitest.sh 2"
+				      *aserve-examples-directory*))))
     (publish :path "/cgi-3"
 	     :function #'(lambda (req ent)
 			   (net.aserve:run-cgi-program 
-			    req ent "sh aserve/examples/cgitest.sh 3")))
+			    req ent
+			    #.(format nil "sh ~acgitest.sh 3"
+				      *aserve-examples-directory*))))
     
     ;; verify that the various headers work
     (test 200 (values2 
@@ -1596,7 +1611,9 @@
     (publish :path "/cgi-4"
 	     :function #'(lambda (req ent)
 			   (net.aserve:run-cgi-program 
-			    req ent "sh aserve/examples/cgitest.sh 4"
+			    req ent
+			    #.(format nil "sh ~acgitest.sh 4"
+				      *aserve-examples-directory*)
 			    :error-output
 			    #'(lambda (req ent stream)
 				(declare (ignore req ent))
@@ -1766,18 +1783,3 @@
    then (test-aserve *test-timeouts*)
    else (format t 
 		" (net.aserve.test::test-aserve) will run the aserve test~%"))
-
-
-
-	
-    
-   
-  
-  
-
-	
-  
-
-  
-
-
