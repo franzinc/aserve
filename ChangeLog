@@ -1,3 +1,12 @@
+2007-04-08  Kevin Layer  <layer@gemini.franz.com>
+
+	* (NEW) httpcopy.cl: implements new http-copy-file client
+          function
+	* load.cl: add httpcopy file
+	* makefile: default mlisp to /fi/cl/8.0/bin/mlisp
+	* packages.cl: export http-copy-file
+	* test/t-aserve.cl: add tests for http-copy-file
+
 2007-04-06  Kevin Layer  <layer@gemini.franz.com>
 
 	* makefile: make default lisp in the presence of ../dcl.dxl be

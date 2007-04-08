@@ -40,7 +40,7 @@ v5: version 1.2.50, Enhanced SSL client/server support."
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: packages.cl,v 1.18 2007/03/22 16:44:42 layer Exp $
+;; $Id: packages.cl,v 1.19 2007/04/08 14:58:05 layer Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe
@@ -214,6 +214,7 @@ v5: version 1.2.50, Enhanced SSL client/server support."
    #:digest-realm
    #:digest-username
    #:do-http-request
+   #:http-copy-file
    #:make-http-client-request
    #:read-client-response-headers
    ))

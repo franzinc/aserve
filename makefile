@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.12 2007/04/06 21:45:49 layer Exp $
+# $Id: makefile,v 1.13 2007/04/08 14:58:05 layer Exp $
 #
 # On Windows, this makefile requires the use of GNU make from Redhat
 # (http://sources.redhat.com/cygwin/).
@@ -17,7 +17,7 @@ ifndef mlisp
 ifeq ($(on_windows),yes)
 mlisp = "/cygdrive/c/Program Files/acl80/mlisp.exe" +B +cn
 else
-mlisp = /usr/local/bin/mlisp
+mlisp = /fi/cl/8.0/bin/mlisp
 endif
 endif
 
@@ -47,7 +47,8 @@ srcdist: FORCE
 	$(mlisp) -batch -L build.tmp -kill
 
 clean:	FORCE
-	rm -fr *.fasl */*.fasl webactions/*.fasl webactions/clpcode/*.fasl build.tmp
+	rm -f build.tmp
+	find . -name '*.fasl' -print | xargs rm -f
 
 cleanall distclean: clean
 	rm -fr aserve-src

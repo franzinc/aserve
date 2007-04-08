@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.54 2007/04/06 21:55:39 layer Exp $
+;; $Id: t-aserve.cl,v 1.55 2007/04/08 14:58:05 layer Exp $
 
 ;; Description:
 ;;   test iserve
@@ -93,12 +93,12 @@
 		   (test-forms port)
 		   (test-client port)
 		   (test-cgi port)
+		   (test-http-copy-file)
 		   (if* (member :ics *features*)
 		      then (test-international port)
 			   (test-spr27296))
 		   (if* test-timeouts 
-		      then (test-timeouts port))
-		   ))
+		      then (test-timeouts port))))
 	    (format t "~%~%===== test direct ~%~%")
 	    (do-tests)
 	    
@@ -1777,6 +1777,37 @@
     (shutdown :server server)))
 			   
 
+(defun test-http-copy-file ()
+  (let ((url
+	 "http://www.franz.com/support/8.0/download/entpro/dist/windows/acl80.exe")
+	(reference-file
+	 "/fi/www/sites/franz/prod/htdocs/support/8.0/download/entpro/dist/windows/acl80.exe")
+	(temp-file-name (sys:make-temp-file-name "temp")))
+    (when (not (probe-file reference-file))
+      (format t "test-http-copy-file: reference file does not exist.~%")
+      (return-from test-http-copy-file))
+    (unwind-protect
+	(flet ((doit (&rest args)
+		 (format t "~&~%copying reference file~@[:~{ ~s~}~]~%"
+			 args)
+		 (let ((before (get-internal-real-time)))
+		   (apply #'http-copy-file url temp-file-name args)
+		   (format t "time = ~s msecs~%"
+			   (- (get-internal-real-time) before)))
+		 (format t "comparing ~a~%" temp-file-name)
+		 (test t (excl::compare-files reference-file temp-file-name))
+		 (delete-file temp-file-name)))
+	  (doit)
+	  (doit :protocol :http/1.0)
+	  (doit :buffer-size 2048)
+	  (doit :buffer-size 4096)
+	  (doit :buffer-size 8192)
+	  (doit
+	   :progress-function
+	   (lambda (bytes-read total-size)
+	     (format t "~&  copy progress: ~a ~a~%" bytes-read total-size)
+	     (force-output t))))
+      (ignore-errors (delete-file temp-file-name)))))
 
     
 (if* user::*do-aserve-test* 
