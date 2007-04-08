@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.66 2007/04/08 14:58:05 layer Exp $
+;; $Id: load.cl,v 1.67 2007/04/08 15:12:15 layer Exp $
 ;;
 
 ;
@@ -27,7 +27,6 @@
       "authorize"
       "log" 
       "client"
-      "httpcopy"
       "proxy"
       "cgi"
       ))

@@ -1,7 +1,10 @@
 2007-04-08  Kevin Layer  <layer@gemini.franz.com>
 
+	* move httpcopy.cl contents into client.cl
+
 	* (NEW) httpcopy.cl: implements new http-copy-file client
           function
+
 	* load.cl: add httpcopy file
 	* makefile: default mlisp to /fi/cl/8.0/bin/mlisp
 	* packages.cl: export http-copy-file
