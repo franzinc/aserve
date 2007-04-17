@@ -3,7 +3,7 @@
 ;; clpage.cl
 ;; common lisp server pages
 ;;
-;; copyright (c) 2003-2005 Franz Inc, Oakland, CA - All rights reserved.
+;; copyright (c) 2003-2007 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: clpage.cl,v 1.11 2005/12/08 21:19:04 layer Exp $
+;; $Id: clpage.cl,v 1.12 2007/04/17 22:05:04 layer Exp $
 
 
 (eval-when (compile load eval) (require :aserve))
