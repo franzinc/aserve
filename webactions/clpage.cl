@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 
-;; $Id: clpage.cl,v 1.12 2007/04/17 22:05:04 layer Exp $
+;; $Id: clpage.cl,v 1.13 2007/08/28 15:28:12 jkf Exp $
 
 
 (eval-when (compile load eval) (require :aserve))
@@ -373,7 +373,11 @@
 				chstart chcount))
 	   elseif (eq ch #\")
 	     then (if* (or (match-buffer backbuffer backindex "=ferh")
-			   (match-buffer backbuffer backindex "=noitca")
+			   ;; check for action= within a form only since
+			   ;; backbase use b:action=
+			   ;; cac 2aug07
+ 			   (and (equalp lasttag "form")
+ 				(match-buffer backbuffer backindex "=noitca"))
 			   (and (equalp lasttag "frame")
 				(match-buffer backbuffer backindex "=crs"))
 			   )
@@ -398,11 +402,11 @@
 					(let ((res (car result)))
 					  (if* (and (> (length (cadr res)) 0)
 						    (or (member 
-						     (aref (cadr res) 0)
-						     '(#\/ #\# #\?))
-						    (match-regexp
-						     "^[A-Za-z]+:" ;eg: http: 
-						     (cadr res)))
+							 (aref (cadr res) 0)
+							 '(#\/ #\# #\?))
+							(match-regexp
+							 "^[A-Za-z]+:" ;eg: http: 
+							 (cadr res)))
 						    )
 					     thenret ; absolute pathname, ok
 					     else (pop result)

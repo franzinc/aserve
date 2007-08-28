@@ -1,3 +1,9 @@
+2007-08-28  John Foderaro  <jkf@tiger.franz.com>
+
+	* clpage.cl (parse-clp-guts):  search for "action" tag
+	 only within a form so as not to match backbase's b:action
+	 tag
+
 2005-03-11  John Foderaro  <jkf@tiger.franz.com>
 
 	* webact.cl - back to using a 301 redirect if the request-method
