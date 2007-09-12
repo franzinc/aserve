@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.13 2007/04/08 14:58:05 layer Exp $
+# $Id: makefile,v 1.14 2007/09/12 20:33:13 layer Exp $
 #
 # On Windows, this makefile requires the use of GNU make from Redhat
 # (http://sources.redhat.com/cygwin/).
@@ -17,7 +17,7 @@ ifndef mlisp
 ifeq ($(on_windows),yes)
 mlisp = "/cygdrive/c/Program Files/acl80/mlisp.exe" +B +cn
 else
-mlisp = /fi/cl/8.0/bin/mlisp
+mlisp = /fi/cl/8.1/bin/mlisp
 endif
 endif
 

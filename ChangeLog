@@ -1,3 +1,10 @@
+2007-09-12  Kevin Layer  <layer@gemini.franz.com>
+1.2.51
+
+	* main.cl: incf version
+	* makefile: use 8.1
+	* publish.cl: update *file-type-to-mime-type*
+
 2007-04-08  Kevin Layer  <layer@gemini.franz.com>
 
 	* client.cl: move httpcopy.cl contents into client.cl
