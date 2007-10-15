@@ -2013,9 +2013,7 @@ secure socket</li>
 <p><a name="f-set-cookie-header"></a><strong><font face="Courier New">(set-cookie-header
 request &amp;key name value expires domain path secure encode-value
 external-format)</font></strong></p>
-<p>This function should be called between the calls to <strong>with-http-response
-</strong>and
-<strong>with-http-body</strong>.&nbsp;&nbsp; It can be called more than
+<p>This function must be called before <strong>with-http-body</strong>.&nbsp;&nbsp; It can be called more than
 once.&nbsp; Each
 call will cause one Set-Cookie directive to be sent to the web browser.
 &nbsp;&nbsp;&nbsp;
