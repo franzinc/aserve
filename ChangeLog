@@ -1,3 +1,11 @@
+2007-10-23  Kevin Layer  <layer@gemini.franz.com>
+1.2.52
+
+	* main.cl: new debug type for 8.1 or later, :zoom-on-error,
+	  allows easier debugging of errors.  Do
+	  (push :zoom-on-error net.aserve::*debug-current*)
+	  to enable this feature.
+
 2007-09-12  Kevin Layer  <layer@gemini.franz.com>
 1.2.51
 

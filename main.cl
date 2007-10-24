@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.181 2007/09/12 20:33:13 layer Exp $
+;; $Id: main.cl,v 1.182 2007/10/24 01:58:49 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -38,7 +38,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 51))
+(defparameter *aserve-version* '(1 2 52))
 
 (eval-when (eval load)
     (require :sock)
@@ -1199,36 +1199,60 @@ by keyword symbols and not by strings"
 		(return-from http-worker-thread nil))
 	
 	(restart-case
-	    (if* (not (member :notrap *debug-current* :test #'eq))
-	       then (handler-case (process-connection sock)
-		      (error (cond)
-			(if* (connection-reset-error cond)
-			   thenret ; don't print these errors,
-			   else (logmess 
-				 (format nil "~agot error ~a~%" 
-					 (if* *worker-request*
-					    then (format 
-						  nil 
-						  "while processing command ~s~%"
-						  (request-raw-request 
-						   *worker-request*))
-					    else "")
-					 cond
-					 )))))
-	       else ; in debugging mode where we don't ignore errors
-		    ; still, we want to ignore connection-reset-by-peer
-		    ; since they are often not errors
-		    (catch 'out-of-connection
-		      (handler-bind 
-			  ((stream-error 
-			    #'(lambda (c)
-				(if* (and 
-				      (not *debug-connection-reset-by-peer*)
-				      (connection-reset-error c))
-				   then (throw 'out-of-connection nil)))))
-			(process-connection sock)))
-		      
-		    )
+	    (cond
+	     ;; Uses the top-level.debug:zoom, which only exists in ACL
+	     ;; 8.1.
+	     #+(version>= 8 1)
+	     ((member :zoom-on-error *debug-current* :test #'eq)
+	      (handler-bind
+		  ((error
+		    (lambda (cond)
+		      (if* (connection-reset-error cond)
+			 thenret ;; don't print these errors,
+			 else (logmess 
+			       (format nil "~agot error ~a~%" 
+				       (if* *worker-request*
+					  then (format 
+						nil 
+						"while processing command ~s~%"
+						(request-raw-request 
+						 *worker-request*))
+					  else "")
+				       cond))
+			      (top-level.debug:zoom
+			       (vhost-error-stream
+				(wserver-default-vhost
+				 *wserver*)))))))
+		(process-connection sock)))
+	     ((not (member :notrap *debug-current* :test #'eq))
+	      (handler-case (process-connection sock)
+		(error (cond)
+		  (if* (connection-reset-error cond)
+		     thenret ; don't print these errors,
+		     else (logmess 
+			   (format nil "~agot error ~a~%" 
+				   (if* *worker-request*
+				      then (format 
+					    nil 
+					    "while processing command ~s~%"
+					    (request-raw-request 
+					     *worker-request*))
+				      else "")
+				   cond))))))
+	     (t
+	      ; in debugging mode where we don't ignore errors
+	      ; still, we want to ignore connection-reset-by-peer
+	      ; since they are often not errors
+	      (catch 'out-of-connection
+		(handler-bind 
+		    ((stream-error 
+		      #'(lambda (c)
+			  (if* (and 
+				(not *debug-connection-reset-by-peer*)
+				(connection-reset-error c))
+			     then (throw 'out-of-connection nil)))))
+		  (process-connection sock)))))
+
 	  (abandon ()
 	      :report "Abandon this request and wait for the next one"
 	    nil))
