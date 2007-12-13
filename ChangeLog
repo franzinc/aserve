@@ -1,3 +1,8 @@
+2007-12-13    <jkf@MINI>
+
+	* do-http-request: have timeout apply to the socket connection
+	 operation as well.
+
 2007-10-23  Kevin Layer  <layer@gemini.franz.com>
 1.2.52
 

@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.56 2007/04/17 22:05:04 layer Exp $
+;; $Id: client.cl,v 1.57 2007/12/13 16:18:24 jkf Exp $
 
 ;; Description:
 ;;   http client code.
@@ -540,7 +540,15 @@
 
 
 
-
+(defmacro with-socket-connect-timeout ((&key timeout host port)
+				       &body body)
+  ;;
+  ;; to wrap around a call to make-socket
+  ;;
+  `(mp:with-timeout ((or ,timeout 99999999)
+		     (error "Connecting to host ~a port ~a timed out after ~s seconds"
+			    ,host ,port ,timeout))
+     ,@body))
 
 
 
@@ -618,21 +626,28 @@
 		 then (error "proxy arg should have form \"foo.com\" ~
 or \"foo.com:8000\", not ~s" proxy))
 	      
-	      (setq sock (socket:make-socket :remote-host phost
-					     :remote-port pport
-					     :format :bivalent
-					     :type net.aserve::*socket-stream-type*
-					     :nodelay t
-					     )))
+	      (setq sock 
+		(with-socket-connect-timeout (:timeout timeout
+						       :host phost 
+						       :port pport)
+		  (socket:make-socket :remote-host phost
+				      :remote-port pport
+				      :format :bivalent
+				      :type net.aserve::*socket-stream-type*
+				      :nodelay t
+				      ))))
        else (setq sock 
-	      (socket:make-socket :remote-host host
-				  :remote-port port
-				  :format :bivalent
-				  :type 
-				  net.aserve::*socket-stream-type*
-				  :nodelay t
+	      (with-socket-connect-timeout (:timeout timeout
+						     :host host
+						     :port port)
+		(socket:make-socket :remote-host host
+				    :remote-port port
+				    :format :bivalent
+				    :type 
+				    net.aserve::*socket-stream-type*
+				    :nodelay t
 					     
-				  ))
+				    )))
 	    (if* ssl
 	       then #+(version>= 8 0)
 		    (setq sock
@@ -663,9 +678,9 @@ or \"foo.com:8000\", not ~s" proxy))
     #+io-timeout
     (if* (integerp timeout)
        then (socket:socket-control 
-		 sock 
-		 :read-timeout timeout
-		 :write-timeout timeout))
+	     sock 
+	     :read-timeout timeout
+	     :write-timeout timeout))
 	    
     
     (if* query
