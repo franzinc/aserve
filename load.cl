@@ -1,6 +1,6 @@
 ;; load in aserve
 ;;
-;; $Id: load.cl,v 1.67 2007/04/08 15:12:15 layer Exp $
+;; $Id: load.cl,v 1.68 2007/12/26 20:36:36 jkf Exp $
 ;;
 
 ;
@@ -230,7 +230,9 @@
 ;; 7. (ftp-publish-src)
 ;; 8. on cobweb in /fi/opensource/src/aserve 
 ;;    do cvs update to put code on opensource site
-;; 9. on spot run /fi/sa/bin/aserve-sync
+;; 9. on cobweb as root do:
+;;    rsh cvs 'cd /repository/cvs-public/aserve && rsync -a --delete /cvs/aserve/ . && chgrp -R cvspublic .'
+;;
 ;; 10. ftp upload.sourceforge.net and put the tar file in the
 ;;     incoming directory, then go to the aserve sourceforge web page and 
 ;;     select the file manager and publish it.
