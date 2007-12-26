@@ -23,7 +23,7 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-;; $Id: websession.cl,v 1.7 2007/04/17 22:05:04 layer Exp $
+;; $Id: websession.cl,v 1.8 2007/12/26 19:02:27 jkf Exp $
 
 (in-package :net.aserve)
 
@@ -201,3 +201,22 @@
   
   
   
+(defun kill-websession (req ent)
+  ;; remove the session associated with this req/ent
+  ;; (untested)
+  (let* ((wa (webaction-from-ent ent))
+	 (sm (and wa (webaction-websession-master wa)))
+	 (sessions (and sm (sm-websessions sm)))
+	 (session (websession-from-req req)))
+    
+    (if* (and sessions session)
+       then (remhash (websession-key session) sessions))))
+
+
+	 
+	 
+    
+	
+    
+    
+   

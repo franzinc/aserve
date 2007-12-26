@@ -1,3 +1,8 @@
+2007-12-26  John Foderaro  <jkf@tiger.franz.com>
+1.2.53
+	* to enable zoom on error do (net.aserve::debug-on :zoom-on-error)
+	and it will no longer act like you added :notrap as well.
+
 2007-12-13    <jkf@MINI>
 
 	* do-http-request: have timeout apply to the socket connection

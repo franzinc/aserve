@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.182 2007/10/24 01:58:49 layer Exp $
+;; $Id: main.cl,v 1.183 2007/12/26 19:02:27 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -38,7 +38,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 52))
+(defparameter *aserve-version* '(1 2 53))
 
 (eval-when (eval load)
     (require :sock)
@@ -85,6 +85,8 @@
 (define-debug-kind :info   :log
   "General information")
 
+(define-debug-kind :zoom-on-error :all
+  "If set then print a zoom to the vhost-error-stream when an error occurs in a handler")
     
 
 (defun debug-on (&rest args)
@@ -1204,26 +1206,31 @@ by keyword symbols and not by strings"
 	     ;; 8.1.
 	     #+(version>= 8 1)
 	     ((member :zoom-on-error *debug-current* :test #'eq)
-	      (handler-bind
-		  ((error
-		    (lambda (cond)
-		      (if* (connection-reset-error cond)
-			 thenret ;; don't print these errors,
-			 else (logmess 
-			       (format nil "~agot error ~a~%" 
-				       (if* *worker-request*
-					  then (format 
-						nil 
-						"while processing command ~s~%"
-						(request-raw-request 
-						 *worker-request*))
-					  else "")
-				       cond))
-			      (top-level.debug:zoom
-			       (vhost-error-stream
-				(wserver-default-vhost
-				 *wserver*)))))))
-		(process-connection sock)))
+	      (tagbody out
+		(handler-bind
+		    ((error
+		      (lambda (cond)
+			(if* (connection-reset-error cond)
+			   then (go out) ;; don't print these errors,
+			   else (logmess 
+				 (format nil "~agot error ~a~%" 
+					 (if* *worker-request*
+					    then (format 
+						  nil 
+						  "while processing command ~s~%"
+						  (request-raw-request 
+						   *worker-request*))
+					    else "")
+					 cond))
+				(top-level.debug:zoom
+				 (vhost-error-stream
+				  (wserver-default-vhost
+				   *wserver*)))
+				(if* (not (member :notrap *debug-current*))
+				   then ; after the zoom ignore the error
+					(go out))
+				))))
+		  (process-connection sock))))
 	     ((not (member :notrap *debug-current* :test #'eq))
 	      (handler-case (process-connection sock)
 		(error (cond)
