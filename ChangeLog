@@ -1,3 +1,8 @@
+2008-01-28  John Foderaro  <jkf@tiger.franz.com>
+1.2.54
+	* fix bug where if aserve as a proxy did get-basic-authorization
+	it would cause two authorization headers to be sent by the proxy
+
 2007-12-26  John Foderaro  <jkf@tiger.franz.com>
 1.2.53
 	* to enable zoom on error do (net.aserve::debug-on :zoom-on-error)

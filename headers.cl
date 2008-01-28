@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.30 2007/04/17 22:05:04 layer Exp $
+;; $Id: headers.cl,v 1.31 2008/01/28 17:52:21 jkf Exp $
 
 ;; Description:
 ;;   header parsing
@@ -915,7 +915,7 @@
 
 
 (defun insert-non-standard-header (buff name value)
-  ;; insert a header that's not know by index into the buffer
+  ;; insert a header that's not known by index into the buffer
   ;;
   (setq name (string name))
   
