@@ -1,6 +1,6 @@
-;; load in aserve
+2;; load in aserve
 ;;
-;; $Id: load.cl,v 1.68 2007/12/26 20:36:36 jkf Exp $
+;; $Id: load.cl,v 1.69 2008/02/04 21:02:24 jkf Exp $
 ;;
 
 ;
@@ -29,6 +29,7 @@
       "client"
       "proxy"
       "cgi"
+      "playback"
       ))
 
 (defparameter *aserve-other-files*
