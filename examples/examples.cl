@@ -23,7 +23,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.40 2007/04/17 22:05:04 layer Exp $
+;; $Id: examples.cl,v 1.41 2008/02/04 19:03:59 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples
@@ -74,7 +74,9 @@
 			 :p
 			 (:b "Sample pages") :br
 			 ((:a :href "gc") "Garbage Collector Stats") :br
-			 ((:a :href "apropos") "Apropos")
+			 ((:a :href "apropos") "Apropos using get")
+			 :br
+			 ((:a :href "apropos-post") "Apropos using post")
 			 :br
 			 ((:a :href "pic") "Sample jpeg") :br
 			 ((:a :href "pic-redirect") "Redirect to previous picture") :br
@@ -367,6 +369,64 @@
 		  "New Apropos of "
 		  ((:form :action "apropos"
 			  :method "get")
+		   ((:input :type "text"
+			    :maxlength 40
+			    :size 20
+			    :name "symbol")))
+		  #+allegro
+		  " The apropos function in ACL is case sensitive."
+		  :p
+			
+		  (if* lookup
+		     then (html :hr (:b "Apropos") " of " 
+				(:princ-safe (cdr lookup))
+				:br
+				:br)
+			  (let ((ans (apropos-list (cdr lookup))))
+			    (if* (null ans)
+			       then (html "No Match Found")
+			       else (macrolet ((my-td (str)
+						 `(html ((:td 
+							  :bgcolor "blue")
+							 ((:font :color "white"
+								 :size "+1")
+							  (:b ,str))))))
+						       
+				      (html ((:table
+					      :bgcolor "silver"
+					      :bordercolor "blue"
+					      :border 3
+					      :cellpadding 3
+					      )
+						   
+					     (:tr
+					      (my-td "Symbol")
+					      (my-td "boundp")
+					      (my-td "fboundp"))
+						 
+						   
+					     (dolist (val ans)
+					       (html (:tr 
+						      (:td (:prin1-safe val))
+						      (:td (:prin1 (and (boundp val) t)))
+						      (:td (:prin1 (and (fboundp val) t))))
+						     :newline)))))))
+		     else (html "Enter name and type enter")))
+		 :newline))))))
+
+(publish 
+ :path "/apropos-post"
+ :content-type "text/html"
+ :function
+ #'(lambda (req ent)
+     (let ((lookup (assoc "symbol" (request-query req) :test #'equal)))
+       (with-http-response (req ent)
+	 (with-http-body (req ent)
+	   (html (:head (:title "Allegro Apropos"))
+		 ((:body :background "aserveweb/fresh.jpg")
+		  "New Apropos of "
+		  ((:form :action "apropos-post"
+			  :method "post")
 		   ((:input :type "text"
 			    :maxlength 40
 			    :size 20

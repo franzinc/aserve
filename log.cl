@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: log.cl,v 1.26 2007/04/17 22:05:04 layer Exp $
+;; $Id: log.cl,v 1.27 2008/02/04 19:03:59 jkf Exp $
 
 ;; Description:
 ;;   iserve's logging
@@ -36,6 +36,8 @@
 (in-package :net.aserve)
 
 (defvar *enable-logging* t) ; to turn on/off the standard logging method
+
+(defvar *save-commands* nil) ; if true then a stream to which to write commands
 
 (defmethod logmess (message)
   ;; send log message to the default vhost's error stream 
@@ -137,7 +139,30 @@
 			; get the stream again
 			(setq stream (vhost-log-stream (request-vhost req)))
 			(do-log))
-		 else (do-log))))))
+		 else (do-log)))))
+  
+  (if* *save-commands*
+     then (multiple-value-bind (ok whole uri-string)
+	      (match-re "^[^ ]+\\s+([^ ]+)" (request-raw-request req))
+	    (declare (ignore ok whole))
+	    (format *save-commands*
+		    "((:method . ~s) (:uri . ~s) (:proto . ~s) ~% (:code . ~s)~@[~% (:body . ~s)~]~@[~% (:auth .  ~s)~]~@[~% (:ctype . ~s)~])~%" 
+		    (request-method req)
+		    uri-string
+		    (request-protocol req)
+		    (let ((obj (request-reply-code req)))
+		      (if* obj
+			 then (response-number obj)
+			 else 999))
+		    (let ((bod (request-request-body req)))
+		      (and (not (equal "" bod)) bod))
+		    (multiple-value-list (get-basic-authorization req))
+		    (header-slot-value req :content-type)
+		    ))
+	  (force-output *save-commands*))
+		  
+	  
+  )
 
 	    	
     
