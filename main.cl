@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.186 2008/02/07 23:31:48 jkf Exp $
+;; $Id: main.cl,v 1.187 2008/02/07 23:35:21 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1342,6 +1342,7 @@ by keyword symbols and not by strings"
 				       (if* (>= (incf busy-sleeps) 4)
 					  then ; we've waited too many times
 					       (setq busy-sleeps 0)
+					       (logmess "too many sleeps, will create a new thread")
 					       (make-worker-thread)
 					  else (sleep 1)))
 			     
