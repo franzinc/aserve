@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.184 2008/01/28 17:52:21 jkf Exp $
+;; $Id: main.cl,v 1.185 2008/02/07 23:16:39 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -904,6 +904,7 @@ by keyword symbols and not by strings"
 		   max-depth
 		   os-processes	 ; to fork and run multiple instances
 		   (external-format nil efp); to set external format
+		   backlog
 		   )
   ;; -exported-
   ;;
@@ -1015,6 +1016,7 @@ by keyword symbols and not by strings"
 					  :local-host host
 					  :reuse-address t
 					  :format :bivalent
+					  :backlog backlog
 					  
 					  :type 
 					  *socket-stream-type*

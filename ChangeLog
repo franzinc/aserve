@@ -1,3 +1,7 @@
+2008-02-07  John Foderaro  <jkf@tiger.franz.com>
+
+	* add backlog argument to net.aserve:start
+
 2008-01-28  John Foderaro  <jkf@tiger.franz.com>
 1.2.54
 	* fix bug where if aserve as a proxy did get-basic-authorization
