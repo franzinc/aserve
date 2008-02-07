@@ -1,5 +1,9 @@
 2008-02-07  John Foderaro  <jkf@tiger.franz.com>
 
+	* if during the accept loop a sleep is necessary 4 times,
+	  a new thread will be created anyway. This will allow
+	  the worker threads to grow in more situations.
+
 	* add backlog argument to net.aserve:start
 
 2008-01-28  John Foderaro  <jkf@tiger.franz.com>

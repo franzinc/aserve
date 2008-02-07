@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.185 2008/02/07 23:16:39 jkf Exp $
+;; $Id: main.cl,v 1.186 2008/02/07 23:31:48 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -1290,7 +1290,8 @@ by keyword symbols and not by strings"
 	 (workers nil)
 	 (server *wserver*)
 	 (main-socket (wserver-socket server))
-	 (ipaddrs (wserver-ipaddrs server)))
+	 (ipaddrs (wserver-ipaddrs server))
+	 (busy-sleeps 0))
     (unwind-protect
 
 	(loop
@@ -1338,7 +1339,11 @@ by keyword symbols and not by strings"
 		       then (case looped
 			      (0 nil)
 			      ((1 2 3) (logmess "all threads busy, pause")
-				       (sleep 1))
+				       (if* (>= (incf busy-sleeps) 4)
+					  then ; we've waited too many times
+					       (setq busy-sleeps 0)
+					       (make-worker-thread)
+					  else (sleep 1)))
 			     
 			      (4 (logmess "forced to create new thread")
 				 (make-worker-thread))
