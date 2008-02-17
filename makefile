@@ -1,4 +1,4 @@
-# $Id: makefile,v 1.14 2007/09/12 20:33:13 layer Exp $
+# $Id: makefile,v 1.15 2008/02/17 06:16:54 layer Exp $
 #
 # On Windows, this makefile requires the use of GNU make from Redhat
 # (http://sources.redhat.com/cygwin/).
@@ -52,5 +52,9 @@ clean:	FORCE
 
 cleanall distclean: clean
 	rm -fr aserve-src
+
+tags: FORCE
+	rm -f TAGS
+	find . -name '*.cl' -print | xargs etags -a
 
 FORCE:

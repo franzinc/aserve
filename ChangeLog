@@ -1,3 +1,7 @@
+2008-02-16  Kevin Layer  <layer@gemini.franz.com>
+
+	* makefile: add `tags' rule
+
 2008-02-07  John Foderaro  <jkf@tiger.franz.com>
 
 	* if during the accept loop a sleep is necessary 4 times,
