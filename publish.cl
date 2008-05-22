@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: publish.cl,v 1.88 2007/09/12 20:33:13 layer Exp $
+;; $Id: publish.cl,v 1.89 2008/05/22 18:14:59 layer Exp $
 
 ;; Description:
 ;;   publishing urls
@@ -490,6 +490,7 @@
       ("application/vnd.xfdl") ("application/vnd.yellowriver-custom-menu")
       ("application/whoispp-query") ("application/whoispp-response")
       ("application/wita") ("application/wordperfect5.1")
+      ("application/x-apple-diskimage" "dmg")
       ("application/x-bcpio" "bcpio") ("application/x-bittorrent" "torrent")
       ("application/x-bzip2" "bz2") ("application/x-cdlink" "vcd")
       ("application/x-chess-pgn" "pgn") ("application/x-compress")

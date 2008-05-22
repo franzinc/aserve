@@ -1,3 +1,8 @@
+2008-05-22  Kevin Layer  <layer@gemini.franz.com>
+1.2.55
+	* publish.cl: set mime type of dmg files to
+	  application/x-apple-diskimage
+
 2008-02-16  Kevin Layer  <layer@gemini.franz.com>
 
 	* makefile: add `tags' rule
