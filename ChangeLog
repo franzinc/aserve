@@ -1,5 +1,5 @@
 2008-07-07  John Foderaro  <jkf@tiger.franz.com>
-
+1.2.56
 	* main.cl: fix bug where getting a large request body would
 	  fail due to array not being adjustable
 
