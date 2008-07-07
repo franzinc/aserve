@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.188 2008/05/22 18:14:59 layer Exp $
+;; $Id: main.cl,v 1.189 2008/07/07 15:06:38 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -38,7 +38,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 55))
+(defparameter *aserve-version* '(1 2 56))
 
 (eval-when (eval load)
     (require :sock)
@@ -1704,6 +1704,7 @@ by keyword symbols and not by strings"
 			    (let ((ans (make-array 
 					2048 
 					:element-type 'character
+					:adjustable t
 					:fill-pointer 0))
 				  (sock (request-socket req))
 				  (ch))
@@ -1738,6 +1739,7 @@ by keyword symbols and not by strings"
 				    (let ((ans (make-array 
 						2048 
 						:element-type 'character
+						:adjustable t
 						:fill-pointer 0))
 					  (sock (request-socket req))
 					  (ch))
