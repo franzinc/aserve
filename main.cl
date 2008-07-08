@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.189 2008/07/07 15:06:38 jkf Exp $
+;; $Id: main.cl,v 1.190 2008/07/08 19:18:38 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -785,9 +785,13 @@ by keyword symbols and not by strings"
     :initform nil
     :accessor request-reply-code)
    
+   (request-date	; when the request came in 
+    :initform 0
+    :accessor request-request-date)
+   
    (reply-date
-    :initform (get-universal-time)  ; when we're responding
-    :reader request-reply-date)
+    :initform 0		  ; when we're responding
+    :accessor request-reply-date)
    
    (reply-headers  ;; alist of headers to send out
     :initform nil
@@ -1456,7 +1460,10 @@ by keyword symbols and not by strings"
 	     else ;; got a request
 		  (setq *worker-request* req) 
 		  
+		  (setf (request-request-date req) (get-universal-time))
 		  (handle-request req)
+		  (setf (request-reply-date req) (get-universal-time))
+		  
 		  (force-output-noblock (request-socket req))
 		  
 		  (log-request req)
@@ -2494,8 +2501,10 @@ in get-multipart-sequence"))
 	      
       (if* post
 	 then (if* (and (eq (request-method req) :post)
-			(equal (header-slot-value req :content-type)
-			    "application/x-www-form-urlencoded"))
+			(search ; sometimes other stuff added we can ignore
+			 "application/x-www-form-urlencoded"
+			 (header-slot-value req :content-type))
+			)
 		 then (setf res
 			(append res
 				(form-urlencoded-to-query

@@ -1,5 +1,11 @@
-2008-07-07  John Foderaro  <jkf@tiger.franz.com>
+2008-07-08  John Foderaro  <jkf@tiger.franz.com>
 1.2.56
+	* [from David Cooper] - store in the request object the time at 
+	which a request came and and when it was finshed being handled.
+	 - when parsing multipart bodies, handle multipart content type 
+	 that has additional info as well
+
+2008-07-07  John Foderaro  <jkf@tiger.franz.com>
 	* main.cl: fix bug where getting a large request body would
 	  fail due to array not being adjustable
 
