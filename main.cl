@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.190 2008/07/08 19:18:38 jkf Exp $
+;; $Id: main.cl,v 1.191 2009/01/13 21:38:52 layer Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -817,7 +817,7 @@ by keyword symbols and not by strings"
     :initform nil
     :accessor request-reply-plist)
 
-   (reply-protocol-sring
+   (reply-protocol-string
     ;; A web server announces the highest minor level of the 
     ;; major level of the protocol that was requested by the client.
     ;; Thus for now we're always http/1.1

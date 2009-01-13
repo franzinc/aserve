@@ -1,3 +1,8 @@
+2009-01-13  Kevin Layer  <layer@gemini.franz.com>
+
+	* main.cl (http-request): fix typo (reply-protocol-sring =>
+	  reply-protocol-string)
+
 2008-07-08  John Foderaro  <jkf@tiger.franz.com>
 1.2.56
 	* [from David Cooper] - store in the request object the time at 
