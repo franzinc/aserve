@@ -1,3 +1,8 @@
+2009-01-23    <jkf@duo.verada.com>
+1.2.57
+	* proxy.cl - correctly send out the comment after the result
+	 code.  Turns out that Microsoft's ISA actually reads it. 
+
 2009-01-13  Kevin Layer  <layer@gemini.franz.com>
 
 	* main.cl (http-request): fix typo (reply-protocol-sring =>
