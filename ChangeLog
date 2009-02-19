@@ -1,3 +1,8 @@
+2009-02-19  John Foderaro  <jkf@max.verada.com>
+1.2.58
+	* fix problem introduced in 1.2.57 where the response date 
+	is always the zero universal time.
+
 2009-01-23    <jkf@duo.verada.com>
 1.2.57
 	* proxy.cl - correctly send out the comment after the result

@@ -24,7 +24,7 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: main.cl,v 1.192 2009/01/23 06:52:20 jkf Exp $
+;; $Id: main.cl,v 1.193 2009/02/19 12:34:19 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -38,7 +38,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 57))
+(defparameter *aserve-version* '(1 2 58))
 
 (eval-when (eval load)
     (require :sock)
@@ -790,7 +790,7 @@ by keyword symbols and not by strings"
     :accessor request-request-date)
    
    (reply-date
-    :initform 0		  ; when we're responding
+    :initform (get-universal-time)	  ; when we're responding
     :accessor request-reply-date)
    
    (reply-headers  ;; alist of headers to send out
