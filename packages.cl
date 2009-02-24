@@ -1,6 +1,9 @@
 #+(version= 8 1)
-(sys:defpatch "aserve" 1
-  "v1: version 1.2.56, large request body & multipart content type & more."
+(sys:defpatch "aserve" 2
+  "v1: version 1.2.56, large request body & multipart content type & more;
+v2: version 1.2.58, fix problem introduced in 1.2.56 where the response date 
+  is always the zero universal time & correctly send out the comment after
+  the result code."
   :type :system
   :post-loadable t)
 
@@ -46,7 +49,7 @@ v5: version 1.2.50, Enhanced SSL client/server support."
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: packages.cl,v 1.21 2008/07/08 19:27:10 layer Exp $
+;; $Id: packages.cl,v 1.22 2009/02/24 19:04:17 layer Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe
