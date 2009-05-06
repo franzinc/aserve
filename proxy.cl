@@ -33,6 +33,9 @@
 ;;- http://www.franz.com/~jkf/coding_standards.html
 ;;-
 
+(eval-when (compile)
+  (require :smpdefs))
+
 (in-package :net.aserve)
 
 ; denotes a request from the browser
@@ -57,7 +60,10 @@
 (defparameter *connections-used-cached* 0) ; number of cached connections used
 ; the cache
 (defparameter *connection-cache-queue* (cons nil nil)) ; (first . last) queue of conn-cache objects
-(defparameter *connection-cache-expire* 10)  ; number of seconds to live
+(defparameter *connection-cache-expire* 10) ; number of seconds to live
+#+smp
+(defparameter *connection-cache-lock*
+    (make-basic-lock :name "connection-cache"))
 
 
 ; number of seconds we wait for a connect before we consider it timed
@@ -66,7 +72,9 @@
 (defparameter *connection-timed-out-wait* 30)
 
 
-(defstruct pcache 
+(defstruct (pcache 
+	    #+smp (:include synchronizing-structure)
+	    )
   ;; proxy cache
   table		; hash table mapping to pcache-ent objects
   disk-caches   ; list of pcache-disk items
@@ -164,7 +172,9 @@
 ; 
 
 
-(defstruct pcache-ent
+(defstruct (pcache-ent
+	    #+smp (:include synchronizing-structure)
+	    )
   key		; the string form of the uri 
   uri		; the actual uri
   last-modified-string  ; last modified time from the header
@@ -971,19 +981,23 @@ cached connection = ~s~%" cond cached-connection))
 		     :port port
 		     :socket socket)))
 	 (queue *connection-cache-queue*))
+    ;; the value of *connection-cache-queue* is always the same cons cell.
     
-    (incf *connections-cached*)
+
     
-    (mp:without-scheduling
+    (with-locked-structure
+	(*connection-cache-lock* :-smp :without-scheduling)
+      (incf *connections-cached*)
       (let ((start (first-valid-entry now queue)))
 		
 	(if* (null start)
-	   then ; empty, this is the first entry
+	   then				; empty, this is the first entry
 		(setf (car queue) 
 		  (setf (cdr queue) ent))
-		; add at the end
+					; add at the end
 	   else (setf (cdr (cdr queue)) ent)
-		(setf (cdr queue) ent))))))
+		(setf (cdr queue) ent))))
+    ))
 
 (defun first-valid-entry (now queue)
   ;; remove expired entries and return the list of entries
@@ -1012,7 +1026,7 @@ cached connection = ~s~%" cond cached-connection))
   ;; build a new one if there isn't  one cached
   (let ((now (get-universal-time))
 	(queue *connection-cache-queue*))
-    (mp:without-scheduling
+    (with-locked-structure (*connection-cache-lock* :-smp :without-scheduling)
       (let ((start (first-valid-entry now queue))
 	    (prev nil))
 	(loop
@@ -1810,6 +1824,8 @@ cached connection = ~s~%" cond cached-connection))
   (incf (pcache-ent-returned pcache-ent))
 
 
+  (ensure-pcache-in-memory pcache-ent) ;; this handles thread safety
+  #+ignore
   (if* (pcache-ent-disk-location pcache-ent)
      then (retrieve-pcache-from-disk pcache-ent))
   
@@ -1842,7 +1858,7 @@ cached connection = ~s~%" cond cached-connection))
   ;; attempt to increase the use count of this entry by one.
   ;; If successful return true.
   ;; If the entry is dead return nil
-  (excl::atomically
+  (with-locked-structure (pcache-ent :-smp :atomically)
     (excl::fast
      (let ((val (pcache-ent-use pcache-ent)))
        (if* val
@@ -1851,7 +1867,7 @@ cached connection = ~s~%" cond cached-connection))
 
 (defun unlock-pcache-ent (pcache-ent)
   ;; reduce the use count of this entry
-  (mp:without-scheduling
+  (with-locked-structure (pcache-ent :-smp :without-scheduling)
     (let ((val (pcache-ent-use pcache-ent)))
       (if* val
 	 then (if* (and (zerop (excl::fast
@@ -1865,6 +1881,9 @@ cached connection = ~s~%" cond cached-connection))
   (let ((queueobj (pcache-ent-queueobj pcache-ent)))
     (move-pcache-ent pcache-ent queueobj queueobj)))
 
+#+ignore
+;; this is the original, which has some hazards even in non-smp
+;; a fixed version appears below
 (defun move-pcache-ent (pcache-ent fromq toq)
   ;; move the pcache-ent between queues
   ;; fromq and toq can be nil or the same.
@@ -1872,7 +1891,7 @@ cached connection = ~s~%" cond cached-connection))
   (let ((prev (pcache-ent-prev pcache-ent))
 	(next (pcache-ent-next pcache-ent)))
     
-    (mp:without-scheduling
+    (mp:without-scheduling ;; in #+ignored defun
       ; unlink
       (if* (and prev next)
 	 then (setf (pcache-ent-next prev) next
@@ -1907,6 +1926,77 @@ cached connection = ~s~%" cond cached-connection))
       
       (setf (pcache-ent-queueobj pcache-ent) toq))))
 
+;; This is the new version, fixed for thread safety
+(defun move-pcache-ent (pcache-ent fromq toq)
+  ;; move the pcache-ent between queues
+  ;; fromq and toq can be nil or the same.
+  ;;
+  ;; to handle errors detected inside a locked block, we
+  ;; set up a flag that we can check after leaving the locked code
+  (let ((error-flag nil))
+    (if* (eq fromq toq)
+       then ;; just shifting it to the head of the queue it's in
+	  (if* (null fromq)
+	    then (setq error-flag :noqueue)
+	   elseif (eq (pcache-ent-state pcache-ent) :dead) ; debugging 
+	     then (setq error-flag :dead)
+	     else (with-locked-structure (fromq :-smp :without-scheduling)
+		    (let* ((prev (pcache-ent-prev pcache-ent))
+			   (next (pcache-ent-next pcache-ent))
+			   (mru-head (queueobj-mru toq))
+			   (mru (pcache-ent-next mru-head)))
+		      ;; unlink and relink, or report error
+		      (if* (or (null prev) (null next))
+			 then (setq error-flag :unlinked)
+			 else (setf (pcache-ent-next prev) next
+				    (pcache-ent-prev next) prev
+				    (pcache-ent-next mru-head) pcache-ent
+				    (pcache-ent-prev pcache-ent) mru-head
+				    (pcache-ent-next pcache-ent) mru
+				    (pcache-ent-prev mru) pcache-ent)))))
+       else ;; toq != fromq; we're changing one or more queue counts
+	    (when fromq
+	      ;; it's leaving the queue fromq
+	      (with-locked-structure (fromq :-smp :without-scheduling)
+		(let ((prev (pcache-ent-prev pcache-ent))
+		      (next (pcache-ent-next pcache-ent)))
+		  ;; unlink
+		  (if* (or (null prev) (null next))
+		     then (setq error-flag :unlinked)
+		     else (setf (pcache-ent-next prev) next
+				(pcache-ent-prev next) prev)
+			  (decf (queueobj-items fromq))
+			  (decf (queueobj-bytes fromq)
+				(pcache-ent-data-length pcache-ent))
+			  (decf (queueobj-blocks fromq)
+				(pcache-ent-blocks pcache-ent))))))
+	    (when (and (null error-flag) toq)
+	      ;; link into the toq, at the mru position
+	      (if* (eq (pcache-ent-state pcache-ent) :dead)
+		 then (setq error-flag :dead)
+		 else (with-locked-structure (toq :-smp :without-scheduling)
+			(let* ((mru-head (queueobj-mru toq))
+			       (mru (pcache-ent-next mru-head)))
+			  (setf (pcache-ent-next mru-head) pcache-ent
+				(pcache-ent-prev pcache-ent) mru-head
+				(pcache-ent-next pcache-ent) mru
+				(pcache-ent-prev mru) pcache-ent))
+			(incf (queueobj-items toq))
+			(incf (queueobj-bytes toq) 
+			      (pcache-ent-data-length pcache-ent))
+			(incf (queueobj-blocks toq)
+			      (pcache-ent-blocks pcache-ent)))))
+	    (if* (null error-flag)
+	       then (setf (pcache-ent-queueobj pcache-ent) toq)))
+    ;; we've either made changes or set error-flag non-nil
+    (case error-flag
+      (:noqueue
+       (error "attempt to move a pcache-ent without specifying a queue"))
+      (:dead (break "shouldn't be dead during move"))
+      (:unlinked
+       (error "attempt to shift an unlinked pcache-ent")))))
+		      
+
 
 
 
@@ -1914,7 +2004,7 @@ cached connection = ~s~%" cond cached-connection))
 (defun kill-pcache-ent (pcache-ent &optional (pcache (wserver-pcache
 						      *wserver*)))
   ; make this entry dead
-  (mp::without-scheduling
+  (with-locked-structure (pcache :-smp :without-scheduling)
     
     ; stop any scanning of this uri
     (setf (pcache-ent-level pcache-ent) -1) 
@@ -2158,10 +2248,11 @@ cached connection = ~s~%" cond cached-connection))
     (loop
       (if* (<= needed 0) then (return))
       
+      #+ignore ;; recoded
       (block main
 	(setq ent-todo nil)
 	
-	(mp:without-scheduling
+	(mp:without-scheduling ;; in a #+ignored form
 	  ;; find the next ent to process without other processes running
 	  (let ((lru lru-head))
 	    (loop
@@ -2172,6 +2263,16 @@ cached connection = ~s~%" cond cached-connection))
 	      (if* (lock-pcache-ent lru)
 		 then (setq ent-todo lru)
 		      (return-from main))))))
+      
+      ;; this is the new version
+      (with-locked-structure (pcache :-smp :without-scheduling)
+	(setq ent-todo nil)
+	(do ((lru (pcache-ent-prev lru-head) (pcache-ent-prev lru)))
+	    ((eq lru mru-head)
+	     (setq needed 0))
+	  (if* (lock-pcache-ent lru)
+	     then (setq ent-todo lru)
+		  (return))))
       
       (if* ent-todo
 	 then ; move this one to disk or kill it off
@@ -2192,10 +2293,17 @@ cached connection = ~s~%" cond cached-connection))
   ;; flush all the deal items from the cache, returning
   ;; their resource
   (let (ent)
-    (excl::atomically
+    #-smp
+    (excl::atomically ;; in a #-smp block
      (excl::fast
       (setf ent (pcache-dead-ent pcache)
 	    (pcache-dead-ent pcache) nil)))
+    #+smp
+    (loop
+      (setq ent (pcache-dead-ent pcache))
+      (excl::fast
+       (when (atomic-conditional-setf (pcache-dead-ent pcache) nil ent)
+	 (return))))
     
     ; now we have an exclusive link to the dead entries
     ; which we can free at our leisure
@@ -2210,10 +2318,16 @@ cached connection = ~s~%" cond cached-connection))
 	     then (return-free-blocks (pcache-ent-pcache-disk ent)
 				      diskloc)))
 	(setq ent (pcache-ent-next ent)))
-      (excl::atomically 
+      #-smp
+      (excl::atomically ;; in a #-smp block
        (excl::fast 
 	(decf (the fixnum (pcache-dead-items pcache)) 
-	      (the fixnum count)))))))
+	      (the fixnum count))))
+      #+smp
+      (excl::fast
+       (decf-atomic (the fixnum (pcache-dead-items pcache)) 
+		    (the fixnum count)))
+      )))
      
      
   
@@ -2267,7 +2381,7 @@ cached connection = ~s~%" cond cached-connection))
 	    (store-data-on-disk pcache-ent pcache-disk to-store-list)
 	    (log-proxy (pcache-ent-key pcache-ent) 0 :wd nil)
 	    (let ((ans
-		   (mp:without-scheduling
+		   (with-locked-structure (pcache-ent :-smp :without-scheduling)
 		     (if* (and (null (pcache-ent-state pcache-ent))
 			       (eql 1 (pcache-ent-use pcache-ent)))
 			then ; we are tre sole user of this entry so we cna
@@ -2307,22 +2421,38 @@ cached connection = ~s~%" cond cached-connection))
 	      (free-header-blocks buffs)
 	      ans))))
 
+(defun ensure-pcache-in-memory (pcache-ent)
+  #+smp
+  (with-locked-structure (pcache-ent)
+    (if* (pcache-ent-disk-location pcache-ent)
+       then (retrieve-pcache-from-disk pcache-ent)))
+  #-smp
+  (if* (pcache-ent-disk-location pcache-ent)
+     then (retrieve-pcache-from-disk pcache-ent)))
+
+
 (defun retrieve-pcache-from-disk (pcache-ent)
   ;; read the cache entry back in from the disk
+  
+  ;; This is now called with the pcache-ent locked in smp lisps,
+  ;; so the flagval isn't needed in smp at all
   
   ; ensure the loading flag to true and set flagval
   ; to the value before we set the flag.
   ; If the value was nil and thus we set it to true, then
   ; we are the process responsible for loading in the data
   ;
-  (let ((flagval (excl::atomically
+  (let (#-smp
+	(flagval (excl::atomically ;; in a #-smp block
 		  (excl::fast 
 		   (let ((val (pcache-ent-loading-flag pcache-ent)))
 		     (if* (null val) 
 			then (setf (pcache-ent-loading-flag pcache-ent) t))
 		     val)))))
+    #-smp
     (if* flagval
-       then (mp:process-wait "cache entry to be loaded"
+       then #-smp
+	    (mp:process-wait "cache entry to be loaded"
 			     #'(lambda (pcache-ent) 
 				 (null (pcache-ent-loading-flag pcache-ent)))
 			     pcache-ent)
@@ -2361,7 +2491,8 @@ cached connection = ~s~%" cond cached-connection))
     
 	; insert in memory 
 	
-	(excl::atomically
+	(#+smp progn
+	 #-smp excl::atomically
 	 (excl::fast
 	  (setf (pcache-ent-disk-location pcache-ent) nil
 		(pcache-ent-pcache-disk pcache-ent) nil

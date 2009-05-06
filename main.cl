@@ -377,6 +377,9 @@
     :initform nil
     :initarg :ssl
     :accessor wserver-ssl)
+   #+smp
+   (excl::lock-control
+    :initform (excl::make-basic-lock :name "server-lock"))
    ))
 
 
@@ -523,11 +526,21 @@ Problems with protocol may occur." (ef-name ef)))))
 
 ; safe versions during multiprocessing
 
+#-smp
 (defmacro atomic-incf (var)
-  `(mp:without-scheduling (incf ,var)))
+  `(mp:without-scheduling (incf ,var)))	;; in a #-smp form
 
+#+smp
+(defmacro atomic-incf (var)
+  `(incf-atomic ,var))
+
+#-smp
 (defmacro atomic-decf (var)
-  `(mp:without-scheduling (decf ,var)))
+  `(mp:without-scheduling (decf ,var))) ;; in a #-smp form
+
+#+smp
+(defmacro atomic-decf (var)
+  `(decf-atomic ,var))
 
 
 ;;;;;;;;; end macros
@@ -1171,6 +1184,8 @@ by keyword symbols and not by strings"
 	     ,@excl:*cl-default-special-bindings*))
      #'http-accept-thread)))
 
+;; make-worker-thread wasn't thread-safe before smp. I'm assuming that's
+;; ok, and leaving it non-thread-safe in the smp version.
 (defun make-worker-thread ()
   (let* ((name (format nil "~d-aserve-worker" (incf *thread-index*)))
 	 (proc (mp:make-process :name name
@@ -1182,7 +1197,7 @@ by keyword symbols and not by strings"
 				)))
     (mp:process-preset proc #'http-worker-thread)
     (push proc (wserver-worker-threads *wserver*))
-    (atomic-incf (wserver-free-workers *wserver*))
+    (incf (wserver-free-workers *wserver*))
     (setf (getf (mp:process-property-list proc) 'short-name) 
       (format nil "w~d" *thread-index*))
     ))
@@ -1269,7 +1284,7 @@ by keyword symbols and not by strings"
 	  (abandon ()
 	      :report "Abandon this request and wait for the next one"
 	    nil))
-	(atomic-incf (wserver-free-workers *wserver*))
+	(incf (wserver-free-workers *wserver*))
 	(mp:process-revoke-run-reason sys:*current-process* sock))
     
       )))
@@ -1359,7 +1374,7 @@ by keyword symbols and not by strings"
 			    (setq workers (wserver-worker-threads server))
 			    (incf looped))
 		    (if* (null (mp:process-run-reasons (car workers)))
-		       then (atomic-decf (wserver-free-workers server))
+		       then (decf (wserver-free-workers server))
 			    (mp:process-add-run-reason (car workers) sock)
 			    (pop workers)
 			    (return) ; satisfied
@@ -1379,7 +1394,12 @@ by keyword symbols and not by strings"
 		 then (logmess "accept: too many errors, bailing")
 		      (return-from http-accept-thread nil)))))
       (ignore-errors (progn
-		       (mp:without-scheduling
+		       #-smp
+		       (mp:without-scheduling ;; in a #-smp form
+			 (if* (eql (wserver-socket server) main-socket)
+			    then (setf (wserver-socket server) nil)))
+		       #+smp
+		       (with-locked-object (server)
 			 (if* (eql (wserver-socket server) main-socket)
 			    then (setf (wserver-socket server) nil)))
 		       (close main-socket))))))

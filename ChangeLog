@@ -1,3 +1,11 @@
+2009-05-06  Robert Rorschach  <rfr@franz.com>
+
+	* client.cl: smp protection
+	* examples/chat.cl: smp protection
+	* main.cl: smp protection
+	* parse.cl: smp protection
+	* proxy.cl: smp protection
+
 2009-05-04  Kevin Layer  <layer@franz.com>
 
 	* test/t-aserve.cl: turn on cgi tests for Windows

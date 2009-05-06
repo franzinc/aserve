@@ -49,19 +49,34 @@
   (max  parseobj-size)
   )
 
-(defvar *parseobjs* nil) 
+(defvar *parseobjs* nil)  ;; never bound; this is a global variable
 
+#-smp
 (defun allocate-parseobj ()
   (let (res)
-    (mp::without-scheduling 
+    (mp::without-scheduling  ;; in a #-smp form
       (if* (setq res (pop *parseobjs*))
 	 then (setf (parseobj-next res) 0)
 	      res
 	 else (make-parseobj)))))
 
+#+smp
+(defun allocate-parseobj ()
+  (let ((res (pop-atomic (si:global-symbol-value '*parseobjs*))))
+    (if* res
+       then (setf (parseobj-next res) 0)
+	    res
+       else (make-parseobj)))
+)
+
+#-smp
 (defun free-parseobj (po)
-  (mp::without-scheduling
+  (mp::without-scheduling ;; in a #-smp form
     (push po *parseobjs*)))
+
+#+smp
+(defun free-parseobj (po)
+  (push-atomic po (si:global-symbol-value '*parseobjs*)))
 
 (defun add-to-parseobj (po start end)
   ;; add the given start,end pair to the parseobj
