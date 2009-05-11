@@ -38,7 +38,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 58))
+(defparameter *aserve-version* '(1 2 59))
 
 (eval-when (eval load)
     (require :sock)
@@ -2500,7 +2500,7 @@ in get-multipart-sequence"))
 				   :external-format external-format)))))
 	      
       (if* post
-	 then (if* (and (eq (request-method req) :post)
+	 then (if* (and (member (request-method req) '(:post :put))
 			(search ; sometimes other stuff added we can ignore
 			 "application/x-www-form-urlencoded"
 			 (header-slot-value req :content-type))
