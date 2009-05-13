@@ -1113,23 +1113,36 @@ or \"foo.com:8000\", not ~s" proxy))
       
 ;; buffer pool for string buffers of the right size for a header
 ;; line
+;; this is a global variable; it is never bound.
 
 (defvar *response-header-buffers* nil)
 
 (defun get-header-line-buffer ()
   ;; return the next header line buffer
   (let (buff)
-    (excl::atomically
-      (excl::fast (setq buff (pop *response-header-buffers*))))
+    #-smp
+    (excl::atomically ;; in a #-smp form
+     (excl::fast (setq buff (pop *response-header-buffers*))))
+    #+smp
+    (setq buff
+      (pop-atomic (si:global-symbol-value '*response-header-buffers*)))
     (if* buff
        thenret
        else (make-array 400 :element-type 'character))))
 
 (defun put-header-line-buffer (buff &optional buff2)
   ;; put back up to two buffers
-  (mp:without-scheduling
+  #-smp
+  (mp:without-scheduling ;; in a #-smp form
     (push buff *response-header-buffers*)
-    (if* buff2 then (push buff2 *response-header-buffers*))))
+    (if* buff2 then (push buff2 *response-header-buffers*)))
+  #+smp
+  (progn
+    (push-atomic buff (si:global-symbol-value '*response-header-buffers*))
+    (if* buff2
+       then (push-atomic buff2
+			 (si:global-symbol-value '*response-header-buffers*))))
+  )
 
 
 
