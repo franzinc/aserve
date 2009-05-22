@@ -38,7 +38,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 59))
+(defparameter *aserve-version* '(1 2 99))
 
 (eval-when (eval load)
     (require :sock)
