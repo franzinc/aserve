@@ -164,7 +164,7 @@ Table of contents:
       Lesser GNU Public License, known as the LLGPL. The LLGPL
       consists of a preamble and the LGPL. Where these conflict, the
       preamble takes precedence. aserve is referenced in the preamble
-      as the LIBRARY.
+      as the LIBRARY.  (http://opensource.franz.com/preamble.html)
 
   10. Notes:
 
@@ -172,7 +172,19 @@ Table of contents:
       mixing static and dynamic content that builds upon AllegroServe
       and is part of this project.
 
-      See the webactions/doc/webactions.html file for more information.
+      See the webactions/doc/webactions.html file for more
+      information.
+
+      For other links that may be of interest are:
+
+       Portable AllegroServe:
+        http://sourceforge.net/projects/portableaserve/
+       
+       Source to the if* macro:
+        http://www.franz.com/~jkf/ifstar.txt
+
+       CL-HTTP:
+        http://www.ai.mit.edu/projects/iiip/doc/cl-http/home-page.html
 
   11. Examples and Information:
 
