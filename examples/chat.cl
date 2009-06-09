@@ -174,7 +174,7 @@
 ;  b = upgrade user
 
 
-(defclass master-chat-controller (mp:lockable-object)
+(defclass master-chat-controller ()
   ((controllers :initform nil
 		; list of chat-controller instances
 		:initarg :controllers
@@ -200,7 +200,7 @@
 
 
 
-(defclass chat-controller (lockable-object)
+(defclass chat-controller ()
   ;; describes a whole set of chats
   
   ((chats :initform nil
@@ -968,7 +968,7 @@
     ; create a unique string to indentify this controller
     (loop
       (setq ustring (make-unique-string))
-      (with-locked-object (*master-controller* :-smp :without-scheduling)
+      (mp:without-scheduling
 	(if* (not (member ustring 
 			  (ustrings *master-controller*)
 			  :test #'equal))
@@ -1023,7 +1023,7 @@
        else (let (ustring)
 	      (loop
 		(setq ustring (make-unique-string))
-		(with-locked-object (controller :-smp :without-scheduling)
+		(mp:without-scheduling
 		  (if* (not (member ustring (ustrings controller) 
 				    :test #'equal))
 		     then (push ustring (ustrings controller))
@@ -1034,7 +1034,7 @@
 					 :filename 
 					 (request-query-value "filename" req)
 					 :ustring ustring)))
-		(with-locked-object (controller :-smp :without-scheduling)
+		(mp:without-scheduling
 		  (push chat (chats controller)))
 		(dump-existing-chat *chat-home*)
 		(with-http-response (req ent)
