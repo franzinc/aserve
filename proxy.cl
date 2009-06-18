@@ -33,10 +33,39 @@
 ;;- http://www.franz.com/~jkf/coding_standards.html
 ;;-
 
-(eval-when (compile)
-  (require :smpdefs))
-
 (in-package :net.aserve)
+
+(check-smp-consistency)
+
+(defmacro with-mp-locked-connection-cache ((s) &rest body)
+  (smp-case
+   ((t :macros) `(with-locked-structure (,s :-smp :without-scheduling)
+		   ,@body))
+   (nil `(si::without-scheduling ,s ,@body)))) ;; in a #-smp block
+
+(defmacro with-mp-locked-pcache-ent ((s) &rest body)
+  (smp-case
+   ((t :macros) `(with-locked-structure (,s :-smp :without-scheduling)
+		   ,@body))
+   (nil `(si::without-scheduling ,s ,@body)))) ;; in a #-smp block
+
+(defmacro with-fast-mp-locked-pcache-ent ((s) &rest body)
+  (smp-case
+   ((t :macros) `(with-locked-structure (,s :-smp :atomically)
+		   ,@body))
+   (nil `(excl::atomically ,s ,@body)))) ;; in a #-smp block
+
+(defmacro with-mp-locked-pcache ((s) &rest body)
+  (smp-case
+   ((t :macros) `(with-locked-structure (,s :-smp :without-scheduling)
+		   ,@body))
+   (nil `(si::without-scheduling ,s ,@body)))) ;; in a #-smp block
+
+(defmacro with-mp-locked-pcache-queue ((s) &rest body)
+  (smp-case
+   ((t :macros) `(with-locked-structure (,s :-smp :without-scheduling)
+		   ,@body))
+   (nil `(si::without-scheduling ,s ,@body)))) ;; in a #-smp block
 
 ; denotes a request from the browser
 (defconstant *browser-level* 100) ;
@@ -61,10 +90,11 @@
 ; the cache
 (defparameter *connection-cache-queue* (cons nil nil)) ; (first . last) queue of conn-cache objects
 (defparameter *connection-cache-expire* 10) ; number of seconds to live
-#+smp
-(defparameter *connection-cache-lock*
-    (make-basic-lock :name "connection-cache"))
 
+(defparameter *connection-cache-lock*
+    (smp-case
+     ((t :macros) (excl::make-basic-lock :name "connection-cache"))
+     (nil nil)))
 
 ; number of seconds we wait for a connect before we consider it timed
 ; out.  Given the chance Linux seems to wait forever for a connection
@@ -73,7 +103,7 @@
 
 
 (defstruct (pcache 
-	    #+smp (:include synchronizing-structure)
+	    #+smp-macros (:include synchronizing-structure)
 	    )
   ;; proxy cache
   table		; hash table mapping to pcache-ent objects
@@ -173,7 +203,7 @@
 
 
 (defstruct (pcache-ent
-	    #+smp (:include synchronizing-structure)
+	    #+smp-macros (:include synchronizing-structure)
 	    )
   key		; the string form of the uri 
   uri		; the actual uri
@@ -985,8 +1015,7 @@ cached connection = ~s~%" cond cached-connection))
     
 
     
-    (with-locked-structure
-	(*connection-cache-lock* :-smp :without-scheduling)
+    (with-mp-locked-connection-cache (*connection-cache-lock*)
       (incf *connections-cached*)
       (let ((start (first-valid-entry now queue)))
 		
@@ -1026,7 +1055,7 @@ cached connection = ~s~%" cond cached-connection))
   ;; build a new one if there isn't  one cached
   (let ((now (get-universal-time))
 	(queue *connection-cache-queue*))
-    (with-locked-structure (*connection-cache-lock* :-smp :without-scheduling)
+    (with-mp-locked-connection-cache (*connection-cache-lock*)
       (let ((start (first-valid-entry now queue))
 	    (prev nil))
 	(loop
@@ -1858,7 +1887,7 @@ cached connection = ~s~%" cond cached-connection))
   ;; attempt to increase the use count of this entry by one.
   ;; If successful return true.
   ;; If the entry is dead return nil
-  (with-locked-structure (pcache-ent :-smp :atomically)
+  (with-fast-mp-locked-pcache-ent (pcache-ent)
     (excl::fast
      (let ((val (pcache-ent-use pcache-ent)))
        (if* val
@@ -1867,7 +1896,7 @@ cached connection = ~s~%" cond cached-connection))
 
 (defun unlock-pcache-ent (pcache-ent)
   ;; reduce the use count of this entry
-  (with-locked-structure (pcache-ent :-smp :without-scheduling)
+  (with-mp-locked-pcache-ent (pcache-ent)
     (let ((val (pcache-ent-use pcache-ent)))
       (if* val
 	 then (if* (and (zerop (excl::fast
@@ -1940,7 +1969,7 @@ cached connection = ~s~%" cond cached-connection))
 	    then (setq error-flag :noqueue)
 	   elseif (eq (pcache-ent-state pcache-ent) :dead) ; debugging 
 	     then (setq error-flag :dead)
-	     else (with-locked-structure (fromq :-smp :without-scheduling)
+	     else (with-mp-locked-pcache-queue (fromq)
 		    (let* ((prev (pcache-ent-prev pcache-ent))
 			   (next (pcache-ent-next pcache-ent))
 			   (mru-head (queueobj-mru toq))
@@ -1957,7 +1986,7 @@ cached connection = ~s~%" cond cached-connection))
        else ;; toq != fromq; we're changing one or more queue counts
 	    (when fromq
 	      ;; it's leaving the queue fromq
-	      (with-locked-structure (fromq :-smp :without-scheduling)
+	      (with-mp-locked-pcache-queue (fromq)
 		(let ((prev (pcache-ent-prev pcache-ent))
 		      (next (pcache-ent-next pcache-ent)))
 		  ;; unlink
@@ -1974,7 +2003,7 @@ cached connection = ~s~%" cond cached-connection))
 	      ;; link into the toq, at the mru position
 	      (if* (eq (pcache-ent-state pcache-ent) :dead)
 		 then (setq error-flag :dead)
-		 else (with-locked-structure (toq :-smp :without-scheduling)
+		 else (with-mp-locked-pcache-queue (toq)
 			(let* ((mru-head (queueobj-mru toq))
 			       (mru (pcache-ent-next mru-head)))
 			  (setf (pcache-ent-next mru-head) pcache-ent
@@ -2004,7 +2033,7 @@ cached connection = ~s~%" cond cached-connection))
 (defun kill-pcache-ent (pcache-ent &optional (pcache (wserver-pcache
 						      *wserver*)))
   ; make this entry dead
-  (with-locked-structure (pcache :-smp :without-scheduling)
+  (with-mp-locked-pcache (pcache)
     
     ; stop any scanning of this uri
     (setf (pcache-ent-level pcache-ent) -1) 
@@ -2265,7 +2294,7 @@ cached connection = ~s~%" cond cached-connection))
 		      (return-from main))))))
       
       ;; this is the new version
-      (with-locked-structure (pcache :-smp :without-scheduling)
+      (with-mp-locked-pcache (pcache)
 	(setq ent-todo nil)
 	(do ((lru (pcache-ent-prev lru-head) (pcache-ent-prev lru)))
 	    ((eq lru mru-head)
@@ -2293,17 +2322,17 @@ cached connection = ~s~%" cond cached-connection))
   ;; flush all the deal items from the cache, returning
   ;; their resource
   (let (ent)
-    #-smp
-    (excl::atomically ;; in a #-smp block
-     (excl::fast
-      (setf ent (pcache-dead-ent pcache)
-	    (pcache-dead-ent pcache) nil)))
-    #+smp
-    (loop
-      (setq ent (pcache-dead-ent pcache))
-      (excl::fast
-       (when (atomic-conditional-setf (pcache-dead-ent pcache) nil ent)
-	 (return))))
+    (smp-case
+     (nil
+      (atomically-fast
+	(setf ent (pcache-dead-ent pcache)
+	      (pcache-dead-ent pcache) nil)))
+     ((t :macros)
+      (loop
+	(setq ent (pcache-dead-ent pcache))
+	(excl::fast
+	 (when (atomic-conditional-setf (pcache-dead-ent pcache) nil ent)
+	   (return))))))
     
     ; now we have an exclusive link to the dead entries
     ; which we can free at our leisure
@@ -2318,15 +2347,15 @@ cached connection = ~s~%" cond cached-connection))
 	     then (return-free-blocks (pcache-ent-pcache-disk ent)
 				      diskloc)))
 	(setq ent (pcache-ent-next ent)))
-      #-smp
-      (excl::atomically ;; in a #-smp block
-       (excl::fast 
-	(decf (the fixnum (pcache-dead-items pcache)) 
-	      (the fixnum count))))
-      #+smp
-      (excl::fast
-       (decf-atomic (the fixnum (pcache-dead-items pcache)) 
-		    (the fixnum count)))
+      (smp-case
+       (nil
+	(atomically-fast
+	  (decf (the fixnum (pcache-dead-items pcache)) 
+		(the fixnum count))))
+       ((t :macros)
+	(excl::fast
+	 (decf-atomic (the fixnum (pcache-dead-items pcache)) 
+		      (the fixnum count)))))
       )))
      
      
@@ -2381,7 +2410,7 @@ cached connection = ~s~%" cond cached-connection))
 	    (store-data-on-disk pcache-ent pcache-disk to-store-list)
 	    (log-proxy (pcache-ent-key pcache-ent) 0 :wd nil)
 	    (let ((ans
-		   (with-locked-structure (pcache-ent :-smp :without-scheduling)
+		   (with-mp-locked-pcache-ent (pcache-ent)
 		     (if* (and (null (pcache-ent-state pcache-ent))
 			       (eql 1 (pcache-ent-use pcache-ent)))
 			then ; we are tre sole user of this entry so we cna
@@ -2422,81 +2451,77 @@ cached connection = ~s~%" cond cached-connection))
 	      ans))))
 
 (defun ensure-pcache-in-memory (pcache-ent)
-  #+smp
-  (with-locked-structure (pcache-ent)
+  (smp-case
+   (t
+    (with-locked-structure (pcache-ent)
+      (if* (pcache-ent-disk-location pcache-ent)
+	 then (retrieve-pcache-from-disk pcache-ent))))
+   ((nil :macros)
     (if* (pcache-ent-disk-location pcache-ent)
-       then (retrieve-pcache-from-disk pcache-ent)))
-  #-smp
-  (if* (pcache-ent-disk-location pcache-ent)
-     then (retrieve-pcache-from-disk pcache-ent)))
+       then (retrieve-pcache-from-disk pcache-ent)))))
 
 
 (defun retrieve-pcache-from-disk (pcache-ent)
   ;; read the cache entry back in from the disk
   
   ;; This is now called with the pcache-ent locked in smp lisps,
-  ;; so the flagval isn't needed in smp at all
+  ;; so the flagval test isn't needed in smp at all
   
   ; ensure the loading flag to true and set flagval
   ; to the value before we set the flag.
   ; If the value was nil and thus we set it to true, then
   ; we are the process responsible for loading in the data
-  ;
-  (let (#-smp
-	(flagval (excl::atomically ;; in a #-smp block
-		  (excl::fast 
-		   (let ((val (pcache-ent-loading-flag pcache-ent)))
-		     (if* (null val) 
-			then (setf (pcache-ent-loading-flag pcache-ent) t))
-		     val)))))
-    #-smp
+					;
+  #-smp
+  (let ((flagval (atomically-fast
+		  (let ((val (pcache-ent-loading-flag pcache-ent)))
+		    (if* (null val) 
+		       then (setf (pcache-ent-loading-flag pcache-ent) t))
+		    val))))
     (if* flagval
-       then #-smp
-	    (mp:process-wait "cache entry to be loaded"
+       then (mp:process-wait "cache entry to be loaded"
 			     #'(lambda (pcache-ent) 
 				 (null (pcache-ent-loading-flag pcache-ent)))
 			     pcache-ent)
 	    (return-from retrieve-pcache-from-disk))
+    )
+  ;; it's our job to load in the entry
+  (let* ((block-list (pcache-ent-disk-location pcache-ent))
+	 (pcache-disk (pcache-ent-pcache-disk pcache-ent))
+	 (stream (pcache-disk-stream pcache-disk))
+	 (bytes (+ (pcache-ent-data-length pcache-ent)
+		   *header-block-size*))
+	 (res))
+    (dlogmess (format nil "retrieve ~s in blocks ~s~%"
+		      (pcache-ent-key pcache-ent)
+		      block-list))
+    (log-proxy (pcache-ent-key pcache-ent) 0 :rd nil)
     
-    ; it's our job to load in the entry
-    (let* ((block-list (pcache-ent-disk-location pcache-ent))
-	   (pcache-disk (pcache-ent-pcache-disk pcache-ent))
-	   (stream (pcache-disk-stream pcache-disk))
-	   (bytes (+ (pcache-ent-data-length pcache-ent)
-		     *header-block-size*))
-	   (res))
-      (dlogmess (format nil "retrieve ~s in blocks ~s~%"
-		       (pcache-ent-key pcache-ent)
-		       block-list))
-      (log-proxy (pcache-ent-key pcache-ent) 0 :rd nil)
-      
-      (mp:with-process-lock ((pcache-disk-lock pcache-disk))
-	; get a lock so we're the only thread doing operations
-	; on the stream to the cache
-	(dolist (ent block-list)
-	  (file-position stream (* (car ent) *header-block-size*))
-	  (dotimes (i (1+ (- (cdr ent) (car ent))))
-	    (let ((buff (get-header-block)))
-	      (read-sequence buff stream :end (min *header-block-size*
-						   bytes))
-	      (decf bytes *header-block-size*)
-	      (push buff res))))
-	(setf (pcache-ent-data pcache-ent) (nreverse res))
+    (mp:with-process-lock ((pcache-disk-lock pcache-disk))
+      ;; get a lock so we're the only thread doing operations
+      ;; on the stream to the cache
+      (dolist (ent block-list)
+	(file-position stream (* (car ent) *header-block-size*))
+	(dotimes (i (1+ (- (cdr ent) (car ent))))
+	  (let ((buff (get-header-block)))
+	    (read-sequence buff stream :end (min *header-block-size*
+						 bytes))
+	    (decf bytes *header-block-size*)
+	    (push buff res))))
+      (setf (pcache-ent-data pcache-ent) (nreverse res))
       
 
-	(return-free-blocks pcache-disk block-list)
+      (return-free-blocks pcache-disk block-list)
 	
-	; insert in the memory ru list
-	(most-recently-used-ent pcache-ent)
+      ;; insert in the memory ru list
+      (most-recently-used-ent pcache-ent)
     
-	; insert in memory 
+      ;; insert in memory 
 	
-	(#+smp progn
-	 #-smp excl::atomically
-	 (excl::fast
-	  (setf (pcache-ent-disk-location pcache-ent) nil
-		(pcache-ent-pcache-disk pcache-ent) nil
-		(pcache-ent-loading-flag pcache-ent) nil)))))))
+      (atomically-fast
+       (setf (pcache-ent-disk-location pcache-ent) nil
+	     (pcache-ent-pcache-disk pcache-ent) nil
+	     (pcache-ent-loading-flag pcache-ent) nil)))))
 
 	
 	
