@@ -4,6 +4,10 @@
 ** Please leave this at the top of the file.  Thanks.
 *******************************************************************************
 
+2009-06-30  Kevin Layer  <layer@gemini.franz.com>
+
+	* load.cl: remove removed files from *aserve-other-files*
+
 2009-05-11  Kevin Layer  <layer@gemini.franz.com>
 1.2.59
 	* main.cl (request-query): rfe8332: make request-query-value
