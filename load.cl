@@ -34,8 +34,7 @@
 
 (defparameter *aserve-other-files*
     ;; other files that make up the aserve dist
-    '("readme.txt"
-      "source-readme.txt"
+    '("README.md"
       "ChangeLog"
       "htmlgen/ChangeLog"
       "license-lgpl.txt"
@@ -72,7 +71,6 @@
       "doc/aserve.html"
       "doc/tutorial.html"
       "doc/htmlgen.html"
-      "doc/cvs.html"
       ))
 
 (defparameter *aserve-examples*
