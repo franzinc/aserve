@@ -129,27 +129,33 @@ information on configuring AllegroServe.
 Documentation
 -------------
 
+For complete documentation see the contents of the doc directory, 
+which is part of this project or visit the online version of the
+[AllegroServe documentation](http://opensource.franz.com/aserve).
+
+### Quick Start Documentation
+
 cd to the directory containing the distribution and start Allegro cl 
 (or start Allegro and use the toplevel ":cd" command to cd to the 
 directory containing the aserve). 
 
-### load aserve.fasl
+#### load aserve.fasl
 
     user(1): :ld aserve.fasl
 
-### load the examples (either the compiled or source version)
+#### load the examples (either the compiled or source version)
 
     user(2): :ld examples/examples
 
-### start the webserver
+#### start the webserver
 
     user(3):  (net.aserve:start :port 8010)
 
-### view in a browser
+#### view in a browser
 
     http://localhost:8010/
 
-### Usage notes
+#### Usage notes
 
  * the steps to load the examples and start the server are interchangeable.
  * if you're running on a PC (or running as root on Unix) you
