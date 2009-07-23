@@ -38,6 +38,7 @@
 
 (in-package :net.aserve)
 
+(check-smp-consistency)
 
 ;; parseobj -- used for cons-free parsing of strings
 (defconstant parseobj-size 20)
@@ -49,19 +50,31 @@
   (max  parseobj-size)
   )
 
-(defvar *parseobjs* nil) 
+(defvar-mp *parseobjs* nil)  ;; never bound; this is a global variable
 
 (defun allocate-parseobj ()
-  (let (res)
-    (mp::without-scheduling 
-      (if* (setq res (pop *parseobjs*))
-	 then (setf (parseobj-next res) 0)
-	      res
-	 else (make-parseobj)))))
+  (smp-case
+   ((t :macros)
+    (let ((res (pop-atomic *parseobjs*)))
+	(if* res
+	   then (setf (parseobj-next res) 0)
+		res
+	   else (make-parseobj))))
+   (nil
+    (let (res)
+      (mp::without-scheduling  ;; in a #-smp form
+	(if* (setq res (pop *parseobjs*))
+	   then (setf (parseobj-next res) 0)
+		res
+	   else (make-parseobj)))))))
 
 (defun free-parseobj (po)
-  (mp::without-scheduling
-    (push po *parseobjs*)))
+  (smp-case
+   ((t :macros)
+    (push-atomic po (si:global-symbol-value '*parseobjs*)))
+   (nil
+    (mp::without-scheduling ;; in a #-smp form
+      (push po *parseobjs*)))))
 
 (defun add-to-parseobj (po start end)
   ;; add the given start,end pair to the parseobj
@@ -794,22 +807,3 @@
 	      (values root tail
 		      (subseq tail 0 pos)
 		      (subseq tail (1+ pos)))))))
-
-			      
-		
-
-    
-
-
-
-
-
-	
-
-      
-	      
-	      
-  
-  
-       
-
