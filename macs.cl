@@ -218,6 +218,90 @@
 				   (return-from ,g-blocktag
 				     (progn ,@actions))))))
 	 ,@body))))
+
+;;;;;;;;;;;;;; SMP-aware macros
+;;
+;; We cater to three slightly different states:
+;;
+;;  #+smp
+;;     (smp-case (t form) ...)
+;;     The compile and execute environments support SMP;
+;;     9.0 with smp.
+;;
+;;  #+(and smp-macros (not smp))
+;;     (smp-case (:macros form) ...)
+;;     Compile environment recognizes the SMP macros, but compiles
+;;     for non-SMP lisp;
+;;     >=8.2 but not smp
+;;     8.1 with smp patches.
+;;
+;;  #-smp-macros
+;;     (smp-case (nil form) ...)
+;;     Compile environment does not recognize SMP macros;
+;;     8.1 without smp patches.
+;;
+
+(defmacro smp-case (&rest clauses)
+  (let* ((key
+	  #+smp t
+	  #+(and smp-macros (not smp)) :macros
+	  #-smp-macros nil
+	  )
+	 (clause (dolist (c clauses)
+		   (unless (and (consp c)
+				(consp (cdr c))
+				(null (cddr c)))
+		     (error "smp-case clause ~s is badly formed" c))
+		   (let ((c-key (car c)))
+		     (if* (or (eq c-key key)
+			      (and (consp c-key)
+				   (member key c-key)))
+			then (return c))))))
+    (unless clause
+      (error "smp-case is missing clause for ~s" key))
+    (second clause)))
+
+(defmacro check-smp-consistency ()
+  (smp-case
+   (nil (when (featurep :smp)
+	  (error "This file was compiled to run in a non-smp acl")))
+   (:macros (if* (featurep :smp)
+	       then (error "This file was compiled to run in a non-smp acl")
+	     elseif (not (featurep :smp-macros))
+	       then (error "This file requires the smp-macros patch")))
+   (t (unless (featurep :smp)
+	(error "This file was compiled to run in an smp acl")))))
+   
+
+(defmacro atomic-incf (var)
+  (smp-case
+   (t `(incf-atomic ,var))
+   (:macros `(with-delayed-scheduling (incf ,var)))
+   (nil `(si:without-scheduling (incf ,var))))
+  )
+
+(defmacro atomic-decf (var)
+  (smp-case
+   (t `(decf-atomic ,var))
+   (:macros `(with-delayed-scheduling (decf ,var)))
+   (nil `(si:without-scheduling (decf ,var)))))
+
+(defmacro with-locked-server ((s) &body body)
+  (smp-case
+   ((t :macros) `(with-locked-object (,s :-smp :without-scheduling) ,@body))
+   (nil `(si:without-scheduling ,s ,@body))))
+
+(defmacro defvar-mp (v &rest rest)
+  (smp-case
+   ((t :macros) `(defvar-nobind ,v ,@rest))
+   (nil `(defvar ,v ,@rest))))
+
+(defmacro atomically-fast (&body body)
+  (smp-case
+   ((t :macros) `(excl::.atomically (excl::fast ,@body)))
+   (nil `(excl::atomically (excl::fast ,@body)))))
+
+;;;;;; end of smp-aware macro definitions
 			 
 
 

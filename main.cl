@@ -38,6 +38,8 @@
 
 (in-package :net.aserve)
 
+(check-smp-consistency)
+
 (defparameter *aserve-version* '(1 2 60))
 
 (eval-when (eval load)
@@ -523,12 +525,7 @@ Problems with protocol may occur." (ef-name ef)))))
 
 ; safe versions during multiprocessing
 
-(defmacro atomic-incf (var)
-  `(mp:without-scheduling (incf ,var)))
-
-(defmacro atomic-decf (var)
-  `(mp:without-scheduling (decf ,var)))
-
+;; atomic-incf and atomic-decf macro definitions moved to aserve/macs.cl
 
 ;;;;;;;;; end macros
 
@@ -1171,6 +1168,9 @@ by keyword symbols and not by strings"
 	     ,@excl:*cl-default-special-bindings*))
      #'http-accept-thread)))
 
+;; make-worker-thread wasn't thread-safe before smp. I'm assuming that's
+;; ok, which it will be if only one thread ever calls it, and leaving it
+;; non-thread-safe in the smp version. 
 (defun make-worker-thread ()
   (let* ((name (format nil "~d-aserve-worker" (incf *thread-index*)))
 	 (proc (mp:make-process :name name
@@ -1379,7 +1379,7 @@ by keyword symbols and not by strings"
 		 then (logmess "accept: too many errors, bailing")
 		      (return-from http-accept-thread nil)))))
       (ignore-errors (progn
-		       (mp:without-scheduling
+		       (with-locked-server (server)
 			 (if* (eql (wserver-socket server) main-socket)
 			    then (setf (wserver-socket server) nil)))
 		       (close main-socket))))))
