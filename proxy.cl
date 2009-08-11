@@ -1906,6 +1906,7 @@ cached connection = ~s~%" cond cached-connection))
   (let ((queueobj (pcache-ent-queueobj pcache-ent)))
     (move-pcache-ent pcache-ent queueobj queueobj)))
 
+#+ignore ;; fixed below for thread safety
 (defun move-pcache-ent (pcache-ent fromq toq)
   ;; move the pcache-ent between queues
   ;; fromq and toq can be nil or the same.
