@@ -188,6 +188,50 @@
      
      ,@body))
 
+(defmacro with-chunking-eof (&body body)
+  `(handler-bind ((excl::socket-chunking-end-of-file
+                   (lambda (e) (declare (ignore e)) (signal 'end-of-file))))
+     ,@body))
+
+(let ((bufsize 16384))
+  (defun buffered-read-body (stream format)
+    (flet ((buffer (size)
+             (if (eq format :text)
+                 (make-string size)
+                 (make-array size :element-type '(unsigned-byte 8)))))
+      (let ((accum ()) buffer read)
+        (loop (setf buffer (buffer bufsize)
+                    read (read-sequence buffer stream))
+              (when (< read bufsize) (return))
+              (push buffer accum))
+        (setf accum (nreverse accum))
+        (let* ((off (* bufsize (length accum)))
+               (bigbuf (buffer (+ read off))))
+          (loop :for sub :in accum :for pos :from 0 :by bufsize
+                :do (replace bigbuf sub :start1 pos))
+          (replace bigbuf buffer :start1 off)
+          bigbuf)))))
+
+(defun read-response-body (creq &key (format :text))
+  (let ((left (client-request-bytes-left creq)))
+    (setf (client-request-bytes-left creq) :eof)
+    (if* (null left)
+       then nil
+     elseif (integerp left)
+       then (let ((buffer (make-array left :element-type '(unsigned-byte 8))))
+              (read-sequence buffer (client-request-socket creq))
+              (if (eq format :text)
+                  (octets-to-string buffer :external-format
+                                    (stream-external-format
+                                     (client-request-socket creq)))
+                  buffer))
+     elseif (eq left :chunked)
+       then (with-chunking-eof
+              (buffered-read-body (client-request-socket creq) format))
+     elseif (eq left :unknown)
+       then (buffered-read-body (client-request-socket creq) format)
+     elseif (eq left :eof)
+       then (error "Body already read."))))
 
 (defun do-http-request (uri 
 			&rest args
@@ -317,54 +361,7 @@
 		     (client-request-headers  creq)
 		     (client-request-uri creq))))
 	  
-	  ;; read the body of the response
-	  (let ((atype (if* (eq format :text) 
-			  then 'character
-			  else '(unsigned-byte 8)))
-		ans
-		res
-		(start 0)
-		(end nil)
-		body)
-	    
-	    (loop
-	      (if* (null ans)
-		 then (setq ans (make-array 1024 :element-type atype)
-			    start 0))
-		
-	      (setq end (client-request-read-sequence ans creq :start start))
-	      (if* (zerop end)
-		 then			; eof
-		      (return))
-	      (if* (eql end 1024)
-		 then			; filled up
-		      (push ans res)
-		      (setq ans nil)
-		 else (setq start end)))
-	    
-	    ;; we're out with res containing full arrays and 
-	    ;; ans either nil or holding partial data up to but not including
-	    ;; index start
-	    
-	    (if* res
-	       then			; multiple items
-		    (let* ((total-size (+ (* 1024 (length res)) start))
-			   (bigarr (make-array total-size :element-type atype)))
-		      (let ((sstart 0))
-			(dolist (arr (reverse res))
-			  (replace bigarr arr :start1 sstart)
-			  (incf sstart (length arr)))
-			(if* ans 
-			   then		; final one 
-				(replace bigarr ans :start1 sstart)))
-		      
-		      (setq body bigarr))
-	       else			; only one item
-		    (if* (eql 0 start)
-		       then		; nothing returned
-			    (setq body "")
-		       else (setq body (subseq ans 0 start))))
-	    
+          (let ((body (read-response-body creq :format format)))
 	    (if* new-location
 	       then			; must do a redirect to get to the real site
 		    (client-request-close creq)
@@ -971,7 +968,6 @@ or \"foo.com:8000\", not ~s" proxy))
 	  )
       (progn (put-header-line-buffer buff2 buff)))))
 		  
-
 
 (defmethod client-request-read-sequence (buffer
 					 (creq client-request)
