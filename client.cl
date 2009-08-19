@@ -982,9 +982,35 @@ or \"foo.com:8000\", not ~s" proxy))
 	(socket (client-request-socket creq))
 	(last start))
     (if* (integerp bytes-left)
-       then ; just a normal read-sequence
+       then
 	    (if* (zerop bytes-left)
 	       then 0  ; eof
+             elseif (stringp buffer)
+               ;; We know the amount of bytes left, not characters left
+               then (let ((pos start)
+                          (dummy-str (make-string 1))
+                          (dummy-buf (make-array 8 :element-type
+                                                 '(unsigned-byte 8)))
+                          (ch (read-char socket)))
+                      ;; This is a bit of a hack -- ACL doesn't seem to expose a
+                      ;; sane interface for determining the amount of bytes a
+                      ;; character requires in a given encoding.
+                      (flet ((char-size (ch)
+                               (setf (char dummy-str 0) ch)
+                               (nth-value 1 (string-to-octets
+                                             dummy-str :null-terminate nil
+                                             :mb-vector dummy-buf
+                                             :external-format
+                                             (stream-external-format socket)))))
+                        (loop
+                         (setf (aref buffer pos) ch)
+                         (incf pos)
+                         (when (or (<= (decf bytes-left (char-size ch)) 0)
+                                   (= pos end)
+                                   (null (setf ch (read-char-no-hang socket nil))))
+                           (setf (client-request-bytes-left creq) bytes-left)
+                           (return pos)))))
+               ;; just a normal read-sequence
 	       else (let ((ans (net.aserve::rational-read-sequence buffer 
 						       socket :start start
 					      :end (+ start 
