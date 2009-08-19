@@ -188,28 +188,29 @@
      
      ,@body))
 
-(defmacro with-chunking-eof (&body body)
-  `(handler-bind ((excl::socket-chunking-end-of-file
-                   (lambda (e) (declare (ignore e)) (signal 'end-of-file))))
-     ,@body))
-
 (let ((bufsize 16384))
   (defun buffered-read-body (stream format)
     (flet ((buffer (size)
              (if (eq format :text)
                  (make-string size)
                  (make-array size :element-type '(unsigned-byte 8)))))
-      (let ((accum ()) buffer read)
+      (let ((accum ()) (size 0) buffer read done)
         (loop (setf buffer (buffer bufsize)
-                    read (read-sequence buffer stream))
-              (when (< read bufsize) (return))
-              (push buffer accum))
+                    read (handler-bind
+                             ((excl::socket-chunking-end-of-file
+                               (lambda (e)
+                                 (declare (ignore e))
+                                 (setf done t))))
+                           (read-sequence buffer stream :partial-fill t)))
+              (push (cons buffer read) accum)
+              (incf size read)
+              (when (or (zerop read) done) (return)))
         (setf accum (nreverse accum))
-        (let* ((off (* bufsize (length accum)))
-               (bigbuf (buffer (+ read off))))
-          (loop :for sub :in accum :for pos :from 0 :by bufsize
-                :do (replace bigbuf sub :start1 pos))
-          (replace bigbuf buffer :start1 off)
+        (let* ((bigbuf (buffer size))
+               (pos 0))
+          (loop :for (sub . size) :in accum
+                :do (replace bigbuf sub :start1 pos :end2 size)
+                :do (incf pos size))
           bigbuf)))))
 
 (defun read-response-body (creq &key (format :text))
@@ -225,10 +226,7 @@
                                     (stream-external-format
                                      (client-request-socket creq)))
                   buffer))
-     elseif (eq left :chunked)
-       then (with-chunking-eof
-              (buffered-read-body (client-request-socket creq) format))
-     elseif (eq left :unknown)
+     elseif (member left '(:chunked :unknown))
        then (buffered-read-body (client-request-socket creq) format)
      elseif (eq left :eof)
        then (error "Body already read."))))
@@ -989,19 +987,13 @@ or \"foo.com:8000\", not ~s" proxy))
                ;; We know the amount of bytes left, not characters left
                then (let ((pos start)
                           (dummy-str (make-string 1))
-                          (dummy-buf (make-array 8 :element-type
-                                                 '(unsigned-byte 8)))
                           (ch (read-char socket)))
                       ;; This is a bit of a hack -- ACL doesn't seem to expose a
                       ;; sane interface for determining the amount of bytes a
                       ;; character requires in a given encoding.
                       (flet ((char-size (ch)
                                (setf (char dummy-str 0) ch)
-                               (nth-value 1 (string-to-octets
-                                             dummy-str :null-terminate nil
-                                             :mb-vector dummy-buf
-                                             :external-format
-                                             (stream-external-format socket)))))
+                               (native-string-sizeof dummy-str)))
                         (loop
                          (setf (aref buffer pos) ch)
                          (incf pos)
