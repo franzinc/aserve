@@ -721,6 +721,10 @@ or \"foo.com:8000\", not ~s" proxy))
        then (net.aserve::format-dif :xmit
 				    sock "Accept: ~a~a" accept crlf))
 
+    ; some webservers (including AServe) have trouble with put/post
+    ; requests without a body
+    (if* (and (not content) (member method '(:put :post)))
+       then (setf content ""))
     ; content can be a nil, a single vector or a list of vectors.
     ; canonicalize..
     (if* (and content (atom content)) then (setq content (list content)))
