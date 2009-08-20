@@ -1,9 +1,10 @@
 #+(version= 8 1)
-(sys:defpatch "aserve" 2
+(sys:defpatch "aserve" 3
   "v1: version 1.2.56, large request body & multipart content type & more;
 v2: version 1.2.58, fix problem introduced in 1.2.56 where the response date 
   is always the zero universal time & correctly send out the comment after
-  the result code."
+  the result code;
+v3: version 1.2.60: uriencode-string: use uppercase hex chars for EC2."
   :type :system
   :post-loadable t)
 

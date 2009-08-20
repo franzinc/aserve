@@ -151,7 +151,9 @@
 					       then (+ ,code
 						       #.(char-code #\0))
 					       else (+ (- ,code 10)
-						       #.(char-code #\a)))))
+;;;; Amazon's EC2 requires that an uppercase character be used here,
+;;;; otherwise the signing of EC2 requests via the REST API don't match.
+						       #.(char-code #\A)))))
 				(let* ((upcode (logand #xf (ash code -4)))
 				       (downcode (logand #xf code)))
 				  (setf (aref newmbvec (+ j 1))
