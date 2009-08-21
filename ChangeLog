@@ -8,6 +8,13 @@
 
 	* macs.cl: track recent changes in the smp macros
 
+2009-08-11  Robert Rorschach  <rfr@franz.com>
+
+	* macs.cl: fix a package error in a macro; defvar-nonbindable
+	replaces defvar-nobind
+	* proxy.cl: restore a dropped #+ignore
+
+
 2009-07-24  Kevin Layer  <layer@gemini.franz.com>
 1.2.60
 	* decode.cl: uriencode-string: use uppercase hex chars for
@@ -22,6 +29,10 @@
 2009-06-30  Kevin Layer  <layer@gemini.franz.com>
 
 	* load.cl: remove removed files from *aserve-other-files*
+<<<<<<< HEAD:ChangeLog
+=======
+
+>>>>>>> private/master:ChangeLog
 2009-06-18  Robert Rorschach  <rfr@franz.com>
 
 	* client.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
