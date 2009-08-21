@@ -276,14 +276,14 @@
 (defmacro atomic-incf (var)
   (smp-case
    (t `(incf-atomic ,var))
-   (:macros `(with-delayed-scheduling (incf ,var)))
+   (:macros `(excl::with-delayed-scheduling (incf ,var)))
    (nil `(si:without-scheduling (incf ,var))))
   )
 
 (defmacro atomic-decf (var)
   (smp-case
    (t `(decf-atomic ,var))
-   (:macros `(with-delayed-scheduling (decf ,var)))
+   (:macros `(excl::with-delayed-scheduling (decf ,var)))
    (nil `(si:without-scheduling (decf ,var)))))
 
 (defmacro with-locked-server ((s) &body body)
@@ -293,7 +293,7 @@
 
 (defmacro defvar-mp (v &rest rest)
   (smp-case
-   ((t :macros) `(defvar-nobind ,v ,@rest))
+   ((t :macros) `(defvar-nonbindable ,v ,@rest))
    (nil `(defvar ,v ,@rest))))
 
 (defmacro atomically-fast (&body body)
