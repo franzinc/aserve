@@ -1112,7 +1112,6 @@ or \"foo.com:8000\", not ~s" proxy))
       
 ;; buffer pool for string buffers of the right size for a header
 ;; line
-;; this is a global variable; it is never bound.
 
 (net.aserve::defvar-mp *response-header-buffers* nil)
 
@@ -1124,7 +1123,7 @@ or \"foo.com:8000\", not ~s" proxy))
       (setq buff
 	(pop-atomic *response-header-buffers*)))
      (nil
-      (excl::atomically ;; in a #-smp form
+      (excl::.atomically ;; in a #-smp form
        (excl::fast (setq buff (pop *response-header-buffers*))))))
     (if* buff
        thenret

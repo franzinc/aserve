@@ -17,18 +17,25 @@
 	* parse.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
 	* proxy.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
 
+2009-07-24  Kevin Layer  <layer@gemini.franz.com>
+1.2.60
+	* decode.cl: uriencode-string: use uppercase hex chars for
+	  EC2.  Amazon's EC2 requires that uppercase characters (A-F)
+	  be used, otherwise the signing of EC2 requests via the REST
+	  API won't match.
+
+2009-07-01    <layer@HOBART128>
+
+	* makefile: dribble test output to "test.out" (mainly for windows)
+
+2009-06-30  Kevin Layer  <layer@gemini.franz.com>
+
+	* load.cl: remove removed files from *aserve-other-files*
+
 2009-05-11  Kevin Layer  <layer@gemini.franz.com>
 1.2.59
 	* main.cl (request-query): rfe8332: make request-query-value
 	  work on PUT requests
-
-2009-05-06  Robert Rorschach  <rfr@franz.com>
-
-	* client.cl: smp protection
-	* examples/chat.cl: smp protection
-	* main.cl: smp protection
-	* parse.cl: smp protection
-	* proxy.cl: smp protection
 
 2009-05-04  Kevin Layer  <layer@franz.com>
 
@@ -1355,5 +1362,3 @@ join from acl50 branch
 1999-10-13  John Foderaro  <jkf@tiger.franz.com>
 1.0.1
 	*  start changelog
-	
-

@@ -379,9 +379,6 @@
     :initform nil
     :initarg :ssl
     :accessor wserver-ssl)
-   #+smp
-   (excl::lock-control
-    :initform (excl::make-basic-lock :name "server-lock"))
    ))
 
 
@@ -1185,7 +1182,7 @@ by keyword symbols and not by strings"
 				)))
     (mp:process-preset proc #'http-worker-thread)
     (push proc (wserver-worker-threads *wserver*))
-    (incf (wserver-free-workers *wserver*))
+    (atomic-incf (wserver-free-workers *wserver*))
     (setf (getf (mp:process-property-list proc) 'short-name) 
       (format nil "w~d" *thread-index*))
     ))
@@ -1272,7 +1269,7 @@ by keyword symbols and not by strings"
 	  (abandon ()
 	      :report "Abandon this request and wait for the next one"
 	    nil))
-	(incf (wserver-free-workers *wserver*))
+	(atomic-incf (wserver-free-workers *wserver*))
 	(mp:process-revoke-run-reason sys:*current-process* sock))
     
       )))
@@ -1362,7 +1359,7 @@ by keyword symbols and not by strings"
 			    (setq workers (wserver-worker-threads server))
 			    (incf looped))
 		    (if* (null (mp:process-run-reasons (car workers)))
-		       then (decf (wserver-free-workers server))
+		       then (atomic-decf (wserver-free-workers server))
 			    (mp:process-add-run-reason (car workers) sock)
 			    (pop workers)
 			    (return) ; satisfied

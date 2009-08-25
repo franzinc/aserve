@@ -89,7 +89,7 @@
 (defparameter *connections-used-cached* 0) ; number of cached connections used
 ; the cache
 (defparameter *connection-cache-queue* (cons nil nil)) ; (first . last) queue of conn-cache objects
-(defparameter *connection-cache-expire* 10) ; number of seconds to live
+(defparameter *connection-cache-expire* 10)  ; number of seconds to live
 
 (defparameter *connection-cache-lock*
     (smp-case
@@ -1011,22 +1011,20 @@ cached connection = ~s~%" cond cached-connection))
 		     :port port
 		     :socket socket)))
 	 (queue *connection-cache-queue*))
-    ;; the value of *connection-cache-queue* is always the same cons cell.
     
-
+    (incf *connections-cached*)
     
     (with-mp-locked-connection-cache (*connection-cache-lock*)
       (incf *connections-cached*)
       (let ((start (first-valid-entry now queue)))
 		
 	(if* (null start)
-	   then				; empty, this is the first entry
+	   then ; empty, this is the first entry
 		(setf (car queue) 
 		  (setf (cdr queue) ent))
-					; add at the end
+		; add at the end
 	   else (setf (cdr (cdr queue)) ent)
-		(setf (cdr queue) ent))))
-    ))
+		(setf (cdr queue) ent))))))
 
 (defun first-valid-entry (now queue)
   ;; remove expired entries and return the list of entries
@@ -1853,8 +1851,6 @@ cached connection = ~s~%" cond cached-connection))
   (incf (pcache-ent-returned pcache-ent))
 
 
-  (ensure-pcache-in-memory pcache-ent) ;; this handles thread safety
-  #+ignore
   (if* (pcache-ent-disk-location pcache-ent)
      then (retrieve-pcache-from-disk pcache-ent))
   
@@ -1910,9 +1906,7 @@ cached connection = ~s~%" cond cached-connection))
   (let ((queueobj (pcache-ent-queueobj pcache-ent)))
     (move-pcache-ent pcache-ent queueobj queueobj)))
 
-#+ignore
-;; this is the original, which has some hazards even in non-smp
-;; a fixed version appears below
+#+ignore ;; an old non-thread-safe version, replaced below
 (defun move-pcache-ent (pcache-ent fromq toq)
   ;; move the pcache-ent between queues
   ;; fromq and toq can be nil or the same.
@@ -1920,7 +1914,7 @@ cached connection = ~s~%" cond cached-connection))
   (let ((prev (pcache-ent-prev pcache-ent))
 	(next (pcache-ent-next pcache-ent)))
     
-    (mp:without-scheduling ;; in #+ignored defun
+    (mp:without-scheduling
       ; unlink
       (if* (and prev next)
 	 then (setf (pcache-ent-next prev) next
@@ -2276,12 +2270,12 @@ cached connection = ~s~%" cond cached-connection))
     
     (loop
       (if* (<= needed 0) then (return))
-      
-      #+ignore ;; recoded
+
+      #+ignore ;; replaced below
       (block main
 	(setq ent-todo nil)
 	
-	(mp:without-scheduling ;; in a #+ignored form
+	(mp:without-scheduling
 	  ;; find the next ent to process without other processes running
 	  (let ((lru lru-head))
 	    (loop
