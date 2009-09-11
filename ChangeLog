@@ -5,6 +5,11 @@
 *******************************************************************************
 
 2009-09-11 Marijn Haverbeke <marijnh@franz.com>
+	* Fix bug that caused every keep-alive time-out to log a
+	  disconcerting warning. (Unintended interaction of
+	  with-timeout-local and ignore-errors.)
+
+2009-09-11 Marijn Haverbeke <marijnh@franz.com>
 1.2.61
 	* Add read-response-body, a client function for reading the whole
 	  response body. (Also added to reference docs.)

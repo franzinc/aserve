@@ -1427,16 +1427,16 @@ by keyword symbols and not by strings"
 	
 	;; get first command
 	(loop
-	   
-	  (with-timeout-local (*read-request-timeout* 
-			       (debug-format :info "request timed out on read~%")
-			       ; this is too common to log, it happens with
-			       ; every keep alive socket when the user stops
-			       ; clicking
-			       ;;(log-timed-out-request-read sock)
-			       (return-from process-connection nil))
-	    (multiple-value-setq (req error-obj)
-	      (ignore-errors (read-http-request sock chars-seen))))
+	   (multiple-value-setq (req error-obj)
+             (ignore-errors
+               (with-timeout-local (*read-request-timeout* 
+                                    (debug-format :info "request timed out on read~%")
+                                    ; this is too common to log, it happens with
+                                    ; every keep alive socket when the user stops
+                                    ; clicking
+			            ;;(log-timed-out-request-read sock)
+                                    (return-from process-connection nil))
+                 (read-http-request sock chars-seen))))
 	  
 	  (if* (null req)
 	     then ; end of file, means do nothing
