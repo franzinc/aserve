@@ -4,6 +4,10 @@
 ** Please leave this at the top of the file.  Thanks.
 *******************************************************************************
 
+2009-09-15    <layer@HOBART128>
+
+	* test/t-aserve.cl: fix test suite for Windows
+
 2009-09-11 Marijn Haverbeke <marijnh@franz.com>
 1.2.61
 	* Fix bug that caused every keep-alive time-out to log a
