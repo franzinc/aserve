@@ -38,13 +38,9 @@
 
 (in-package :net.aserve)
 
-<<<<<<< HEAD:main.cl
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 2 60))
-=======
 (defparameter *aserve-version* '(1 2 61))
->>>>>>> origin/master:main.cl
 
 (eval-when (eval load)
     (require :sock)

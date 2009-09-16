@@ -4,6 +4,10 @@
 ** Please leave this at the top of the file.  Thanks.
 *******************************************************************************
 
+2009-09-16  Robert Rorschach  <rfr@franz.com>
+
+	* main.cl: clean up unresolved conflict
+
 2009-08-20  Robert Rorschach  <rfr@franz.com>
 
 	* macs.cl: track recent changes in the smp macros
