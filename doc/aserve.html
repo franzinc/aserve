@@ -97,6 +97,7 @@ Access Files</a><font face="Courier New"><br>
 &nbsp; <a href="#f-make-http-client-request">make-http-client-request</a><br>
 &nbsp; <a href="#f-read-client-response">read-client-response-headers</a><br>
 &nbsp; <a href="#f-client-request-read-sequence">client-request-read-sequence</a><br>
+&nbsp; <a href="#f-read-response-body">read-response-body</a><br>
 &nbsp; <a href="#f-client-request-read-close">client-request-close</a><br>
 &nbsp; <a href="#f-compute-digest-authorization">compute-digest-authorization</a><br>
 &nbsp; <a href="#f-uriencode-string">uriencode-string</a></font><br>
@@ -2775,7 +2776,9 @@ web server.
 The body of the
 response (if any) has not been read at this point.&nbsp;&nbsp;&nbsp;
 You should use <strong>client-request-read-sequence</strong>
-to read the body of the response</p>
+to read the body of the response part by part, or
+<strong><a href="#f-read-response-body">read-response-body</a></strong>
+to read it as a whole.</p>
 <p>&nbsp;</p>
 <p>&nbsp;</p>
 <p><a name="f-client-request-read-sequence"></a><strong><font
@@ -2799,6 +2802,18 @@ caller of the function must be prepared for having the buffer only
 partially filled.
 &nbsp; If the return value is zero then it indicates an End of File
 condition.</p>
+<p>&nbsp;</p>
+<p><a name="f-read-response-body"></a><strong><font
+ face="Courier New">(read-response-body client-request &amp;key format</font></strong></p>
+<p>Should only be called after <strong><a
+href="#f-read-client-response">read-client-response-headers</a></strong>
+has been called. Reads the whole response body (if any) and returns
+it. If the <strong>format</strong> parameter has a value of
+<strong>:text</strong> (the default) the body is returned as a string,
+if given <strong>:binary</strong>, it will be an array of
+<strong>(unsigned-byte 8)</strong> elements. When reading text, the
+external format given when creating the request is used to decode
+characters.</p>
 <p>&nbsp;</p>
 <p><a name="f-client-request-read-close"></a><font face="Courier New"><strong>(client-request-close
 client-request)</strong></font></p>

@@ -94,6 +94,7 @@
 		   (test-client port)
 		   (test-cgi port)
 		   (test-http-copy-file)
+                   (test-client-unicode-content-length)
 		   (if* (member :ics *features*)
 		      then (test-international port)
 			   (test-spr27296))
@@ -1775,7 +1776,20 @@
       :content string
       :external-format (crlf-base-ef :utf8))
     (shutdown :server server)))
-			   
+
+(defun test-client-unicode-content-length ()
+  ;; Older versions treated content-length as a character count rather
+  ;; than byte count, which went wrong with multi-byte encodings.
+  (let ((server (start :port nil :server :new
+		       :external-format (crlf-base-ef :utf8))))
+    (publish-file :server server :path "/" :file (format nil "~a../test/testdir/unicode"
+                                                         *aserve-examples-directory*))
+    ;; Not timing out is the test.
+    (do-http-request (format nil "http://localhost:~a/"
+                             (socket:local-port
+                              (wserver-socket server)))
+      :external-format (crlf-base-ef :utf8) :keep-alive t :timeout 3)
+    (shutdown :server server)))
 
 (defun test-http-copy-file ()
   (let ((url
