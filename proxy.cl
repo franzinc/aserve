@@ -39,31 +39,31 @@
 
 (defmacro with-mp-locked-connection-cache ((s) &rest body)
   (smp-case
-   ((t :macros) `(with-locked-structure (,s :-smp :without-scheduling)
+   ((t :macros) `(with-locked-structure (,s :non-smp :without-scheduling)
 		   ,@body))
    (nil `(si::without-scheduling ,s ,@body)))) ;; in a #-smp block
 
 (defmacro with-mp-locked-pcache-ent ((s) &rest body)
   (smp-case
-   ((t :macros) `(with-locked-structure (,s :-smp :without-scheduling)
+   ((t :macros) `(with-locked-structure (,s :non-smp :without-scheduling)
 		   ,@body))
    (nil `(si::without-scheduling ,s ,@body)))) ;; in a #-smp block
 
 (defmacro with-fast-mp-locked-pcache-ent ((s) &rest body)
   (smp-case
-   ((t :macros) `(with-locked-structure (,s :-smp :atomically)
+   ((t :macros) `(with-locked-structure (,s :non-smp :atomically)
 		   ,@body))
    (nil `(excl::atomically ,s ,@body)))) ;; in a #-smp block
 
 (defmacro with-mp-locked-pcache ((s) &rest body)
   (smp-case
-   ((t :macros) `(with-locked-structure (,s :-smp :without-scheduling)
+   ((t :macros) `(with-locked-structure (,s :non-smp :without-scheduling)
 		   ,@body))
    (nil `(si::without-scheduling ,s ,@body)))) ;; in a #-smp block
 
 (defmacro with-mp-locked-pcache-queue ((s) &rest body)
   (smp-case
-   ((t :macros) `(with-locked-structure (,s :-smp :without-scheduling)
+   ((t :macros) `(with-locked-structure (,s :non-smp :without-scheduling)
 		   ,@body))
    (nil `(si::without-scheduling ,s ,@body)))) ;; in a #-smp block
 
