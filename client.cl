@@ -187,6 +187,48 @@
      
      ,@body))
 
+(let ((bufsize 16384))
+  (defun buffered-read-body (stream format)
+    (flet ((buffer (size)
+             (if (eq format :text)
+                 (make-string size)
+                 (make-array size :element-type '(unsigned-byte 8)))))
+      (let ((accum ()) (size 0) buffer read done)
+        (loop (setf buffer (buffer bufsize)
+                    read (handler-bind
+                             ((excl::socket-chunking-end-of-file
+                               (lambda (e)
+                                 (declare (ignore e))
+                                 (setf done t))))
+                           (read-sequence buffer stream :partial-fill t)))
+              (push (cons buffer read) accum)
+              (incf size read)
+              (when (or (zerop read) done) (return)))
+        (setf accum (nreverse accum))
+        (let* ((bigbuf (buffer size))
+               (pos 0))
+          (loop :for (sub . size) :in accum
+                :do (replace bigbuf sub :start1 pos :end2 size)
+                :do (incf pos size))
+          bigbuf)))))
+
+(defun read-response-body (creq &key (format :text))
+  (let ((left (client-request-bytes-left creq)))
+    (setf (client-request-bytes-left creq) :eof)
+    (if* (null left)
+       then nil
+     elseif (integerp left)
+       then (let ((buffer (make-array left :element-type '(unsigned-byte 8))))
+              (read-sequence buffer (client-request-socket creq))
+              (if (eq format :text)
+                  (octets-to-string buffer :external-format
+                                    (stream-external-format
+                                     (client-request-socket creq)))
+                  buffer))
+     elseif (member left '(:chunked :unknown))
+       then (buffered-read-body (client-request-socket creq) format)
+     elseif (eq left :eof)
+       then (error "Body already read."))))
 
 (defun do-http-request (uri 
 			&rest args
@@ -316,54 +358,7 @@
 		     (client-request-headers  creq)
 		     (client-request-uri creq))))
 	  
-	  ;; read the body of the response
-	  (let ((atype (if* (eq format :text) 
-			  then 'character
-			  else '(unsigned-byte 8)))
-		ans
-		res
-		(start 0)
-		(end nil)
-		body)
-	    
-	    (loop
-	      (if* (null ans)
-		 then (setq ans (make-array 1024 :element-type atype)
-			    start 0))
-		
-	      (setq end (client-request-read-sequence ans creq :start start))
-	      (if* (zerop end)
-		 then			; eof
-		      (return))
-	      (if* (eql end 1024)
-		 then			; filled up
-		      (push ans res)
-		      (setq ans nil)
-		 else (setq start end)))
-	    
-	    ;; we're out with res containing full arrays and 
-	    ;; ans either nil or holding partial data up to but not including
-	    ;; index start
-	    
-	    (if* res
-	       then			; multiple items
-		    (let* ((total-size (+ (* 1024 (length res)) start))
-			   (bigarr (make-array total-size :element-type atype)))
-		      (let ((sstart 0))
-			(dolist (arr (reverse res))
-			  (replace bigarr arr :start1 sstart)
-			  (incf sstart (length arr)))
-			(if* ans 
-			   then		; final one 
-				(replace bigarr ans :start1 sstart)))
-		      
-		      (setq body bigarr))
-	       else			; only one item
-		    (if* (eql 0 start)
-		       then		; nothing returned
-			    (setq body "")
-		       else (setq body (subseq ans 0 start))))
-	    
+          (let ((body (read-response-body creq :format format)))
 	    (if* new-location
 	       then			; must do a redirect to get to the real site
 		    (client-request-close creq)
@@ -725,6 +720,10 @@ or \"foo.com:8000\", not ~s" proxy))
        then (net.aserve::format-dif :xmit
 				    sock "Accept: ~a~a" accept crlf))
 
+    ; some webservers (including AServe) have trouble with put/post
+    ; requests without a body
+    (if* (and (not content) (member method '(:put :post)))
+       then (setf content ""))
     ; content can be a nil, a single vector or a list of vectors.
     ; canonicalize..
     (if* (and content (atom content)) then (setq content (list content)))
@@ -971,7 +970,6 @@ or \"foo.com:8000\", not ~s" proxy))
       (progn (put-header-line-buffer buff2 buff)))))
 		  
 
-
 (defmethod client-request-read-sequence (buffer
 					 (creq client-request)
 					 &key
@@ -985,9 +983,29 @@ or \"foo.com:8000\", not ~s" proxy))
 	(socket (client-request-socket creq))
 	(last start))
     (if* (integerp bytes-left)
-       then ; just a normal read-sequence
+       then
 	    (if* (zerop bytes-left)
 	       then 0  ; eof
+             elseif (stringp buffer)
+               ;; We know the amount of bytes left, not characters left
+               then (let ((pos start)
+                          (dummy-str (make-string 1))
+                          (ch (read-char socket)))
+                      ;; This is a bit of a hack -- ACL doesn't seem to expose a
+                      ;; sane interface for determining the amount of bytes a
+                      ;; character requires in a given encoding.
+                      (flet ((char-size (ch)
+                               (setf (char dummy-str 0) ch)
+                               (native-string-sizeof dummy-str)))
+                        (loop
+                         (setf (aref buffer pos) ch)
+                         (incf pos)
+                         (when (or (<= (decf bytes-left (char-size ch)) 0)
+                                   (= pos end)
+                                   (null (setf ch (read-char-no-hang socket nil))))
+                           (setf (client-request-bytes-left creq) bytes-left)
+                           (return pos)))))
+               ;; just a normal read-sequence
 	       else (let ((ans (net.aserve::rational-read-sequence buffer 
 						       socket :start start
 					      :end (+ start 

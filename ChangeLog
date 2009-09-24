@@ -22,6 +22,27 @@
 	* parse.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
 	* proxy.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
 
+2009-09-15    <layer@HOBART128>
+
+	* test/t-aserve.cl: fix test suite for Windows
+
+2009-09-11 Marijn Haverbeke <marijnh@franz.com>
+1.2.61
+	* Fix bug that caused every keep-alive time-out to log a
+	  disconcerting warning. (Unintended interaction of
+	  with-timeout-local and ignore-errors.)
+
+2009-09-11 Marijn Haverbeke <marijnh@franz.com>
+
+	* Add read-response-body, a client function for reading the whole
+	  response body. (Also added to reference docs.)
+	* Fix bug in client-request-read-sequence and do-http-request, which
+	  interpreted content-length as a character length, would get
+	  confused by multi-byte characters.
+	* Make sure client requests always sent a content-length for PUT and
+	  POST requests, since the aserve server gets confused when it
+	  doesn't.
+
 2009-07-24  Kevin Layer  <layer@gemini.franz.com>
 1.2.60
 	* decode.cl: uriencode-string: use uppercase hex chars for

@@ -2122,6 +2122,7 @@
 	      (>= (wserver-free-workers *wserver*) 2)
 	      (header-value-member "keep-alive" 
 				   (header-slot-value req :connection )))))
+
     (if* (eq (request-method req) :head)
        then ; head commands are particularly easy to reply to
 	    (setq strategy '(:use-socket-stream

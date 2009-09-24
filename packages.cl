@@ -1,10 +1,9 @@
 #+(version= 8 1)
-(sys:defpatch "aserve" 3
+(sys:defpatch "aserve" 2
   "v1: version 1.2.56, large request body & multipart content type & more;
 v2: version 1.2.58, fix problem introduced in 1.2.56 where the response date 
   is always the zero universal time & correctly send out the comment after
-  the result code;
-v3: version 1.2.60: uriencode-string: use uppercase hex chars for EC2."
+  the result code."
   :type :system
   :post-loadable t)
 
@@ -211,6 +210,7 @@ v5: version 1.2.50, Enhanced SSL client/server support."
    #:client-request-socket
    #:client-request-uri
    #:client-response-header-value
+   #:read-response-body
    #:compute-digest-authorization
    #:cookie-item
    #:cookie-item-expires
