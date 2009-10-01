@@ -391,6 +391,10 @@
 	      (if* sock 
 		 then (socket:local-port sock)
 		 else "-no socket-")))))
+
+(defmethod incf-free-workers ((wserver wserver) count)
+  (with-locked-object (wserver :non-smp :without-interrupts)
+    (incf (wserver-free-workers wserver) count)))
      
 
 ;;;;; virtual host class
@@ -1183,7 +1187,7 @@ by keyword symbols and not by strings"
 				)))
     (mp:process-preset proc #'http-worker-thread)
     (push proc (wserver-worker-threads *wserver*))
-    (atomic-incf (wserver-free-workers *wserver*))
+    (incf-free-workers *wserver* 1)
     (setf (getf (mp:process-property-list proc) 'short-name) 
       (format nil "w~d" *thread-index*))
     ))
@@ -1270,7 +1274,7 @@ by keyword symbols and not by strings"
 	  (abandon ()
 	      :report "Abandon this request and wait for the next one"
 	    nil))
-	(atomic-incf (wserver-free-workers *wserver*))
+	(incf-free-workers *wserver* 1)
 	(mp:process-revoke-run-reason sys:*current-process* sock))
     
       )))
@@ -1360,7 +1364,7 @@ by keyword symbols and not by strings"
 			    (setq workers (wserver-worker-threads server))
 			    (incf looped))
 		    (if* (null (mp:process-run-reasons (car workers)))
-		       then (atomic-decf (wserver-free-workers server))
+		       then (incf-free-workers server -1)
 			    (mp:process-add-run-reason (car workers) sock)
 			    (pop workers)
 			    (return) ; satisfied

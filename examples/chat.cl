@@ -43,7 +43,7 @@
 
 (defmacro with-mp-locked-controller ((c) &body body)
   (net.aserve::smp-case
-   ((t :macros) `(with-locked-object (,c :-smp :without-scheduling)
+   ((t :macros) `(with-locked-object (,c :non-smp :without-scheduling)
 		   ,@body))
    (nil `(si::without-scheduling ,c ,@body))))
 
