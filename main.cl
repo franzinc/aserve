@@ -1646,7 +1646,7 @@ by keyword symbols and not by strings"
 	  (or (request-request-body req)
 	      (setf (request-request-body req)
 		(get-request-body-retrieve req)))))
-    (if* ef-supplied			; spr27296
+    (if* (and ef-supplied result) ; spr27296
        then (values
 	     (octets-to-string
 	      (string-to-octets result :external-format :octets)
