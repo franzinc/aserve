@@ -39,6 +39,14 @@
 			:net.html.generator))
 (in-package :user)
 
+(net.aserve::check-smp-consistency)
+
+(defmacro with-mp-locked-controller ((c) &body body)
+  (net.aserve::smp-case
+   ((t :macros) `(with-locked-object (,c :-smp :without-scheduling)
+		   ,@body))
+   (nil `(si::without-scheduling ,c ,@body))))
+
 (defvar *chat-home-package* :user) ; :user for now while debugging
 (defvar *chat-home*)     ; home dir for chat info
 (defvar *chat-home-pics*)     ; home dir for chat pics
@@ -174,7 +182,7 @@
 ;  b = upgrade user
 
 
-(defclass master-chat-controller ()
+(defclass master-chat-controller (#+smp mp:lockable-object)
   ((controllers :initform nil
 		; list of chat-controller instances
 		:initarg :controllers
@@ -200,7 +208,7 @@
 
 
 
-(defclass chat-controller ()
+(defclass chat-controller (#+smp mp:lockable-object)
   ;; describes a whole set of chats
   
   ((chats :initform nil
@@ -968,7 +976,7 @@
     ; create a unique string to indentify this controller
     (loop
       (setq ustring (make-unique-string))
-      (mp:without-scheduling
+      (with-mp-locked-controller (*master-controller*)
 	(if* (not (member ustring 
 			  (ustrings *master-controller*)
 			  :test #'equal))
@@ -1023,7 +1031,7 @@
        else (let (ustring)
 	      (loop
 		(setq ustring (make-unique-string))
-		(mp:without-scheduling
+		(with-mp-locked-controller (controller)
 		  (if* (not (member ustring (ustrings controller) 
 				    :test #'equal))
 		     then (push ustring (ustrings controller))
@@ -1034,7 +1042,7 @@
 					 :filename 
 					 (request-query-value "filename" req)
 					 :ustring ustring)))
-		(mp:without-scheduling
+		(with-mp-locked-controller (controller)
 		  (push chat (chats controller)))
 		(dump-existing-chat *chat-home*)
 		(with-http-response (req ent)

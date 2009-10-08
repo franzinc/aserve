@@ -4,6 +4,15 @@
 ** Please leave this at the top of the file.  Thanks.
 *******************************************************************************
 
+2009-10-08  Robert Rorschach  <rfr@franz.com>
+1.2.64
+
+	* macs.cl: track recent changes in the smp macros
+
+	* macs.cl: fix a package error in a macro; defvar-nonbindable
+	replaces defvar-nobind
+	* proxy.cl: restore a dropped #+ignore
+
 2009-10-08  Kevin Layer  <layer@gemini.franz.com>
 1.2.63
 	(really from Marijn)
@@ -49,6 +58,15 @@
 2009-06-30  Kevin Layer  <layer@gemini.franz.com>
 
 	* load.cl: remove removed files from *aserve-other-files*
+
+2009-06-18  Robert Rorschach  <rfr@franz.com>
+
+	* client.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
+	* examples/chat.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
+	* macs.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
+	* main.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0; bump version
+	* parse.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
+	* proxy.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
 
 2009-05-11  Kevin Layer  <layer@gemini.franz.com>
 1.2.59
