@@ -38,7 +38,7 @@
 
 (in-package :net.aserve)
 
-(defparameter *aserve-version* '(1 2 61))
+(defparameter *aserve-version* '(1 2 63))
 
 (eval-when (eval load)
     (require :sock)
@@ -181,7 +181,8 @@
 
 
 ;; more specials
-(defvar *max-socket-fd* 0) ; the maximum fd returned by accept-connection
+(defvar *max-socket-fd* nil) ; set this to 0 to enable tracking and logging of
+                             ; the maximum fd returned by accept-connection
 (defvar *aserve-debug-stream* nil) ; stream to which to seen debug messages
 (defvar *debug-connection-reset-by-peer* nil) ; true to signal these too
 (defvar *default-aserve-external-format* :latin1-base) 
@@ -1325,11 +1326,12 @@ by keyword symbols and not by strings"
 		
 		; another useful test to see if we're losing file
 		; descriptors
-		(let ((fd (excl::stream-input-fn sock)))
-		  (if* (> fd *max-socket-fd*)
-		     then (setq *max-socket-fd* fd)
-			  (logmess (format nil 
-					   "Maximum socket file descriptor number is now ~d" fd))))
+                (when *max-socket-fd*
+                  (let ((fd (excl::stream-input-fn sock)))
+                    (if* (> fd *max-socket-fd*)
+                         then (setq *max-socket-fd* fd)
+                              (logmess (format nil 
+                                               "Maximum socket file descriptor number is now ~d" fd)))))
 		
 		
 		(setq error-count 0) ; reset count
