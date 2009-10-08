@@ -4,6 +4,11 @@
 ** Please leave this at the top of the file.  Thanks.
 *******************************************************************************
 
+2009-10-08  Kevin Layer  <layer@gemini.franz.com>
+1.2.63
+	(really from Marijn)
+	* main.cl: reduce warnings ("Maximum socket file descriptor...")
+
 2009-10-05  Kevin Layer  <layer@gemini.franz.com>
 1.2.62
 	* main.cl: get-request-body: only call string-to-octets on
