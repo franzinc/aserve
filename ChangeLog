@@ -4,6 +4,13 @@
 ** Please leave this at the top of the file.  Thanks.
 *******************************************************************************
 
+2009-10-11  Kevin Layer  <layer@gemini.franz.com>
+
+	* makefile: make 8.1 the default on Windows (like it is on UNIX)
+	* test/t-aserve.cl: tweak the http-copy-file tests to not
+	  depend on being on the Franz local network, and to use the
+	  server instance created during the tests
+
 2009-10-08  Robert Rorschach  <rfr@franz.com>
 1.2.64
 

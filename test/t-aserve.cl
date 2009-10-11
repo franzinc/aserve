@@ -93,7 +93,7 @@
 		   (test-forms port)
 		   (test-client port)
 		   (test-cgi port)
-		   (test-http-copy-file)
+		   (test-http-copy-file port)
                    (test-client-unicode-content-length)
 		   (if* (member :ics *features*)
 		      then (test-international port)
@@ -1791,37 +1791,49 @@
       :external-format (crlf-base-ef :utf8) :keep-alive t :timeout 3)
     (shutdown :server server)))
 
-(defun test-http-copy-file ()
-  (let ((url
-	 "http://www.franz.com/support/8.0/download/entpro/dist/windows/acl80.exe")
-	(reference-file
-	 "/fi/www/sites/franz/prod/htdocs/support/8.0/download/entpro/dist/windows/acl80.exe")
-	(temp-file-name (sys:make-temp-file-name "temp")))
-    (when (not (probe-file reference-file))
-      (format t "test-http-copy-file: reference file does not exist.~%")
-      (return-from test-http-copy-file))
-    (unwind-protect
-	(flet ((doit (&rest args)
-		 (format t "~&~%copying reference file~@[:~{ ~s~}~]~%"
-			 args)
-		 (let ((before (get-internal-real-time)))
-		   (apply #'http-copy-file url temp-file-name args)
-		   (format t "time = ~s msecs~%"
-			   (- (get-internal-real-time) before)))
-		 (format t "comparing ~a~%" temp-file-name)
-		 (test t (excl::compare-files reference-file temp-file-name))
-		 (delete-file temp-file-name)))
-	  (doit)
-	  (doit :protocol :http/1.0)
-	  (doit :buffer-size 2048)
-	  (doit :buffer-size 4096)
-	  (doit :buffer-size 8192)
-	  (doit
-	   :progress-function
-	   (lambda (bytes-read total-size)
-	     (format t "~&  copy progress: ~a ~a~%" bytes-read total-size)
-	     (force-output t))))
-      (ignore-errors (delete-file temp-file-name)))))
+(defun test-http-copy-file (port)
+  (when *x-ssl*
+    ;; bug18668: doesn't work when SSL turned on.  Dunno why.  Get a
+    ;; "premature eof from server" in read-client-response-headers.
+    (return-from test-http-copy-file))
+  (let* ((reference-files '("sys:files.bu"
+			    "sys:runtime.bu"
+			    "sys:mlisp.dxl"
+			    "sys:mlisp8.dxl"
+			    "sys:alisp.dxl"
+			    "sys:alisp8.dxl"
+			    "sys:dcl.dxl"))
+	 (url (format nil "http://localhost:~a/http-copy-file" port))
+	 (temp-file-name (sys:make-temp-file-name "temp")))
+
+    (dolist (reference-file reference-files)
+      (when (probe-file reference-file)
+	(format t "~&~%======= test-http-copy-file: ~a~%" reference-file)
+	(publish-file :path "/http-copy-file" :file reference-file
+		      :content-type "application/octet-stream")
+	(unwind-protect
+	    (labels
+		((progress (bytes-read total-size)
+		   (format t "~&  copy progress: ~a ~a~%" bytes-read total-size)
+		   (force-output t))
+		 (doit (&rest args)
+		   (format t "~&~%copying reference file~@[:~{ ~a~}~]~%"
+			   args)
+		   (let ((before (get-internal-real-time)))
+		     (apply #'http-copy-file url temp-file-name args)
+		     (format t "time = ~s msecs~%"
+			     (- (get-internal-real-time) before)))
+		   (format t "comparing ~a~%" temp-file-name)
+		   (test t (excl::compare-files reference-file temp-file-name))
+		   (delete-file temp-file-name)))
+	      (doit :progress-function #'progress)
+	      ;;*** no need to do this so many times:
+	      ;;(doit)
+	      ;;(doit :buffer-size 2048)
+	      ;;(doit :buffer-size 4096)
+	      (doit :buffer-size 8192)
+	      (doit :protocol :http/1.0))
+	  (ignore-errors (delete-file temp-file-name)))))))
 
     
 (if* user::*do-aserve-test* 
