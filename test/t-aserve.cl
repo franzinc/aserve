@@ -1792,10 +1792,6 @@
     (shutdown :server server)))
 
 (defun test-http-copy-file (port)
-  (when *x-ssl*
-    ;; bug18668: doesn't work when SSL turned on.  Dunno why.  Get a
-    ;; "premature eof from server" in read-client-response-headers.
-    (return-from test-http-copy-file))
   (let* ((reference-files '("sys:files.bu"
 			    "sys:runtime.bu"
 			    "sys:mlisp.dxl"
@@ -1803,7 +1799,7 @@
 			    "sys:alisp.dxl"
 			    "sys:alisp8.dxl"
 			    "sys:dcl.dxl"))
-	 (url (format nil "http://localhost:~a/http-copy-file" port))
+	 (url (format nil "http~a://localhost:~a/http-copy-file" (if *x-ssl* "s" "") port))
 	 (temp-file-name (sys:make-temp-file-name "temp")))
 
     (dolist (reference-file reference-files)
