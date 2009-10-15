@@ -4,6 +4,10 @@
 ** Please leave this at the top of the file.  Thanks.
 *******************************************************************************
 
+2009-10-15  Marijn Haverbeke  <marijnh@franz.com>
+
+	* test/t-aserve.cl: bug18668: fix http-copy-file test for SSL
+
 2009-10-11  Kevin Layer  <layer@gemini.franz.com>
 
 	* makefile: make 8.1 the default on Windows (like it is on UNIX)
