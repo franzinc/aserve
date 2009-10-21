@@ -27,6 +27,36 @@
 	* parse.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
 	* proxy.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
 
+2009-10-15  Marijn Haverbeke  <marijnh@franz.com>
+
+	* test/t-aserve.cl: bug18668: fix http-copy-file test for SSL
+
+2009-10-11  Kevin Layer  <layer@gemini.franz.com>
+
+	* makefile: make 8.1 the default on Windows (like it is on UNIX)
+	* test/t-aserve.cl: tweak the http-copy-file tests to not
+	  depend on being on the Franz local network, and to use the
+	  server instance created during the tests
+
+2009-10-08  Robert Rorschach  <rfr@franz.com>
+1.2.64
+
+	* macs.cl: track recent changes in the smp macros
+
+	* macs.cl: fix a package error in a macro; defvar-nonbindable
+	replaces defvar-nobind
+	* proxy.cl: restore a dropped #+ignore
+
+2009-10-08  Kevin Layer  <layer@gemini.franz.com>
+1.2.63
+	(really from Marijn)
+	* main.cl: reduce warnings ("Maximum socket file descriptor...")
+
+2009-10-05  Kevin Layer  <layer@gemini.franz.com>
+1.2.62
+	* main.cl: get-request-body: only call string-to-octets on
+	  result if it's non-nil
+
 2009-09-15    <layer@HOBART128>
 
 	* test/t-aserve.cl: fix test suite for Windows
@@ -62,6 +92,16 @@
 2009-06-30  Kevin Layer  <layer@gemini.franz.com>
 
 	* load.cl: remove removed files from *aserve-other-files*
+
+
+2009-06-18  Robert Rorschach  <rfr@franz.com>
+
+	* client.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
+	* examples/chat.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
+	* macs.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
+	* main.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0; bump version
+	* parse.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
+	* proxy.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
 
 2009-05-11  Kevin Layer  <layer@gemini.franz.com>
 1.2.59

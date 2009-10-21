@@ -22,9 +22,6 @@
 ;; http://www.gnu.org/copyleft/lesser.txt (until superseded by a newer
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
-;;
-;;
-;; $Id: main.cl,v 1.193 2009/02/19 12:34:19 jkf Exp $
 
 ;; Description:
 ;;   aserve's main loop
@@ -41,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 2 61))
+(defparameter *aserve-version* '(1 2 64))
 
 (eval-when (eval load)
     (require :sock)
@@ -184,7 +181,8 @@
 
 
 ;; more specials
-(defvar *max-socket-fd* 0) ; the maximum fd returned by accept-connection
+(defvar *max-socket-fd* nil) ; set this to 0 to enable tracking and logging of
+                             ; the maximum fd returned by accept-connection
 (defvar *aserve-debug-stream* nil) ; stream to which to seen debug messages
 (defvar *debug-connection-reset-by-peer* nil) ; true to signal these too
 (defvar *default-aserve-external-format* :latin1-base) 
@@ -1330,11 +1328,12 @@ by keyword symbols and not by strings"
 		
 		; another useful test to see if we're losing file
 		; descriptors
-		(let ((fd (excl::stream-input-fn sock)))
-		  (if* (> fd *max-socket-fd*)
-		     then (setq *max-socket-fd* fd)
-			  (logmess (format nil 
-					   "Maximum socket file descriptor number is now ~d" fd))))
+                (when *max-socket-fd*
+                  (let ((fd (excl::stream-input-fn sock)))
+                    (if* (> fd *max-socket-fd*)
+                         then (setq *max-socket-fd* fd)
+                              (logmess (format nil 
+                                               "Maximum socket file descriptor number is now ~d" fd)))))
 		
 		
 		(setq error-count 0) ; reset count
@@ -1651,7 +1650,7 @@ by keyword symbols and not by strings"
 	  (or (request-request-body req)
 	      (setf (request-request-body req)
 		(get-request-body-retrieve req)))))
-    (if* ef-supplied			; spr27296
+    (if* (and ef-supplied result) ; spr27296
        then (values
 	     (octets-to-string
 	      (string-to-octets result :external-format :octets)

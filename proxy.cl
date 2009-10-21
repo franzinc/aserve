@@ -89,7 +89,7 @@
 (defparameter *connections-used-cached* 0) ; number of cached connections used
 ; the cache
 (defparameter *connection-cache-queue* (cons nil nil)) ; (first . last) queue of conn-cache objects
-(defparameter *connection-cache-expire* 10)  ; number of seconds to live
+(defparameter *connection-cache-expire* 10) ; number of seconds to live
 
 (defparameter *connection-cache-lock*
     (smp-case
@@ -1906,7 +1906,7 @@ cached connection = ~s~%" cond cached-connection))
   (let ((queueobj (pcache-ent-queueobj pcache-ent)))
     (move-pcache-ent pcache-ent queueobj queueobj)))
 
-#+ignore ;; an old non-thread-safe version, replaced below
+#+ignore ;; fixed below for thread safety
 (defun move-pcache-ent (pcache-ent fromq toq)
   ;; move the pcache-ent between queues
   ;; fromq and toq can be nil or the same.
@@ -2019,9 +2019,6 @@ cached connection = ~s~%" cond cached-connection))
       (:unlinked
        (error "attempt to shift an unlinked pcache-ent")))))
 		      
-
-
-
 
 
 (defun kill-pcache-ent (pcache-ent &optional (pcache (wserver-pcache
@@ -2270,8 +2267,7 @@ cached connection = ~s~%" cond cached-connection))
     
     (loop
       (if* (<= needed 0) then (return))
-
-      #+ignore ;; replaced below
+      #+ignore ;; recoded below
       (block main
 	(setq ent-todo nil)
 	
@@ -2465,7 +2461,7 @@ cached connection = ~s~%" cond cached-connection))
   ; to the value before we set the flag.
   ; If the value was nil and thus we set it to true, then
   ; we are the process responsible for loading in the data
-					;
+  ;
   #-smp
   (let ((flagval (atomically-fast
 		  (let ((val (pcache-ent-loading-flag pcache-ent)))
