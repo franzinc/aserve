@@ -4,6 +4,15 @@
 ** Please leave this at the top of the file.  Thanks.
 *******************************************************************************
 
+2009-11-09  Kevin Layer  <layer@gemini.franz.com>
+1.2.65
+
+	* packages.cl: 8.2.beta patch v1
+    from Marijn:
+	* publish.cl: allow HTTP 1.1 connections to be persistent as
+	  long as no connection: close is sent (rather than only when
+	  connection: keep-alive is sent)
+
 2009-10-15  Marijn Haverbeke  <marijnh@franz.com>
 
 	* test/t-aserve.cl: bug18668: fix http-copy-file test for SSL
