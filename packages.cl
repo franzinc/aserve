@@ -1,9 +1,3 @@
-#+(version= 8 2 :beta)
-(sys:defpatch "aserve" 1
-  "v1: HTTP 1.1 connections and persistence w/connection: close."
-  :type :system
-  :post-loadable t)
-
 #+(version= 8 1)
 (sys:defpatch "aserve" 2
   "v1: version 1.2.56, large request body & multipart content type & more;
