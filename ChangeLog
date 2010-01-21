@@ -1,3 +1,7 @@
+2010-01-21  Robert Rorschach  <rfr@franz.com>
+
+	* main.cl: smp changes
+
 *******************************************************************************
 ** Please increment the version if you change anything user-visible.
 ** See *aserve-version* in main.cl.

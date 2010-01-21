@@ -226,7 +226,7 @@
 ;;;;;;;;;;;;;  end special vars
 
 
-(defclass wserver ()
+(defclass wserver (#+smp lockable-object)
   ;; all the information contained in a web server
   (
    ;;
