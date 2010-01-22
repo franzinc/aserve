@@ -2120,8 +2120,11 @@
 	(keep-alive-possible
 	 (and (wserver-enable-keep-alive *wserver*)
 	      (>= (wserver-free-workers *wserver*) 2)
-	      (header-value-member "keep-alive" 
-				   (header-slot-value req :connection )))))
+              (if* (eq (request-protocol req) :http/1.1)
+		 then (not (header-value-member
+			    "close" (header-slot-value req :connection)))
+		 else (header-value-member
+		       "keep-alive" (header-slot-value req :connection))))))
 
     (if* (eq (request-method req) :head)
        then ; head commands are particularly easy to reply to
