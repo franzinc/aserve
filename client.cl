@@ -1141,7 +1141,7 @@ or \"foo.com:8000\", not ~s" proxy))
       (setq buff
 	(pop-atomic *response-header-buffers*)))
      (nil
-      (excl::.atomically ;; in a #-smp form
+      (excl::atomically ;; in a #-smp form
        (excl::fast (setq buff (pop *response-header-buffers*))))))
     (if* buff
        thenret

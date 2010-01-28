@@ -391,9 +391,13 @@
 		 else "-no socket-")))))
 
 (defmethod incf-free-workers ((wserver wserver) count)
-  (with-locked-object (wserver :non-smp :without-interrupts)
-    (incf (wserver-free-workers wserver) count)))
-     
+  (net.aserve::smp-case
+   ((t :macros)
+    (with-locked-object (wserver :non-smp :without-interrupts)
+      (incf (wserver-free-workers wserver) count)))
+   (nil
+    (without-interrupts
+     (incf (wserver-free-workers wserver) count)))))
 
 ;;;;; virtual host class
 (defclass vhost ()

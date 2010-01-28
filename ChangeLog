@@ -4,6 +4,11 @@
 ** Please leave this at the top of the file.  Thanks.
 *******************************************************************************
 
+2010-01-28  Robert Rorschach  <rfr@franz.com>
+
+	* client.cl: retrofit for 7.0-8.1
+	* main.cl: retrofit for 7.0-8.1
+
 2010-01-21  Robert Rorschach  <rfr@franz.com>
 
 	* main.cl: smp changes
