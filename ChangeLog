@@ -4,14 +4,14 @@
 ** Please leave this at the top of the file.  Thanks.
 *******************************************************************************
 
-2010-01-28  Robert Rorschach  <rfr@franz.com>
+2010-02-03  Robert Rorschach  <rfr@franz.com>
 
-	* client.cl: retrofit for 7.0-8.1
-	* main.cl: retrofit for 7.0-8.1
-
-2010-01-21  Robert Rorschach  <rfr@franz.com>
-
-	* main.cl: smp changes
+	* client.cl: retrofit for 7.0-8.2
+	* macs.cl: track recent changes in the smp macros
+	* main.cl: smp changes, retrofit for 7.0-8.2, bump version
+	* parse.cl: retrofit for 7.0-8.2
+	* proxy.cl: restore a dropped #+ignore, retrofit for 7.0-8.2
+	* examples/chat.cl: retrofit for 7.0-8.2
 
 2009-11-09  Kevin Layer  <layer@gemini.franz.com>
 1.2.65
@@ -33,15 +33,6 @@
 	  depend on being on the Franz local network, and to use the
 	  server instance created during the tests
 
-2009-10-08  Robert Rorschach  <rfr@franz.com>
-1.2.64
-
-	* macs.cl: track recent changes in the smp macros
-
-	* macs.cl: fix a package error in a macro; defvar-nonbindable
-	replaces defvar-nobind
-	* proxy.cl: restore a dropped #+ignore
-
 2009-10-08  Kevin Layer  <layer@gemini.franz.com>
 1.2.63
 	(really from Marijn)
@@ -51,16 +42,6 @@
 1.2.62
 	* main.cl: get-request-body: only call string-to-octets on
 	  result if it's non-nil
-
-2009-10-01  Robert Rorschach  <rfr@franz.com>
-
-	* examples/chat.cl: fix after 8.2 merge
-	* main.cl: smp fixes
-
-2009-09-24  Robert Rorschach  <rfr@franz.com>
-
-	* macs.cl: fix after 8.2 merge
-	* proxy.cl: fix after 8.2 merge
 
 2009-09-15    <layer@HOBART128>
 
@@ -90,10 +71,6 @@
 	  be used, otherwise the signing of EC2 requests via the REST
 	  API won't match.
 
-2009-07-23  Robert Rorschach  <rfr@franz.com>
-
-	* macs.cl: track changes in 8.1 patch
-
 2009-07-01    <layer@HOBART128>
 
 	* makefile: dribble test output to "test.out" (mainly for windows)
@@ -101,25 +78,6 @@
 2009-06-30  Kevin Layer  <layer@gemini.franz.com>
 
 	* load.cl: remove removed files from *aserve-other-files*
-
-
-2009-06-18  Robert Rorschach  <rfr@franz.com>
-
-	* client.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
-	* examples/chat.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
-	* macs.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
-	* main.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0; bump version
-	* parse.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
-	* proxy.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
-
-2009-06-18  Robert Rorschach  <rfr@franz.com>
-
-	* client.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
-	* examples/chat.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
-	* macs.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
-	* main.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0; bump version
-	* parse.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
-	* proxy.cl: compile in 8.1, 8.1+smp-macros, 8.2, 9.0
 
 2009-05-11  Kevin Layer  <layer@gemini.franz.com>
 1.2.59
