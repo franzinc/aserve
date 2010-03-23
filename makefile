@@ -32,7 +32,7 @@ test: FORCE
 	echo '(setq excl::*break-on-warnings* t)' >> build.tmp
 	echo '(load "load.cl")' >> build.tmp
 	echo '(dribble "test.out")' >> build.tmp
-	echo '(load "test/t-aserve.cl")' >> build.tmp
+	echo '(time (load "test/t-aserve.cl"))' >> build.tmp
 	echo '(exit util.test::*test-errors*)' >> build.tmp
 # -batch must come before -L, since arguments are evaluated from left to right
 	$(mlisp) -batch -L build.tmp -kill
