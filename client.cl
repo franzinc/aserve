@@ -87,6 +87,14 @@
     :accessor client-request-cookies
     :initarg :cookies
     :initform nil)
+   
+   (return-connection
+    ;; set to
+    ;;  :maybe - would like to return but only if no errors
+    ;;  :yes   - return for sure
+    :initarg :return-connection
+    :accessor client-request-return-connection
+    :initform nil)
    ))
 
 
@@ -261,6 +269,7 @@
 			ca-directory
 			verify
 			max-depth
+			connection ; existing socket to the server
 			
 			;; internal
 			recursing-call ; true if we are calling ourself
@@ -294,16 +303,37 @@
 	       :ca-directory ca-directory
 	       :verify verify
 	       :max-depth max-depth
+	       :connection connection
 	       )))
 
     (unwind-protect
 	(let (new-location) 
 	  
 	  (loop
-	    (read-client-response-headers creq)
-	    ;; if it's a continue, then start the read again
-	    (if* (not (eql 100 (client-request-response-code creq)))
-	       then (return)))
+	    (if* (catch 'premature-eof
+		   (read-client-response-headers creq
+						 :throw-on-eof
+						 (and connection
+						      'premature-eof))
+		   ;; if it's a continue, then start the read again
+		   (if* (not (eql 100 (client-request-response-code creq)))
+		      then (return))
+		   
+		   nil)
+		    
+	       then ; got eof right away.. likely due to bogus
+		    ; saved connection... so try again with
+		    ; no saved connection
+		    (ignore-errors (close connection))
+		    (setf (getf args :connection) nil)
+		    (return-from do-http-request
+		      (apply 'do-http-request uri args))))
+	  
+	  (if* (equal "close" (cdr (assoc :connection 
+					  (client-request-headers creq))))
+	     then ; server forced the close
+		  ; so don't return the connection
+		  (setf (client-request-return-connection creq) nil))
 	  
 		  
 	  (if* (and (member (client-request-response-code creq)
@@ -349,14 +379,19 @@
 				 *response-no-content*)
 				#.(net.aserve::response-number 
 				   *response-not-modified*)
-			      )))
+				)))
 	     then
 		  (return-from do-http-request
 		    (values 
 		     nil		; no body
 		     (client-request-response-code creq)
 		     (client-request-headers  creq)
-		     (client-request-uri creq))))
+		     (client-request-uri creq)
+		     (and (client-request-return-connection creq)
+			  (setf (client-request-return-connection creq)
+			    :yes)
+			  (client-request-socket creq))
+		     )))
 	  
           (let ((body (read-response-body creq :format format)))
 	    (if* new-location
@@ -374,7 +409,12 @@
 		     body
 		     (client-request-response-code creq)
 		     (client-request-headers  creq)
-		     (client-request-uri creq)))))
+		     (client-request-uri creq)
+		     (and (client-request-return-connection creq)
+			  (setf (client-request-return-connection creq)
+			    :yes)
+			  (client-request-socket creq))
+		     ))))
       
       ;; protected form:
       (client-request-close creq))))
@@ -550,39 +590,57 @@
 
 
 
-(defun make-http-client-request (uri &key 
-				     (method  :get)  ; :get, :post, ....
-				     (protocol  :http/1.1)
-				     keep-alive 
-				     (accept "*/*") 
-				     cookies  ; nil or a cookie-jar
-				     basic-authorization
-				     digest-authorization
-				     content
-				     content-length 
-				     content-type
-				     query
-				     headers
-				     proxy
-				     proxy-basic-authorization
-				     user-agent
-				     (external-format 
-				      *default-aserve-external-format*)
-				     ssl
-				     timeout
-				     certificate
-				     key
-				     certificate-password
-				     ca-file
-				     ca-directory
-				     verify
-				     max-depth
-				     )
+(defun make-http-client-request (uri &rest args
+				 &key 
+				 (method  :get)  ; :get, :post, ....
+				 (protocol  :http/1.1)
+				 keep-alive 
+				 (accept "*/*") 
+				 cookies  ; nil or a cookie-jar
+				 basic-authorization
+				 digest-authorization
+				 content
+				 content-length 
+				 content-type
+				 query
+				 headers
+				 proxy
+				 proxy-basic-authorization
+				 user-agent
+				 (external-format 
+				  *default-aserve-external-format*)
+				 ssl
+				 timeout
+				 certificate
+				 key
+				 certificate-password
+				 ca-file
+				 ca-directory
+				 verify
+				 max-depth
+				 connection
+				 use-socket
+				     
+				 )
   
 
   (declare (ignorable timeout certificate key certificate-password ca-file 
 		      ca-directory verify max-depth))
   
+  
+  (if* (and connection (not use-socket))
+     then ; try using it
+	  (handler-case (return-from make-http-client-request
+			  (apply #'make-http-client-request 
+				 uri
+				 :use-socket connection
+				 args))
+	    (error (c)
+	      (declare (ignore c))
+	      (ignore-errors (close connection))
+	      ; drop into code to do it normally
+	      )))
+			       
   (let (host sock port fresh-uri scheme-default-port)
     ;; start a request 
   
@@ -622,16 +680,22 @@
 or \"foo.com:8000\", not ~s" proxy))
 	      
 	      (setq sock 
-		(with-socket-connect-timeout (:timeout timeout
-						       :host phost 
-						       :port pport)
-		  (socket:make-socket :remote-host phost
-				      :remote-port pport
-				      :format :bivalent
-				      :type net.aserve::*socket-stream-type*
-				      :nodelay t
-				      ))))
-       else (setq sock 
+		(or use-socket
+		    (with-socket-connect-timeout (:timeout timeout
+							   :host phost 
+							   :port pport)
+		      (socket:make-socket :remote-host phost
+					  :remote-port pport
+					  :format :bivalent
+					  :type net.aserve::*socket-stream-type*
+					  :nodelay t
+					  )))))
+     elseif use-socket
+       then ; persistent connection
+	    (setq sock use-socket)
+       else 
+	   
+	    (setq sock
 	      (with-socket-connect-timeout (:timeout timeout
 						     :host host
 						     :port port)
@@ -656,26 +720,28 @@ or \"foo.com:8000\", not ~s" proxy))
 			       :max-depth max-depth))
 		    #-(version>= 8 0)
 		    (setq sock
-		      (funcall 'socket::make-ssl-client-stream sock))
-		    )
-	    )
+		      (funcall 'socket::make-ssl-client-stream sock))))
+    
+		    
 
-    #+(and allegro (version>= 6 0))
-    (let ((ef (find-external-format external-format)))
-      #+(version>= 6) (net.aserve::warn-if-crlf ef)
-      (setf (stream-external-format sock) ef))
+    (if* (not use-socket)
+       then ; a fresh socket, so set params
+	    #+(and allegro (version>= 6 0))
+	    (let ((ef (find-external-format external-format)))
+	      #+(version>= 6) (net.aserve::warn-if-crlf ef)
+	      (setf (stream-external-format sock) ef))
     
-    (if* net.aserve::*watch-for-open-sockets*
-       then (schedule-finalization 
-	     sock 
-	     #'net.aserve::check-for-open-socket-before-gc))
+	    (if* net.aserve::*watch-for-open-sockets*
+	       then (schedule-finalization 
+		     sock 
+		     #'net.aserve::check-for-open-socket-before-gc))
     
-    #+io-timeout
-    (if* (integerp timeout)
-       then (socket:socket-control 
-	     sock 
-	     :read-timeout timeout
-	     :write-timeout timeout))
+	    #+io-timeout
+	    (if* (integerp timeout)
+	       then (socket:socket-control 
+		     sock 
+		     :read-timeout timeout
+		     :write-timeout timeout)))
 	    
     
     (if* query
@@ -704,6 +770,9 @@ or \"foo.com:8000\", not ~s" proxy))
 			       else (uri-path-etc uri))
 			    (string-upcase (string protocol))
 			    crlf)
+    
+    ; write often to trigger error if connection closed
+    (if* use-socket then (force-output sock))
 
     ; always send a Host header, required for http/1.1 and a good idea
     ; for http/1.0
@@ -711,15 +780,24 @@ or \"foo.com:8000\", not ~s" proxy))
        then (net.aserve::format-dif :xmit sock "Host: ~a:~a~a" host port crlf)
        else (net.aserve::format-dif :xmit  sock "Host: ~a~a" host crlf))
     
+    
     ; now the headers
-    (if* keep-alive
-       then (net.aserve::format-dif :xmit
-				    sock "Connection: Keep-Alive~a" crlf))
+    (if* (and keep-alive (eq protocol :http/1.0))
+       then ; for http/1.1 keep alive is the default so no need 
+	    ; to express it
+	    (net.aserve::format-dif :xmit
+				    sock "Connection: Keep-Alive~a" crlf)
+     elseif (and (not keep-alive) (eq protocol :http/1.1))
+       then ; request it close for us
+	    (net.aserve::format-dif :xmit
+				    sock "Connection: close~a" crlf))
 
+    
     (if* accept
        then (net.aserve::format-dif :xmit
 				    sock "Accept: ~a~a" accept crlf))
 
+    
     ; some webservers (including AServe) have trouble with put/post
     ; requests without a body
     (if* (and (not content) (member method '(:put :post)))
@@ -752,7 +830,7 @@ or \"foo.com:8000\", not ~s" proxy))
     (if* content-length
        then (net.aserve::format-dif :xmit
 				    sock "Content-Length: ~s~a" content-length crlf))
-    
+  
 	    
     (if* cookies 
        then (let ((str (compute-cookie-string uri
@@ -814,10 +892,12 @@ or \"foo.com:8000\", not ~s" proxy))
        then (net.aserve::format-dif :xmit sock "Content-Type: ~a~a"
 				    content-type
 				    crlf))
+    
     (if* headers
        then (dolist (header headers)
 	      (net.aserve::format-dif :xmit sock "~a: ~a~a" 
 				      (car header) (cdr header) crlf)))
+    (if* use-socket then (force-output sock))
     
 
     (write-string crlf sock)  ; final crlf
@@ -844,6 +924,7 @@ or \"foo.com:8000\", not ~s" proxy))
       :socket sock
       :cookies cookies
       :method method
+      :return-connection (if* keep-alive then :maybe)
       )))
 
 
@@ -859,7 +940,8 @@ or \"foo.com:8000\", not ~s" proxy))
     (net.uri:render-uri nuri nil)))
     
     
-(defmethod read-client-response-headers ((creq client-request))
+(defmethod read-client-response-headers ((creq client-request)
+					 &key throw-on-eof)
   ;; read the response and the headers
   (let ((buff (get-header-line-buffer))
 	(buff2 (get-header-line-buffer))
@@ -876,6 +958,12 @@ or \"foo.com:8000\", not ~s" proxy))
 	(with-better-scan-macros
 	    (if* (null (setq len (read-socket-line sock buff (length buff))))
 	       then ; eof getting response
+		    
+		    ; see if someone cares
+		    (if* throw-on-eof
+		       then 
+			    (throw throw-on-eof t))
+		    
 		    (error "premature eof from server"))
 	  (macrolet ((fail ()
 		       `(let ((i 0))
@@ -1063,7 +1151,8 @@ or \"foo.com:8000\", not ~s" proxy))
 
 (defmethod client-request-close ((creq client-request))
   (let ((sock (client-request-socket creq)))
-    (if* sock
+    (if* (and sock (not (eq (client-request-return-connection creq) 
+			    :yes)))
        then (setf (client-request-socket creq) nil)
 	    (ignore-errors (force-output sock))
 	    (ignore-errors (close sock)))))

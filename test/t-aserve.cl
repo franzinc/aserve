@@ -141,7 +141,9 @@
 
 (defun start-aserve-running (&optional ssl)
   ;; start aserve, return the port on which we've started aserve
-  (let ((wserver (start :port nil :server :new :ssl ssl))); let the system pick a port
+  (let ((wserver (start :port nil :server :new :ssl ssl
+			:listeners 20 ; so keep-alive will be possible
+			))); let the system pick a port
     (setq *wserver* wserver)
     (unpublish :all t) ; flush anything published
     (setq *x-ssl* ssl)
@@ -253,7 +255,9 @@
 
       ;; 
       (dolist (cur-prefix (list prefix-local prefix-dns))
-	(dolist (keep-alive '(nil t))
+	;* don't specify keep-alive unless you're willing
+	;  to close the resulting socket
+	(dolist (keep-alive '(nil))
 	  (dolist (protocol '(:http/1.0 :http/1.1))
 	    (format t "test 1 - ~s~%" (list keep-alive protocol))
 	    (multiple-value-bind (body code headers)
@@ -308,7 +312,7 @@
 
     ;; 
     (dolist (cur-prefix (list prefix-local prefix-dns))
-      (dolist (keep-alive '(nil t))
+      (dolist (keep-alive '(nil))
 	(dolist (protocol '(:http/1.0 :http/1.1))
 	  (format t "test 2 - ~s~%" (list keep-alive protocol))
 	  (multiple-value-bind (body code headers)
@@ -511,7 +515,7 @@
 		     (with-http-response (req ent)
 		       (with-http-body (req ent)
 			 (write-sequence this *html-stream*))))))
-      (dolist (keep-alive '(nil t))
+      (dolist (keep-alive '(nil))
 	(dolist (protocol '(:http/1.0 :http/1.1))
 	  (multiple-value-bind (body code headers)
 	      (x-do-http-request (format nil "~a~a" prefix-local (car pair))
@@ -1141,6 +1145,52 @@
 	(x-do-http-request (format nil "~a/redir-inf" prefix-local))
       (declare (ignore body headers))
       (test 302 (and :fifth code)))
+    
+    
+    
+    ;; test that keepalive works
+    (multiple-value-bind (body code1 headers uri socket)
+	(x-do-http-request (format nil "~a/redir-target" prefix-local))
+      (declare (ignore body headers uri))
+      (test 200 code1)
+      (test nil (and "no-keepalive" socket)))
+    
+    (multiple-value-bind (body code2 headers uri socket)
+	(x-do-http-request (format nil "~a/redir-target" prefix-local)
+			   :keep-alive t)
+      (declare (ignore body headers uri))
+      (test 200 code2)
+      (test t (and "with no-keepalive" (not (null socket))))
+      
+      ; now reuse it
+      (multiple-value-bind (body code3 headers uri socket2)
+	  (x-do-http-request (format nil "~a/redir-target" prefix-local)
+			     :keep-alive t
+			     :connection socket)
+	(declare (ignore body headers uri))
+	(test 200 code3)
+	(if* (and (not *x-ssl*)
+		  (not *x-proxy*))
+	   then ; reuse should happen
+		(test socket (and "reuse socket" socket2))
+		(format t "~%~%pause ~d seconds ....~%" 
+			(+ net.aserve::*read-request-timeout* 10))
+		(force-output)
+		(sleep (+ net.aserve::*read-request-timeout* 10))
+		
+		; now the server should have shut down the
+		; socket so reuse will not happen
+		(multiple-value-bind (body code4 headers uri socket3)
+		    (x-do-http-request (format nil "~a/redir-target" prefix-local)
+				       :connection socket2)
+		  (declare (ignore body headers uri))
+		  (test 200 code4)
+		  (test t (and "not reuse socket" (not (eq socket2 socket3))))
+		  
+		  
+		  ))))
+    
+      
     ))
   
   
@@ -1788,7 +1838,7 @@
     (do-http-request (format nil "http://localhost:~a/"
                              (socket:local-port
                               (wserver-socket server)))
-      :external-format (crlf-base-ef :utf8) :keep-alive t :timeout 3)
+      :external-format (crlf-base-ef :utf8) :keep-alive nil :timeout 3)
     (shutdown :server server)))
 
 (defun test-http-copy-file (port)
@@ -1821,7 +1871,9 @@
 			     (- (get-internal-real-time) before)))
 		   (format t "comparing ~a~%" temp-file-name)
 		   (test t (excl::compare-files reference-file temp-file-name))
-		   (delete-file temp-file-name)))
+		   (delete-file temp-file-name)
+		   (format  t "~%compare finished~%")
+		   ))
 	      (doit :progress-function #'progress)
 	      ;;*** no need to do this so many times:
 	      ;;(doit)

@@ -2115,7 +2115,7 @@
 
 (defmethod compute-strategy ((req http-request) (ent entity) format)
   ;; determine how we'll respond to this request
-  
+
   (let ((strategy nil)
 	(keep-alive-possible
 	 (and (wserver-enable-keep-alive *wserver*)
@@ -2183,8 +2183,12 @@
   (declare (ignore format))
   (let ((keep-alive (and (wserver-enable-keep-alive *wserver*)
 			 (>= (wserver-free-workers *wserver*) 2)
-			 (equalp "keep-alive" 
-				 (header-slot-value req :connection))))
+			 (if* (eq (request-protocol req) :http/1.1)
+			    then (not (header-value-member
+				       "close" (header-slot-value req :connection)))
+			    else (header-value-member
+				  "keep-alive" (header-slot-value req :connection)))
+			 ))
 	(strategy))
     
     (if*  (eq (request-method req) :get)
