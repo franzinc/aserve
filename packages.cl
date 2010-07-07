@@ -1,3 +1,9 @@
+#+(version= 8 2)
+(sys:defpatch "aserve" 1
+  "v1: version 1.2.67, implement keep-alive in allegroserve client."
+  :type :system
+  :post-loadable t)
+
 #+(version= 8 1)
 (sys:defpatch "aserve" 2
   "v1: version 1.2.56, large request body & multipart content type & more;
@@ -14,12 +20,6 @@ v2: version 1.2.46;
 v3: version 1.2.47;
 v4: version 1.2.48, handle HTTP `204 No Content';
 v5: version 1.2.50, Enhanced SSL client/server support."
-  :type :system
-  :post-loadable t)
-
-#+(version= 7 0)
-(sys:defpatch "aserve" 2
-  "v2: version 1.2.45."
   :type :system
   :post-loadable t)
 
