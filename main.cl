@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 2 67))
+(defparameter *aserve-version* '(1 2 68))
 
 (eval-when (eval load)
     (require :sock)
@@ -1742,9 +1742,7 @@ by keyword symbols and not by strings"
 			  
 		     else	; no content length given
 			  
-			  (if* (equalp "keep-alive" 
-				       (header-slot-value req
-							  :connection))
+			  (if* (keep-alive-specified req)
 			     then ; must be no body
 				  ""
 			     else ; read until the end of file

@@ -1496,7 +1496,7 @@
 			  ;; the lastmod value we just calculated shows
 			  ;; that the file hasn't changed since the browser
 			  ;; last grabbed it.
-			
+                          
 			  (setf (request-reply-content-length req) size)
 			  (setf (reply-header-slot-value req :last-modified)
 			    (last-modified-string ent))
@@ -2111,6 +2111,12 @@
 		      )))))
 
     
+(defun keep-alive-specified (req)
+  (if* (eq (request-protocol req) :http/1.1)
+     then (not (header-value-member
+                "close" (header-slot-value req :connection)))
+     else (header-value-member
+           "keep-alive" (header-slot-value req :connection))))
 
 
 (defmethod compute-strategy ((req http-request) (ent entity) format)
@@ -2120,11 +2126,7 @@
 	(keep-alive-possible
 	 (and (wserver-enable-keep-alive *wserver*)
 	      (>= (wserver-free-workers *wserver*) 2)
-              (if* (eq (request-protocol req) :http/1.1)
-		 then (not (header-value-member
-			    "close" (header-slot-value req :connection)))
-		 else (header-value-member
-		       "keep-alive" (header-slot-value req :connection))))))
+              (keep-alive-specified req))))
 
     (if* (eq (request-method req) :head)
        then ; head commands are particularly easy to reply to
@@ -2183,12 +2185,7 @@
   (declare (ignore format))
   (let ((keep-alive (and (wserver-enable-keep-alive *wserver*)
 			 (>= (wserver-free-workers *wserver*) 2)
-			 (if* (eq (request-protocol req) :http/1.1)
-			    then (not (header-value-member
-				       "close" (header-slot-value req :connection)))
-			    else (header-value-member
-				  "keep-alive" (header-slot-value req :connection)))
-			 ))
+			 (keep-alive-specified req)))
 	(strategy))
     
     (if*  (eq (request-method req) :get)
