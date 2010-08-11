@@ -1,6 +1,7 @@
 #+(version= 8 2)
-(sys:defpatch "aserve" 1
-  "v1: version 1.2.67, implement keep-alive in allegroserve client."
+(sys:defpatch "aserve" 2
+  "v1: version 1.2.67, implement keep-alive in allegroserve client;
+v2: 1.2.68, obey keep-alive requests for PUT and POST requests."
   :type :system
   :post-loadable t)
 
