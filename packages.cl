@@ -172,6 +172,7 @@ v5: version 1.2.50, Enhanced SSL client/server support."
    #:wserver-response-timeout
    #:wserver-socket
    #:wserver-vhosts
+   #:log-for-wserver
 
    #:*aserve-version*
    #:*default-aserve-external-format*

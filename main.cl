@@ -1439,10 +1439,6 @@ by keyword symbols and not by strings"
              (ignore-errors
                (with-timeout-local (*read-request-timeout* 
                                     (debug-format :info "request timed out on read~%")
-                                    ; this is too common to log, it happens with
-                                    ; every keep alive socket when the user stops
-                                    ; clicking
-			            ;;(log-timed-out-request-read sock)
                                     (return-from process-connection nil))
                  (read-http-request sock chars-seen))))
 	  
@@ -1451,11 +1447,12 @@ by keyword symbols and not by strings"
 		  ; (logmess "eof when reading request")
 		  ; end this connection by closing socket
 		  (if* error-obj
-		     then (brief-logmess 
+		     then (logmess 
 			   (format nil "While reading http request~:_ from ~a:~:_ ~a" 
 				   (socket:ipaddr-to-dotted 
 				    (socket::remote-host sock))
-				   error-obj)))
+				   error-obj)
+                           :brief))
 
 		  ; notify the client if it's still listening
 		  (if* (car chars-seen)

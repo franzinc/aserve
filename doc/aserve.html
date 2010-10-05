@@ -113,6 +113,8 @@ Access Files</a><font face="Courier New"><br>
  href="#f-ensure-stream-lock">ensure-stream-lock</a></font><br>
 &nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-map-entities"><font
  face="Courier New">map-entities</font></a><br>
+&nbsp;&nbsp;&nbsp;&nbsp; <a href="#f-log-for-wserver"><font
+ face="Courier New">log-for-wserver</font></a><br>
 <a href="#asaservice">Running AllegroServe as a Service on Windows NT</a><br>
 <a href="#international-chars-aserve">Using International Characters in
 AllegroServe</a><br>
@@ -3332,6 +3334,19 @@ will remove the entity&nbsp; passed to the <strong>function</strong>
 if
 the <strong>function</strong>
 returns the keyword symbol <strong>:remove</strong> as its value.</p>
+<p>&nbsp;</p>
+<p><a name="f-log-for-wserver"></a><font face="Courier New"><strong>(log-for-wserver
+wserver message format)</strong></font></p>
+<p>This is a method that is called by AllegroServe whenever it wants
+to log something. The <code>wserver</code> argument can be specialized
+on for your own server class, in order to make log messages go to your
+own log stream, formatted using your own logging conventions.
+<code>message</code> will always be a string, and <code>format</code>
+can be one of <code>:long</code> or <code>:brief</code>, which
+AllegroServe itself uses to distinguish between messages that get a
+full date timestamp, and those that get only a time. Your custom
+method can choose to ignore this if it doesn't support multiple levels
+of verbosity.</p>
 <p>&nbsp;</p>
 <hr>
 <h2><a name="asaservice"></a>Running AllegroServe as a Service on

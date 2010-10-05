@@ -39,28 +39,30 @@
 
 (defvar *save-commands* nil) ; if true then a stream to which to write commands
 
-(defmethod logmess (message)
+(defun logmess (message &optional (format :long))
+  (log-for-wserver *wserver* message format))
+
+(defmethod log-for-wserver ((wserver wserver) message format)
   ;; send log message to the default vhost's error stream 
-  (logmess-stream message (vhost-error-stream
-			   (wserver-default-vhost
-			    *wserver*))))
+  (logmess-stream message (vhost-error-stream (wserver-default-vhost wserver)) format))
 
-
-
-(defmethod logmess-stream (message stream)
+(defmethod logmess-stream (message stream &optional (format :long))
   ;; send the log message to the given stream which should be a
   ;; stream object and not a stream indicator (like t)
   ;; If the stream has a lock use that.
   (multiple-value-bind (csec cmin chour cday cmonth cyear)
       (decode-universal-time (get-universal-time))
     (let* ((*print-pretty* nil)
-	   (str (format
-		 nil
-		 "~a: ~2,'0d/~2,'0d/~2,'0d - ~2,'0d:~2,'0d:~2,'0d - ~a~%"
-		 (mp:process-name sys:*current-process*)
-		 cmonth cday (mod cyear 100)
-		 chour cmin csec
-		 message))
+	   (str (ecase format
+                  (:long
+                   (format
+                    nil "~a: ~2,'0d/~2,'0d/~2,'0d - ~2,'0d:~2,'0d:~2,'0d - ~a~%"
+                    (mp:process-name sys:*current-process*)
+                    cmonth cday (mod cyear 100) chour cmin csec
+                    message))
+                  (:brief
+                   (format nil "~2,'0d:~2,'0d:~2,'0d - ~a~%" chour cmin csec
+                           message))))
 	   (lock (getf (excl::stream-property-list stream) :lock)))
       (if* lock
 	 then (mp:with-process-lock (lock)
@@ -69,38 +71,6 @@
 			(finish-output stream)))
 	 else (write-sequence str stream)
 	      (finish-output stream)))))
-
-(defmethod brief-logmess (message)
-  ;; omit process name and month, day, year
-  (multiple-value-bind (csec cmin chour)
-      (decode-universal-time (get-universal-time))
-    (let* ((*print-pretty* nil)
-	   (stream (vhost-error-stream
-		    (wserver-default-vhost
-		     *wserver*)))
-	   (str (format nil
-			"~2,'0d:~2,'0d:~2,'0d - ~a~%"
-			chour cmin csec
-			message))
-	   (lock (getf (excl::stream-property-list stream) :lock)))
-      (if* lock
-	 then (mp:with-process-lock (lock)
-		(setq stream (vhost-error-stream
-			      (wserver-default-vhost
-			       *wserver*)))
-		(write-sequence str stream)
-		(finish-output stream))
-	 else (write-sequence str stream)
-	      (finish-output stream)))))
-
-
-
-
-
-(defun log-timed-out-request-read (socket)
-  (logmess (format nil "No request read from address ~a" 
-		   (socket::ipaddr-to-dotted (socket::remote-host socket)))))
-
 
 
 (defmethod log-request ((req http-request))
@@ -170,7 +140,7 @@
 (defun log-proxy (uri level action extra)
   ;; log information from the proxy module
   ;;
-  (brief-logmess 
+  (logmess 
    (format nil "~a ~d ~a ~a~@[ ~s~]"
 	   (or (getf (mp:process-property-list mp:*current-process*)
 		     'short-name)
@@ -180,10 +150,8 @@
 	   (if* (stringp uri) 
 	      then uri 
 	      else (net.uri:render-uri uri nil))
-	   extra))
-  (force-output (vhost-error-stream
-		 (wserver-default-vhost
-		  *wserver*))))
+	   extra)
+   :brief))
 
     
   
