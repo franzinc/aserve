@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 2 69))
+(defparameter *aserve-version* '(1 2 70))
 
 (eval-when (eval load)
     (require :sock)
@@ -1466,6 +1466,10 @@ by keyword symbols and not by strings"
 		  (setq *worker-request* req) 
 		  
 		  (setf (request-request-date req) (get-universal-time))
+		  (if* (equal (header-slot-value req :expect) "100-continue")
+		     then (format sock "~a 100 Continue~a~a"
+		                  (request-protocol-string req) *crlf* *crlf*)
+		          (force-output sock))
 		  (handle-request req)
 		  (setf (request-reply-date req) (get-universal-time))
 		  
