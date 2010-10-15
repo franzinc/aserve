@@ -35,8 +35,6 @@
 (defparameter *aserve-other-files*
     ;; other files that make up the aserve dist
     '("README.md"
-      "ChangeLog"
-      "htmlgen/ChangeLog"
       "license-lgpl.txt"
       "license-allegroserve.txt"
       "examples/examples.cl"
