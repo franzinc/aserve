@@ -2,7 +2,8 @@
 (sys:defpatch "aserve" 3
   "v1: version 1.2.67, implement keep-alive in allegroserve client;
 v2: 1.2.68, obey keep-alive requests for PUT and POST requests;
-v3: 1.2.69, make logging though method specialized on wserver class."
+v3: 1.2.69, make logging though method specialized on wserver class;
+v4: 1.2.70: add support for Expect: 100-continue requests."
   :type :system
   :post-loadable t)
 
