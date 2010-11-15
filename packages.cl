@@ -50,9 +50,6 @@ v5: version 1.2.50, Enhanced SSL client/server support."
 ;; http://www.gnu.org/copyleft/lesser.txt (until superseded by a newer
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
-;;
-;;
-;; $Id: packages.cl,v 1.22 2009/02/24 19:04:17 layer Exp $
 
 ;; Description:
 ;;   packages and exports for AllegroServe
@@ -68,6 +65,7 @@ v5: version 1.2.50, Enhanced SSL client/server support."
 (in-package :user)
 
 (eval-when (compile load eval)
+  (require :autozoom)
   (require :uri)
   #-(and allegro (version>= 6))
   (require :streamc))
