@@ -29,7 +29,7 @@
       "client"
       "proxy"
       "cgi"
-      "playback"
+      #+include-playback "playback"   ;;; not part of production release
       ))
 
 (defparameter *aserve-other-files*

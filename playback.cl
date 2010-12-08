@@ -33,6 +33,11 @@
 ;;- http://www.franz.com/~jkf/coding_standards.html
 ;;-
 
+;; 2010-12-08 mm: This file is not included in the build script for the 
+;;   production release.  
+;; The code in playback-form assumes only one thread will be calling it
+;;   at any instant. Use by several threads will require adding some locks.
+
 (in-package :net.aserve)
 
 (defvar *last-responses* nil)
