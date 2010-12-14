@@ -204,6 +204,15 @@
 
 (defun header-keywordify (name)
   ;; convert name to keyword.. check cache first
+
+  ;; mm 2010-12: This code is not SMP-safe but little is lost thereby.
+  ;;    The way this is coded, some kw conversions might get lost and
+  ;;    thus need to be repeated, if a push gets overwritten.
+  ;;    There may be duplicates in the alist if two threads try to add
+  ;;    the same kw at the same time.
+  ;;    But adding a lock seems like overkill.  
+  ;;    Even the cache may be of dubious value (intern may be faster than assoc).
+
   (or (cdr (assoc name *headername-to-kwd* :test #'equal))
       (let ((kwd (intern (if* (eq *current-case-mode* :case-insensitive-upper)
 			    then (string-upcase name)

@@ -1141,8 +1141,8 @@ cached connection = ~s~%" cond cached-connection))
     (start-proxy-cache-processes server pcache)))
 
 
-(defun start-proxy-cache-processes (server pcache)
-  (let ((name (format nil "~d-cache-cleaner" (incf *thread-index*))))
+(defun start-proxy-cache-processes (server pcache &aux (thx (atomic-incf *thread-index*)))
+  (let ((name (format nil "~d-cache-cleaner" thx)))
     (setf (pcache-cleaner pcache)
       (mp:process-run-function 
        name
@@ -1160,7 +1160,7 @@ cached connection = ~s~%" cond cached-connection))
        server))
     (setf (getf (mp:process-property-list (pcache-cleaner pcache))
 		'short-name)
-      (format nil "c~d" *thread-index*))
+      (format nil "c~d" thx))
     )
   
   (publish :path "/cache-stats"

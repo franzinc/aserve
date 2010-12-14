@@ -2524,7 +2524,7 @@
 		   then (format-dif :xmit
 				    hsock "Connection: Keep-Alive~aKeep-Alive: timeout=~d~a"
 				    *crlf*
-				    *read-request-timeout*
+				    (wserver-read-request-timeout *wserver*)
 				    *crlf*)
 		   else (format-dif :xmit hsock "Connection: Close~a" *crlf*))
 

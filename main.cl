@@ -186,7 +186,7 @@
 
 
 ;; more specials
-(defvar *max-socket-fd* nil) ; set this to 0 to enable tracking and logging of
+(defvar-mp *max-socket-fd* nil) ; set this to 0 to enable tracking and logging of
                              ; the maximum fd returned by accept-connection
 (defvar *aserve-debug-stream* nil) ; stream to which to seen debug messages
 (defvar *debug-connection-reset-by-peer* nil) ; true to signal these too
@@ -394,6 +394,22 @@
     :initform nil
     :initarg :ssl
     :accessor wserver-ssl)
+
+   ;; The following 3 used to be global variables, but logically they need to
+   ;; be specific to each server instance.
+   (debug-connection-reset-by-peer
+    :initarg :debug-connection-reset-by-peer
+    :initform *debug-connection-reset-by-peer*
+    :accessor wserver-debug-connection-reset-by-peer)
+   (read-request-timeout
+    :initarg :read-request-timeout
+    :initform *read-request-timeout*
+    :accessor wserver-read-request-timeout)
+   (read-request-body-timeout
+    :initarg :read-request-body-timeout
+    :initform *read-request-body-timeout*
+    :accessor wserver-read-request-body-timeout)
+
    ))
 
 
@@ -900,7 +916,7 @@ by keyword symbols and not by strings"
 (defvar *crlf* (make-array 2 :element-type 'character :initial-contents
 			   '(#\return #\linefeed)))
 
-(defvar *thread-index*  0)      ; globalcounter to gen process names
+(defvar-mp *thread-index*  0)      ; globalcounter to gen process names
 
 
 				    
@@ -1189,7 +1205,7 @@ by keyword symbols and not by strings"
   ; create accept thread
   (setf (wserver-accept-thread *wserver*)
     (mp:process-run-function 
-     (list :name (format nil "aserve-accept-~d" (incf *thread-index*))
+     (list :name (format nil "aserve-accept-~d" (atomic-incf *thread-index*))
 	   :initial-bindings
 	   `((*wserver*  . ',*wserver*)
 	     #+ignore (*debug-io* . ',(wserver-terminal-io *wserver*))
@@ -1199,8 +1215,9 @@ by keyword symbols and not by strings"
 ;; make-worker-thread wasn't thread-safe before smp. I'm assuming that's
 ;; ok, which it will be if only one thread ever calls it, and leaving it
 ;; non-thread-safe in the smp version. 
-(defun make-worker-thread ()
-  (let* ((name (format nil "~d-aserve-worker" (incf *thread-index*)))
+;; mm 2010-12: this assumption is false if several servers are running.
+(defun make-worker-thread (&aux (thx (atomic-incf *thread-index*)))
+  (let* ((name (format nil "~d-aserve-worker" thx))
 	 (proc (mp:make-process :name name
 				:initial-bindings
 				`((*wserver*  . ',*wserver*)
@@ -1212,7 +1229,7 @@ by keyword symbols and not by strings"
     (push proc (wserver-worker-threads *wserver*))
     (incf-free-workers *wserver* 1)
     (setf (getf (mp:process-property-list proc) 'short-name) 
-      (format nil "w~d" *thread-index*))
+      (format nil "w~d" thx))
     ))
 
 
@@ -1290,7 +1307,7 @@ by keyword symbols and not by strings"
 		    ((stream-error 
 		      #'(lambda (c)
 			  (if* (and 
-				(not *debug-connection-reset-by-peer*)
+				(not (wserver-debug-connection-reset-by-peer *wserver*))
 				(connection-reset-error c))
 			     then (throw 'out-of-connection nil)))))
 		  (process-connection sock)))))
@@ -1356,11 +1373,9 @@ by keyword symbols and not by strings"
 		; descriptors
                 (if* *max-socket-fd*
 		   then (let ((fd (excl::stream-input-fn sock)))
-			  (if* (> fd *max-socket-fd*)
-			       then (setq *max-socket-fd* fd)
-			       (logmess (format nil 
-						"Maximum socket file descriptor number is now ~d" fd)))))
-		
+			  (if* (atomic-setf-max *max-socket-fd* fd)
+                             then (logmess (format nil 
+                                                   "Maximum socket file descriptor number is now ~d" fd)))))
 		
 		(setq error-count 0) ; reset count
 	
@@ -1459,7 +1474,7 @@ by keyword symbols and not by strings"
 	(loop
 	   (multiple-value-setq (req error-obj)
              (ignore-errors
-               (with-timeout-local (*read-request-timeout* 
+               (with-timeout-local ((wserver-read-request-timeout *wserver*)
                                     (debug-format :info "request timed out on read~%")
                                     (return-from process-connection nil))
                  (read-http-request sock chars-seen))))
@@ -1709,7 +1724,7 @@ by keyword symbols and not by strings"
 				   (read-sequence-with-timeout 
 				    ret length 
 				    (request-socket req)
-				    *read-request-body-timeout*))
+				    (wserver-read-request-body-timeout *wserver*)))
 	    
 			    ; netscape (at least) is buggy in that 
 			    ; it sends a crlf after
@@ -1740,7 +1755,7 @@ by keyword symbols and not by strings"
 						 :input-chunking t)
 			  
 			  (with-timeout-local
-			      (*read-request-body-timeout* nil)
+			      ((wserver-read-request-body-timeout *wserver*) nil)
 			    (let ((ans (make-array 
 					2048 
 					:element-type 'character
@@ -1772,7 +1787,7 @@ by keyword symbols and not by strings"
 				  ""
 			     else ; read until the end of file
 				  (with-timeout-local
-				      (*read-request-body-timeout* 
+				      ((wserver-read-request-body-timeout *wserver*) 
 				       nil)
 				    (let ((ans (make-array 
 						2048 
