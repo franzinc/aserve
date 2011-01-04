@@ -1142,7 +1142,10 @@ cached connection = ~s~%" cond cached-connection))
 
 
 (defun start-proxy-cache-processes (server pcache &aux (thx (atomic-incf *thread-index*)))
-  (let ((name (format nil "~d-cache-cleaner" thx)))
+  (let ((name (format nil "~d-~A~Acache-cleaner" 
+		      thx
+		      (if *log-wserver-name* (wserver-name server) "")
+		      (if *log-wserver-name* "-" ""))))
     (setf (pcache-cleaner pcache)
       (mp:process-run-function 
        name

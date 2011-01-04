@@ -227,6 +227,9 @@
 
 (defvar *not-modified-entity*) ; used to send back not-modified message
 
+(defvar-mp *thread-index*  0)      ; globalcounter to gen process names
+
+(defvar *log-wserver-name* nil)
 	
 ;;;;;;;;;;;;;  end special vars
 
@@ -394,6 +397,11 @@
     :initform nil
     :initarg :ssl
     :accessor wserver-ssl)
+
+   (name
+    :initform (format nil "w~d" (atomic-incf *thread-index*))
+    :initarg :name
+    :reader wserver-name)
 
    ;; The following 3 used to be global variables, but logically they need to
    ;; be specific to each server instance.
@@ -916,7 +924,6 @@ by keyword symbols and not by strings"
 (defvar *crlf* (make-array 2 :element-type 'character :initial-contents
 			   '(#\return #\linefeed)))
 
-(defvar-mp *thread-index*  0)      ; globalcounter to gen process names
 
 
 				    
@@ -1205,7 +1212,9 @@ by keyword symbols and not by strings"
   ; create accept thread
   (setf (wserver-accept-thread *wserver*)
     (mp:process-run-function 
-     (list :name (format nil "aserve-accept-~d" (atomic-incf *thread-index*))
+     (list :name (format nil "~A-accept-~d"
+			 (if *log-wserver-name* (wserver-name *wserver*) "aserve")
+			 (atomic-incf *thread-index*))
 	   :initial-bindings
 	   `((*wserver*  . ',*wserver*)
 	     #+ignore (*debug-io* . ',(wserver-terminal-io *wserver*))
@@ -1217,7 +1226,9 @@ by keyword symbols and not by strings"
 ;; non-thread-safe in the smp version. 
 ;; mm 2010-12: this assumption is false if several servers are running.
 (defun make-worker-thread (&aux (thx (atomic-incf *thread-index*)))
-  (let* ((name (format nil "~d-aserve-worker" thx))
+  (let* ((name (format nil "~d-~A-worker" 
+		       thx
+		       (if *log-wserver-name* (wserver-name *wserver*) "aserve")))
 	 (proc (mp:make-process :name name
 				:initial-bindings
 				`((*wserver*  . ',*wserver*)
