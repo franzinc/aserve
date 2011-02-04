@@ -1473,7 +1473,8 @@ by keyword symbols and not by strings"
 		  (setq *worker-request* req) 
 		  
 		  (setf (request-request-date req) (get-universal-time))
-		  (if* (equal (header-slot-value req :expect) "100-continue")
+		  (if* (let ((cont (header-slot-value req :expect)))
+                         (and cont (match-re "\\b100-continue\\b" cont :case-fold t)))
 		     then (format sock "~a 100 Continue~a~a"
 		                  (request-protocol-string req) *crlf* *crlf*)
 		          (force-output sock))
