@@ -193,7 +193,7 @@
 	     (sm-websessions sm))
   
     (dolist (websession toreap)
-      (format t " flush session ~s~%" (websession-key websession))
+      (debug-format :info " flush session ~s~%" (websession-key websession))
       (force-output)
       (remhash (websession-key websession) (sm-websessions sm)))))
 
