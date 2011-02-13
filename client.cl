@@ -198,9 +198,9 @@
 (let ((bufsize 16384))
   (defun buffered-read-body (stream format)
     (flet ((buffer (size)
-             (if (eq format :text)
-                 (make-string size)
-                 (make-array size :element-type '(unsigned-byte 8)))))
+             (if* (eq format :text)
+		then (make-string size)
+		else (make-array size :element-type '(unsigned-byte 8)))))
       (let ((accum ()) (size 0) buffer read done)
         (loop (setf buffer (buffer bufsize)
                     read (handler-bind
@@ -209,15 +209,16 @@
                                  (declare (ignore e))
                                  (setf done t))))
                            (read-sequence buffer stream :partial-fill t)))
-              (push (cons buffer read) accum)
-              (incf size read)
-              (when (or (zerop read) done) (return)))
+	  (push (cons buffer read) accum)
+	  (incf size read)
+	  (if* (or (zerop read) done) then (return)))
         (setf accum (nreverse accum))
         (let* ((bigbuf (buffer size))
                (pos 0))
-          (loop :for (sub . size) :in accum
-                :do (replace bigbuf sub :start1 pos :end2 size)
-                :do (incf pos size))
+	  (dolist (acc accum)
+	    (destructuring-bind (sub . size) acc
+	      (replace bigbuf sub :start1 pos :end2 size)
+	      (incf pos size)))
           bigbuf)))))
 
 (defun read-response-body (creq &key (format :text))
@@ -228,11 +229,11 @@
      elseif (integerp left)
        then (let ((buffer (make-array left :element-type '(unsigned-byte 8))))
               (read-sequence buffer (client-request-socket creq))
-              (if (eq format :text)
-                  (octets-to-string buffer :external-format
-                                    (stream-external-format
-                                     (client-request-socket creq)))
-                  buffer))
+              (if* (eq format :text)
+		 then (octets-to-string buffer :external-format
+					(stream-external-format
+					 (client-request-socket creq)))
+		 else buffer))
      elseif (member left '(:chunked :unknown))
        then (buffered-read-body (client-request-socket creq) format)
      elseif (eq left :eof)
@@ -1086,39 +1087,39 @@ or \"foo.com:8000\", not ~s" proxy))
 	    (if* (zerop bytes-left)
 	       then 0  ; eof
              elseif (stringp buffer)
-               ;; We know the amount of bytes left, not characters left
+		    ;; We know the amount of bytes left, not characters left
                then (let ((pos start)
                           (dummy-str (make-string 1))
                           (ch (read-char socket)))
-                      ;; This is a bit of a hack -- ACL doesn't seem to expose a
-                      ;; sane interface for determining the amount of bytes a
-                      ;; character requires in a given encoding.
+		      ;; This is a bit of a hack -- ACL doesn't seem to expose a
+		      ;; sane interface for determining the amount of bytes a
+		      ;; character requires in a given encoding.
                       (flet ((char-size (ch)
                                (setf (char dummy-str 0) ch)
                                (native-string-sizeof dummy-str)))
                         (loop
-                         (setf (aref buffer pos) ch)
-                         (incf pos)
-                         (when (or (<= (decf bytes-left (char-size ch)) 0)
+			  (setf (aref buffer pos) ch)
+			  (incf pos)
+			  (if* (or (<= (decf bytes-left (char-size ch)) 0)
                                    (= pos end)
                                    (null (setf ch (read-char-no-hang socket nil))))
-                           (setf (client-request-bytes-left creq) bytes-left)
-                           (return pos)))))
-               ;; just a normal read-sequence
+			     then (setf (client-request-bytes-left creq) bytes-left)
+				  (return pos)))))
+		    ;; just a normal read-sequence
 	       else (let ((ans (net.aserve::rational-read-sequence buffer 
-						       socket :start start
-					      :end (+ start 
-						      (min (- end start) 
-							   bytes-left)))))
+								   socket :start start
+								   :end (+ start 
+									   (min (- end start) 
+										bytes-left)))))
 		      (if* (eq ans start)
 			 then 0  ; eof
 			 else (net.aserve::if-debug-action :xmit
-					       (write-sequence 
-						buffer 
-						net.aserve::*debug-stream*
-						:start start
-						:end
-						ans))
+							   (write-sequence 
+							    buffer 
+							    net.aserve::*debug-stream*
+							    :start start
+							    :end
+							    ans))
 			      (setf (client-request-bytes-left creq)
 				(- bytes-left (- ans start)))
 			      ans)))

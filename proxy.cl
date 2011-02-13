@@ -1959,56 +1959,56 @@ cached connection = ~s~%" cond cached-connection))
   (let ((error-flag nil))
     (if* (eq fromq toq)
        then ;; just shifting it to the head of the queue it's in
-	  (if* (null fromq)
-	    then (setq error-flag :noqueue)
-	   elseif (eq (pcache-ent-state pcache-ent) :dead) ; debugging 
-	     then (setq error-flag :dead)
-	     else (with-mp-locked-pcache-queue (fromq)
-		    (let* ((prev (pcache-ent-prev pcache-ent))
-			   (next (pcache-ent-next pcache-ent))
-			   (mru-head (queueobj-mru toq))
-			   (mru (pcache-ent-next mru-head)))
-		      ;; unlink and relink, or report error
-		      (if* (or (null prev) (null next))
-			 then (setq error-flag :unlinked)
-			 else (setf (pcache-ent-next prev) next
-				    (pcache-ent-prev next) prev
-				    (pcache-ent-next mru-head) pcache-ent
-				    (pcache-ent-prev pcache-ent) mru-head
-				    (pcache-ent-next pcache-ent) mru
-				    (pcache-ent-prev mru) pcache-ent)))))
+	    (if* (null fromq)
+	       then (setq error-flag :noqueue)
+	     elseif (eq (pcache-ent-state pcache-ent) :dead) ; debugging 
+	       then (setq error-flag :dead)
+	       else (with-mp-locked-pcache-queue (fromq)
+		      (let* ((prev (pcache-ent-prev pcache-ent))
+			     (next (pcache-ent-next pcache-ent))
+			     (mru-head (queueobj-mru toq))
+			     (mru (pcache-ent-next mru-head)))
+			;; unlink and relink, or report error
+			(if* (or (null prev) (null next))
+			   then (setq error-flag :unlinked)
+			   else (setf (pcache-ent-next prev) next
+				      (pcache-ent-prev next) prev
+				      (pcache-ent-next mru-head) pcache-ent
+				      (pcache-ent-prev pcache-ent) mru-head
+				      (pcache-ent-next pcache-ent) mru
+				      (pcache-ent-prev mru) pcache-ent)))))
        else ;; toq != fromq; we're changing one or more queue counts
-	    (when fromq
-	      ;; it's leaving the queue fromq
-	      (with-mp-locked-pcache-queue (fromq)
-		(let ((prev (pcache-ent-prev pcache-ent))
-		      (next (pcache-ent-next pcache-ent)))
-		  ;; unlink
-		  (if* (or (null prev) (null next))
-		     then (setq error-flag :unlinked)
-		     else (setf (pcache-ent-next prev) next
-				(pcache-ent-prev next) prev)
-			  (decf (queueobj-items fromq))
-			  (decf (queueobj-bytes fromq)
-				(pcache-ent-data-length pcache-ent))
-			  (decf (queueobj-blocks fromq)
-				(pcache-ent-blocks pcache-ent))))))
-	    (when (and (null error-flag) toq)
-	      ;; link into the toq, at the mru position
-	      (if* (eq (pcache-ent-state pcache-ent) :dead)
-		 then (setq error-flag :dead)
-		 else (with-mp-locked-pcache-queue (toq)
-			(let* ((mru-head (queueobj-mru toq))
-			       (mru (pcache-ent-next mru-head)))
-			  (setf (pcache-ent-next mru-head) pcache-ent
-				(pcache-ent-prev pcache-ent) mru-head
-				(pcache-ent-next pcache-ent) mru
-				(pcache-ent-prev mru) pcache-ent))
-			(incf (queueobj-items toq))
-			(incf (queueobj-bytes toq) 
-			      (pcache-ent-data-length pcache-ent))
-			(incf (queueobj-blocks toq)
-			      (pcache-ent-blocks pcache-ent)))))
+	    (if* fromq
+	       then ;; it's leaving the queue fromq
+		    (with-mp-locked-pcache-queue (fromq)
+		      (let ((prev (pcache-ent-prev pcache-ent))
+			    (next (pcache-ent-next pcache-ent)))
+			;; unlink
+			(if* (or (null prev) (null next))
+			   then (setq error-flag :unlinked)
+			   else (setf (pcache-ent-next prev) next
+				      (pcache-ent-prev next) prev)
+				(decf (queueobj-items fromq))
+				(decf (queueobj-bytes fromq)
+				      (pcache-ent-data-length pcache-ent))
+				(decf (queueobj-blocks fromq)
+				      (pcache-ent-blocks pcache-ent))))))
+	    (if* (and (null error-flag) toq)
+	       then ;; link into the toq, at the mru position
+		    (if* (eq (pcache-ent-state pcache-ent) :dead)
+		       then (setq error-flag :dead)
+		       else (with-mp-locked-pcache-queue (toq)
+			      (let* ((mru-head (queueobj-mru toq))
+				     (mru (pcache-ent-next mru-head)))
+				(setf (pcache-ent-next mru-head) pcache-ent
+				      (pcache-ent-prev pcache-ent) mru-head
+				      (pcache-ent-next pcache-ent) mru
+				      (pcache-ent-prev mru) pcache-ent))
+			      (incf (queueobj-items toq))
+			      (incf (queueobj-bytes toq) 
+				    (pcache-ent-data-length pcache-ent))
+			      (incf (queueobj-blocks toq)
+				    (pcache-ent-blocks pcache-ent)))))
 	    (if* (null error-flag)
 	       then (setf (pcache-ent-queueobj pcache-ent) toq)))
     ;; we've either made changes or set error-flag non-nil
@@ -2315,14 +2315,14 @@ cached connection = ~s~%" cond cached-connection))
     (smp-case
      (nil
       (atomically-fast
-	(setf ent (pcache-dead-ent pcache)
-	      (pcache-dead-ent pcache) nil)))
+       (setf ent (pcache-dead-ent pcache)
+	     (pcache-dead-ent pcache) nil)))
      ((t :macros)
       (loop
 	(setq ent (pcache-dead-ent pcache))
 	(excl::fast
-	 (when (atomic-conditional-setf (pcache-dead-ent pcache) nil ent)
-	   (return))))))
+	 (if* (atomic-conditional-setf (pcache-dead-ent pcache) nil ent)
+	    then (return))))))
     
     ; now we have an exclusive link to the dead entries
     ; which we can free at our leisure
@@ -2340,8 +2340,8 @@ cached connection = ~s~%" cond cached-connection))
       (smp-case
        (nil
 	(atomically-fast
-	  (decf (the fixnum (pcache-dead-items pcache)) 
-		(the fixnum count))))
+	 (decf (the fixnum (pcache-dead-items pcache)) 
+	       (the fixnum count))))
        ((t :macros)
 	(excl::fast
 	 (decf-atomic (the fixnum (pcache-dead-items pcache)) 

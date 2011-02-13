@@ -1332,12 +1332,12 @@ by keyword symbols and not by strings"
 		
 		; another useful test to see if we're losing file
 		; descriptors
-                (when *max-socket-fd*
-                  (let ((fd (excl::stream-input-fn sock)))
-                    (if* (> fd *max-socket-fd*)
-                         then (setq *max-socket-fd* fd)
-                              (logmess (format nil 
-                                               "Maximum socket file descriptor number is now ~d" fd)))))
+                (if* *max-socket-fd*
+		   then (let ((fd (excl::stream-input-fn sock)))
+			  (if* (> fd *max-socket-fd*)
+			       then (setq *max-socket-fd* fd)
+			       (logmess (format nil 
+						"Maximum socket file descriptor number is now ~d" fd)))))
 		
 		
 		(setq error-count 0) ; reset count
