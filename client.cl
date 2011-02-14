@@ -253,7 +253,7 @@
 			(redirect-methods '(:get :head))
 			basic-authorization  ; (name . password)
 			digest-authorization ; digest-authorization object
-			keep-alive   ; if true, set con to keep alive
+			(keep-alive (eq method :connect))  ; if true, set con to keep alive
 			headers	    ; extra header lines, alist
 			proxy	    ; naming proxy server to access through
 			proxy-basic-authorization  ; (name . password)
@@ -379,7 +379,10 @@
 				 *response-no-content*)
 				#.(net.aserve::response-number 
 				   *response-not-modified*)
-				)))
+				))
+		   (and (eq method :connect)
+			(eq (client-request-response-code creq)
+			    #.(net.aserve::response-number *response-ok*))))
 	     then
 		  (return-from do-http-request
 		    (values 
@@ -644,30 +647,35 @@
   (let (host sock port fresh-uri scheme-default-port)
     ;; start a request 
   
-    ; parse the uri we're accessing
-    (if* (not (typep uri 'net.uri:uri))
-       then (setq uri (net.uri:parse-uri uri)
-		  fresh-uri t))
+    ;; CONNECT method requests do not require a uri
+    ;; but do require a proxy host:port.
+    (if* (eq method :connect)
+       then (unless proxy
+	      (error "A proxy argument must be supplied when making a connect request."))
+       else ; parse the uri we're accessing
+	    (if* (not (typep uri 'net.uri:uri))
+	       then (setq uri (net.uri:parse-uri uri)
+			  fresh-uri t))
     
-    ; make sure it's an http uri
-    (case (or (net.uri:uri-scheme uri) :http)
-      (:http nil)
-      (:https (setq ssl t))
-      (t (error "Can only do client access of http or https uri's, not ~s" uri)))
+	    ; make sure it's an http uri
+	    (case (or (net.uri:uri-scheme uri) :http)
+	      (:http nil)
+	      (:https (setq ssl t))
+	      (t (error "Can only do client access of http or https uri's, not ~s" uri)))
   
-    ; make sure that there's a host
-    (if* (null (setq host (net.uri:uri-host uri)))
-       then (error "need a host in the client request: ~s" uri))
+	    ; make sure that there's a host
+	    (if* (null (setq host (net.uri:uri-host uri)))
+	       then (error "need a host in the client request: ~s" uri))
 
-    (setq scheme-default-port
-      (case (or (net.uri:uri-scheme uri) (if* ssl 
-					    then :https
-					    else :http))
-	(:http 80)
-	(:https 443)))
+	    (setq scheme-default-port
+	      (case (or (net.uri:uri-scheme uri) (if* ssl 
+						    then :https
+						    else :http))
+		(:http 80)
+		(:https 443)))
     
-    ; default the port to what's appropriate for http or https
-    (setq port (or (net.uri:uri-port uri) scheme-default-port))
+	    ; default the port to what's appropriate for http or https
+	    (setq port (or (net.uri:uri-port uri) scheme-default-port)))
     
     (if* proxy
        then ; sent request through a proxy server
@@ -765,9 +773,12 @@ or \"foo.com:8000\", not ~s" proxy))
     
     (net.aserve::format-dif :xmit sock "~a ~a ~a~a"
 			    (string-upcase (string method))
-			    (if* proxy
-			       then (net.uri:render-uri uri nil)
-			       else (uri-path-etc uri))
+			    (if* (eq method :connect)
+			       then ;; deliver 'uri' untouched
+				    uri
+			       else (if* proxy
+				       then (net.uri:render-uri uri nil)
+				       else (uri-path-etc uri)))
 			    (string-upcase (string protocol))
 			    crlf)
     
