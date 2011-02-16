@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 2 71))
+(defparameter *aserve-version* '(1 2 72))
 
 (eval-when (eval load)
     (require :sock)
@@ -244,7 +244,7 @@
     :accessor wserver-enable-keep-alive)
      
    (enable-chunking  ;; do chunking if it's possible
-    :initform t
+    :initform nil
     :initarg :enable-chunking
     :accessor wserver-enable-chunking)
      
@@ -737,7 +737,7 @@ by keyword symbols and not by strings"
    
    (socket ;; the socket we're communicating through
     :initarg :socket
-    :reader request-socket)
+    :accessor request-socket)
    
    (wserver ;; wserver object for web server this request came to
     :initarg :wserver
@@ -960,7 +960,6 @@ by keyword symbols and not by strings"
 			 :certificate-password ssl-password)
 		))
 	    
-	  (setq chunking nil) ; doesn't work well through ssl
 	  (if* (not port-p)
 	     then ; ssl defaults to port 443
 		  (setq port 443)))
@@ -1692,7 +1691,7 @@ by keyword symbols and not by strings"
 			    ; the body.  We have to eat that crlf.
 			    ; We could check
 			    ; which browser is calling us but it's 
-			    ; not clear what
+				    ; not clear what
 			    ; is the set of buggy browsers 
 			    (let ((ch (read-char-no-hang
 				       (request-socket req)

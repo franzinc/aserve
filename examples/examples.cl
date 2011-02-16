@@ -59,6 +59,7 @@
 	     ;(print (net.aserve::compute-request-headers req))
 	     (with-http-response (req ent)
 	       (with-http-body (req ent)
+		 (format t "html stream is ~s~%" net.aserve::*html-stream*)
 		 (html
 		  (:head (:title "Welcome to AllegroServe"))
 		  (:body (:center ((:img :src "aservelogo.gif")))

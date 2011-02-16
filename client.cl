@@ -234,7 +234,12 @@
 					(stream-external-format
 					 (client-request-socket creq)))
 		 else buffer))
-     elseif (member left '(:chunked :unknown))
+     elseif (eq left :chunked)
+       then (buffered-read-body 
+	     (make-instance 'net.aserve::unchunking-stream 
+	       :input-handle (client-request-socket creq))
+	     format)
+     elseif (eq left :unknown)
        then (buffered-read-body (client-request-socket creq) format)
      elseif (eq left :eof)
        then (error "Body already read."))))
@@ -651,8 +656,8 @@
     ;; CONNECT method requests do not require a uri
     ;; but do require a proxy host:port.
     (if* (eq method :connect)
-       then (unless proxy
-	      (error "A proxy argument must be supplied when making a connect request."))
+       then (if* (not proxy)
+	       then (error "A proxy argument must be supplied when making a connect request."))
        else ; parse the uri we're accessing
 	    (if* (not (typep uri 'net.uri:uri))
 	       then (setq uri (net.uri:parse-uri uri)
@@ -1048,6 +1053,7 @@ or \"foo.com:8000\", not ~s" proxy))
 				     creq :transfer-encoding))
 	     then ; data will come back in chunked style
 		  (setf (client-request-bytes-left creq) :chunked)
+		  #+ignore
 		  (socket:socket-control (client-request-socket creq)
 					 :input-chunking t)
 	   elseif (setq val (client-response-header-value

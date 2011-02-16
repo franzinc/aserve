@@ -29,6 +29,7 @@
       "client"
       "proxy"
       "cgi"
+      "chunker"
       #+include-playback "playback"   ;;; not part of production release
       ))
 

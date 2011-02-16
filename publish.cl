@@ -2236,6 +2236,7 @@
 		 else (eq time :pre))
 	      )
 	     (sos-ef) ; string output stream external format
+	     (ssl-p (wserver-ssl *wserver*))
 	     )
       
       
@@ -2340,7 +2341,15 @@
       
 	(if* (and send-headers chunked-p (eq time :pre))
 	   then (force-output sock)
-		(socket:socket-control sock :output-chunking t))
+		(if* ssl-p
+		   then ; do chunking
+			(setq sock
+			  (make-instance 'chunking-stream 
+			    :output-handle sock))
+			(setf (request-reply-stream req) sock)
+			
+		   else (socket:socket-control sock :output-chunking t)))
+		
       
       
 	; if we did post-headers then there's a string input
@@ -2350,12 +2359,17 @@
       
 	;; if we're chunking then shut that off
 	(if* (and chunked-p (eq time :post))
-	   then (socket:socket-control sock :output-chunking-eof t)
-		; in acl5.0.1 the output chunking eof didn't send 
-		; the final crlf, so we do it here
-		#+(and allegro (not (version>= 6)))
-		(write-sequence *crlf* sock)
-		)
+	   then 
+		(if* ssl-p
+		   then (force-output (request-reply-stream req))
+			(close (request-reply-stream req)) ; send chunking eof
+			(force-output (inner-stream (request-reply-stream req)))
+		   else (socket:socket-control sock :output-chunking-eof t)
+			; in acl5.0.1 the output chunking eof didn't send 
+			; the final crlf, so we do it here
+			#+(and allegro (not (version>= 6)))
+			(write-sequence *crlf* sock)
+			))
 	))))
 
       	
