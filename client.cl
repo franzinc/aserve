@@ -95,6 +95,13 @@
     :initarg :return-connection
     :accessor client-request-return-connection
     :initform nil)
+   
+   (content-encoding
+    ;; if the content is itself encoded then it is one of
+    ;; :gzip :deflate (but we don't support deflate yet)
+    :initarg :content-encoding
+    :initform nil
+    :accessor client-request-content-encoding)
    ))
 
 
@@ -222,7 +229,28 @@
           bigbuf)))))
 
 (defun read-response-body (creq &key (format :text))
-  (let ((left (client-request-bytes-left creq)))
+  (let ((left (client-request-bytes-left creq))
+	(socket (client-request-socket creq)))
+    
+    
+    
+    ; the data is coming in chunked then unchunk it
+    (if* (eq :chunked (client-request-bytes-left creq))
+       then (setq socket
+	      (make-instance 'net.aserve::unchunking-stream
+		:input-handle socket)))
+    
+    
+    
+    ; if data is content-encoded, then decode
+    (if* (client-request-content-encoding creq)
+       then (setq socket
+	      (make-instance 'net.aserve::inflate-stream
+		:input-handle socket
+		:skip-gzip-header t
+		:content-length (and (integerp left) left)))
+	    (setq left :unknown))
+    
     (setf (client-request-bytes-left creq) :eof)
     (if* (null left)
        then nil
@@ -233,23 +261,26 @@
 		 then (octets-to-string buffer :external-format
 					(stream-external-format
 					 (client-request-socket creq)))
-		 else buffer))
-     elseif (eq left :chunked)
-       then (buffered-read-body 
-	     (make-instance 'net.aserve::unchunking-stream 
-	       :input-handle (client-request-socket creq))
-	     format)
-     elseif (eq left :unknown)
-       then (buffered-read-body (client-request-socket creq) format)
+		 else buffer)
+	      
+	       
+	      )
+     elseif (member left '(:chunked :unknown))
+       then (prog1 (buffered-read-body socket format)
+	      
+	      )
      elseif (eq left :eof)
        then (error "Body already read."))))
 
+      
+    
 (defun do-http-request (uri 
 			&rest args
 			&key 
 			(method  :get)
 			(protocol  :http/1.1)
 			(accept "*/*")
+			compress   ; say we'll willing to accept compressed response
 			content
 			content-type
 			query
@@ -288,6 +319,7 @@
 	       :method method
 	       :protocol protocol
 	       :accept  accept
+	       :compress compress
 	       :content content
 	       :content-type content-type
 	       :query query
@@ -608,6 +640,7 @@
 				 cookies  ; nil or a cookie-jar
 				 basic-authorization
 				 digest-authorization
+				 compress
 				 content
 				 content-length 
 				 content-type
@@ -814,7 +847,11 @@ or \"foo.com:8000\", not ~s" proxy))
        then (net.aserve::format-dif :xmit
 				    sock "Accept: ~a~a" accept crlf))
 
-    
+
+    (if* compress
+       then (net.aserve::format-dif :xmit
+				    sock "Accept-Encoding: gzip~a"  crlf))
+      
     ; some webservers (including AServe) have trouble with put/post
     ; requests without a body
     (if* (and (not content) (member method '(:put :post)))
@@ -1045,6 +1082,11 @@ or \"foo.com:8000\", not ~s" proxy))
 				     jar
 				     cc)))))
 	  
+	  
+	  (setf (client-request-content-encoding creq)
+	    (cdr (assoc (client-response-header-value creq :content-encoding) 
+			'(("gzip" . :gzip)  ("deflate" . :deflate))
+			:test #'equalp)))
 	  
 	  (if* (eq :head (client-request-method creq))
 	     then  ; no data is returned for a head request

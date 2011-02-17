@@ -68,11 +68,21 @@ v5: version 1.2.50, Enhanced SSL client/server support."
   (require :autozoom)
   (require :uri)
   #-(and allegro (version>= 6))
-  (require :streamc))
+  (require :streamc)
+  (require :inflate))
 
+(eval-when (compile load eval)
+  (handler-case
+      (require :deflate)
+    (error (c)
+      c
+      (warn "deflate module could not be loaded, server compression disabled"))))
+
+
+		     
 
 (defpackage :net.aserve
-  (:use :common-lisp :excl :net.html.generator :net.uri)
+  (:use :common-lisp :excl :net.html.generator :net.uri :util.zip)
   (:export
    #:authorize
    #:authorizer

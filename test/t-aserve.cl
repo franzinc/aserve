@@ -54,6 +54,7 @@
 (defvar user::*do-aserve-test* t)
 (defvar *x-proxy* nil) ; when true x-do-http-request will go through a proxy
 (defvar *x-ssl*   nil) ; true when we want to do ssl client calls
+(defvar *x-compress* nil) ; true when compressing
 (defvar *proxy-wserver* nil)
 
 ; if true run timeout test
@@ -82,24 +83,36 @@
 	   (port (start-aserve-running)))
       (format t "server started on port ~d~%" port)
       (unwind-protect 
-	  (flet ((do-tests ()
-		   (test-publish-file port)
-		   (test-publish-directory port)
-		   (test-publish-computed port)
-		   (test-publish-multi port)
-		   (test-publish-prefix port)
-		   (test-authorization port)
-		   (test-encoding)
-		   (test-forms port)
-		   (test-client port)
-		   (test-cgi port)
-		   (test-http-copy-file port)
-                   (test-client-unicode-content-length)
-		   (if* (member :ics *features*)
-		      then (test-international port)
-			   (test-spr27296))
-		   (if* test-timeouts 
-		      then (test-timeouts port))))
+	  (labels ((do-tests ()
+		     ; run test with and with compression
+		     ; accepted by do-http-request
+		     (dolist (cv (if* (member :zlib-deflate *features*)
+				    then '(nil t)
+				    else '(nil)))
+		       (let ((*x-compress* cv))
+			 (format t "~2%Compress ~s~2%" cv)
+			 (do-tests-inner))))
+		   
+		   (do-tests-inner ()
+		     (test-publish-file port)
+		     (test-publish-directory port)
+		     (test-publish-computed port)
+		     (test-publish-multi port)
+		     (test-publish-prefix port)
+		     (test-authorization port)
+		     (test-encoding)
+		     (test-forms port)
+		     (test-client port)
+		     (test-cgi port)
+		     (test-http-copy-file port)
+		     (test-client-unicode-content-length)
+		     (if* (member :ics *features*)
+			then (test-international port)
+			     (test-spr27296))
+		     (if* test-timeouts 
+			then (test-timeouts port)))
+		 
+		   )
 	    (format t "~%~%===== test direct ~%~%")
 	    (do-tests)
 	    
@@ -183,7 +196,9 @@
 
 (defun x-do-http-request (uri &rest args)
   ;; add a proxy arg
-  (apply #'do-http-request uri :proxy *x-proxy* :ssl *x-ssl* args))
+  (apply #'do-http-request uri :proxy *x-proxy* 
+	 :compress *x-compress*
+	 :ssl *x-ssl* args))
 
 
 
@@ -1114,6 +1129,7 @@
 			       "redir-inf")
 			     (with-http-body (req ent)))))
     
+
   
     ; first test target
     (multiple-value-bind (body code headers)
@@ -1154,12 +1170,15 @@
       (declare (ignore body headers uri))
       (test 200 code1)
       (test nil (and "no-keepalive" socket)))
-    
+
+      
     (multiple-value-bind (body code2 headers uri socket)
 	(x-do-http-request (format nil "~a/redir-target" prefix-local)
 			   :keep-alive t)
       (declare (ignore body headers uri))
       (test 200 code2)
+      
+      
       (test t (and "with no-keepalive" (not (null socket))))
       
       ; now reuse it
@@ -1790,9 +1809,15 @@
 		     (string-to-octets (subseq result (1+ begin) end)
 				       :external-format :octets)
 		     :external-format :koi8-r))))
+      
+      
+      
       (test t (not (null begin)))  ; verify we found begin 
       (test t (not (null end)))    ; and end markers
-      (test Privyet! test-string :test #'string=))))
+      (test Privyet! test-string :test #'string=)
+      
+      
+      )))
 
 
 

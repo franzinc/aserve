@@ -47,7 +47,7 @@
     (setf (slot-value p 'excl::output-handle) output-handle)
     
     (install-single-channel-character-strategy
-     p (find-external-format (or (getf options :external-format) :octets))
+     p (stream-external-format output-handle)
      nil)
     
     (add-stream-instance-flags p :output :simple)
@@ -63,7 +63,9 @@
 
 (defmethod print-object ((stream chunking-stream) s)
   (print-unreadable-object (stream s :identity *print-escape* :type t)
-    (format s "~s buffered" (slot-value stream  'excl::buffpos))))
+    (format s "ef ~s, to ~s " 
+	    (excl::ef-name (stream-external-format stream))
+	    (slot-value stream 'excl::output-handle))))
 
 (defmethod device-write ((p chunking-stream) buffer start end blocking)
   (declare (ignore blocking))
@@ -101,8 +103,9 @@
     (force-output inner-stream)
     p))
 
-(defmethod inner-stream ((p chunking-stream))
-  (slot-value p 'excl::output-handle))
+(without-package-locks
+(defmethod excl::inner-stream ((p chunking-stream))
+  (slot-value p 'excl::output-handle)))
 
 
 ;;; un chunking
@@ -129,8 +132,9 @@
     (setf (slot-value p 'excl::output-handle) nil)
     
     (install-single-channel-character-strategy
-     p (find-external-format (or (getf options :external-format) :octets))
-     nil)
+     p (stream-external-format input-handle) nil)
+    
+    (setf (stream-external-format p) (stream-external-format input-handle))
     
     (add-stream-instance-flags p :input :simple)
     
@@ -147,7 +151,9 @@
 
 (defmethod print-object ((stream unchunking-stream) s)
   (print-unreadable-object (stream s :identity *print-escape* :type t)
-    (format s "" )))
+    (format s "ef ~s, from ~s " 
+	    (excl::ef-name (stream-external-format stream))
+	    (slot-value stream 'excl::input-handle))))
 
 (defmethod device-read ((p unchunking-stream) buffer start end blocking)
 
@@ -161,7 +167,7 @@
 	  (ins (slot-value p 'excl::input-handle)))
       (case state
 	(:eof
-	 (return-from device-read start))
+	 (return-from device-read -1))
 	(:need-count 
 	 (let ((count 0)
 	       (seen nil))
@@ -209,7 +215,7 @@
 		 
 		   ; return signal of eof
 		   (setf (unchunking-state p) :eof)
-		   (return-from device-read start)
+		   (return-from device-read -1)
 	      else ; now ready to ready data
 		   (setf (unchunking-state p) :read-data
 			 (unchunking-count p) count)
@@ -245,9 +251,19 @@
   
   p)
 
-(defmethod inner-stream ((p unchunking-stream))
-  (slot-value p 'excl::input-handle))
+(without-package-locks
+(defmethod excl::inner-stream ((p unchunking-stream))
+  (slot-value p 'excl::input-handle)))
 
+(without-package-locks
+ 
+(defmethod excl::record-stream-advance-to-eof ((p unchunking-stream))
+   ;; if the stream is composed of records ending in a pseudo eof
+   ;; then read up to an eof
+   (loop 
+     ;; advance to eof
+     (if* (null (read-byte p nil nil)) then (return)))
+   p))
 
 
 	 

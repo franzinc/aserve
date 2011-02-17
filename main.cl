@@ -247,7 +247,12 @@
     :initform nil
     :initarg :enable-chunking
     :accessor wserver-enable-chunking)
-     
+
+   (enable-compression  ;; do compression if it's possible
+    :initform (member :zlib-deflate *features*)
+    :initarg :enable-compression
+    :accessor wserver-enable-compression)
+   
    (locators
     ;; list of locators objects in search order
     :initform (list (make-instance 'locator-exact
@@ -807,6 +812,7 @@ by keyword symbols and not by strings"
    
    (reply-stream   ;; stream to which to send response
     :initform nil
+    :initarg :reply-stream
     :accessor request-reply-stream)
    
    (reply-content-length
@@ -913,6 +919,7 @@ by keyword symbols and not by strings"
 		   os-processes	 ; to fork and run multiple instances
 		   (external-format nil efp); to set external format
 		   backlog
+		   (compress (and (member :zlib-deflate *features*) t))
 		   )
   ;; -exported-
   ;;
@@ -932,7 +939,8 @@ by keyword symbols and not by strings"
 	       else debug-stream)))
   
   (if* (eq server :new)
-     then (setq server (make-instance 'wserver)))
+     then (setq server (make-instance 'wserver
+			 :enable-compression compress)))
 
   (if* efp then (setf (wserver-external-format server) external-format))
 	  
@@ -1569,6 +1577,7 @@ by keyword symbols and not by strings"
 					   (:http/1.1 "HTTP/1.1")
 					   (:http/0.9 "HTTP/0.9"))
 			:socket sock
+			:reply-stream sock  ; default
 			:wserver *wserver*
 			:raw-request raw-cmd
 			))

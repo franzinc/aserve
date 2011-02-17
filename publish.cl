@@ -100,6 +100,14 @@
    (headers  :initarg :headers
 	     :initform nil
 	     :accessor entity-headers)
+
+   ; if true then aserve is permitted (but not required) to
+   ; send this entity back compressed.  There is also a 
+   ; global compress switch in the wserver object that must be true
+   ; in order for compression to be done
+   (compress :initarg :compress
+	     :initform t
+	     :accessor entity-compress)
    
    ; extra holds random info we need for a particular entity
    (extra    :initarg :extra  :reader entity-extra)
@@ -680,6 +688,7 @@
 		     plist
 		     hook
 		     headers
+		     (compress t)
 		     )
   ;; publish the given url
   ;; if file is given then it specifies a file to return
@@ -710,6 +719,7 @@
 			 :timeout timeout
 			 :hook hook
 			 :headers headers
+			 :compress compress
 			 )))
 	      (publish-entity ent locator path hval)))))
 
@@ -723,6 +733,7 @@
 			    timeout
 			    plist
 			    headers
+			    (compress t)
 			    )
   ;; publish a handler for all urls with a certain prefix
   ;; 
@@ -752,6 +763,7 @@
 			 :plist plist
 			 :timeout timeout
 			 :headers headers
+			 :compress compress
 			 )))
 	      (publish-prefix-entity ent prefix locator  hval
 				     host-p nil)
@@ -772,6 +784,7 @@
 				   #-io-timeout nil)
 			  hook
 			  headers
+			  (compress t)
 			  )
 			  
   ;; return the given file as the value of the url
@@ -830,6 +843,7 @@
 			    :plist plist
 			    :hook hook
 			    :headers headers
+			    :compress compress
 			    ))))
        else (setq ent (make-instance (or class 'file-entity)
 			:host hval 
@@ -843,6 +857,7 @@
 			:plist plist
 			:hook hook
 			:headers headers
+			:compress compress
 			)))
 
     (publish-entity ent locator path hval)))
@@ -870,6 +885,7 @@
 			       plist
 			       hook
 			       headers
+			       (compress t)
 			       )
   
   ;; make a whole directory available
@@ -901,6 +917,7 @@
 	       :plist plist
 	       :hook hook
 	       :headers headers
+	       :compress compress
 	       )))
     
     (publish-prefix-entity ent prefix locator host host-p nil)
@@ -992,7 +1009,9 @@
 			   timeout
 			   plist
 			   hook
-			   headers)
+			   headers
+			  (compress t)
+			   )
   
   (if* (null locator)
      then (setq locator (find-locator :exact server)))
@@ -1049,6 +1068,7 @@
 		:timeout timeout
 		:hook hook
 		:headers headers
+		:compress compress
 		)))
     (publish-entity ent locator path hval)))
 
@@ -1708,6 +1728,7 @@
 		  :plist (list :parent ent) ; who spawned us
 		  :hook (entity-hook ent)
 		  :headers (entity-headers ent)
+		  :compress (entity-compress ent)
 		  )))
       
 
@@ -2119,6 +2140,21 @@
            "keep-alive" (header-slot-value req :connection))))
 
 
+(defun compute-accepted-encodings (req)
+  ;; return a list of accepted encodings as strings removing
+  ;; encoding parameters (such as q)
+  (let ((str (header-slot-value req :accept-encoding)))
+    (if* (stringp str)
+       then (mapcar #'(lambda (param)
+			(if* (and (consp param)
+				  (eq :param (car param)))
+			   then (cadr param)
+			 elseif (stringp param)
+			   then param))
+		    (parse-header-value str)))))
+    
+	    
+    
 (defmethod compute-strategy ((req http-request) (ent entity) format)
   ;; determine how we'll respond to this request
 
@@ -2126,7 +2162,15 @@
 	(keep-alive-possible
 	 (and (wserver-enable-keep-alive *wserver*)
 	      (>= (wserver-free-workers *wserver*) 2)
-              (keep-alive-specified req))))
+              (keep-alive-specified req)))
+	(compression-possible
+	 (and (wserver-enable-compression *wserver*)
+	      (entity-compress ent)
+	      (let ((encs (compute-accepted-encodings req)))
+		(if* (member "gzip" encs :test #'equalp)
+		   then :gzip
+		 elseif (member "deflate" encs :test #'equalp)
+		   then :deflate)))))
 
     (if* (eq (request-method req) :head)
        then ; head commands are particularly easy to reply to
@@ -2170,6 +2214,18 @@
 	       else ; keep alive not requested
 		    (setq strategy '(:use-socket-stream
 				     ))))
+
+    (if* (and compression-possible
+	      (member :use-socket-stream strategy :test #'eq)
+	      (not (member :omit-body strategy :test #'eq))
+	      ; if the content length is given then that
+	      ; is pre-compression so it will be wrong if
+	      ; we send compressed data
+	      (null (content-length ent)) 
+	      )
+       then (push compression-possible strategy) ; must follow :compress
+	    (push :compress strategy)
+	    )
     
     ;;  save it
 
@@ -2223,12 +2279,16 @@
 			  (throw 'with-http-response nil))
     (with-standard-io-syntax
       (let* ((sock (request-socket req))
+	     (reply-stream (request-reply-stream req))
 	     (strategy (request-reply-strategy req))
 	     (extra-headers (request-reply-headers req))
 	     (post-headers (member :post-headers strategy :test #'eq))
 	     (content)
 	     (*print-readably* nil) ; set by w-s-io-syntax and not desired
 	     (chunked-p (member :chunked strategy :test #'eq))
+	     (compress (let ((ent (member :compress strategy :test #'eq)))
+			 (cadr ent) ; will be :gzip or :deflate or nil
+			 ))
 	     (code (request-reply-code req))
 	     (send-headers
 	      (if* post-headers
@@ -2236,10 +2296,11 @@
 		 else (eq time :pre))
 	      )
 	     (sos-ef) ; string output stream external format
-	     (ssl-p (wserver-ssl *wserver*))
+	     ;(ssl-p (wserver-ssl *wserver*))
 	     )
       
-      
+
+	
       
 	(if* send-headers
 	   then (format-dif :xmit sock "~a ~d  ~a~a"
@@ -2303,7 +2364,13 @@
 		   then (format-dif :xmit
 				    sock "Transfer-Encoding: chunked~a"
 				    *crlf*))
-	      
+
+		(if* compress
+		   then (format-dif :xmit
+				    sock "Content-Encoding: ~a~a"
+				    compress
+				    *crlf*))
+			
 		(if* (and (not chunked-p)
 			  (request-reply-content-length req))
 		   then (format-dif :xmit sock "Content-Length: ~d~a"
@@ -2341,35 +2408,52 @@
       
 	(if* (and send-headers chunked-p (eq time :pre))
 	   then (force-output sock)
-		(if* ssl-p
-		   then ; do chunking
-			(setq sock
-			  (make-instance 'chunking-stream 
-			    :output-handle sock))
-			(setf (request-reply-stream req) sock)
+		; do chunking
+		(setq reply-stream
+		  (make-instance 'chunking-stream 
+		    :output-handle reply-stream))
+		(setf (request-reply-stream req) 
+		  reply-stream))
 			
-		   else (socket:socket-control sock :output-chunking t)))
 		
       
+
+	(if* (and send-headers compress (eq time :pre))
+	   then (setq reply-stream
+		  (setf (request-reply-stream req)
+		    (make-instance 'deflate-stream
+		      :target reply-stream
+		      :compress compress
+		      ))))
+		
+		
       
 	; if we did post-headers then there's a string input
 	; stream to dump out.
 	(if* content
 	   then (write-sequence content sock))
-      
+
+	(if* (and  compress (eq time :post))
+	   then (force-output reply-stream)
+		
+		(close reply-stream)  ; close deflate stream
+		
+		(setq reply-stream
+		  (setf (request-reply-stream req) (excl::inner-stream reply-stream)))
+		(force-output reply-stream))
+				      
 	;; if we're chunking then shut that off
 	(if* (and chunked-p (eq time :post))
-	   then 
-		(if* ssl-p
-		   then (force-output (request-reply-stream req))
-			(close (request-reply-stream req)) ; send chunking eof
-			(force-output (inner-stream (request-reply-stream req)))
-		   else (socket:socket-control sock :output-chunking-eof t)
-			; in acl5.0.1 the output chunking eof didn't send 
-			; the final crlf, so we do it here
-			#+(and allegro (not (version>= 6)))
-			(write-sequence *crlf* sock)
-			))
+	   then ; unwrap the chunked stream
+		
+		(force-output reply-stream)
+		(close reply-stream) ; send chunking eof
+		(setq reply-stream
+		  (setf (request-reply-stream req) (excl::inner-stream reply-stream)))
+		(force-output reply-stream))
+	
+	
+	
 	))))
 
       	
