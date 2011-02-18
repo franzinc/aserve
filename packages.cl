@@ -71,15 +71,14 @@ v5: version 1.2.50, Enhanced SSL client/server support."
   (require :streamc)
   (require :inflate))
 
+sys::
 (eval-when (compile load eval)
-  (handler-case
-      (require :deflate)
+  (defvar *user-warned-about-deflate* nil)
+  (handler-case (require :deflate)
     (error (c)
-      c
-      (warn "deflate module could not be loaded, server compression disabled"))))
-
-
-		     
+      (when (null *user-warned-about-deflate*)
+	(format t "~&NOTE: ~a~%" c)
+	(setq *user-warned-about-deflate* t)))))
 
 (defpackage :net.aserve
   (:use :common-lisp :excl :net.html.generator :net.uri :util.zip)
