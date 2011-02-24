@@ -94,7 +94,10 @@
 			 (do-tests-inner))))
 		   
 		   (do-tests-inner ()
-		     (test-publish-file port)
+		     (test-publish-file port nil) ; no compression
+		     #+unix
+		     (test-publish-file port t) ; with compression
+		     
 		     (test-publish-directory port)
 		     (test-publish-computed port)
 		     (test-publish-multi port)
@@ -215,7 +218,7 @@
 (defvar *dummy-file-value* nil)
 (defvar *dummy-file-name*  "aservetest.xx")
 
-(defun build-dummy-file (length line-length name)
+(defun build-dummy-file (length line-length name compress)
   ;; write a dummy file named  name  (if name isn't nil)
   ;; of a given   length   with spaces every line-length characters
   ;; Return the string holding the contents of the file.
@@ -232,11 +235,22 @@
        then (with-open-file (p name :direction :output
 			     :if-exists :supersede)
 	      (write-sequence result p)))
+    (if* compress
+       then
+	    #+unix(run-shell-command (format nil "gzip -c ~a > ~a.gz"
+					     name name))
+	    nil
+       else #+unix(ignore-errors
+		   ;; get rid of the compressed file if it exists
+		   (delete-file (format nil "~a.gz" name)))
+	    nil)
+	    
+	    
     
     result))
   
 
-(defun test-publish-file (port)
+(defun test-publish-file (port compress)
   (let (dummy-1-contents 
 	(dummy-1-name "xxaservetest.txt")
 	dummy-2-contents
@@ -248,7 +262,8 @@
 	(reps 0)
 	(got-reps nil))
     
-    (setq dummy-1-contents (build-dummy-file 8055 70 dummy-1-name))
+    (setq dummy-1-contents (build-dummy-file 8055 70 dummy-1-name
+					     compress))
 
     
     ;; basic publish file test
@@ -265,6 +280,7 @@
 				       (setq got-reps (or got-reps 0))
 				       (incf got-reps))
 			     :headers '((:testhead . "testval"))
+			     :compress compress
 			     )))
       (test nil (net.aserve::contents ent)) ; nothing cached yet
 
@@ -297,12 +313,15 @@
 	      (test dummy-1-contents body :test #'equal)))))
       
       ;; stuff should be cached by now
-      (test t (not (null (net.aserve::contents ent))))
+      ;; but when doing a compressed retrieval caching isn't done
+      (if* (not compress)
+	 then (test t (not (null (net.aserve::contents ent)))))
       )
 
     (test reps got-reps)  ; verify hook function worked
 
-    (setq dummy-2-contents (build-dummy-file 8055 65 dummy-2-name))
+    (setq dummy-2-contents (build-dummy-file 8055 65 dummy-2-name
+					     compress))
 
     
     ;; preload publish file test
@@ -339,8 +358,8 @@
 		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
 	    (test "testval"
-		    (cdr (assoc "testhead" headers :test #'equal))
-		    :test #'equal)
+		  (cdr (assoc "testhead" headers :test #'equal))
+		  :test #'equal)
 	    #+ignore (if* (eq protocol :http/1.1)
 			then (test "chunked"
 				   (cdr (assoc :transfer-encoding headers 
@@ -359,12 +378,13 @@
 	    (test "text/plain"
 		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
-	    (test (subseq dummy-2-contents 100 401)
-		  body :test #'equal)
+	    (if* (not compress)
+	       then (test (subseq dummy-2-contents 100 401)
+			  body :test #'equal)
 	    
-	    (test "bytes 100-400/8178"
-		  (cdr (assoc :content-range headers :test #'eq))
-		  :test #'equal)
+		    (test "bytes 100-400/8178"
+			  (cdr (assoc :content-range headers :test #'eq))
+			  :test #'equal))
 	    
 	    )
 	  )))
@@ -450,7 +470,8 @@
     
     
 
-    (setq dummy-1-contents (build-dummy-file 432 23 dummy-1-name))
+    (setq dummy-1-contents (build-dummy-file 432 23 dummy-1-name
+					     compress))
     
     ; test caching and auto uncaching and recaching
     (let ((ent (publish-file :path "/check-uncache"
@@ -458,7 +479,8 @@
 			     :cache-p t)))
 
       ; verify nothing cached right now
-      (test nil (and :second (net.aserve::contents ent)))
+      (if* (not compress)
+	 then (test nil (and :second (net.aserve::contents ent))))
       
       (let ((body2 (x-do-http-request (format nil "~a/check-uncache" 
 					      prefix-local))))
@@ -467,11 +489,13 @@
 	(test dummy-1-contents body2 :test #'equal)
 
 	; verify that something's cached.
-	(test t (not (null (and :second (net.aserve::contents ent)))))
+	(if* (not compress)
+	   then (test t (not (null (and :second (net.aserve::contents ent))))))
 
 	; overwrite dummy file with new contents
 	(sleep 2) ; pause to get file write date to noticably advance
-	(setq dummy-1-contents (build-dummy-file 555 44 dummy-1-name))
+	(setq dummy-1-contents (build-dummy-file 555 44 dummy-1-name
+						 compress))
 	
 	; verify that the contents are in fact different
 	(test nil (equal dummy-1-contents body2))
@@ -499,12 +523,12 @@
 
 (defun test-publish-computed (port)
   ;; test publishing computed entities
-  (let ((dummy-1-content (build-dummy-file 0 50 nil))
-	(dummy-2-content (build-dummy-file 1 50 nil))
-	(dummy-3-content (build-dummy-file 100 50 nil))
-	(dummy-4-content (build-dummy-file 1000 50 nil))
-	(dummy-5-content (build-dummy-file 10000 50 nil))
-	(dummy-6-content (build-dummy-file 100000 50 nil))
+  (let ((dummy-1-content (build-dummy-file 0 50 nil nil))
+	(dummy-2-content (build-dummy-file 1 50 nil nil))
+	(dummy-3-content (build-dummy-file 100 50 nil nil))
+	(dummy-4-content (build-dummy-file 1000 50 nil nil))
+	(dummy-5-content (build-dummy-file 10000 50 nil nil))
+	(dummy-6-content (build-dummy-file 100000 50 nil nil))
 	
 	(prefix-local (format nil "http://localhost:~a" port))
 	)

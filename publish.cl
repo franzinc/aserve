@@ -1449,97 +1449,149 @@
 	    
 	    
 	 else ; the non-preloaded case
-	      (let (p range)
+	      (let (accepts compressed-file-comp)
+		(if* (and (entity-compress ent) ; look for compression
+			  (setq accepts (compute-accepted-encodings 
+					 req :as-keywords t))
+			  (setq compressed-file-comp
+			    (find-compressed-version (file ent) accepts)))
+		   then (send-file-back req 
+					ent
+					(car compressed-file-comp) ; name
+					(cdr compressed-file-comp) ; enc
+					nil	; no cache
+					)
+		   else (if* (eq :retry (send-file-back req 
+							ent
+							(file ent)
+							nil
+							t))
+			   then (go retry)))))))
+    
+  t	; we've handled it
+  )
 
-		
-		
-		
-		(setf (last-modified ent) nil) ; forget previous cached value
-	      
-		(if* (null (errorset 
-			    (setq p (open (file ent) 
-					  :direction :input
-					  #-(and allegro (version>= 6))
-					  :element-type
-					  #-(and allegro (version>= 6))
-					  '(unsigned-byte 8)))))
-		   then ; file not readable
+(defun find-compressed-version (filename accepted-encodings)
+  ; see if there is a compressed version of this file on the 
+  ; disk that's newer than the uncompressed one
+  (let ((uncompressed-stat (ignore-errors (excl.osi:stat filename))))
+    (dolist (file-type (wserver-compression-file-types *wserver*))
+      (if* (member (cdr file-type) accepted-encodings :test #'eq)
+	 then (let* ((compressed-name (util.string:string+ 
+				       filename "." (car file-type)))
+		     (compressed-stat 
+		      (ignore-errors (excl.osi:stat compressed-name))))
+		(if* compressed-stat
+		   then (if* uncompressed-stat
+			   then ; both exist
+				(if* (>= (excl.osi:stat-mtime compressed-stat)
+					 (excl.osi:stat-mtime uncompressed-stat))
+				   then ; compressed is newer, a win
+					(return-from find-compressed-version
+					  (cons compressed-name 
+						(cdr file-type) ; encoding
+						)))
+			   else ; uncompressed doesn't exist.. return
+				; compressed version
+				(return-from find-compressed-version
+				  (cons compressed-name 
+					(cdr file-type) ; encoding
+					)))))))))
 		      
-			(return-from process-entity nil))
+		  
+
+(defun send-file-back (req ent filename encoding cache-ok)
+  (let (p range)
+		
+    (setf (last-modified ent) nil) ; forget previous cached value
 	      
-		(unwind-protect 
-		    (progn
-		      (let ((size (excl::filesys-size (stream-input-fn p)))
-			    (lastmod (excl::filesys-write-date 
-				      (stream-input-fn p)))
-			    (buffer (make-array 1024 
-						:element-type '(unsigned-byte 8))))
-			(declare (dynamic-extent buffer))
+    (if* (null (errorset 
+		(setq p (open filename
+			      :direction :input
+			      #-(and allegro (version>= 6))
+			      :element-type
+			      #-(and allegro (version>= 6))
+			      '(unsigned-byte 8)))))
+       then ; file not readable
+		      
+	    (return-from send-file-back nil))
+	      
+    (unwind-protect 
+	(progn
+	  (let ((size (excl::filesys-size (stream-input-fn p)))
+		(lastmod (excl::filesys-write-date 
+			  (stream-input-fn p)))
+		(buffer (make-array 1024 
+				    :element-type '(unsigned-byte 8))))
+	    (declare (dynamic-extent buffer))
 
 			
 				
 			
-			(setf (last-modified ent) lastmod
-			      (last-modified-string ent)
-			      (universal-time-to-date lastmod))
+	    (setf (last-modified ent) lastmod
+		  (last-modified-string ent)
+		  (universal-time-to-date lastmod))
 		      
-			(if* (cache-p ent)
-			   then ; we should read and cache the contents
-				; and then do the cached thing
-				(let ((wholebuf 
-				       (make-array
-					size
-					:element-type '(unsigned-byte 8))))
-				  (read-sequence wholebuf p)
-				  (setf (contents ent) wholebuf))
-				(go retry))
+	    (if* (and cache-ok (cache-p ent))
+	       then ; we should read and cache the contents
+		    ; and then do the cached thing
+		    (let ((wholebuf 
+			   (make-array
+			    size
+			    :element-type '(unsigned-byte 8))))
+		      (read-sequence wholebuf p)
+		      (setf (contents ent) wholebuf))
+		    (return-from send-file-back :retry))
 			      
 
-			(if* (setq range (header-slot-value req :range))
-			   then (setq range (parse-range-value range))
-				(if* (not (eql (length range) 1))
-				   then ; ignore multiple ranges 
-					; since we're not
-					; prepared to send back a multipart
-					; response yet.
-					(setq range nil)))
-			(if* range
-			   then (return-from process-entity
-				  (return-file-range-response
-				   req ent range buffer p size)))
+	    (if* (setq range (header-slot-value req :range))
+	       then (setq range (parse-range-value range))
+		    (if* (not (eql (length range) 1))
+		       then ; ignore multiple ranges 
+			    ; since we're not
+			    ; prepared to send back a multipart
+			    ; response yet.
+			    (setq range nil)))
+	    (if* range
+	       then (return-from send-file-back
+		      (return-file-range-response
+		       req ent range buffer p size)))
 			      
 		      
-			(with-http-response (req ent :format :binary)
+	    (with-http-response (req ent :format :binary)
 
-			  ;; control will not reach here if the request
-			  ;; included an if-modified-since line and if
-			  ;; the lastmod value we just calculated shows
-			  ;; that the file hasn't changed since the browser
-			  ;; last grabbed it.
+	      ;; control will not reach here if the request
+	      ;; included an if-modified-since line and if
+	      ;; the lastmod value we just calculated shows
+	      ;; that the file hasn't changed since the browser
+	      ;; last grabbed it.
                           
-			  (setf (request-reply-content-length req) size)
-			  (setf (reply-header-slot-value req :last-modified)
-			    (last-modified-string ent))
+	      (setf (request-reply-content-length req) size)
+	      (setf (reply-header-slot-value req :last-modified)
+		(last-modified-string ent))
+	      
+	      (if* encoding
+		 then (setf (reply-header-slot-value req :content-encoding)
+			(string encoding)))
+	       
 			
-			  (run-entity-hook req ent nil)
+	      (run-entity-hook req ent nil)
 			
-			  (with-http-body (req ent)
-			    (loop
-			      (if* (<= size 0) then (return))
-			      (let ((got (read-sequence buffer 
-							p :end 
-							(min size 1024))))
-				(if* (<= got 0) then (return))
-				(write-sequence buffer (request-reply-stream req)
-						:end got)
-				(decf size got)))))))
+	      (with-http-body (req ent)
+		(loop
+		  (if* (<= size 0) then (return))
+		  (let ((got (read-sequence buffer 
+					    p :end 
+					    (min size 1024))))
+		    (if* (<= got 0) then (return))
+		    (write-sequence buffer (request-reply-stream req)
+				    :end got)
+		    (decf size got)))))))
 		      
 		      
 		
-		  (close p))))))
-    
-  t	; we've handled it
-  )
+      (close p))))
+  
 
 
 (defun run-entity-hook (req ent extra)
@@ -1646,6 +1698,20 @@
 	    (return-from process-entity nil))
     
     (let ((type (excl::filesys-type realname)))
+      
+      ; file may not exist but compressed version might..
+      ; if the compressed version exists then 
+      ; publish the file in hopes that the request will
+      ; ask for a compressed value
+      (and (null type)
+	   (entity-compress ent) ; compression allowed
+	   (dolist (ctype (wserver-compression-file-types *wserver*))
+	     (if* (probe-file (util.string:string+ realname "." 
+						   (car ctype)))
+		then ; compressed version exists,
+		     (setq type :file)
+		     (return))))
+       
       (if* (null type)
 	 then ; not present
 	      (return-from process-entity nil)
@@ -2122,6 +2188,8 @@
 		      ; recompute strategy based on simple 0 length
 		      ; thing to return
 		      (compute-strategy req nm-ent nil)
+		      ; if we had a stream to reply, forget it
+		      (setf (request-reply-stream req) nil)
 		      
 		      (setf (request-reply-code req) *response-not-modified*)
 		      (run-entity-hook req ent :not-modified)
@@ -2140,18 +2208,33 @@
            "keep-alive" (header-slot-value req :connection))))
 
 
-(defun compute-accepted-encodings (req)
+(defun compute-accepted-encodings (req &key as-keywords)
   ;; return a list of accepted encodings as strings removing
-  ;; encoding parameters (such as q)
+  ;; encoding parameters (such as q).
+  ;; If as-keywords is specified then return the answer
+  ;; as a list of keywords from the set that we support.
   (let ((str (header-slot-value req :accept-encoding)))
     (if* (stringp str)
-       then (mapcar #'(lambda (param)
-			(if* (and (consp param)
-				  (eq :param (car param)))
-			   then (cadr param)
-			 elseif (stringp param)
-			   then param))
-		    (parse-header-value str)))))
+       then (let ((string-ans (mapcar #'(lambda (param)
+					  (if* (and (consp param)
+						    (eq :param (car param)))
+					     then (cadr param)
+					   elseif (stringp param)
+					     then param))
+				      (parse-header-value str))))
+	      (if* as-keywords
+		 then ; convert to supported keywords
+		      (let (res)
+			(if* (member "deflate" string-ans :test #'equalp)
+			   then (push :deflate res))
+			(if* (member "gzip" string-ans :test #'equalp)
+			   then (push :gzip res))
+			res)
+		 else string-ans)))))
+
+				
+				
+		      
     
 	    
     

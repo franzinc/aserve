@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 2 72))
+(defparameter *aserve-version* '(1 3 0))
 
 (eval-when (eval load)
     (require :sock)
@@ -252,6 +252,12 @@
     :initform (member :zlib-deflate *features*)
     :initarg :enable-compression
     :accessor wserver-enable-compression)
+   
+   (compression-file-types
+    ;; list of file types and they type of compression 
+    ;; they imply
+    :initform '(("gz" . :gzip))
+    :accessor wserver-compression-file-types)
    
    (locators
     ;; list of locators objects in search order
@@ -912,6 +918,7 @@ by keyword symbols and not by strings"
 		   ssl		 ; enable ssl
 		   ssl-key       ; File containing private key. 
 		   ssl-password  ; for ssl: pswd to decode priv key
+		   (ssl-method :sslv23) ; protocols for ssl server
 		   verify
 		   ca-file
 		   ca-directory
@@ -930,7 +937,8 @@ by keyword symbols and not by strings"
 
   (declare (ignore debug))  ; for now
 
-  (declare (ignorable ssl-key verify ca-file ca-directory max-depth))
+  (declare (ignorable ssl-key verify ca-file ca-directory max-depth
+		      ssl-method))
   
   (if* debug-stream 
      then (setq *aserve-debug-stream* 
@@ -961,6 +969,7 @@ by keyword symbols and not by strings"
 			 :verify verify
 			 :ca-file ca-file
 			 :ca-directory ca-directory
+			 :method ssl-method
 			 :max-depth max-depth)
 		#-(version>= 8 0)
 		(funcall 'socket::make-ssl-server-stream socket

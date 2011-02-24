@@ -298,6 +298,7 @@
 			(external-format *default-aserve-external-format*)
 			ssl		; do an ssl connection
 			skip-body ; fcn of request object
+			ssl-method
 			timeout
 			certificate
 			key
@@ -333,6 +334,7 @@
 	       :user-agent user-agent
 	       :external-format external-format
 	       :ssl ssl
+	       :ssl-method ssl-method
 	       :timeout timeout
 	       :certificate certificate
 	       :key key
@@ -652,6 +654,7 @@
 				 (external-format 
 				  *default-aserve-external-format*)
 				 ssl
+				 ssl-method
 				 timeout
 				 certificate
 				 key
@@ -667,7 +670,7 @@
   
 
   (declare (ignorable timeout certificate key certificate-password ca-file 
-		      ca-directory verify max-depth))
+		      ca-directory verify max-depth ssl-method))
   
   
   (if* (and connection (not use-socket))
@@ -764,6 +767,7 @@ or \"foo.com:8000\", not ~s" proxy))
 			       :ca-file ca-file
 			       :ca-directory ca-directory
 			       :verify verify
+			       :method (or ssl-method :sslv23)
 			       :max-depth max-depth))
 		    #-(version>= 8 0)
 		    (setq sock
