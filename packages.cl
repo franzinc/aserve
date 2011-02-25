@@ -67,6 +67,7 @@ v5: version 1.2.50, Enhanced SSL client/server support."
 (in-package :user)
 
 (eval-when (compile load eval)
+  (require :osi)
   (require :autozoom)
   (require :uri)
   #-(and allegro (version>= 6))
