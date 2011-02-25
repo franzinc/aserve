@@ -1547,6 +1547,21 @@
 			:basic-authorization '("joe"  . "eoj")
 			)))
     
+
+    ; try multilple directories
+    (publish-directory :prefix "/multiple-test/"
+		       :destination 
+		       (list (concatenate 'string test-dir "testdir/")
+			     (concatenate 'string test-dir "testdir2/")))
+    
+    ; from the first dir
+    (test 200 (values2 (x-do-http-request 
+			(format nil "~a/multiple-test/ccc.html"
+				prefix-local))))
+    ; from the second dir
+    (test 200 (values2 (x-do-http-request 
+			(format nil "~a/multiple-test/second.txt"
+				prefix-local))))
     
     ))
 

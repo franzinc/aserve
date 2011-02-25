@@ -904,7 +904,9 @@
 	  (return-from publish-directory nil))
   
   (let ((ent (make-instance 'directory-entity 
-	       :directory destination
+	       :directory (if* (atom destination)
+			     then (list destination)
+			     else destination)
 	       :prefix prefix
 	       :host host
 	       :port port
@@ -1660,14 +1662,19 @@
 
 
 (defmethod process-entity ((req http-request) (ent directory-entity))
+  ;; try each directory in turn for a file
+  (dolist (directory (entity-directory ent) nil)
+    (if* (process-entity-single-directory req ent directory)
+       then (return t))))
+
+  
+(defun process-entity-single-directory (req ent directory)  
   ;; search for a file in the directory and then create a file
   ;; entity for it so we can track last modified.
-  
-  ; remove the prefix and tack and append to the given directory
-  
+
   (let* ((postfix nil)
 	 (realname (concatenate 'string
-		     (entity-directory ent)
+		     directory
 		     (setq postfix (subseq (request-decoded-uri-path req)
 					   (length (prefix ent))))))
 	 (redir-to)
@@ -1685,7 +1692,7 @@
 	    ; ok, it could be valid, like foo../, but that's unlikely
 	    ; Also on Windows don't allow \ since that's a directory sep
 	    ; and user should be using / in http paths for that.
-	    (return-from process-entity nil))
+	    (return-from process-entity-single-directory nil))
     
     (if* sys:*tilde-expand-namestrings*
        then (setq realname (excl::tilde-expand-unix-namestring realname)))
@@ -1695,7 +1702,7 @@
     
     (if* forbidden
        then ; give up right away.
-	    (return-from process-entity nil))
+	    (return-from process-entity-single-directory nil))
     
     (let ((type (excl::filesys-type realname)))
       
@@ -1714,7 +1721,7 @@
        
       (if* (null type)
 	 then ; not present
-	      (return-from process-entity nil)
+	      (return-from process-entity-single-directory nil)
        elseif (eq :directory type)
 	 then ; Try the indexes (index.html, index.htm, or user-defined).
 	      ; tack on a trailing slash if there isn't one already.
@@ -1724,14 +1731,14 @@
 	      (setf redir-to 
 		(dolist (index (directory-entity-indexes ent) 
 			  ; no match to index file, give up
-			  (return-from process-entity nil))
+			  (return-from process-entity-single-directory nil))
 		  (if* (eq :file (excl::filesys-type
 				  (concatenate 'string realname index)))
 		     then (return index))))
 	      
        elseif (not (eq :file type))
 	 then  ; bizarre object
-	      (return-from process-entity nil)))
+	      (return-from process-entity-single-directory nil)))
     
     (if* redir-to
        then ; redirect to an existing index file
@@ -1757,14 +1764,14 @@
 		(with-http-body (req ent))))
      elseif (and info (file-should-be-denied-p realname info))
        then ; we should ignore this file
-	    (return-from process-entity nil)
+	    (return-from process-entity-single-directory nil)
      elseif (and (directory-entity-filter ent)
 		 (funcall (directory-entity-filter ent) req ent 
 			  realname info))
        thenret ; processed by the filter
        else ;; ok realname is a file.
 	    ;; create an entity object for it, publish it, and dispatch on it
-	    (return-from process-entity
+	    (return-from process-entity-single-directory
 	      (authorize-and-process 
 	       req 
 	       (funcall 
