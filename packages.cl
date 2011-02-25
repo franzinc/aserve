@@ -1,9 +1,11 @@
 #+(version= 8 2)
-(sys:defpatch "aserve" 3
+(sys:defpatch "aserve" 5
   "v1: version 1.2.67, implement keep-alive in allegroserve client;
 v2: 1.2.68, obey keep-alive requests for PUT and POST requests;
 v3: 1.2.69, make logging though method specialized on wserver class;
-v4: 1.2.70: add support for Expect: 100-continue requests."
+v4: 1.2.70: add support for Expect: 100-continue requests;
+v5: 1.3.1: compression support, publish-directory :destination can be a
+   list of directories, and various SSL improvements."
   :type :system
   :post-loadable t)
 
