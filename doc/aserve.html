@@ -2472,7 +2472,7 @@ ssl ssl-method<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 skip-body
 timeout
-compress<br>
+compress keep-alive connection<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 certificate
 key
@@ -2494,6 +2494,11 @@ computed from the <strong>uri</strong> value passed in but if
 redirection was done then this reflects the target of the
 redirection.&nbsp; If you plan to interpret relative html links in the <strong>body</strong>
 returned then you must do so with respect to <em>this</em> uri value </li>
+  <li>If a true value for the <span style="font-weight: bold;">:keep-alive</span>
+argument was given then this will be socket connection to the server if
+the server chose to accept the keep-alive request.&nbsp; This socket
+can be used as the value of the <span style="font-weight: bold;">:connection</span>
+argument in a subsequent call to do-http-request to the same server.</li>
 </ol>
 <p>The <strong>uri</strong> can be a uri object or a
 string.&nbsp;&nbsp; The scheme of the
@@ -2684,6 +2689,27 @@ in which case an appropriate user agent string is sent.</td>
       <td width="16%">the value of <strong>*default-aserve-external-format*</strong></td>
       <td width="62%">This determines the socket stream's external
 format.</td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">keep-alive<br>
+      </td>
+      <td style="vertical-align: top;">nil<br>
+      </td>
+      <td style="vertical-align: top;">if true then the client will
+request that the server keep alive the connection.&nbsp; If the server
+agrees then that socket connection is returned as the fifth value.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">connection<br>
+      </td>
+      <td style="vertical-align: top;">nil<br>
+      </td>
+      <td style="vertical-align: top;">If non nil then this is a socket
+connected to the server for which this request is made.&nbsp; If the
+socket is not valid (likely due to the server closing its end) then a
+new socket will be created.&nbsp; Thus it is not an error.<br>
+      </td>
     </tr>
     <tr>
       <td width="22%">ssl</td>
