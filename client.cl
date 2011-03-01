@@ -67,6 +67,9 @@
    (socket  ; the socket through which we'll talk to the server
     :initarg :socket
     :accessor client-request-socket)
+   (response-stream ; the (possibly) chunking, inflating stream
+    :initform nil
+    :accessor client-request-response-stream)
    (protocol 
     ; the protocol value returned by the web server
     ; note, even if the request is for http/1.0, apache will return
@@ -228,35 +231,39 @@
 	      (incf pos size)))
           bigbuf)))))
 
+(defun get-client-request-response-stream (creq)
+  (or (client-request-response-stream creq)
+      (let ((left (client-request-bytes-left creq))
+            (socket (client-request-socket creq)))
+
+        ; the data is coming in chunked then unchunk it
+        (if* (eq :chunked left)
+           then (setq socket
+                      (make-instance 'net.aserve::unchunking-stream
+                                     :input-handle socket)))
+    
+        ; if data is content-encoded, then decode
+        (if* (client-request-content-encoding creq)
+           then (setq socket
+                      (make-instance 'net.aserve::inflate-stream
+                                     :input-handle socket
+                                     :skip-gzip-header t
+                                     :content-length (and (integerp left) left)))
+                (setf (client-request-bytes-left creq) :unknown))
+    
+        (setf (client-request-response-stream creq) socket))))
+    
 (defun read-response-body (creq &key (format :text))
-  (let ((left (client-request-bytes-left creq))
-	(socket (client-request-socket creq)))
-    
-    
-    
-    ; the data is coming in chunked then unchunk it
-    (if* (eq :chunked (client-request-bytes-left creq))
-       then (setq socket
-	      (make-instance 'net.aserve::unchunking-stream
-		:input-handle socket)))
-    
-    
-    
-    ; if data is content-encoded, then decode
-    (if* (client-request-content-encoding creq)
-       then (setq socket
-	      (make-instance 'net.aserve::inflate-stream
-		:input-handle socket
-		:skip-gzip-header t
-		:content-length (and (integerp left) left)))
-	    (setq left :unknown))
+  (let ((socket (get-client-request-response-stream creq))
+        (left (client-request-bytes-left creq)))
+	
     
     (setf (client-request-bytes-left creq) :eof)
     (if* (null left)
        then nil
      elseif (integerp left)
        then (let ((buffer (make-array left :element-type '(unsigned-byte 8))))
-              (read-sequence buffer (client-request-socket creq))
+              (read-sequence buffer socket)
               (if* (eq format :text)
 		 then (octets-to-string buffer :external-format
 					(stream-external-format
@@ -1131,8 +1138,8 @@ or \"foo.com:8000\", not ~s" proxy))
   ;;   turning on chunking if needed
   ;;   return index after last byte read.
   ;;   return 0 if eof
-  (let ((bytes-left (client-request-bytes-left creq))
-	(socket (client-request-socket creq))
+  (let ((socket (get-client-request-response-stream creq))
+        (bytes-left (client-request-bytes-left creq))
 	(last start))
     (if* (integerp bytes-left)
        then
@@ -1188,7 +1195,8 @@ or \"foo.com:8000\", not ~s" proxy))
 					 then (read-char socket nil nil)
 					 else (read-byte socket nil nil))))
 			      (if* (null ch)
-				 then (return)
+				 then (setf (client-request-bytes-left creq) :eof)
+				      (return)
 				 else (if* debug-on
 					 then (write-char
 					       (if* (characterp ch) 
@@ -1200,7 +1208,7 @@ or \"foo.com:8000\", not ~s" proxy))
 		  (cond)
 		(declare (ignore cond))
 		; remember that there is no more data left
-		(setf (client-request-bytes-left creq) :eof)
+                (setf (client-request-bytes-left creq) :eof)		
 		nil))
 	    ; we return zero on eof, regarless of the value of start
 	    ; I think that this is ok, the spec isn't completely clear
