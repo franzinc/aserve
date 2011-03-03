@@ -108,6 +108,10 @@
 			 :br
 			 ((:a :href "missing-link") "Missing Link")
 			 " should get an error when clicked"
+			 :br
+			 ((:a :href "computed-error") "Computed error")
+			 " demonstrate handlin error in response computation"
+						      
 			 
 			 :br
 			 #+unix
@@ -901,6 +905,34 @@
 		 (html "done")))))
 
 
+
+(publish :path "/computed-error"
+	 :content-type "text/plain"
+	 :function
+	 #'(lambda (req ent)
+	     ;; this will get an error after the header is geneated
+	     ;; but before the first body output is done
+	     ;; this will test the delayed header send.
+	     ;; the user should see a 500 "internal server error"
+	     (handler-case
+		 (with-http-response (req ent)
+		   (with-http-body (req ent)
+		     ; make an error
+		     (let ((a (+ 1 2 3 :bogus)))
+		       (+ a a))
+		     (html "done")))
+	       (error (c)
+		 (with-http-response (req ent 
+					  :response 
+					  *response-internal-server-error*
+					  :content-type
+					  "text/html")
+		   (with-http-body (req ent)
+		     (html (:head (:title "Internal Server Error"))
+			   (:body "As expected this entity caused error " 
+				  (:princ c)))))))))
+	       
+	       
 
 ;; cgi publishing, we publish a shell script that only works
 ;; on Unix shells:

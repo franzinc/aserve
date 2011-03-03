@@ -50,6 +50,11 @@
 	  (error "Could not find the aserve examples directory.")))
   )
 
+; to trap errors when they happen uncomment this
+;(setq util.test:*break-on-test-failures* t
+;      util.test:*error-protect-tests*   nil)
+;(net.aserve::debug-on t)
+
 ; set to nil before loading the test to prevent the test from auto-running
 (defvar user::*do-aserve-test* t)
 (defvar *x-proxy* nil) ; when true x-do-http-request will go through a proxy
@@ -394,6 +399,7 @@
     ;;
     ; verify it's still there
     (test 200 (values2 (x-do-http-request (format nil "~a/frob" prefix-local))))
+    
     (test 200 (values2 (x-do-http-request (format nil "~a/frob" prefix-dns))))
     
     ; check that skip-body works
@@ -403,10 +409,12 @@
     ; remove it
     (publish-file :path "/frob" :remove t)
     
+    
     ; verify that it's not there:
     (test 404 (values2 (x-do-http-request (format nil "~a/frob" prefix-local))))
     (test 404 (values2 (x-do-http-request (format nil "~a/frob" prefix-dns))))
     
+
     ;; likewise for frob2
     
     ; verify it's still there
@@ -615,9 +623,41 @@
       (test 200 code)
       (test "zipzip" (cdr (assoc "snortsnort" headers :test #'equalp))
 	    :test #'equal))
-		       
     
-    ))
+    ;; test that if an error occurs we don't send out the
+    ;; header before we encounter the error
+    (publish :path "/error-computed-error"
+	 :content-type "text/plain"
+	 :function
+	 #'(lambda (req ent)
+	     ;; this will get an error after the header is geneated
+	     ;; but before the first body output is done
+	     ;; this will test the delayed header send.
+	     ;; the user should see a 500 "internal server error"
+	     (handler-case
+		 (with-http-response (req ent)
+		   (with-http-body (req ent)
+		     ; make an error
+		     (let ((a (+ 1 2 3 :bogus)))
+		       (+ a a))
+		     (html "done")))
+	       (error (c)
+		 (with-http-response (req ent 
+					  :response 
+					  *response-internal-server-error*
+					  :content-type
+					  "text/html")
+		   (with-http-body (req ent)
+		     (html (:head (:title "Internal Server Error"))
+			   (:body "As expected this entity caused error " 
+				  (:princ c)))))))))
+    
+    (multiple-value-bind (body code headers)
+	(x-do-http-request (format nil "~a/error-computed-error" prefix-local)
+			   :headers '(("frobfrob" . "booboo")))
+      (declare (ignore body headers))
+      
+      (test 500 code))))
 
 
 (defun test-authorization (port)

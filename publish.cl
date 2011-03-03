@@ -49,7 +49,9 @@
 	 :initform nil
 	 :reader port)
    (path :initarg :path
-	 :reader path)
+	 :reader path
+	 :initform "--unspecified-path--"
+	 )
    (location :initarg :location
 	     :reader location)
    (prefix :initarg :prefix
@@ -1224,6 +1226,7 @@
     (if* (null entity)
        then (setq entity 
 	      (make-instance 'computed-entity
+		:path "--- built-in 404 ---"
 		:function #'(lambda (req ent)
 			      (with-http-response 
 				  (req ent
@@ -1259,6 +1262,7 @@
     (if* (null entity)
        then (setq entity 
 	      (make-instance 'computed-entity
+		:path "--- built-in 404 ---"
 		:function #'(lambda (req ent)
 			      (with-http-response 
 				  (req ent
@@ -2241,7 +2245,46 @@
 
 				
 				
-		      
+;; strategies
+;;   The server has to let the client know when it's sent the entire
+;;   body.  There are three ways of doing this:
+;;   1. send the content-length in the header.   Only possible if we
+;;      are sending a file, for computed entities not known until the
+;;      computation is over
+;;   2. chunking.  Only possible for HTTP/1.1.
+;;   3. close the socket after the last byte was sent - if the client
+;;	requested keep-alive then this is legal but not friendly.
+;; 
+;;
+;;
+;; inputs
+;;   head or other request  - 
+;;   keep-alive-possible - requested by client and we have resources
+;;   transfer mode :binary, or not
+;;
+;; head request         
+;;			(:use-socket-stream :omit-body [:keep-alive])
+;;
+;; other req, 
+;;     http/1.1, 
+;;          no-content-length
+;;		binary-or-not
+;;                      -> (:chunked :use-socket-stream [:keep-alive])
+;;     http/1.0
+;;	    no-content-length
+;;	        -> (:use-socket-stream)
+;;     http/1.0 or http/1.1
+;;          content-length
+;;		binary
+;;			-> (:use-socket-stream [:keep-alive])
+;;		text
+;;		  keep-alive
+;;			-> (:string-output-stream :keep-alive :post-headers)
+;;		  not keep alive
+;;                      -> (:use-socket-stream)
+;;
+;;
+;; 
     
 	    
     
@@ -2344,7 +2387,20 @@
     (setf (request-reply-strategy req) strategy)))
 
 	    
-	    
+
+(defmethod compute-strategy :around ((req http-request) (ent computed-entity) format)
+  (declare (ignore format))
+  
+  (let ((strategy (call-next-method)))
+    
+    (if* (and (member :use-socket-stream strategy)
+	      (not (member :post-headers strategy)))
+       then (setf (request-reply-strategy req)
+	      (cons :delay-headers strategy))
+       else strategy)))
+
+  
+  
   
 		    
 		    
@@ -2369,6 +2425,7 @@
 			  (throw 'with-http-response nil))
     (with-standard-io-syntax
       (let* ((sock (request-socket req))
+	     (hsock) ; to send headers
 	     (reply-stream (request-reply-stream req))
 	     (strategy (request-reply-strategy req))
 	     (extra-headers (request-reply-headers req))
@@ -2390,10 +2447,15 @@
 	     )
       
 
+		
+	(setq hsock sock)
+	(if* (and send-headers (member :delay-headers strategy :test #'eq))
+	   then ; must capture the headers in a string output stream
+		(setq hsock (make-string-output-stream)))
 	
       
 	(if* send-headers
-	   then (format-dif :xmit sock "~a ~d  ~a~a"
+	   then (format-dif :xmit hsock "~a ~d  ~a~a"
 			    (request-reply-protocol-string req)
 			    (response-number code)
 			    (response-desc   code)
@@ -2426,44 +2488,44 @@
 	(if* (and send-headers
 		  (not (eq (request-protocol req) :http/0.9)))
 	   then ; can put out headers
-		(format-dif :xmit sock "Date: ~a~a" 
+		(format-dif :xmit hsock "Date: ~a~a" 
 			    (maybe-universal-time-to-date (request-reply-date req))
 			    *crlf*)
 
 		(if* (member :keep-alive strategy :test #'eq)
 		   then (format-dif :xmit
-				    sock "Connection: Keep-Alive~aKeep-Alive: timeout=~d~a"
+				    hsock "Connection: Keep-Alive~aKeep-Alive: timeout=~d~a"
 				    *crlf*
 				    *read-request-timeout*
 				    *crlf*)
-		   else (format-dif :xmit sock "Connection: Close~a" *crlf*))
+		   else (format-dif :xmit hsock "Connection: Close~a" *crlf*))
 
 		(if* (not (assoc :server extra-headers :test #'eq))
 		   then ; put out default server info
-			(format-dif :xmit sock "Server: AllegroServe/~a~a" 
+			(format-dif :xmit hsock "Server: AllegroServe/~a~a" 
 				    *aserve-version-string*
 				    *crlf*))
       
 		(if* (request-reply-content-type req)
 		   then (format-dif :xmit
-				    sock "Content-Type: ~a~a" 
+				    hsock "Content-Type: ~a~a" 
 				    (request-reply-content-type req)
 				    *crlf*))
 
 		(if* chunked-p
 		   then (format-dif :xmit
-				    sock "Transfer-Encoding: chunked~a"
+				    hsock "Transfer-Encoding: chunked~a"
 				    *crlf*))
 
 		(if* compress
 		   then (format-dif :xmit
-				    sock "Content-Encoding: ~a~a"
+				    hsock "Content-Encoding: ~a~a"
 				    compress
 				    *crlf*))
 			
 		(if* (and (not chunked-p)
 			  (request-reply-content-length req))
-		   then (format-dif :xmit sock "Content-Length: ~d~a"
+		   then (format-dif :xmit hsock "Content-Length: ~d~a"
 				    (request-reply-content-length req)      
 				    *crlf*)
 			(debug-format :info
@@ -2483,21 +2545,39 @@
 				      ))
 	      
 		(dolist (head (request-reply-headers req))
-		  (format-dif :xmit sock "~a: ~a~a"
+		  (format-dif :xmit hsock "~a: ~a~a"
 			      (car head)
 			      (cdr head)
 			      *crlf*))
-		(format-dif :xmit sock "~a" *crlf*)
+		(format-dif :xmit hsock "~a" *crlf*)
 	      
-		(force-output sock)
+		(force-output hsock)
 		; clear bytes written count so we can count data bytes
 		; transferred
 		#+(and allegro (version>= 6))
-		(excl::socket-bytes-written sock 0) 
+		(excl::socket-bytes-written hsock 0) 
 		)
-      
+
+	(if* (and send-headers (member :delay-headers strategy :test #'eq))
+	   then ; headers are now in a string output stream
+		
+		
+		(let ((header-content
+		       (string-to-octets
+			(get-output-stream-string hsock)
+			:null-terminate nil)))
+		  
+		  (setq reply-stream
+		    (setf (request-reply-stream req)
+		      (make-instance 'prepend-stream
+			:content header-content
+			:output-handle reply-stream)))))
+		    
+		
+	
+	
 	(if* (and send-headers chunked-p (eq time :pre))
-	   then (force-output sock)
+	   then (force-output hsock)
 		; do chunking
 		(setq reply-stream
 		  (make-instance 'chunking-stream 
@@ -2523,6 +2603,13 @@
 	(if* content
 	   then (write-sequence content sock))
 
+	(if* (and (eq time :post) (prepend-stream-p reply-stream))
+	   then (force-output reply-stream)
+		(close reply-stream) ; close prepend stream only
+		(setq reply-stream
+		  (setf (request-reply-stream req)
+		    (prepend-stream-inner-stream reply-stream))))
+		
 	(if* (and  compress (eq time :post))
 	   then (force-output reply-stream)
 		
@@ -2682,7 +2769,102 @@
 
   
   
+
+;; delayed send stream
+;; 
+;; 
+
+(def-stream-class prepend-stream (single-channel-simple-stream)
+  ((content :initform nil
+	    ;; what to send before the first write
+	    :initarg :content
+	    :accessor prepend-stream-content))
   
+  )
+
+
+(defmethod prepend-stream-p (stream)
+  (declare (ignore stream))
+  nil)
+
+(defmethod prepend-stream-p ((stream prepend-stream))
+  t)
+
+(defmethod print-object ((p prepend-stream) s)
+  (print-unreadable-object (p s :identity t :type t)
+    (format s "~a content" (if* (prepend-stream-content p)
+			      then "has"
+			      else "no"))))
+
+
+(defmethod device-open ((p prepend-stream) dummy options)
+  (declare (ignore dummy))
+  
+  (let ((output-handle (getf options :output-handle)))
+    
+    (setf 
+	(slot-value p 'excl::buffer) (make-array 4096 :element-type '(unsigned-byte 8))
+	  
+	(slot-value p 'excl::buffer-ptr) 0
+	(slot-value p 'excl::output-handle) output-handle
+	
+	(slot-value p 'excl::control-out) excl::*std-control-out-table*
+	
+	)
+    
+    (setf (stream-external-format p)
+      (stream-external-format p))
+  
+    (add-stream-instance-flags p :output :simple)
+    
+    t))
+
+
+(defmethod device-write ((p prepend-stream) buffer start end blocking)
+  (declare (ignore blocking))
+   
+  (let ((content (prepend-stream-content p))
+	(output-handle (slot-value p 'excl::output-handle)))
+    (if* content
+       then (setf (prepend-stream-content p) nil)
+	    (write-full-vector content output-handle))
+    
+    (if* (> end start) 
+       then (write-full-vector (or buffer (slot-value p 'excl::buffer))
+			       output-handle
+			       :start start
+			       :end end)
+       else start)))
+	    
+
+(defmethod device-close ((p prepend-stream) abort)
+  ;; close only this stream, not the inner stream
+  (if* (not abort)
+     then (force-output p)
+	  ; just to ensure header is sent
+	  (device-write p nil 0 0 nil))
+  
+  t)
+
+(defmethod prepend-stream-inner-stream ((p prepend-stream))
+  (slot-value p 'excl::output-handle))
+
+(defun write-full-vector (vec stream &key (start 0) (end (length vec)))
+  (loop
+    (if* (>= start end)
+       then (return start)
+       else (setq start (write-vector vec stream 
+				      :start start
+				      :end end)))))
+
+
+(defmethod excl::socket-bytes-written ((stream prepend-stream) &optional set)
+  ;; pass it on to the inner stream
+  (excl::socket-bytes-written (slot-value stream 'excl::output-handle)
+			      set))
+
+
+
 
 ;;;;;;;;;;;;;;; setup things
 
