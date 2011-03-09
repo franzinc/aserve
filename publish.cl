@@ -194,10 +194,14 @@
    ;  it should create and publish an entity and return it
    (publisher :initarg :publisher
 	      :initform nil
-	      :accessor directory-entity-publisher))
+	      :accessor directory-entity-publisher)
    
    
-  )
+   (hidden-index-redirect
+    :initform nil
+    :initarg  :hidden-index-redirect
+    :reader   directory-hidden-index-redirect)
+   ))
 
 
 (defclass special-entity (entity)
@@ -888,6 +892,7 @@
 			       hook
 			       headers
 			       (compress t)
+			       hidden-index-redirect
 			       )
   
   ;; make a whole directory available
@@ -922,6 +927,7 @@
 	       :hook hook
 	       :headers headers
 	       :compress compress
+	       :hidden-index-redirect hidden-index-redirect
 	       )))
     
     (publish-prefix-entity ent prefix locator host host-p nil)
@@ -1677,13 +1683,14 @@
   ;; entity for it so we can track last modified.
 
   (let* ((postfix nil)
+	 (path  (request-decoded-uri-path req))
 	 (realname (concatenate 'string
 		     directory
-		     (setq postfix (subseq (request-decoded-uri-path req)
-					   (length (prefix ent))))))
+		     (setq postfix (subseq path (length (prefix ent))))))
 	 (redir-to)
 	 (info)
 	 (forbidden)
+	 (redirect-kind *response-temporary-redirect*)
 	 )
     (debug-format :info "directory request for ~s~%" realname)
     
@@ -1729,16 +1736,36 @@
        elseif (eq :directory type)
 	 then ; Try the indexes (index.html, index.htm, or user-defined).
 	      ; tack on a trailing slash if there isn't one already.
-	      (if* (not (eq #\/ (schar realname (1- (length realname)))))
-		 then (setq realname (concatenate 'string realname "/")))
-
-	      (setf redir-to 
-		(dolist (index (directory-entity-indexes ent) 
-			  ; no match to index file, give up
-			  (return-from process-entity-single-directory nil))
-		  (if* (eq :file (excl::filesys-type
-				  (concatenate 'string realname index)))
-		     then (return index))))
+	      
+	      (if* (not (eq #\/ (schar path (1- (length path)))))
+		 then ; uri referred to a a directory but didn't end
+		      ; in a slash, so add that slash
+		      (setq redirect-kind 
+			*response-moved-permanently*)
+			
+		      (setf redir-to 
+			"" ; tack on a empty string
+			)
+		 else ; uri ends in /, realname is directory
+		      ; ensure path we're building ends in / so
+		      ; we can look for indexes
+		      (if* (not (eq #\/ 
+				    (schar realname (1- (length realname)))))
+			 then (setq realname 
+				(concatenate 'string realname "/")))
+		      (dolist (index (directory-entity-indexes ent) 
+				; no match to index file, give up
+				(return-from process-entity-single-directory nil))
+			(if* (eq :file (excl::filesys-type
+					(concatenate 'string realname index)))
+			   then ; we have an index
+				(if* (directory-hidden-index-redirect ent)
+				   then ; just send back the index file contents
+					(setq realname
+					  (concatenate 'string realname index))
+				   else ; redirect to the index file
+					(setq redir-to index))
+				(return))))
 	      
        elseif (not (eq :file type))
 	 then  ; bizarre object
@@ -1747,7 +1774,7 @@
     (if* redir-to
        then ; redirect to an existing index file
 	    (with-http-response (req ent
-				     :response *response-temporary-redirect*)
+				     :response redirect-kind)
 	      
 		      
 	      (let ((path (uri-path (request-uri req))))
@@ -1755,14 +1782,15 @@
 		  (render-uri 
 		   (copy-uri (request-uri req) 
 			     :path 
-			     (concatenate 'string path
-					  (if* (and path
-						    (> (length path) 0)
-						    (eq #\/ (aref path 
-								  (1- (length path)))))
-					     then ""
-					     else "/")
-					  redir-to))
+			     (concatenate 
+				 'string path
+				 (if* (and path
+					   (> (length path) 0)
+					   (eq #\/ (aref path 
+							 (1- (length path)))))
+				    then ""
+				    else "/")
+				 redir-to))
 		   nil))
 			     
 		(with-http-body (req ent))))

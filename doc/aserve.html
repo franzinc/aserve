@@ -36,7 +36,7 @@
   </tbody>
 </table>
 <h1 align="center">AllegroServe - A Web Application Server<br>
-<small><small><small>version <font face="Courier New">1.3.1</font></small></small></small></h1>
+<small><small><small>version <font face="Courier New">1.3.3</font></small></small></small></h1>
 <p align="left"><strong><small>copyright(c) 2000-2011. Franz Inc</small></strong></p>
 <h2 align="left">Table of Contents</h2>
 <p align="left"><a href="#introduction">Introduction</a><br>
@@ -257,6 +257,7 @@ argument then 5 is assumed. &nbsp; If&nbsp; the value is <strong>nil </strong>or
 
 
 
+
     <strong>0 </strong>then the server runs in <em>simple server mode<strong>
     </strong></em>in which the <strong>start</strong> function doesn't
 return - instead it processes the requests itself, one at a time.&nbsp;
@@ -391,7 +392,8 @@ used
 in
 a
 fully
-patched ACL 8.0 (or newer).&nbsp;
+patched
+ACL 8.0 (or newer).&nbsp;
 In older versions of ACL these values are ignored.&nbsp; By specifiying
 these values you can have more control on how the server does SSL
 certificate managment.<br>
@@ -434,7 +436,8 @@ found,
 it
 is
 passed
-the request and is responsible for
+the
+request and is responsible for
 generating and
 sending a response to the client.&nbsp; If an entity can't be found
 then AllegroServe
@@ -491,7 +494,8 @@ content-type
 class
 preload
 cache-p
-remove <br>
+remove
+<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 authorizer
 server
@@ -512,7 +516,8 @@ of
 the
 arguments
 are
-optional..&nbsp; The arguments
+optional..&nbsp;
+The arguments
 have these meanings: </p>
 <ul>
   <li><strong>path </strong>-- a string that must match the name part
@@ -544,6 +549,7 @@ used to hold this entity.&nbsp; The class must be a subclass of&nbsp; <strong>fi
 
 
 
+
   </li>
   <li><strong>preload</strong> --if true it instructs <strong>AllegroServe</strong>
 to read the contents of the file in immediately and store it in a lisp
@@ -561,6 +567,7 @@ otherwise <strong>AllegroServe</strong> will read in and cache the new
 contents of the file and will return that as a response.</li>
   <li><strong>remove </strong>-- instead of adding an entity, remove
 the entities that match the given <strong>path</strong> and <strong>host.
+
 
 
 
@@ -678,7 +685,8 @@ access-file<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 hook
 headers
-compress)</font></strong></p>
+compress
+hidden-index-redirect)</font></strong></p>
 <p><strong>publish-directory</strong> is used to publish a complete
 directory tree of
 files.&nbsp; This is similar to how web servers such as Apache publish
@@ -720,12 +728,27 @@ type). &nbsp;&nbsp; Next that <strong>file-entity </strong>is made to
 handle the request
 in the normal manner.</p>
 <p>If a request comes that maps to a directory rather than a file then
-AllegroServe tries
+AllegroServe takes special action.&nbsp; First AllegroServe ensures
+that the request uri ends in a slash. &nbsp; If the request was <span
+ style="text-decoration: underline;">http://foo.com/onedir/twodir</span>&nbsp;
+then AllegroServe will return a redirect response so the client now
+asks for <span style="text-decoration: underline;">http://foo.com/onedir/twodir/
+</span>.&nbsp; Next AllegroServe tries
 to locate an index file for that directory.&nbsp; The <strong>indexes</strong>
 argument
 specifies a list of index files to search for.&nbsp; By default the
 list consists of two
-filenames "index.html" and "index.htm".</p>
+filenames "index.html" and "index.htm".&nbsp; If an index file is found
+then the value of&nbsp; the<span style="font-weight: bold;"><span
+ style="font-weight: bold;"><span style="font-weight: bold;"> </span></span>hidden-index-redirect
+</span>argument is consulted.&nbsp; If it is nil then AllegroServe
+returns a redirect to the index file, e.g&nbsp; <span
+ style="text-decoration: underline;">http://foo.com/onedir/twodir/index.html</span>.<br>
+If <span style="font-weight: bold;">hidden-index-redirect</span> is
+true then AllegroServe will return the contents of the index file from
+the request, effectively doing the redirection to the index file
+internally and invisibly to the client.<br>
+</p>
 <p>The value of the <strong>filter </strong>argument is a function of
 four values: <strong>req</strong>
 <strong>ent</strong>&nbsp; <strong>filename</strong> and <strong>info</strong>.&nbsp;
@@ -767,7 +790,8 @@ the
 disk
 that
 matches
-the incoming <strong>url</strong>.&nbsp;&nbsp;
+the
+incoming <strong>url</strong>.&nbsp;&nbsp;
 Nomally
 a
 <strong>publish-file</strong>
@@ -995,7 +1019,8 @@ deny
 argument
 can
 be
-a string or a list of
+a
+string or a list of
 strings or nil
 (which is the same as that argument not being given).<strong> </strong>&nbsp;
 The
@@ -1007,7 +1032,8 @@ expressions
 are
 not
 exactly
-like unix shell wildcard
+like
+unix shell wildcard
 filename
 expressions).&nbsp;&nbsp; In particular <font face="Courier New">".*"</font>
 is
@@ -1029,7 +1055,8 @@ to
 be
 found
 in
-the accumulated information, then
+the
+accumulated information, then
 access is allowed.&nbsp;&nbsp; A similar thing is true if AllegroServe
 is searching for <strong>:subdirectories</strong> information and none
 is found.</li>
@@ -1081,7 +1108,8 @@ computes
 its
 response
 every
-time a request comes in.&nbsp;
+time
+a request comes in.&nbsp;
 The <strong>path</strong>,
 <strong>host</strong>, <strong>port</strong>, <strong>remove, server</strong>
 , <strong>authorizer,
@@ -1120,7 +1148,8 @@ prefix
 host
 port
 content-type
-function class <br>
+function
+class <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 format
 remove
@@ -1140,7 +1169,8 @@ prefix
 handlers
 have
 lower
-priority than
+priority
+than
 exact handlers.
 &nbsp; Thus if you declare a prefix handler for "/foo" and also a
 specific
@@ -1421,7 +1451,8 @@ an
 effect
 on
 the
-stream created.</em></p>
+stream
+created.</em></p>
 <hr>
 <p><a name="f-get-request-body"></a><strong><font face="Courier New">(get-request-body
 request
@@ -1723,7 +1754,8 @@ set
 according
 to
 the
-CGI protocol.&nbsp; The
+CGI
+protocol.&nbsp; The
 <strong>timeout</strong>
 argument is how long AllegroServe should wait for a response from the <strong>program
 </strong>before
@@ -1859,6 +1891,7 @@ body)
 
 
 
+
     </strong>to turn it into an alist that associates form field
 names with values.</li>
   <li><strong>&lt;form method="post" enctype="multipart/form-data"&gt;
@@ -1943,6 +1976,7 @@ more multipart items. &nbsp; This value is returned when the value of <strong>he
 
 
 
+
     </strong>is <strong>nil.</strong></li>
   <li><strong>:data</strong> - the next multipart item is a simple form
 value.&nbsp; The second value returned is a string naming the
@@ -1976,7 +2010,8 @@ this
 please
 let
 us
-know about it
+know
+about it
 since we would like to enhance <strong>parse-multipart-header</strong>
 to
 understand this type of header. &nbsp;&nbsp; If you encounter
@@ -2226,6 +2261,7 @@ two slots:</p>
 
 
 
+
       </strong>where any of the listed name password pairs
 will allow access to this page.</td>
     </tr>
@@ -2303,6 +2339,7 @@ is
 this:
 if
 the
+
 
 
     <strong>ipaddress </strong>is a host
@@ -2383,7 +2420,8 @@ than
 once.&nbsp;
 Each
 call
-will cause one Set-Cookie directive to be sent to the web browser.
+will
+cause one Set-Cookie directive to be sent to the web browser.
 &nbsp;&nbsp;&nbsp;
 The <strong>name</strong> and <strong>value</strong> arguments should
 be given (and they
@@ -2523,7 +2561,8 @@ worker
 threads
 then
 AllegroServe
-waits for one to be
+waits
+for one to be
 available.</p>
 <p>In each worker thread the variable <strong>*wserver*</strong> is
 bound to the <strong>wserver</strong>
@@ -2599,7 +2638,8 @@ new
 locator
 classes.&nbsp;&nbsp;&nbsp;
 Locators
-should define
+should
+define
 the <strong>standard-locator</strong>
 method as well as </p>
 <p><a name="f-unpublish-locator"></a><strong><font face="Courier New">(unpublish-locator
@@ -2627,6 +2667,7 @@ function]</p>
   <li><strong>t -- </strong>The request is authorized,&nbsp; call <strong>process-entity</strong>
 to make the entity respond.</li>
   <li><strong>nil</strong> -- The request is not authorized, call <strong>failed-request
+
 
 
 
@@ -2789,7 +2830,8 @@ return
 the
 response
 body
-in chunks if told to
+in
+chunks if told to
 use the <strong>:http/1.1</strong> protocol.&nbsp; Buggy web servers
 may do chunking incorrectly (even Apache has bugs in this regard but
 we've worked around them).&nbsp; If you have trouble talking to a web
@@ -2836,6 +2878,7 @@ is
 a
 
 
+
       <strong>:get</strong> then the value
 of&nbsp; this argument is <strong>urlencoded</strong> and made the
 query string of the uri being accessed.&nbsp; If the method is <strong>:post</strong>
@@ -2864,6 +2907,7 @@ object should be passed as the value of this argument.</td>
       <td width="16%">5</td>
       <td width="62%">If the response is a redirect (code 301, 302,
 303), and the method is one given by the value of <strong>redirect-methods
+
 
 
 
@@ -3000,6 +3044,7 @@ scheme then <strong>ssl</strong> is assumed to be true and the <strong>ssl
 
 
 
+
       </strong>argument need not be specified.</td>
     </tr>
     <tr>
@@ -3007,6 +3052,7 @@ scheme then <strong>ssl</strong> is assumed to be true and the <strong>ssl
       </td>
       <td style="vertical-align: top;">nil</td>
       <td style="vertical-align: top;"><span style="font-weight: bold;"></span>see
+
 
 
 
@@ -3028,6 +3074,7 @@ is
 funcalled
 passing
 the
+
 
       <strong>client-request </strong>object
 as
@@ -3609,6 +3656,7 @@ raw uri: </p>
 
 
 
+
     </strong></li>
   <li>the request-uri is still <strong>http://foo.bar.com:23/whatever </strong></li>
   <li>the Host header value is still <strong>"foo.bar.com:23" </strong></li>
@@ -3777,7 +3825,8 @@ is
 clear:
 it
 means
-that this entity will be visible on this
+that
+this entity will be visible on this
 virtual host.
 &nbsp; The meaning of <strong>:wild </strong>is that this entity will
 be visible on <em>all</em>
@@ -3973,7 +4022,8 @@ the
 only
 meaningful
 value
-you would want to pass is <span style="font-weight: bold;">:tlsv1</span>
+you
+would want to pass is <span style="font-weight: bold;">:tlsv1</span>
 meaning that you only want to
 communicate using TLS v1.0 (SSL v3.1), the most modern and secure of
 the protocols.<br>
@@ -4097,7 +4147,8 @@ with&nbsp;
 a
 right
 click
-as well. </p>
+as
+well. </p>
 <p>&nbsp;</p>
 <hr>
 <h2><a name="international-chars-aserve"></a>Using International
@@ -4220,7 +4271,8 @@ you
 to
 write
 web
-pages that can use
+pages
+that can use
 characters
 from nearly every
 language in the world (whether the web browser can find the glyphs to

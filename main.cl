@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 2))
+(defparameter *aserve-version* '(1 3 3))
 
 (eval-when (eval load)
     (require :sock)
@@ -515,8 +515,8 @@ Problems with protocol may occur." (ef-name ef)))))
 	   (,g-external-format (find-external-format ,external-format))
 	   )
        (declare (ignore-if-unused ,g-req ,g-ent ,g-external-format))
-       ,(if* body 
-	   then `(compute-response-stream ,g-req ,g-ent))
+        
+       (compute-response-stream ,g-req ,g-ent)
        (if* (entity-headers ,g-ent)
 	  then (bulk-set-reply-headers ,g-req (entity-headers ,g-ent)))
        (if* ,g-headers
@@ -1252,9 +1252,10 @@ by keyword symbols and not by strings"
 					    else "")
 					 cond))
 				(top-level.debug:zoom
-				 (vhost-error-stream
-				  (wserver-default-vhost
-				   *wserver*)))
+				 (or (vhost-error-stream
+				      (wserver-default-vhost
+				       *wserver*))
+				     *initial-terminal-io*))
 				(if* (not (member :notrap *debug-current*))
 				   then ; after the zoom ignore the error
 					(go out))
@@ -1266,7 +1267,7 @@ by keyword symbols and not by strings"
 		  (if* (connection-reset-error cond)
 		     thenret ; don't print these errors,
 		     else (logmess 
-			   (format nil "~agot error ~a~%" 
+			   (format nil "~agot the error ~a~%" 
 				   (if* *worker-request*
 				      then (format 
 					    nil 

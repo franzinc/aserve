@@ -50,10 +50,16 @@
 	  (error "Could not find the aserve examples directory.")))
   )
 
+(defparameter *aserve-set-full-debug*  nil) ; :all and :notrap are useful
+(net.aserve::debug-on *aserve-set-full-debug*)
+
 ; to trap errors when they happen uncomment this
-;(setq util.test:*break-on-test-failures* t
-;      util.test:*error-protect-tests*   nil)
-;(net.aserve::debug-on t)
+#+ignore 
+(setq util.test:*break-on-test-failures* t
+      util.test:*error-protect-tests*   nil)
+
+
+
 
 ; set to nil before loading the test to prevent the test from auto-running
 (defvar user::*do-aserve-test* t)
@@ -99,11 +105,13 @@
 			 (do-tests-inner))))
 		   
 		   (do-tests-inner ()
+		     
 		     (test-publish-file port nil) ; no compression
 		     #+unix
 		     (test-publish-file port t) ; with compression
 		     
 		     (test-publish-directory port)
+		     
 		     (test-publish-computed port)
 		     (test-publish-multi port)
 		     (test-publish-prefix port)
@@ -118,7 +126,10 @@
 			then (test-international port)
 			     (test-spr27296))
 		     (if* test-timeouts 
-			then (test-timeouts port)))
+		     then (test-timeouts port))
+
+		     
+		     )
 		 
 		   )
 	    (format t "~%~%===== test direct ~%~%")
@@ -166,6 +177,7 @@
 			:listeners 20 ; so keep-alive will be possible
 			))); let the system pick a port
     (setq *wserver* wserver)
+    (net.aserve::debug-on *aserve-set-full-debug*)
     (unpublish :all t) ; flush anything published
     (setq *x-ssl* ssl)
     (socket::local-port (net.aserve::wserver-socket wserver))
@@ -183,6 +195,9 @@
 			       :port nil 
 			       :proxy t
 			       :proxy-proxy *x-proxy*))
+  
+  (let ((*wserver* *proxy-wserver*))
+    (net.aserve::debug-on *aserve-set-full-debug*))
   
   (push *x-proxy* *save-x-proxy*)
   (setq *x-proxy* (format nil "localhost:~d" 
@@ -1413,9 +1428,9 @@
     (publish-directory :prefix "/test-pd/"
 		       :destination test-dir
 		       :hook #'(lambda (req ent extra)
-				       (declare (ignore req ent extra))
-				       (setq got-reps (or got-reps 0))
-				       (incf got-reps))
+				 (declare (ignore req ent extra))
+				 (setq got-reps (or got-reps 0))
+				 (incf got-reps))
 		       :headers '(("testvdir" . "testvval"))
 		       :filter #'(lambda (req ent filename info)
 				   (declare (ignore ent info))
@@ -1444,8 +1459,8 @@
       (declare (ignore body))
       (test 200 code)
       (test "testvval"
-		    (cdr (assoc "testvdir" headers :test #'equal))
-		    :test #'equal))
+	    (cdr (assoc "testvdir" headers :test #'equal))
+	    :test #'equal))
     
     (test 1 got-reps)   ; hook fired
     
@@ -1602,6 +1617,119 @@
     (test 200 (values2 (x-do-http-request 
 			(format nil "~a/multiple-test/second.txt"
 				prefix-local))))
+
+    ;;
+    ;; test redirects to the index file
+    ;;
+    (publish-directory :prefix "/redirnormal/"
+		       :destination 
+		       (concatenate 'string test-dir "testdir3/"))
+    
+    ; do a normal redirect to the index
+    
+    (multiple-value-bind (body retcode headers uri)
+	(x-do-http-request 
+	 (format nil "~a/redirnormal/"
+		 prefix-local))
+      (declare (ignore headers))
+      (test (file-contents 
+	     (concatenate 'string test-dir "testdir3/index.html"))
+	    body
+	    :test #'equal
+	    )
+      (test 200 retcode)
+      (test "/redirnormal/index.html"
+	    (net.uri:uri-path uri)
+	    :test #'equal
+	    ))
+    
+    ; do one directory level down redirect
+    (multiple-value-bind (body retcode headers uri)
+	(x-do-http-request 
+	 (format nil "~a/redirnormal/subdir"
+		 prefix-local))
+      (declare (ignore headers))
+      (test (file-contents 
+	     (concatenate 'string test-dir "testdir3/subdir/index.html"))
+	    body
+	    :test #'equal
+	    )
+      (test 200 retcode)
+      (test "/redirnormal/subdir/index.html"
+	    (net.uri:uri-path uri)
+	    :test #'equal
+	    ))
+    
+    ; check that the first step of a uri not ending in /
+    ; is to add the /
+    
+    (multiple-value-bind (body retcode headers uri)
+	(x-do-http-request 
+	 (format nil "~a/redirnormal/subdir"
+		 prefix-local)
+	 :redirect nil  ; don't auto redirect
+	 )
+      
+      (declare (ignore body uri))
+      (test 301 retcode)
+      (test t (values (match-re "/redirnormal/subdir/$"
+				(cdr (assoc :location headers))))))
+    
+    
+    ; test where an internal redirect is done
+    (publish-directory :prefix "/redirhidden/"
+		       :destination 
+		       (concatenate 'string test-dir "testdir3/")
+		       
+		       :hidden-index-redirect t
+		       )
+    
+    ; simple
+    (multiple-value-bind (body retcode headers uri)
+	(x-do-http-request 
+	 (format nil "~a/redirhidden/"
+		 prefix-local))
+      (declare (ignore headers))
+      (test (file-contents 
+	     (concatenate 'string test-dir "testdir3/index.html"))
+	    body
+	    :test #'equal
+	    )
+      (test 200 retcode)
+      (test "/redirhidden/"
+	    (net.uri:uri-path uri)
+	    :test #'equal
+	    ))
+    
+    ; one level down
+    (multiple-value-bind (body retcode headers uri)
+	(x-do-http-request 
+	 (format nil "~a/redirhidden/subdir"
+		 prefix-local))
+      (declare (ignore headers))
+      (test (file-contents 
+	     (concatenate 'string test-dir "testdir3/subdir/index.html"))
+	    body
+	    :test #'equal
+	    )
+      (test 200 retcode)
+      (test "/redirhidden/subdir/"
+	    (net.uri:uri-path uri)
+	    :test #'equal
+	    ))
+    
+    ; one step one level done
+    (multiple-value-bind (body retcode headers uri)
+	(x-do-http-request 
+	 (format nil "~a/redirhidden/subdir"
+		 prefix-local)
+	 :redirect nil  ; don't auto redirect
+	 )
+      
+      (declare (ignore body uri))
+      (test 301 retcode)
+      (test t (values (match-re "/redirhidden/subdir/$"
+				(cdr (assoc :location headers))))))
     
     ))
 
