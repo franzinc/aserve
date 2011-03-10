@@ -22,29 +22,37 @@ Description
 
 AllegroServe has these components:
 
- * HTTP/1.1 compliant web server capable of serving static and
-   dynamic pages
- * HTML generation facility that seamlessly merges html tag
-   printing with computation of dynamic content. The HTML
-   generator matches perfectly with the HTML parser (which is
-   in another project) to allow web pages to be read, modifed
-   in Lisp and then regenerated.
+ * HTTP/1.1 compliant web server capable of serving static and dynamic pages
+ * HTML generation facility that seamlessly merges html tag printing with 
+   computation of dynamic content. The HTML generator matches perfectly 
+   with the HTML parser (which is in another project) to allow web 
+   pages to be read, modifed in Lisp and then regenerated.
  * HTTP client functions to access web sites and retrieve data.
  * Secure Socket Layer (SSL) for both the server and client.
  * Web Proxy facility with a local cache.
- * Comprehensive regression test suite that verifies the
-   functionality of the client, server, proxy and SSL
+ * Comprehensive regression test suite that verifies the functionality 
+   of the client, server, proxy and SSL
  * high performance for static and dynamic web page delivery
- * Licensed under terms that ensure that it will always be open
-   source and that encourages its use in commercial settings.
- * A new publish function that builds a page from static and
+ * Licensed under terms that ensure that it will always be open source 
+   and that encourages its use in commercial settings.
+ * A publish function that builds a page from static and 
    dynamic data and handles caching of the result.
- * Access control mechanisms for publishing directories that
-   gives the webmaster the ability to specify which files and
+ * Access control mechanisms for publishing directories that 
+   gives the webmaster the ability to specify which files and 
    directories in the tree should be visible.
  * The ability to run external CGI programs.
- * An improved virtual hosting system that supports different
+ * An improved virtual hosting system that supports different 
    logging and error streams for each virtual host.
+
+We've recently added these features:
+
+ * The ability to compress and inflate files on the fly.
+ * Support for chunking and http/1.1
+ * Security up through TLS 1.0 (SSL 3.1).
+
+See [the latest Allegro CL Release
+Notes])http://www.franz.com/support/documentation/current/doc/release-notes.htm)
+for more information on AllegroServe changes.
 
 Author
 ------
@@ -75,8 +83,8 @@ Dependencies
 ------------
 
 There are no dependences for AllegroServe.  In order to run the
-allegroserve test suite you'll need to have [tester]
-(<http://opensource.franz.com>) loaded.
+allegroserve test suite you'll need to have the tester module
+(available at <https://github.com/franzinc>) loaded.
 
 Installation
 ------------
@@ -131,7 +139,7 @@ Documentation
 
 For complete documentation see the contents of the doc directory, 
 which is part of this project or visit the online version of the
-[AllegroServe documentation](http://opensource.franz.com/aserve).
+[AllegroServe documentation](http://www.franz.com/support/documentation/current/doc/aserve/aserve.html).
 
 ### Quick Start Documentation
 
@@ -198,7 +206,7 @@ work with AllegroServe.
 Franz Inc. Open Source Info
 ---------------------------
       
-This project's homepage is <http://opensource.franz.com>. There is an
+This project's homepage is <https://github.com/franzinc/aserve>. There is an
 informal community support and development mailing list 
 [opensource@franz.com](http://opensource.franz.com/mailinglist.html)
 for these open source projects. We encourage you to take advantage by
