@@ -327,7 +327,7 @@ destination index <br>
 &nbsp;sessions session-lifetime reap-interval reap-hook-function server
 authorizer<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-host access-file clp-content-type external-format)</span><br>
+host access-file clp-content-type default-actions external-format)</span><br>
 <br>
 <span style="font-weight: bold;">webaction-project</span> creates
 project data structures and executes calls to <span
@@ -418,6 +418,10 @@ access-files.<br>
 <span style="font-weight: bold;">clp-content-type</span> - a string
 holding the content type for all clp files published in this
 project.&nbsp; The default is "text/html".<br>
+<span style="font-weight: bold;">default-actions</span> -
+the actions to invoke if there are no map-entry matches in the
+map.&nbsp; The default is <span style="font-weight: bold;">nil </span>
+(meaning no default actions).<br>
 <span style="font-weight: bold;">external-format</span> - the external
 format used when sending data back to the browser.&nbsp;&nbsp; The
 default is the value of *default-aserve-external-format*<br>

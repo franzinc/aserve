@@ -97,13 +97,16 @@
    (clp-content-type :accessor webaction-clp-content-type
 		     :initform nil)
    
+   ;; default actions when there is no map match
+   (default-actions :initform nil
+     :accessor webaction-default-actions)
    ))
 
 (defparameter *webactions-version* "1.12")
 	      
 (defvar *name-to-webaction* (make-hash-table :test #'equal))
 
-(defparameter *session-reap-interval* (* 5 60)) ; 5 minutse
+(defparameter *session-reap-interval* (* 5 60)) ; 5 minutes
 
 (defun webaction-project (name &key (project-prefix "/")
 				    (clp-suffixes '("clp"))
@@ -121,6 +124,7 @@
 				    clp-content-type
 				    (external-format
 				     *default-aserve-external-format*)
+				    (default-actions nil)
 				    )
   ;; create a webaction project
   ;; and publish all prefixes
@@ -153,6 +157,7 @@
     (setf (webaction-destination wa) destination)
     (setf (webaction-external-format wa) external-format)
     (setf (webaction-clp-content-type wa) clp-content-type)
+    (setf (webaction-default-actions wa) default-actions)
     
     (if* (and reap-interval (integerp reap-interval) (> reap-interval 0))
        then (setq *session-reap-interval* reap-interval))
@@ -267,7 +272,11 @@
 
 
 
-(defun webaction-entity (req ent)
+(defun webaction-entity (req ent
+			 ;; use-actions is used in an internal recursive call
+			 ;; when there are no action matches and we turn to
+			 ;; the webaction's default-actions.
+			 &key (use-actions nil))
   ;; handle a request in the uri-space of this project
   
   ; determine if it's in the action space, if so, find the action
@@ -358,7 +367,8 @@
 	      ; was found in the url
 	      ; try to locate the session via a cookie
 	      
-	      (let* ((actions (locate-actions req ent wa following))
+	      (let* ((actions (or use-actions
+				  (locate-actions req ent wa following)))
 		     (redirect))
 		
 		; there may be a list of flags at the end of
@@ -467,10 +477,30 @@
 	
 	(let ((type (excl::filesys-type realname)))
 	  (if* (not (eq :file type))
-	     then (if* failed-following
-		     then (logmess (format nil "no map for webaction ~s"
-					   failed-following)))
-		  (return-from webaction-entity (failed-request req)))
+	     then ;; No regular map entry for webaction.  If it has a default
+		  ;; action, we try it here.
+		  (if* use-actions
+		     then ;; I don't think we can actually get here, but
+			  ;; just in case...
+			  (when failed-following
+			    (logmess (format nil "~
+no map for webaction with default-actions ~s"
+					     failed-following)))
+			  (return-from webaction-entity (failed-request req))
+		     else (let ((default-actions
+				    (webaction-default-actions wa)))
+			    (if* default-actions
+			       then ;; try again specifying actions
+				    (return-from webaction-entity
+				      (webaction-entity
+				       req ent
+				       :use-actions default-actions))
+			       else (when failed-following
+				      (logmess
+				       (format nil "no map for webaction ~s"
+					       failed-following)))
+				    (return-from webaction-entity
+				      (failed-request req))))))
 
 	  (let ((new-ent (clp-directory-entity-publisher
 			  req ent realname info
