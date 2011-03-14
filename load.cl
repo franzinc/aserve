@@ -1,4 +1,6 @@
-2;; load in aserve
+(in-package :cl-user)
+
+;; load in aserve
 ;;
 ;; $Id: load.cl,v 1.69 2008/02/04 21:02:24 jkf Exp $
 ;;
