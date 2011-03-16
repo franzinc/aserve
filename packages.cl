@@ -1,5 +1,4 @@
 #+(version= 8 2)
-#+(version= 8 2)
 (sys:defpatch "aserve" 6
   "v1: version 1.2.67, implement keep-alive in allegroserve client;
 v2: 1.2.68, obey keep-alive requests for PUT and POST requests;
