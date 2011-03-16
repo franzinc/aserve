@@ -2593,7 +2593,9 @@
 		(let ((header-content
 		       (string-to-octets
 			(get-output-stream-string hsock)
-			:null-terminate nil)))
+			:null-terminate nil
+			:external-format :octets
+			)))
 		  
 		  (setq reply-stream
 		    (setf (request-reply-stream req)
