@@ -80,7 +80,9 @@ sys::
   (handler-case (require :deflate)
     (error (c)
       (when (null *user-warned-about-deflate*)
-	(format t "~&NOTE: ~a~%" c)
+	(format t "~&NOTE: ~@<the deflate module could not be loaded, so ~
+server compression is disabled.  AllegroServe is completely functional ~
+without compression.  Original error loading deflate was:~:@>~%~a~%" c)
 	(setq *user-warned-about-deflate* t)))))
 
 (defpackage :net.aserve
