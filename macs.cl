@@ -307,7 +307,7 @@
    (nil (let ((newvar (gensym)))
 	  `(let ((,newvar ,val))
 	     (without-interrupts
-	      (when (< ,place ,newvar) (setf ,place ,newvar) t)))))
+	      (if* (< ,place ,newvar) then (setf ,place ,newvar) t)))))
    ((t :macros) (let ((newvar (gensym)) (oldvar (gensym)))
 		  `(let ((,newvar ,val) ,oldvar)
 		     (loop

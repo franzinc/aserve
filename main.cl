@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 5))
+(defparameter *aserve-version* '(1 3 6))
 
 (eval-when (eval load)
     (require :sock)
@@ -1212,14 +1212,16 @@ by keyword symbols and not by strings"
   ; create accept thread
   (setf (wserver-accept-thread *wserver*)
     (mp:process-run-function 
-     (list :name (format nil "~A-accept-~d"
-			 (if *log-wserver-name* (wserver-name *wserver*) "aserve")
-			 (atomic-incf *thread-index*))
-	   :initial-bindings
-	   `((*wserver*  . ',*wserver*)
-	     #+ignore (*debug-io* . ',(wserver-terminal-io *wserver*))
-	     ,@excl:*cl-default-special-bindings*))
-     #'http-accept-thread)))
+	(list :name (format nil "~A-accept-~d"
+			    (if* *log-wserver-name* 
+			       then (wserver-name *wserver*) 
+			       else "aserve")
+			    (atomic-incf *thread-index*))
+	      :initial-bindings
+	      `((*wserver*  . ',*wserver*)
+		#+ignore (*debug-io* . ',(wserver-terminal-io *wserver*))
+		,@excl:*cl-default-special-bindings*))
+      #'http-accept-thread)))
 
 ;; make-worker-thread wasn't thread-safe before smp. I'm assuming that's
 ;; ok, which it will be if only one thread ever calls it, and leaving it
@@ -1228,12 +1230,14 @@ by keyword symbols and not by strings"
 (defun make-worker-thread (&aux (thx (atomic-incf *thread-index*)))
   (let* ((name (format nil "~d-~A-worker" 
 		       thx
-		       (if *log-wserver-name* (wserver-name *wserver*) "aserve")))
+		       (if* *log-wserver-name* 
+			  then (wserver-name *wserver*) 
+			  else "aserve")))
 	 (proc (mp:make-process :name name
 				:initial-bindings
 				`((*wserver*  . ',*wserver*)
 				  #+ignore (*debug-io* . ',(wserver-terminal-io 
-						   *wserver*))
+							    *wserver*))
 				  ,@excl:*cl-default-special-bindings*)
 				)))
     (mp:process-preset proc #'http-worker-thread)

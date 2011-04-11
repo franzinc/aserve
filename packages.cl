@@ -83,11 +83,11 @@ sys::
   (defvar *user-warned-about-deflate* nil)
   (handler-case (require :deflate)
     (error (c)
-      (when (null *user-warned-about-deflate*)
-	(format t "~&NOTE: ~@<the deflate module could not be loaded, so ~
+      (if* (null *user-warned-about-deflate*)
+	 then (format t "~&NOTE: ~@<the deflate module could not be loaded, so ~
 server compression is disabled.  AllegroServe is completely functional ~
 without compression.  Original error loading deflate was:~:@>~%~a~%" c)
-	(setq *user-warned-about-deflate* t)))))
+	      (setq *user-warned-about-deflate* t)))))
 
 (defpackage :net.aserve
   (:use :common-lisp :excl :net.html.generator :net.uri :util.zip)

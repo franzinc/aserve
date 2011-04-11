@@ -482,10 +482,10 @@
 		  (if* use-actions
 		     then ;; I don't think we can actually get here, but
 			  ;; just in case...
-			  (when failed-following
-			    (logmess (format nil "~
+			  (if* failed-following
+			     then (logmess (format nil "~
 no map for webaction with default-actions ~s"
-					     failed-following)))
+						   failed-following)))
 			  (return-from webaction-entity (failed-request req))
 		     else (let ((default-actions
 				    (webaction-default-actions wa)))
@@ -495,10 +495,10 @@ no map for webaction with default-actions ~s"
 				      (webaction-entity
 				       req ent
 				       :use-actions default-actions))
-			       else (when failed-following
-				      (logmess
-				       (format nil "no map for webaction ~s"
-					       failed-following)))
+			       else (if* failed-following
+				       then (logmess
+					     (format nil "no map for webaction ~s"
+						     failed-following)))
 				    (return-from webaction-entity
 				      (failed-request req))))))
 
