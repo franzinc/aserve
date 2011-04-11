@@ -17,6 +17,7 @@
     '("htmlgen/htmlgen"
       "packages"
       "macs"
+      "queue"
       "main"
       "headers"
       "parse"

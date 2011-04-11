@@ -348,7 +348,11 @@
    (worker-threads  ;; list of threads that can handle http requests
     :initform nil
     :accessor wserver-worker-threads)
-     
+
+   (free-worker-threads
+    :initform (make-queue-with-timeout)
+    :accessor wserver-free-worker-threads)
+   
    (free-workers    ;; estimate of the number of workers that are idle
     :initform 0
     :accessor wserver-free-workers)
@@ -1151,6 +1155,7 @@ by keyword symbols and not by strings"
     (mp:process-allow-schedule))
   
   (setf (wserver-worker-threads server) nil)
+  (setf (wserver-free-worker-threads server) (make-instance 'queue-with-timeout))
   
   (dolist (hook (wserver-shutdown-hooks server))
     (funcall hook server))
@@ -1242,6 +1247,7 @@ by keyword symbols and not by strings"
 				)))
     (mp:process-preset proc #'http-worker-thread)
     (push proc (wserver-worker-threads *wserver*))
+    (enqueue (wserver-free-worker-threads *wserver*) proc)
     (incf-free-workers *wserver* 1)
     (setf (getf (mp:process-property-list proc) 'short-name) 
       (format nil "w~d" thx))
@@ -1331,8 +1337,9 @@ by keyword symbols and not by strings"
 	      :report "Abandon this request and wait for the next one"
 	    nil))
 	(incf-free-workers *wserver* 1)
-	(mp:process-revoke-run-reason sys:*current-process* sock))
-    
+	(enqueue (wserver-free-worker-threads *wserver*) sys:*current-process*)
+        (mp:process-revoke-run-reason sys:*current-process* sock))
+      
       )))
 
 (defun connection-reset-error (c)
@@ -1352,7 +1359,6 @@ by keyword symbols and not by strings"
   ;; ignore sporatic errors but stop if we get a few consecutive ones
   ;; since that means things probably aren't going to get better.
   (let* ((error-count 0)
-	 (workers nil)
 	 (server *wserver*)
 	 (main-socket (wserver-socket server))
 	 (ipaddrs (wserver-ipaddrs server))
@@ -1399,32 +1405,27 @@ by keyword symbols and not by strings"
 		; for one so we can handle cases where the workers are all busy
 		(let ((looped 0))
 		  (loop
-		    (if* (null workers) 
-		       then (case looped
-			      (0 nil)
-			      ((1 2 3) (logmess "all threads busy, pause")
-				       (if* (>= (incf busy-sleeps) 4)
-					  then ; we've waited too many times
-					       (setq busy-sleeps 0)
-					       (logmess "too many sleeps, will create a new thread")
-					       (make-worker-thread)
-					  else (sleep 1)))
+                    (multiple-value-bind (worker found-worker-p) (dequeue (wserver-free-worker-threads server) :wait 1)
+                      (if* (not found-worker-p)
+                           then (case looped
+                                  (0 nil)
+                                  ((1 2 3) (logmess "all threads busy, pause")
+                                   (if* (>= (incf busy-sleeps) 4)
+                                        then ; we've waited too many times
+                                        (setq busy-sleeps 0)
+                                        (logmess "too many sleeps, will create a new thread")
+                                        (make-worker-thread)))
 			     
-			      (4 (logmess "forced to create new thread")
-				 (make-worker-thread))
+                                  (4 (logmess "forced to create new thread")
+                                     (make-worker-thread))
 		    
-			      (5 (logmess "can't even create new thread, quitting")
-				 (return-from http-accept-thread nil)))
+                                  (5 (logmess "can't even create new thread, quitting")
+                                     (return-from http-accept-thread nil)))
 			   
-			    (setq workers (wserver-worker-threads server))
-			    (incf looped))
-		    (if* (null (mp:process-run-reasons (car workers)))
-		       then (incf-free-workers server -1)
-			    (mp:process-add-run-reason (car workers) sock)
-			    (pop workers)
-			    (return) ; satisfied
-			    )
-		    (pop workers))))
+                           (incf looped)
+                           else (incf-free-workers server -1)
+                           (mp:process-add-run-reason worker sock)
+                           (return))))))
 	  
 	    (error (cond)
 	      (logmess (format nil "accept: error ~s on accept ~a" 
