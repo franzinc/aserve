@@ -1155,7 +1155,7 @@ by keyword symbols and not by strings"
     (mp:process-allow-schedule))
   
   (setf (wserver-worker-threads server) nil)
-  (setf (wserver-free-worker-threads server) (make-instance 'queue-with-timeout))
+  (setf (wserver-free-worker-threads server) (make-queue-with-timeout))
   
   (dolist (hook (wserver-shutdown-hooks server))
     (funcall hook server))
