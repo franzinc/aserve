@@ -1,5 +1,5 @@
 #+(version= 8 2)
-(sys:defpatch "aserve" 6
+(sys:defpatch "aserve" 7
   "v1: version 1.2.67, implement keep-alive in allegroserve client;
 v2: 1.2.68, obey keep-alive requests for PUT and POST requests;
 v3: 1.2.69, make logging though method specialized on wserver class;
@@ -9,7 +9,10 @@ v5: 1.3.1: compression support, publish-directory :destination can be a
 v6: 1.3.5: doc updates, make client-request-read-sequence work with
    compressed responses, delay sending headers for computed entities,
    add option to do hidden redirect to an index file in a directory,
-   fix prepend-headers so that it works on windows."
+   fix prepend-headers so that it works on windows;
+v7: 1.3.7: Add :default-actions to webactions,
+   Avoid polling in http-accept-thread,
+   smp thread safety changes."
   :type :system
   :post-loadable t)
 
