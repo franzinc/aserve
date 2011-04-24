@@ -30,6 +30,7 @@ build: FORCE
 test: FORCE
 	rm -f build.tmp
 	echo '(setq excl::*break-on-warnings* t)' >> build.tmp
+	echo '(setq util.test::*break-on-test-failures* t)' >> build.tmp
 	echo '(load "load.cl")' >> build.tmp
 	echo '(dribble "test.out")' >> build.tmp
 	echo '(time (load "test/t-aserve.cl"))' >> build.tmp

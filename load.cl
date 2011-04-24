@@ -4,6 +4,8 @@
 ;;
 ;; $Id: load.cl,v 1.69 2008/02/04 21:02:24 jkf Exp $
 ;;
+;; load in aserve
+
 
 ;
 ; loading this file will compile and load AllegroServe (+++mt NOT Webactions and examples)
@@ -11,7 +13,8 @@
 ; calling (make-aserve.fasl) will build
 ;   aserve.fasl  - just allegroserve
 ;   webactions/webactions.fasl  - just webactions 
-;
+
+(in-package :user)
 
 (defvar *loadswitch* :compile-if-needed)
 (defparameter *aserve-root* (directory-namestring *load-pathname*))
@@ -21,6 +24,7 @@
     '("htmlgen/htmlgen"
       "packages"
       "macs"
+      "queue"
       "main"
       "headers"
       "parse"

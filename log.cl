@@ -95,7 +95,13 @@
 
 	    (macrolet ((do-log ()
 			 '(progn (format stream
-				  "~a - - [~a] ~s ~s ~s~%"
+				  "~A~A~a - - [~a] ~s ~s ~s~%"
+				  (if* *log-wserver-name* 
+				     then (wserver-name *wserver*) 
+				     else "")
+				  (if* *log-wserver-name* 
+				     then " " 
+				     else "")
 				  (socket:ipaddr-to-dotted ipaddr)
 				  (maybe-universal-time-to-date time)
 				  (request-raw-request req)

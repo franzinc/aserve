@@ -1633,7 +1633,8 @@
 		 prefix-local))
       (declare (ignore headers))
       (test (file-contents 
-	     (concatenate 'string test-dir "testdir3/index.html"))
+	     (concatenate 'string test-dir "testdir3/index.html")
+	     :external-format :octets)
 	    body
 	    :test #'equal
 	    )
@@ -1650,7 +1651,8 @@
 		 prefix-local))
       (declare (ignore headers))
       (test (file-contents 
-	     (concatenate 'string test-dir "testdir3/subdir/index.html"))
+	     (concatenate 'string test-dir "testdir3/subdir/index.html")
+	     :external-format :octets)
 	    body
 	    :test #'equal
 	    )
@@ -1691,7 +1693,9 @@
 		 prefix-local))
       (declare (ignore headers))
       (test (file-contents 
-	     (concatenate 'string test-dir "testdir3/index.html"))
+	     (concatenate 'string test-dir "testdir3/index.html")
+	     :external-format :octets
+	     )
 	    body
 	    :test #'equal
 	    )
@@ -1708,7 +1712,9 @@
 		 prefix-local))
       (declare (ignore headers))
       (test (file-contents 
-	     (concatenate 'string test-dir "testdir3/subdir/index.html"))
+	     (concatenate 'string test-dir "testdir3/subdir/index.html")
+	     :external-format :octets
+	     )
 	    body
 	    :test #'equal
 	    )

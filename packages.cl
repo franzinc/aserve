@@ -1,11 +1,18 @@
 #+(version= 8 2)
-(sys:defpatch "aserve" 5
+(sys:defpatch "aserve" 7
   "v1: version 1.2.67, implement keep-alive in allegroserve client;
 v2: 1.2.68, obey keep-alive requests for PUT and POST requests;
 v3: 1.2.69, make logging though method specialized on wserver class;
 v4: 1.2.70: add support for Expect: 100-continue requests;
 v5: 1.3.1: compression support, publish-directory :destination can be a
-   list of directories, and various SSL improvements."
+   list of directories, and various SSL improvements;
+v6: 1.3.5: doc updates, make client-request-read-sequence work with
+   compressed responses, delay sending headers for computed entities,
+   add option to do hidden redirect to an index file in a directory,
+   fix prepend-headers so that it works on windows;
+v7: 1.3.7: Add :default-actions to webactions,
+   Avoid polling in http-accept-thread,
+   smp thread safety changes."
   :type :system
   :post-loadable t)
 
@@ -79,9 +86,11 @@ sys::
   (defvar *user-warned-about-deflate* nil)
   (handler-case (require :deflate)
     (error (c)
-      (when (null *user-warned-about-deflate*)
-	(format t "~&NOTE: ~a~%" c)
-	(setq *user-warned-about-deflate* t)))))
+      (if* (null *user-warned-about-deflate*)
+	 then (format t "~&NOTE: ~@<the deflate module could not be loaded, so ~
+server compression is disabled.  AllegroServe is completely functional ~
+without compression.  Original error loading deflate was:~:@>~%~a~%" c)
+	      (setq *user-warned-about-deflate* t)))))
 
 (defpackage :net.aserve
   (:use :common-lisp :excl :net.html.generator :net.uri :util.zip)

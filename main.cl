@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 3))
+(defparameter *aserve-version* '(1 3 7))
 
 (eval-when (eval load)
     (require :sock)
@@ -158,9 +158,14 @@
 (defun check-for-open-socket-before-gc (socket)
   (if* (open-stream-p socket)
      then (logmess 
-	   (format nil 
-		   "socket ~s is open yet is about to be gc'ed. It will be closed" 
-		   socket))
+	   (let ((*print-readably* nil))
+	     ;; explicitly binding *print-readably* nil in order to avoid
+	     ;; a printer crash if the finalization is run in a thread
+	     ;; with, say, with-standard-io-syntax that binds *print-readably*
+	     ;; true.
+	     (format nil 
+		     "socket ~s is open yet is about to be gc'ed. It will be closed" 
+		     socket)))
 	  (ignore-errors (close socket))))
 
 
@@ -181,7 +186,7 @@
 
 
 ;; more specials
-(defvar *max-socket-fd* nil) ; set this to 0 to enable tracking and logging of
+(defvar-mp *max-socket-fd* nil) ; set this to 0 to enable tracking and logging of
                              ; the maximum fd returned by accept-connection
 (defvar *aserve-debug-stream* nil) ; stream to which to seen debug messages
 (defvar *debug-connection-reset-by-peer* nil) ; true to signal these too
@@ -222,6 +227,9 @@
 
 (defvar *not-modified-entity*) ; used to send back not-modified message
 
+(defvar-mp *thread-index*  0)      ; globalcounter to gen process names
+
+(defvar *log-wserver-name* nil)
 	
 ;;;;;;;;;;;;;  end special vars
 
@@ -340,7 +348,11 @@
    (worker-threads  ;; list of threads that can handle http requests
     :initform nil
     :accessor wserver-worker-threads)
-     
+
+   (free-worker-threads
+    :initform (make-queue-with-timeout)
+    :accessor wserver-free-worker-threads)
+   
    (free-workers    ;; estimate of the number of workers that are idle
     :initform 0
     :accessor wserver-free-workers)
@@ -389,6 +401,27 @@
     :initform nil
     :initarg :ssl
     :accessor wserver-ssl)
+
+   (name
+    :initform (format nil "w~d" (atomic-incf *thread-index*))
+    :initarg :name
+    :reader wserver-name)
+
+   ;; The following 3 used to be global variables, but logically they need to
+   ;; be specific to each server instance.
+   (debug-connection-reset-by-peer
+    :initarg :debug-connection-reset-by-peer
+    :initform *debug-connection-reset-by-peer*
+    :accessor wserver-debug-connection-reset-by-peer)
+   (read-request-timeout
+    :initarg :read-request-timeout
+    :initform *read-request-timeout*
+    :accessor wserver-read-request-timeout)
+   (read-request-body-timeout
+    :initarg :read-request-body-timeout
+    :initform *read-request-body-timeout*
+    :accessor wserver-read-request-body-timeout)
+
    ))
 
 
@@ -895,7 +928,6 @@ by keyword symbols and not by strings"
 (defvar *crlf* (make-array 2 :element-type 'character :initial-contents
 			   '(#\return #\linefeed)))
 
-(defvar *thread-index*  0)      ; globalcounter to gen process names
 
 
 				    
@@ -1123,6 +1155,7 @@ by keyword symbols and not by strings"
     (mp:process-allow-schedule))
   
   (setf (wserver-worker-threads server) nil)
+  (setf (wserver-free-worker-threads server) (make-queue-with-timeout))
   
   (dolist (hook (wserver-shutdown-hooks server))
     (funcall hook server))
@@ -1184,30 +1217,40 @@ by keyword symbols and not by strings"
   ; create accept thread
   (setf (wserver-accept-thread *wserver*)
     (mp:process-run-function 
-     (list :name (format nil "aserve-accept-~d" (incf *thread-index*))
-	   :initial-bindings
-	   `((*wserver*  . ',*wserver*)
-	     #+ignore (*debug-io* . ',(wserver-terminal-io *wserver*))
-	     ,@excl:*cl-default-special-bindings*))
-     #'http-accept-thread)))
+	(list :name (format nil "~A-accept-~d"
+			    (if* *log-wserver-name* 
+			       then (wserver-name *wserver*) 
+			       else "aserve")
+			    (atomic-incf *thread-index*))
+	      :initial-bindings
+	      `((*wserver*  . ',*wserver*)
+		#+ignore (*debug-io* . ',(wserver-terminal-io *wserver*))
+		,@excl:*cl-default-special-bindings*))
+      #'http-accept-thread)))
 
 ;; make-worker-thread wasn't thread-safe before smp. I'm assuming that's
 ;; ok, which it will be if only one thread ever calls it, and leaving it
 ;; non-thread-safe in the smp version. 
-(defun make-worker-thread ()
-  (let* ((name (format nil "~d-aserve-worker" (incf *thread-index*)))
+;; mm 2010-12: this assumption is false if several servers are running.
+(defun make-worker-thread (&aux (thx (atomic-incf *thread-index*)))
+  (let* ((name (format nil "~d-~A-worker" 
+		       thx
+		       (if* *log-wserver-name* 
+			  then (wserver-name *wserver*) 
+			  else "aserve")))
 	 (proc (mp:make-process :name name
 				:initial-bindings
 				`((*wserver*  . ',*wserver*)
 				  #+ignore (*debug-io* . ',(wserver-terminal-io 
-						   *wserver*))
+							    *wserver*))
 				  ,@excl:*cl-default-special-bindings*)
 				)))
     (mp:process-preset proc #'http-worker-thread)
     (push proc (wserver-worker-threads *wserver*))
+    (enqueue (wserver-free-worker-threads *wserver*) proc)
     (incf-free-workers *wserver* 1)
     (setf (getf (mp:process-property-list proc) 'short-name) 
-      (format nil "w~d" *thread-index*))
+      (format nil "w~d" thx))
     ))
 
 
@@ -1285,7 +1328,7 @@ by keyword symbols and not by strings"
 		    ((stream-error 
 		      #'(lambda (c)
 			  (if* (and 
-				(not *debug-connection-reset-by-peer*)
+				(not (wserver-debug-connection-reset-by-peer *wserver*))
 				(connection-reset-error c))
 			     then (throw 'out-of-connection nil)))))
 		  (process-connection sock)))))
@@ -1294,8 +1337,9 @@ by keyword symbols and not by strings"
 	      :report "Abandon this request and wait for the next one"
 	    nil))
 	(incf-free-workers *wserver* 1)
-	(mp:process-revoke-run-reason sys:*current-process* sock))
-    
+	(enqueue (wserver-free-worker-threads *wserver*) sys:*current-process*)
+        (mp:process-revoke-run-reason sys:*current-process* sock))
+      
       )))
 
 (defun connection-reset-error (c)
@@ -1315,7 +1359,6 @@ by keyword symbols and not by strings"
   ;; ignore sporatic errors but stop if we get a few consecutive ones
   ;; since that means things probably aren't going to get better.
   (let* ((error-count 0)
-	 (workers nil)
 	 (server *wserver*)
 	 (main-socket (wserver-socket server))
 	 (ipaddrs (wserver-ipaddrs server))
@@ -1351,11 +1394,9 @@ by keyword symbols and not by strings"
 		; descriptors
                 (if* *max-socket-fd*
 		   then (let ((fd (excl::stream-input-fn sock)))
-			  (if* (> fd *max-socket-fd*)
-			       then (setq *max-socket-fd* fd)
-			       (logmess (format nil 
-						"Maximum socket file descriptor number is now ~d" fd)))))
-		
+			  (if* (atomic-setf-max *max-socket-fd* fd)
+                             then (logmess (format nil 
+                                                   "Maximum socket file descriptor number is now ~d" fd)))))
 		
 		(setq error-count 0) ; reset count
 	
@@ -1364,32 +1405,27 @@ by keyword symbols and not by strings"
 		; for one so we can handle cases where the workers are all busy
 		(let ((looped 0))
 		  (loop
-		    (if* (null workers) 
-		       then (case looped
-			      (0 nil)
-			      ((1 2 3) (logmess "all threads busy, pause")
-				       (if* (>= (incf busy-sleeps) 4)
-					  then ; we've waited too many times
-					       (setq busy-sleeps 0)
-					       (logmess "too many sleeps, will create a new thread")
-					       (make-worker-thread)
-					  else (sleep 1)))
+                    (multiple-value-bind (worker found-worker-p) (dequeue (wserver-free-worker-threads server) :wait 1)
+                      (if* (not found-worker-p)
+                           then (case looped
+                                  (0 nil)
+                                  ((1 2 3) (logmess "all threads busy, pause")
+                                   (if* (>= (incf busy-sleeps) 4)
+                                        then ; we've waited too many times
+                                        (setq busy-sleeps 0)
+                                        (logmess "too many sleeps, will create a new thread")
+                                        (make-worker-thread)))
 			     
-			      (4 (logmess "forced to create new thread")
-				 (make-worker-thread))
+                                  (4 (logmess "forced to create new thread")
+                                     (make-worker-thread))
 		    
-			      (5 (logmess "can't even create new thread, quitting")
-				 (return-from http-accept-thread nil)))
+                                  (5 (logmess "can't even create new thread, quitting")
+                                     (return-from http-accept-thread nil)))
 			   
-			    (setq workers (wserver-worker-threads server))
-			    (incf looped))
-		    (if* (null (mp:process-run-reasons (car workers)))
-		       then (incf-free-workers server -1)
-			    (mp:process-add-run-reason (car workers) sock)
-			    (pop workers)
-			    (return) ; satisfied
-			    )
-		    (pop workers))))
+                           (incf looped)
+                           else (incf-free-workers server -1)
+                           (mp:process-add-run-reason worker sock)
+                           (return))))))
 	  
 	    (error (cond)
 	      (logmess (format nil "accept: error ~s on accept ~a" 
@@ -1454,7 +1490,7 @@ by keyword symbols and not by strings"
 	(loop
 	   (multiple-value-setq (req error-obj)
              (ignore-errors
-               (with-timeout-local (*read-request-timeout* 
+               (with-timeout-local ((wserver-read-request-timeout *wserver*)
                                     (debug-format :info "request timed out on read~%")
                                     (return-from process-connection nil))
                  (read-http-request sock chars-seen))))
@@ -1704,7 +1740,7 @@ by keyword symbols and not by strings"
 				   (read-sequence-with-timeout 
 				    ret length 
 				    (request-socket req)
-				    *read-request-body-timeout*))
+				    (wserver-read-request-body-timeout *wserver*)))
 	    
 			    ; netscape (at least) is buggy in that 
 			    ; it sends a crlf after
@@ -1735,7 +1771,7 @@ by keyword symbols and not by strings"
 						 :input-chunking t)
 			  
 			  (with-timeout-local
-			      (*read-request-body-timeout* nil)
+			      ((wserver-read-request-body-timeout *wserver*) nil)
 			    (let ((ans (make-array 
 					2048 
 					:element-type 'character
@@ -1767,7 +1803,7 @@ by keyword symbols and not by strings"
 				  ""
 			     else ; read until the end of file
 				  (with-timeout-local
-				      (*read-request-body-timeout* 
+				      ((wserver-read-request-body-timeout *wserver*) 
 				       nil)
 				    (let ((ans (make-array 
 						2048 

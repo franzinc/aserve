@@ -38,6 +38,11 @@
 (def-stream-class chunking-stream (single-channel-simple-stream)
   ())
 
+(defvar *binary-crlf*
+    (make-array 2 :element-type '(unsigned-byte 8)
+		:initial-contents '(#.(char-code #\return)
+				    #.(char-code #\linefeed))))
+
 
 (defmethod device-open ((p chunking-stream) dummy options)
   (declare (ignore dummy))
@@ -80,9 +85,10 @@
     (if* (> end start)
        then ; write it out with chunking
 	    ; chunk header
-	    (format output "~x~a" (- end start) *crlf*)
+	    (format output "~x" (- end start))
+	    (write-sequence *binary-crlf* output)
 	    (write-sequence buffer output :start start :end end)
-	    (write-string *crlf* output)
+	    (write-sequence *binary-crlf* output)
 	    (force-output output)))
   
   end)
@@ -99,7 +105,9 @@
     (if* (not abort) then (force-output p))
 
     ; chunking eof
-    (format inner-stream "0~a~a" *crlf* *crlf*)
+    (write-char #\0 inner-stream)
+    (write-sequence *binary-crlf* inner-stream)
+    (write-sequence *binary-crlf* inner-stream)
     (force-output inner-stream)
     p))
 
@@ -161,7 +169,7 @@
   
   (setq buffer (or buffer (slot-value p 'excl::buffer)))
   (setq end    (or end (length buffer)))
-  
+
   (loop
     (let ((state (unchunking-state p))
 	  (ins (slot-value p 'excl::input-handle)))
@@ -190,14 +198,14 @@
 		  then (return) ; valid count
 		  else ; non hex char
 		       (error "bad chunking count"))))
-	 
+	   
 	   ; now skip to newline
 	   (loop 
 	     (let ((ch (read-byte ins nil nil)))
 	       (if* (null ch) then (error "premature eof before chunking data"))
 	       (if* (eq ch #.(char-int #\newline))
 		  then (return))))
-	 
+
 	   (if* (zerop count)
 	      then ; chunking eof, read trailers and trailing crlf
 		   (let ((seen-stuff-on-line nil))

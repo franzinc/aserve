@@ -301,6 +301,22 @@
    ((t :macros) `(excl::.atomically (excl::fast ,@body)))
    (nil `(excl::atomically (excl::fast ,@body)))))
 
+
+(defmacro atomic-setf-max (place val)
+  (smp-case
+   (nil (let ((newvar (gensym)))
+	  `(let ((,newvar ,val))
+	     (without-interrupts
+	      (if* (< ,place ,newvar) then (setf ,place ,newvar) t)))))
+   ((t :macros) (let ((newvar (gensym)) (oldvar (gensym)))
+		  `(let ((,newvar ,val) ,oldvar)
+		     (loop
+		      (setq ,oldvar  ,place)
+		      (cond ((not (< ,oldvar ,newvar)) (return nil))
+			    ((atomic-conditional-setf ,place ,newvar ,oldvar)
+			     (return t)))))))))
+
+
 ;;;;;; end of smp-aware macro definitions
 			 
 

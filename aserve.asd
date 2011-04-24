@@ -16,6 +16,7 @@
                                    (:static-file "ChangeLog")))
    (:cl-file "packages")
    (:cl-file "macs")
+   (:cl-file "queue")
    (:cl-file "main")
    (:cl-file "headers")
    (:cl-file "parse")
