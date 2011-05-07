@@ -243,8 +243,7 @@
       
       (let ((ch (read-byte sock nil nil)))
 	(if* (null ch) 
-	   then (format *debug-stream* "early eof reading response after ~d bytes~%" i)
-		(return nil) ; eof - failure
+	   then (return nil) ; eof - failure
 		)
 	
 	; enable this if things are really messed
