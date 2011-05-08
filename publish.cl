@@ -2641,23 +2641,25 @@
 		    (prepend-stream-inner-stream reply-stream))))
 		
 	(if* (and  compress (eq time :post))
-	   then (force-output reply-stream)
+	   then (if* reply-stream
+		   then (force-output reply-stream)
 		
-		(close reply-stream)  ; close deflate stream
+			(close reply-stream)  ; close deflate stream
 		
-		(setq reply-stream
-		  (setf (request-reply-stream req) (excl::inner-stream reply-stream)))
-		(force-output reply-stream))
+			(setq reply-stream
+			  (setf (request-reply-stream req) (excl::inner-stream reply-stream)))
+			(and reply-stream (force-output reply-stream))))
 				      
 	;; if we're chunking then shut that off
 	(if* (and chunked-p (eq time :post))
 	   then ; unwrap the chunked stream
 		
-		(force-output reply-stream)
-		(close reply-stream) ; send chunking eof
-		(setq reply-stream
-		  (setf (request-reply-stream req) (excl::inner-stream reply-stream)))
-		(force-output reply-stream))
+		(if* reply-stream
+		   then (force-output reply-stream)
+			(close reply-stream) ; send chunking eof
+			(setq reply-stream
+			  (setf (request-reply-stream req) (excl::inner-stream reply-stream)))
+			(and reply-stream (force-output reply-stream))))
 	
 	
 	

@@ -68,6 +68,8 @@
 (defvar *x-compress* nil) ; true when compressing
 (defvar *proxy-wserver* nil)
 
+(defvar *our-long-site-name* "127.0.0.1")
+
 ; if true run timeout test
 (defvar *test-timeouts* nil)
 
@@ -91,8 +93,33 @@
 	util.test::*test-unexpected-failures* 0)
   (with-tests (:name "aserve")
     (let* ((*wserver* *wserver*)
+	   (*our-long-site-name*
+	    (let ((our-ext-ip-addr
+		   (let ((socket (socket:make-socket 
+				  :remote-host "www.google.com"
+				  :remote-port 80)))
+		     (prog1 (socket:local-host socket)
+		       (close socket)))))
+	      (if* (and (equal our-ext-ip-addr 
+			  (ignore-errors 
+			   (socket:lookup-hostname (long-site-name))))
+			(equal our-ext-ip-addr 
+			  (ignore-errors 
+			   (socket:lookup-hostname (long-site-name))))
+			(equal our-ext-ip-addr 
+			  (ignore-errors 
+			   (socket:lookup-hostname (long-site-name)))))
+		      
+		 then ; had to test three times since sometimes 
+		      ; the ip address will alternate between
+		      ; the external ip address and 127.1 which
+		      ; is not good for the test
+		      (long-site-name)
+		 else (socket:ipaddr-to-dotted our-ext-ip-addr))))
+	      
 	   (port (start-aserve-running)))
       (format t "server started on port ~d~%" port)
+      (format t "our long site name is ~s~%" *our-long-site-name*)
       (unwind-protect 
 	  (labels ((do-tests ()
 		     ; run test with and with compression
@@ -126,7 +153,7 @@
 			then (test-international port)
 			     (test-spr27296))
 		     (if* test-timeouts 
-		     then (test-timeouts port))
+			then (test-timeouts port))
 
 		     
 		     )
@@ -277,7 +304,7 @@
 	(dummy-2-name "xx2aservetest.txt")
 	(prefix-local (format nil "http://localhost:~a" port))
 	(prefix-dns   (format nil "http://~a:~a" 
-			      (long-site-name)
+			      *our-long-site-name*
 			      port))
 	(reps 0)
 	(got-reps nil))
@@ -455,7 +482,7 @@
 		  :content-type "text/plain")
     
     (publish-file :path "/checkit" 
-		  :host (long-site-name)
+		  :host *our-long-site-name*
 		  :file dummy-2-name
 		  :content-type "text/plain")
     
@@ -483,7 +510,7 @@
     
     ; remove the dns one
     (publish-file :path "/checkit" 
-		  :host (long-site-name)
+		  :host *our-long-site-name*
 		  :remove t)
     
     ; verify it's gone too
@@ -678,7 +705,7 @@
 (defun test-authorization (port)
   (let ((prefix-local (format nil "http://localhost:~a" port))
 	(prefix-dns   (format nil "http://~a:~a" 
-			      (long-site-name) port)))
+			      *our-long-site-name* port)))
     
     ;; manual authorization testing
     ;; basic authorization
@@ -841,7 +868,7 @@
       ;; accept from dns name only 
       
       (setf (location-authorizer-patterns loca) 
-	`((:accept ,(long-site-name))
+	`((:accept ,*our-long-site-name*)
 	  :deny))
       
       (test 404
@@ -855,7 +882,7 @@
       
       ;; deny dns and accept all others
       (setf (location-authorizer-patterns loca) 
-	`((:deny ,(long-site-name))
+	`((:deny ,*our-long-site-name*)
 	  :accept))
       
       (test 200
@@ -1410,7 +1437,7 @@
 (defun test-publish-directory (port)
   (let ((prefix-local (format nil "http://localhost:~a" port))
 	(prefix-dns   (format nil "http://~a:~a" 
-			      (long-site-name)
+			      *our-long-site-name*
 			      port))
 	(test-dir)
 	(step 0)
@@ -1773,7 +1800,7 @@
 (defun test-publish-prefix (port)
   (let ((prefix-local (format nil "http://localhost:~a" port))
 	(prefix-dns   (format nil "http://~a:~a" 
-			      (long-site-name)
+			      *our-long-site-name*
 			      port))
 	(got-here))
     (publish-prefix :prefix "/pptest"
