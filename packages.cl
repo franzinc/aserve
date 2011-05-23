@@ -1,5 +1,5 @@
 #+(version= 8 2)
-(sys:defpatch "aserve" 8
+(sys:defpatch "aserve" 9
   "v1: version 1.2.67, implement keep-alive in allegroserve client;
 v2: 1.2.68, obey keep-alive requests for PUT and POST requests;
 v3: 1.2.69, make logging though method specialized on wserver class;
@@ -13,7 +13,8 @@ v6: 1.3.5: doc updates, make client-request-read-sequence work with
 v7: 1.3.7: Add :default-actions to webactions,
    Avoid polling in http-accept-thread,
    smp thread safety changes;
-v8: 1.3.8: fix problem w/response handler using string output streams."
+v8: 1.3.8: fix problem w/response handler using string output streams;
+v9: 1.3.9: speed up unchunking-streams."
   :type :system
   :post-loadable t)
 
