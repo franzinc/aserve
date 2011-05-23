@@ -238,20 +238,21 @@
 	      then ; read crlf
 		   
 		   (setf (unchunking-state p) :need-count)
-	      else (do ((i start (1+ i))
-			(count count (1- count)))
-		       ((or (zerop count)
-			    (>= i end))
-			(if* (zerop count)
-			   then (loop (let ((ch (read-byte ins)))
-					(if* (eq ch #.(char-int #\newline)) 
-					   then (return))))
-				(setf (unchunking-state p) :need-count))
-			(setf (unchunking-count p) count)
-			
-			(return-from device-read i))
-			
-		     (setf (aref buffer i) (read-byte ins))))))))))
+	      else (do ((bytes-read 0)
+                        (i start (+ i bytes-read))
+                        (count count (- count bytes-read)))
+                       ((or (zerop count)
+                            (>= i end))
+
+                        (if* (zerop count)
+                           then (loop (let ((ch (read-byte ins)))
+                                        (if* (eq ch #.(char-int #\newline))
+                                           then (return))))
+                                (setf (unchunking-state p) :need-count))
+                        (setf (unchunking-count p) count)
+                        (return-from device-read i))
+                     (setf bytes-read (- (read-sequence buffer ins :start i :end (min (+ i count) end))
+                                         i))))))))))
 
 
 (defmethod device-close ((p unchunking-stream) abort)
