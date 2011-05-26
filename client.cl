@@ -1119,6 +1119,7 @@ or \"foo.com:8000\", not ~s" proxy))
 				creq :connection)))
 	     then ; connection will close, let it indicate eof
 		  (setf (client-request-bytes-left creq) :unknown)
+		  (setf (client-request-return-connection creq) nil)
 	     else ; no data in the response
 		  nil)
 	  

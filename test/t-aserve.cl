@@ -1403,42 +1403,40 @@
 			   :keep-alive t)
       (declare (ignore body headers uri))
       (test 200 code2)
-      (test t (and "with no-keepalive" (not (null socket))))
       
-      ; now reuse it
+      (if* (not (asc x-proxy))
+         then (test t (not (null socket)) :fail-info "socket not kept alive"))
       
-      ;; bug20222: give a chance for the server to close the
-      ;; connection
-      (sleep (random 1.0))
-      (multiple-value-bind (body code3 headers uri socket2)
-	  (x-do-http-request (format nil "~a/redir-target" prefix-local)
-			     :keep-alive t
-			     :connection socket)
-	(declare (ignore body headers uri))
-	(test 200 code3)
-	(if* (and (not (asc x-proxy))
-		  (not (asc x-ssl)))
-	   then ; reuse should happen
-		(test socket (and "reuse socket" socket2))
-		(asc-format "~%~%pause ~d seconds ....~%" 
-			(+ net.aserve::*read-request-timeout* 10))
-		(force-output)
-		(sleep (+ net.aserve::*read-request-timeout* 10))
-		
-		; now the server should have shut down the
-		; socket so reuse will not happen
-		(multiple-value-bind (body code4 headers uri socket3)
-		    (x-do-http-request (format nil "~a/redir-target" prefix-local)
-				       :connection socket2)
-		  (declare (ignore body headers uri))
-		  (test 200 code4)
-		  (test t (and "not reuse socket" (not (eq socket2 socket3))))
-		  
-		  
-		  ))))
-    
-      
-    ))
+      (if* socket
+         then ;; now reuse it
+              ;; bug20222: give a chance for the server to close the
+              ;; connection
+              (sleep (random 1.0))
+              (multiple-value-bind (body code3 headers uri socket2)
+                  (x-do-http-request (format nil "~a/redir-target" prefix-local)
+                                     :keep-alive t
+                                     :connection socket)
+                (declare (ignore body headers uri))
+                (test 200 code3)
+                (if* (and (not (asc x-proxy))
+                          (not (asc x-ssl)))
+                     then               ; reuse should happen
+                     (test socket (and "reuse socket" socket2))
+                     (asc-format "~%~%pause ~d seconds ....~%" 
+                                 (+ net.aserve::*read-request-timeout* 10))
+                     (force-output)
+                     (sleep (+ net.aserve::*read-request-timeout* 10))
+                                        ; now the server should have
+                                        ; shut down the socket so
+                                        ; reuse will not happen
+                     (multiple-value-bind (body code4 headers uri socket3)
+                         (x-do-http-request (format nil "~a/redir-target"
+                                                    prefix-local)
+                                            :connection socket2)
+                       (declare (ignore body headers uri))
+                       (test 200 code4)
+                       (test t (and "not reuse socket"
+                                    (not (eq socket2 socket3)))))))))))
   
   
 
