@@ -1406,6 +1406,10 @@
       (test t (and "with no-keepalive" (not (null socket))))
       
       ; now reuse it
+      
+      ;; bug20222: give a chance for the server to close the
+      ;; connection
+      (sleep (random 1.0))
       (multiple-value-bind (body code3 headers uri socket2)
 	  (x-do-http-request (format nil "~a/redir-target" prefix-local)
 			     :keep-alive t
