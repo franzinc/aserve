@@ -3,7 +3,7 @@
 ;; t-aserve.cl
 ;;
 ;; copyright (c) 1986-2005 Franz Inc, Berkeley, CA  - All rights reserved.
-;; copyright (c) 2000-2007 Franz Inc, Oakland, CA - All rights reserved.
+;; copyright (c) 2000-2011 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
@@ -23,22 +23,48 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: t-aserve.cl,v 1.56 2007/04/17 22:05:04 layer Exp $
 
 ;; Description:
-;;   test iserve
+;;  This file is a copy of aserve/test/t-aserve.cl 
+;;  modified to run the same tests in several servers
+;;  simultaneously.
+;;
+;; THIS FILE MUST BE COMPILED WITH THE CURRENT DIRECTORY 
+;;  set to the aserve source directory,
+;;  ie ./examples/ should be the aserve/examples/ directory.
+;; 
+;;  (test-aserve test-timeouts)  -- Run tests in one server
+;;  (test-aserve-n :n n option...)   -- Run tests in n servers
+;;        n=nil or 0 --- just like test-aserve in this thread
+;;        n>0  --- run n servers in n new threads
+;;        n=1 is like n=nil or 0 but leaves the initial listener 
+;;            free for console interactions
 
-;;- This code in this file obeys the Lisp Coding Standard found in
-;;- http://www.franz.com/~jkf/coding_standards.html
-;;-
 
 (eval-when (compile load eval)
-  (require :tester))
+  (require :tester)
+  (require :aserve)
+  )
+
+;; This hack is needed to allow running with older versions of aserve.
+(defvar user::*default-log-wserver-name* t)
+
+(eval-when (compile load eval)
+  (when (not (boundp  'net.aserve::*log-wserver-name*))
+    ;; With older aserve, there is no wserver-name slot, so the messages
+    ;; will be harder to identify.
+    (defvar net.aserve::*log-wserver-name* nil)
+    (defun net.aserve::wserver-name (x) (declare (ignore x)) "")
+    (setq user::*default-log-wserver-name* nil)
+    )
+  )
+
 
 (defpackage :net.aserve.test
   (:use :common-lisp :excl :net.html.generator :net.aserve 
 	:net.aserve.client
 	:util.test)
+  (:import-from :net.aserve #:*log-wserver-name* #:wserver-name #:logmess)
   )
 
 (in-package :net.aserve.test)
@@ -59,28 +85,132 @@
       util.test:*error-protect-tests*   nil)
 
 
-
-
 ; set to nil before loading the test to prevent the test from auto-running
-(defvar user::*do-aserve-test* t)
-(defvar *x-proxy* nil) ; when true x-do-http-request will go through a proxy
-(defvar *x-ssl*   nil) ; true when we want to do ssl client calls
-(defvar *x-compress* nil) ; true when compressing
-(defvar *proxy-wserver* nil)
-
-(defvar *our-long-site-name* "127.0.0.1")
+; or set to the number of threads/servers to run simultaneously
+(defvar user::*do-aserve-test* 0)
 
 ; if true run timeout test
 (defvar *test-timeouts* nil)
 
-; stack of old values
-(defvar *save-x-proxy* nil)
-(defvar *save-proxy-wserver* nil)
+
+(defclass aserve-test-config ()
+  (
+   (name    :reader asc-name :initarg :name :initform "")
+   (index   :reader asc-index :initarg :index :initform "")
+   (x-proxy :accessor asc-x-proxy 
+	    ;; when true x-do-http-request will go through a proxy
+	    :initform nil)
+   (x-ssl   :accessor asc-x-ssl   
+	    ;; true when we want to do ssl client calls
+	    :initform nil)
+   (x-compress :accessor asc-x-compress
+	       ;; true when compressing
+	       :initform nil)
+   (proxy-wserver :accessor asc-proxy-wserver :initform nil)
+   (test-timeouts :accessor asc-test-timeouts :initarg :test-timeouts
+		  :initform *test-timeouts*)
+   (save-x-proxy  :accessor asc-save-x-proxy 
+		  ;; stack of old values
+		  :initform nil)
+   (save-proxy-wserver :accessor asc-save-proxy-wserver
+		       ;; stack of old values
+		       :initform nil)
+   (wserver :accessor asc-wserver :initform nil)
+   (done    :accessor asc-done    :initform nil)
+   ))
+(defvar *aserve-test-config* (make-instance 'aserve-test-config))
+(defmacro asc (slot &aux (accessor
+			  (read-from-string
+			   (format nil "~A::asc-~A "
+				   (package-name 
+				    (find-package :net.aserve.test))
+				   slot))))
+  `(,accessor *aserve-test-config*))
+
+
 
 ; remember where we were loaded from so we can run manually
 (defparameter *aserve-load-truename* *load-pathname*)
 
-(defun test-aserve (test-timeouts)
+(defvar *aserve-test-configs* nil)
+
+(defun asp-index ()
+  (if *log-wserver-name*
+      (format nil "~A[~A]" 
+	      (mp:process-name mp:*current-process*)
+	      (sys::thread-bindstack-index
+	       (mp:process-thread mp:*current-process*)))
+    ""))
+
+(defun user::test-aserve-n (&key n (test-timeouts *test-timeouts*) (delay 0) logs
+				 (direct t) (proxy t) (proxyproxy t) (ssl t)
+				 (name "ast") (log-name nil l-n-p)
+			   &aux wname)
+  (setq *aserve-test-configs* (make-array (case n ((nil 0) 1) (t n))))
+  (case n
+    ((nil 0)
+     (if l-n-p
+	 (setq *log-wserver-name* log-name)
+       (setq *log-wserver-name* nil))
+     (test-aserve test-timeouts :direct direct :proxy proxy :proxyproxy proxyproxy 
+		  :ssl ssl))
+    (otherwise
+     (when (cond (l-n-p (setq *log-wserver-name* log-name))
+		 ((eql n 1) (setq *log-wserver-name* nil))
+		 (t  (setq *log-wserver-name* user::*default-log-wserver-name*)))
+       (when (boundp 'util.test::*test-report-thread*)
+	 (set 'util.test::*test-report-thread* t)))	 
+     (dotimes (i n)
+       (mp:process-run-function
+	(setq wname (format nil "~A~A" i name))
+	(lambda (i name)
+	  (let* (os
+		 clean 
+		 (*standard-output*
+		  (if logs
+		      (setq os
+			    (open (format nil "~A~A.log" logs i) :direction :output
+				  :if-exists :supersede))
+		    *standard-output*))
+		 (*aserve-test-config* 
+		  (setf (aref *aserve-test-configs* i)
+			(make-instance 'aserve-test-config
+				       :name name :index i
+				       :test-timeouts test-timeouts)))
+		 (*wserver* (apply #'make-instance 'wserver 
+				   (when user::*default-log-wserver-name* (list :name name)))))
+	    (unwind-protect
+		(let ()
+		  (asc-format "~&~%============ STARTING SERVER ~A ~A ~%~%" i name)
+		  (setf (asc wserver) *wserver*)
+		  (test-aserve test-timeouts
+			       :direct direct :proxy proxy :proxyproxy proxyproxy :ssl ssl)
+		  (setq clean t))
+	      (asc-format "~&~%============ ENDING SERVER ~A ~A ~A ~%~%" i name 
+			  (if clean "normally" "ABRUPTLY"))
+	      (when os (close os))
+	      (setf (asc done) (if clean :clean :abrupt))
+	      (dotimes (j (length *aserve-test-configs*)
+			  (format *initial-terminal-io* "~&~%~%ALL SERVERS ENDED~%~%"))
+		(or (asc-done (aref *aserve-test-configs* j)) (return)))
+	      )))
+	i wname)
+       (sleep delay))))
+  )
+
+(defvar *asc-lock* (mp:make-process-lock :name "asc"))
+(defun asc-format (fmt &rest args)
+  (mp:with-process-lock
+   (*asc-lock*)
+   (cond
+    ((or (equal 0 (search "~&~%" fmt)) (equal 0 (search "~%~%" fmt)))
+     (format t "~&~%~A ~A" (asp-index) (apply #'format nil (subseq fmt 4) args)))
+    ((or (equal 0 (search "~&" fmt)) (equal 0 (search "~%" fmt)))
+     (format t "~&~A ~A" (asp-index) (apply #'format nil (subseq fmt 2) args)))
+    (t (format t "~&~A ~A~%" (asp-index) (apply #'format nil fmt args))))))
+			
+
+(defun test-aserve (test-timeouts &key (direct t) (proxy t) (proxyproxy t) (ssl t))
   ;; run the allegroserve tests three ways:
   ;;  1. normally
   ;   2. through an allegroserve proxy to test the proxy
@@ -93,33 +223,8 @@
 	util.test::*test-unexpected-failures* 0)
   (with-tests (:name "aserve")
     (let* ((*wserver* *wserver*)
-	   (*our-long-site-name*
-	    (let ((our-ext-ip-addr
-		   (let ((socket (socket:make-socket 
-				  :remote-host "www.google.com"
-				  :remote-port 80)))
-		     (prog1 (socket:local-host socket)
-		       (close socket)))))
-	      (if* (and (equal our-ext-ip-addr 
-			  (ignore-errors 
-			   (socket:lookup-hostname (long-site-name))))
-			(equal our-ext-ip-addr 
-			  (ignore-errors 
-			   (socket:lookup-hostname (long-site-name))))
-			(equal our-ext-ip-addr 
-			  (ignore-errors 
-			   (socket:lookup-hostname (long-site-name)))))
-		      
-		 then ; had to test three times since sometimes 
-		      ; the ip address will alternate between
-		      ; the external ip address and 127.1 which
-		      ; is not good for the test
-		      (long-site-name)
-		 else (socket:ipaddr-to-dotted our-ext-ip-addr))))
-	      
 	   (port (start-aserve-running)))
-      (format t "server started on port ~d~%" port)
-      (format t "our long site name is ~s~%" *our-long-site-name*)
+      (asc-format "server started on port ~d" port)
       (unwind-protect 
 	  (labels ((do-tests ()
 		     ; run test with and with compression
@@ -127,61 +232,63 @@
 		     (dolist (cv (if* (member :zlib-deflate *features*)
 				    then '(nil t)
 				    else '(nil)))
-		       (let ((*x-compress* cv))
-			 (format t "~2%Compress ~s~2%" cv)
-			 (do-tests-inner))))
-		   
+		       (let ((prev (asc x-compress)))
+			 (unwind-protect
+			     (progn
+			       (setf (asc x-compress) cv)
+			       (format t "~2%Compress ~s~2%" cv)
+			       (do-tests-inner))
+			   (setf (asc x-compress) prev)))))
 		   (do-tests-inner ()
-		     
+				   
 		     (test-publish-file port nil) ; no compression
 		     #+unix
 		     (test-publish-file port t) ; with compression
 		     
-		     (test-publish-directory port)
-		     
-		     (test-publish-computed port)
-		     (test-publish-multi port)
-		     (test-publish-prefix port)
-		     (test-authorization port)
-		     (test-encoding)
-		     (test-forms port)
-		     (test-client port)
-		     (test-cgi port)
-		     (test-http-copy-file port)
-		     (test-client-unicode-content-length)
-		     (if* (member :ics *features*)
-			then (test-international port)
-			     (test-spr27296))
-		     (if* test-timeouts 
-			then (test-timeouts port))
-
-		     
-		     )
-		 
-		   )
-	    (format t "~%~%===== test direct ~%~%")
-	    (do-tests)
+		   (test-publish-directory port)
+		   (test-publish-computed port)
+		   (test-publish-multi port)
+		   (test-publish-prefix port)
+		   (test-authorization port)
+		   (test-encoding)
+		   (test-forms port)
+		   (test-client port)
+		   (test-cgi port)
+		   (test-http-copy-file port)
+                   (test-client-unicode-content-length)
+		   (if* (member :ics *features*)
+		      then (test-international port)
+			   (test-spr27296))
+		   (if* test-timeouts 
+		      then (test-timeouts port))))
+	    (when direct
+	      (asc-format "~%~%===== test direct ~%~%")
+	      (do-tests))
 	    
-	    (format t "~%~%===== test through proxy ~%~%")
-	    (start-proxy-running)
-	    (do-tests)
+	    (when proxy
+	      (asc-format "~%~%===== test through proxy ~%~%")
+	      (start-proxy-running)
+	      (do-tests))
 	    
-	    (format t "~%~%===== test through proxy to proxy~%~%")
-	    (start-proxy-running)
-	    (do-tests)
+	    (when proxyproxy
+	      (asc-format "~%~%===== test through proxy to proxy~%~%")
+	      (start-proxy-running)
+	      (do-tests))
 	    
-	    (format t "~%>> checking to see if ssl is present~%~%")
-	    (if* (errorset (require :ssl))
-	       then ; we have ssl capability, run tests through ssl
-		    (stop-proxy-running)
-		    (stop-proxy-running)
-		    (stop-aserve-running)
-		    (format t "~%~%===== test through ssl ~%~%")
-		    (setq port (start-aserve-running 
-				(merge-pathnames 
-				 "server.pem" *aserve-load-truename*)))
-		    (do-tests)
-	       else (format t "~%>> it isn't so ssl tests skipped~%~%")))
+	    (when ssl
+	      (asc-format "~%>> checking to see if ssl is present~%~%")
+	      (if* (errorset (as-require :ssl))
+		   then ; we have ssl capability, run tests through ssl
+		   (stop-proxy-running)
+		   (stop-proxy-running)
+		   (stop-aserve-running)
+		   (asc-format "~%~%===== test through ssl ~%~%")
+		   (setq port (start-aserve-running 
+			       (merge-pathnames 
+				"server.pem" *aserve-load-truename*)))
+		   (do-tests)
+		   else (asc-format "~%>> it isn't so ssl tests skipped~%~%")))
+	    ) ;;; end body of unwind-protect 
 	; cleanup forms:
 	(stop-aserve-running)
 	(stop-proxy-running)
@@ -190,10 +297,10 @@
   (if* (or (> util.test::*test-errors* 0)
 	   (> util.test::*test-successes* 0)
 	   (> util.test::*test-unexpected-failures* 0))
-     then (format t "~%Test information from other threads:~%")
-	  (format t "Errors:    ~d~%" util.test::*test-errors*)
-	  (format t "Successes: ~d~%~%" util.test::*test-successes*)
-	  (format t "Unexpected failures: ~d~%" 
+     then (asc-format "Test information from other threads:")
+	  (asc-format "Errors:    ~d" util.test::*test-errors*)
+	  (asc-format "Successes: ~d~%" util.test::*test-successes*)
+	  (asc-format "Unexpected failures: ~d~%" 
 		  util.test::*test-unexpected-failures*)))
     
 
@@ -205,8 +312,9 @@
 			))); let the system pick a port
     (setq *wserver* wserver)
     (net.aserve::debug-on *aserve-set-full-debug*)
+    (logmess (format nil "wserver name is now ~A" (wserver-name *wserver*)))
     (unpublish :all t) ; flush anything published
-    (setq *x-ssl* ssl)
+    (setf (asc x-ssl) ssl)
     (socket::local-port (net.aserve::wserver-socket wserver))
     ))
 
@@ -216,28 +324,28 @@
 
 (defun start-proxy-running ()
   ;; start another web server to be the proxy
-  (push *proxy-wserver* *save-proxy-wserver*)
+  (push (asc proxy-wserver) (asc save-proxy-wserver))
   
-  (setq *proxy-wserver* (start :server :new 
+  (setf (asc proxy-wserver) (start :server :new 
 			       :port nil 
 			       :proxy t
-			       :proxy-proxy *x-proxy*))
+			       :proxy-proxy (asc x-proxy)))
+  (let ((*wserver* (asc proxy-wserver)))
+    (net.aserve::debug-on *aserve-set-full-debug*)
+    (logmess (format nil "proxy wserver name is ~A" (wserver-name *wserver*))))
   
-  (let ((*wserver* *proxy-wserver*))
-    (net.aserve::debug-on *aserve-set-full-debug*))
-  
-  (push *x-proxy* *save-x-proxy*)
-  (setq *x-proxy* (format nil "localhost:~d" 
+  (push (asc x-proxy) (asc save-x-proxy))
+  (setf (asc x-proxy) (format nil "localhost:~d" 
 			  (socket:local-port
-			   (wserver-socket *proxy-wserver*))))
+			   (wserver-socket (asc proxy-wserver)))))
   )
 
 
 (defun stop-proxy-running ()
-  (if* *proxy-wserver*
-     then (shutdown :server *proxy-wserver*)
-	  (setq *proxy-wserver* (pop *save-proxy-wserver*)))
-  (setq *x-proxy* (pop *save-x-proxy*)))
+  (if* (asc proxy-wserver)
+     then (shutdown :server (asc proxy-wserver))
+	  (setf (asc proxy-wserver) (pop (asc save-proxy-wserver))))
+  (setf (asc x-proxy) (pop (asc save-x-proxy))))
 
 	  
 
@@ -246,9 +354,9 @@
 
 (defun x-do-http-request (uri &rest args)
   ;; add a proxy arg
-  (apply #'do-http-request uri :proxy *x-proxy* 
-	 :compress *x-compress*
-	 :ssl *x-ssl* args))
+  (apply #'do-http-request uri :proxy (asc x-proxy) 
+	 :compress (asc x-compress)
+	 :ssl (asc x-ssl) args))
 
 
 
@@ -291,20 +399,18 @@
 		   ;; get rid of the compressed file if it exists
 		   (delete-file (format nil "~a.gz" name)))
 	    nil)
-	    
-	    
     
     result))
   
 
 (defun test-publish-file (port compress)
   (let (dummy-1-contents 
-	(dummy-1-name "xxaservetest.txt")
+	(dummy-1-name (format nil "x~Axaservetest.txt" (asc index)))
 	dummy-2-contents
-	(dummy-2-name "xx2aservetest.txt")
+	(dummy-2-name (format nil "x~Ax2aservetest.txt" (asc index)))
 	(prefix-local (format nil "http://localhost:~a" port))
 	(prefix-dns   (format nil "http://~a:~a" 
-			      *our-long-site-name*
+			      (long-site-name)
 			      port))
 	(reps 0)
 	(got-reps nil))
@@ -337,7 +443,7 @@
 	;  to close the resulting socket
 	(dolist (keep-alive '(nil))
 	  (dolist (protocol '(:http/1.0 :http/1.1))
-	    (format t "test 1 - ~s~%" (list keep-alive protocol))
+	    (asc-format "test 1 - ~s" (list keep-alive protocol))
 	    (multiple-value-bind (body code headers)
 		(x-do-http-request (format nil "~a/frob" cur-prefix)
 				   :protocol protocol
@@ -395,7 +501,7 @@
     (dolist (cur-prefix (list prefix-local prefix-dns))
       (dolist (keep-alive '(nil))
 	(dolist (protocol '(:http/1.0 :http/1.1))
-	  (format t "test 2 - ~s~%" (list keep-alive protocol))
+	  (asc-format "test 2 - ~s" (list keep-alive protocol))
 	  (multiple-value-bind (body code headers)
 	      (x-do-http-request (format nil "~a/frob2" cur-prefix)
 				 :protocol protocol
@@ -405,8 +511,8 @@
 		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
 	    (test "testval"
-		  (cdr (assoc "testhead" headers :test #'equal))
-		  :test #'equal)
+		    (cdr (assoc "testhead" headers :test #'equal))
+		    :test #'equal)
 	    #+ignore (if* (eq protocol :http/1.1)
 			then (test "chunked"
 				   (cdr (assoc :transfer-encoding headers 
@@ -424,7 +530,7 @@
 	    (test 206 code)
 	    (test "text/plain"
 		  (cdr (assoc :content-type headers :test #'eq))
-		  :test #'equal)
+		  :test #'equal)	    
 	    (if* (not compress)
 	       then (test (subseq dummy-2-contents 100 401)
 			  body :test #'equal)
@@ -441,7 +547,6 @@
     ;;
     ; verify it's still there
     (test 200 (values2 (x-do-http-request (format nil "~a/frob" prefix-local))))
-    
     (test 200 (values2 (x-do-http-request (format nil "~a/frob" prefix-dns))))
     
     ; check that skip-body works
@@ -451,12 +556,10 @@
     ; remove it
     (publish-file :path "/frob" :remove t)
     
-    
     ; verify that it's not there:
     (test 404 (values2 (x-do-http-request (format nil "~a/frob" prefix-local))))
     (test 404 (values2 (x-do-http-request (format nil "~a/frob" prefix-dns))))
     
-
     ;; likewise for frob2
     
     ; verify it's still there
@@ -482,7 +585,7 @@
 		  :content-type "text/plain")
     
     (publish-file :path "/checkit" 
-		  :host *our-long-site-name*
+		  :host (long-site-name)
 		  :file dummy-2-name
 		  :content-type "text/plain")
     
@@ -510,7 +613,7 @@
     
     ; remove the dns one
     (publish-file :path "/checkit" 
-		  :host *our-long-site-name*
+		  :host (long-site-name)
 		  :remove t)
     
     ; verify it's gone too
@@ -618,8 +721,8 @@
 		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
 	    (if* (and (eq protocol :http/1.1)
-		      (null *x-proxy*)
-		      (null *x-ssl*)
+		      (null (asc x-proxy))
+		      (null (asc x-ssl))
 		      )
 	       then (test "chunked"
 			  (cdr (assoc :transfer-encoding headers 
@@ -699,13 +802,15 @@
 			   :headers '(("frobfrob" . "booboo")))
       (declare (ignore body headers))
       
-      (test 500 code))))
+      (test 500 code))
+    
+    ))
 
 
 (defun test-authorization (port)
   (let ((prefix-local (format nil "http://localhost:~a" port))
 	(prefix-dns   (format nil "http://~a:~a" 
-			      *our-long-site-name* port)))
+			      (long-site-name) port)))
     
     ;; manual authorization testing
     ;; basic authorization
@@ -868,7 +973,7 @@
       ;; accept from dns name only 
       
       (setf (location-authorizer-patterns loca) 
-	`((:accept ,*our-long-site-name*)
+	`((:accept ,(long-site-name))
 	  :deny))
       
       (test 404
@@ -882,7 +987,7 @@
       
       ;; deny dns and accept all others
       (setf (location-authorizer-patterns loca) 
-	`((:deny ,*our-long-site-name*)
+	`((:deny ,(long-site-name))
 	  :accept))
       
       (test 200
@@ -944,6 +1049,23 @@
 	
 	))))
 
+(defvar *as-test-lock* (mp:make-process-lock :name "aseflock"))
+
+(defun as-find-external-format (&rest args)
+  (mp:with-process-lock 
+   ;; 2010-12 mm: Use a process-lock to avoid conditionalizing on smp...
+   ;; We need a lock to avoid races in find-external-format.
+   ;; If and when ef code is fixed, this lock could be removed [see rfe10327].
+   (*as-test-lock*)
+   (apply #'find-external-format args)))
+
+(defun as-require (&rest args)
+  (mp:with-process-lock
+   ;; 2010-12 mm: Use a process-lock to avoid conditionalizing on smp...
+   ;; We need a lock to avoid race on require.
+   ;; If and when require code is fixed, this lock could be removed.
+   (*as-test-lock*)
+   (apply #'require args)))
 
 (defun test-encoding ()
   ;; test the encoding and decoding
@@ -970,13 +1092,13 @@
 		       'string))
 	 (query `(("bazzer" . ,str1)
 		  (,str2 . "berry"))))
-    (dolist (ef (list (find-external-format :utf8)
-		      (find-external-format :shiftjis)
-		      ;; 6.0 beta didn't have an ef for unicode.
-		      (if* (find-external-format :unicode :errorp nil)
-			 thenret
-			 else (find-external-format :utf8))
-		      (find-external-format :euc)))
+    (dolist (ef (list (as-find-external-format :utf8)
+		       (as-find-external-format :shiftjis)
+		       ;; 6.0 beta didn't have an ef for unicode.
+		       (if* (as-find-external-format :unicode :errorp nil)
+			    thenret
+			    else (as-find-external-format :utf8))
+		       (as-find-external-format :euc)))
       (test (form-urlencoded-to-query
 	     (query-to-form-urlencoded query :external-format ef)
 	     :external-format ef)
@@ -1235,7 +1357,6 @@
 			       "redir-inf")
 			     (with-http-body (req ent)))))
     
-
   
     ; first test target
     (multiple-value-bind (body code headers)
@@ -1276,15 +1397,12 @@
       (declare (ignore body headers uri))
       (test 200 code1)
       (test nil (and "no-keepalive" socket)))
-
-      
+    
     (multiple-value-bind (body code2 headers uri socket)
 	(x-do-http-request (format nil "~a/redir-target" prefix-local)
 			   :keep-alive t)
       (declare (ignore body headers uri))
       (test 200 code2)
-      
-      
       (test t (and "with no-keepalive" (not (null socket))))
       
       ; now reuse it
@@ -1294,11 +1412,11 @@
 			     :connection socket)
 	(declare (ignore body headers uri))
 	(test 200 code3)
-	(if* (and (not *x-ssl*)
-		  (not *x-proxy*))
+	(if* (and (not (asc x-proxy))
+		  (not (asc x-ssl)))
 	   then ; reuse should happen
 		(test socket (and "reuse socket" socket2))
-		(format t "~%~%pause ~d seconds ....~%" 
+		(asc-format "~%~%pause ~d seconds ....~%" 
 			(+ net.aserve::*read-request-timeout* 10))
 		(force-output)
 		(sleep (+ net.aserve::*read-request-timeout* 10))
@@ -1332,6 +1450,9 @@
 	 (pcache (net.aserve::wserver-pcache proxy-wserver))
 	 (*print-level* 4) ; in case we see some errors
 	 )
+    (logmess (format nil "wserver name is now ~A" (wserver-name *wserver*)))
+    (let ((*wserver* proxy-wserver))
+      (logmess (format nil "proxy wserver name is ~A" (wserver-name *wserver*))))
     
     (macrolet ((test-2 (res1 res2 form &key (test #'eql))
 		 `(multiple-value-bind (v1 v2) ,form
@@ -1349,86 +1470,88 @@
 	(format nil "http://localhost:~d" (socket:local-port
 					   (net.aserve::wserver-socket *wserver*))))
 
-      (format t "server on port ~d, proxy server on port ~d~%"
+      (asc-format "server on port ~d, proxy server on port ~d"
 	      (socket:local-port
 	       (net.aserve::wserver-socket *wserver*))
 	      (socket:local-port
 	       (net.aserve::wserver-socket proxy-wserver)))
 
-      (with-open-file (p "aservetest.xx" :direction :output
-		       :if-exists :supersede)
-	(format p "foo"))
+      (let ((tfile (format nil "aserve~Atest.xx" (asc index))))
+	(with-open-file (p tfile :direction :output
+			   :if-exists :supersede)
+			(format p "foo"))
       
-      (with-tests (:name "aserve-proxy-cache")
-	(unwind-protect
-	    (progn
-	      (publish-file  :path "/foo" :file "aservetest.xx" :cache-p t)
+	(with-tests 
+	 (:name "aserve-proxy-cache")
+	 (unwind-protect
+	     (progn
+	       (publish-file  :path "/foo" :file tfile :cache-p t)
 
-	      ; a miss
-	      (test-2 "foo" 200
-		      (do-http-request 
-			  (format nil "~a/foo" origin-server)
+					; a miss
+	       (test-2 "foo" 200
+		       (do-http-request 
+			(format nil "~a/foo" origin-server)
 			:proxy proxy-host)
-		      :test #'equal)
+		       :test #'equal)
 	      
-	      (test 1 (net.aserve::pcache-r-miss pcache))
+	       (test 1 (net.aserve::pcache-r-miss pcache))
 	      
-	      ; a fast hit
-	      (test-2 "foo" 200
-		      (do-http-request 
-			  (format nil "~a/foo" origin-server)
+					; a fast hit
+	       (test-2 "foo" 200
+		       (do-http-request 
+			(format nil "~a/foo" origin-server)
 			:proxy proxy-host)
-		      :test #'equal)
-	      (test 1 (net.aserve::pcache-r-fast-hit pcache))
+		       :test #'equal)
+	       (test 1 (net.aserve::pcache-r-fast-hit pcache))
 	      
-	      ; another fast hit
-	      (test-2 "foo" 200
-		      (do-http-request 
-			  (format nil "~a/foo" origin-server)
+					; another fast hit
+	       (test-2 "foo" 200
+		       (do-http-request 
+			(format nil "~a/foo" origin-server)
 			:proxy proxy-host)
-		      :test #'equal)
-	      (test 2 (net.aserve::pcache-r-fast-hit pcache))
+		       :test #'equal)
+	       (test 2 (net.aserve::pcache-r-fast-hit pcache))
 	  
 
-	      (format t "sleeping for 10 secs.....~%")(force-output)
-	      (sleep 10)
+	       (asc-format "sleeping for 10 secs.....")(force-output)
+	       (sleep 10)
 	      
-	      ; entry no longer fresh so get a slow hit
-	      (test-2 "foo" 200
-		      (do-http-request 
-			  (format nil "~a/foo" origin-server)
+					; entry no longer fresh so get a slow hit
+	       (test-2 "foo" 200
+		       (do-http-request 
+			(format nil "~a/foo" origin-server)
 			:proxy proxy-host)
-		      :test #'equal)
-	      (test 1 (net.aserve::pcache-r-slow-hit pcache))
+		       :test #'equal)
+	       (test 1 (net.aserve::pcache-r-slow-hit pcache))
 
-	      ; entry now updated so we get a fast hit 
-	      (test-2 "foo"  200
-		      (do-http-request 
-			  (format nil "~a/foo" origin-server)
+					; entry now updated so we get a fast hit 
+	       (test-2 "foo"  200
+		       (do-http-request 
+			(format nil "~a/foo" origin-server)
 			:proxy proxy-host)
-		      :test #'equal)
+		       :test #'equal)
 	      
-	      (test 3 (net.aserve::pcache-r-fast-hit pcache))
+	       (test 3 (net.aserve::pcache-r-fast-hit pcache))
 	      
-	      ; try flushing all to disk
-	      (net.aserve::flush-memory-cache pcache 0)
+					; try flushing all to disk
+	       (net.aserve::flush-memory-cache pcache 0)
 	      
-	      ; and retrieve from the disk
-	      (test-2 "foo"  200
-		      (do-http-request 
-			  (format nil "~a/foo" origin-server)
+					; and retrieve from the disk
+	       (test-2 "foo"  200
+		       (do-http-request 
+			(format nil "~a/foo" origin-server)
 			:proxy proxy-host)
-		      :test #'equal)
-	      (test 4 (net.aserve::pcache-r-fast-hit pcache))
+		       :test #'equal)
+	       (test 4 (net.aserve::pcache-r-fast-hit pcache))
 		
-	      )
+	       )
 	    
 	  
       
 
-	  (ignore-errors (delete-file "aservetest.xx"))
-	  (shutdown  :server proxy-wserver)
-	  (shutdown  :server *wserver*))))))
+	   (ignore-errors (delete-file tfile))
+	   (shutdown  :server proxy-wserver)
+	   (shutdown  :server *wserver*)))))))
 
     
     
@@ -1437,7 +1560,7 @@
 (defun test-publish-directory (port)
   (let ((prefix-local (format nil "http://localhost:~a" port))
 	(prefix-dns   (format nil "http://~a:~a" 
-			      *our-long-site-name*
+			      (long-site-name)
 			      port))
 	(test-dir)
 	(step 0)
@@ -1455,9 +1578,9 @@
     (publish-directory :prefix "/test-pd/"
 		       :destination test-dir
 		       :hook #'(lambda (req ent extra)
-				 (declare (ignore req ent extra))
-				 (setq got-reps (or got-reps 0))
-				 (incf got-reps))
+				       (declare (ignore req ent extra))
+				       (setq got-reps (or got-reps 0))
+				       (incf got-reps))
 		       :headers '(("testvdir" . "testvval"))
 		       :filter #'(lambda (req ent filename info)
 				   (declare (ignore ent info))
@@ -1486,8 +1609,8 @@
       (declare (ignore body))
       (test 200 code)
       (test "testvval"
-	    (cdr (assoc "testvdir" headers :test #'equal))
-	    :test #'equal))
+		    (cdr (assoc "testvdir" headers :test #'equal))
+		    :test #'equal))
     
     (test 1 got-reps)   ; hook fired
     
@@ -1629,7 +1752,6 @@
 			:basic-authorization '("joe"  . "eoj")
 			)))
     
-
     ; try multilple directories
     (publish-directory :prefix "/multiple-test/"
 		       :destination 
@@ -1764,19 +1886,22 @@
       (test t (values (match-re "/redirhidden/subdir/$"
 				(cdr (assoc :location headers))))))
     
+    
     ))
 
 
 ;; publish-multi tests
 (defun test-publish-multi (port)
-  (let ((prefix-local (format nil "http://localhost:~a" port)))
-    (with-open-file (p "aservemulti.xx" 
+  (let ((prefix-local (format nil "http://localhost:~a" port))
+	(multifile (format nil "aserve~Amulti.xx" (asc index)))
+	)
+    (with-open-file (p multifile
 		     :direction :output
 		     :if-exists :supersede)
       (write-sequence "bar" p))
     (publish-multi :path "/multi-test"
 		   :items (list '(:string "foo")
-				"aservemulti.xx"  ; file
+				multifile  ; file
 				#'(lambda (req ent time value)
 				    (declare (ignore req ent time value))
 				    "baz")
@@ -1790,7 +1915,7 @@
 	  (values (x-do-http-request  (format nil "~a/multi-test" prefix-local)))
 	  :test #'equal)
     
-    (ignore-errors (delete-file "aservemulti.xx"))
+    (ignore-errors (delete-file multifile))
     ))
 		   
 
@@ -1800,7 +1925,7 @@
 (defun test-publish-prefix (port)
   (let ((prefix-local (format nil "http://localhost:~a" port))
 	(prefix-dns   (format nil "http://~a:~a" 
-			      *our-long-site-name*
+			      (long-site-name)
 			      port))
 	(got-here))
     (publish-prefix :prefix "/pptest"
@@ -1948,26 +2073,29 @@
         
     (multiple-value-bind (body rescode)
 	(x-do-http-request (format nil "~a/cgi-4" prefix-local))
-      (test "okay
-" body :test #'equal)
+      (test "okay" body :test #'equal-line)
       (test 200 rescode)
-      (test "stuff-on-error-stream
-" error-buffer :test #'equal))
+      (test "stuff-on-error-stream" error-buffer :test #'equal-line))
     ))
    
-	    
+(defun equal-line (a b &aux (la (when (stringp a) (length a))) (lb (when (stringp b) (length b))))
+  ;; 2010-12 mm: Add this hack to avoid unexplained inequality in Unix.
+  (and (< 0 la) (eql #\newline (elt a (1- la))) (decf la))
+  (and (< 0 lb) (eql #\newline (elt b (1- lb))) (decf lb))
+  (and (eql la lb)
+       (dotimes (i la t) (or (eql (elt a i) (elt b i)) (return nil)))))
 	
 (defun test-timeouts (port)
   ;; test aserve timing out when the client is non responsive
   (let (#+ignore (prefix-local (format nil "http://localhost:~a" port)))
     
-    (if* *x-ssl* 
+    (if* (asc x-ssl) 
        then ; we don't get the same timeout behavior since we're
 	    ; not directly connected to the server socket, so
 	    ; don't try the tests
 	    (return-from test-timeouts nil))
     
-    (format t "timeout tests.. expect pauses~%")(force-output)
+    (asc-format "timeout tests.. expect pauses")(force-output)
     
     ;; try making a connection and not sending any headers.
     ;; we should timeout
@@ -1985,7 +2113,7 @@
        #+io-timeout
        (dotimes (i 3)
 	 (sleep (max 1 (- net.aserve:*http-io-timeout* 10)))
-	 (format t "send packet~%")(force-output)
+	 (asc-format "send packet")(force-output)
 	 (format sock "brap: brop~c~c" #\return #\newline)
 	 (force-output sock)
 	 )
@@ -2015,6 +2143,7 @@
 			    #\cyrillic_small_letter_te
 			    #\!)
 			  'string)))
+    (as-find-external-format :koi8-r) ;;; 2010-12 mm: make sure the ef arrives safely
     (publish 
      :path "/simple-form-itest"
      :function
@@ -2049,15 +2178,9 @@
 		     (string-to-octets (subseq result (1+ begin) end)
 				       :external-format :octets)
 		     :external-format :koi8-r))))
-      
-      
-      
       (test t (not (null begin)))  ; verify we found begin 
       (test t (not (null end)))    ; and end markers
-      (test Privyet! test-string :test #'string=)
-      
-      
-      )))
+      (test Privyet! test-string :test #'string=))))
 
 
 
@@ -2073,6 +2196,8 @@
 		  "cz P"
 		  '(#\latin_small_letter_e_with_acute)
 		  "ter</Name>")))
+    (let ((*wserver* server))
+      (logmess (format nil "test-spr27296 wserver name is ~A" (wserver-name *wserver*))))
     (publish :path "/spr27296"
 	     :content-type "text/xml"
 	     :server server
@@ -2097,6 +2222,10 @@
   ;; than byte count, which went wrong with multi-byte encodings.
   (let ((server (start :port nil :server :new
 		       :external-format (crlf-base-ef :utf8))))
+    (let ((*wserver* server))
+      (logmess
+       (format nil "test-client-unicode-content-length wserver name is ~A"
+	       (wserver-name *wserver*))))
     (publish-file :server server :path "/" :file (format nil "~a../test/testdir/unicode"
                                                          *aserve-examples-directory*))
     ;; Not timing out is the test.
@@ -2114,30 +2243,31 @@
 			    "sys:alisp.dxl"
 			    "sys:alisp8.dxl"
 			    "sys:dcl.dxl"))
-	 (url (format nil "http~a://localhost:~a/http-copy-file" (if *x-ssl* "s" "") port))
+	 (url (format nil "http~a://localhost:~a/http-copy-file"
+		      (if (asc x-ssl) "s" "") port))
 	 (temp-file-name (sys:make-temp-file-name "temp")))
 
     (dolist (reference-file reference-files)
       (when (probe-file reference-file)
-	(format t "~&~%======= test-http-copy-file: ~a~%" reference-file)
+	(asc-format "~&~%======= test-http-copy-file: ~a~%" reference-file)
 	(publish-file :path "/http-copy-file" :file reference-file
 		      :content-type "application/octet-stream")
 	(unwind-protect
 	    (labels
 		((progress (bytes-read total-size)
-		   (format t "~&  copy progress: ~a ~a~%" bytes-read total-size)
+		   (asc-format "  copy progress: ~a ~a" bytes-read total-size)
 		   (force-output t))
 		 (doit (&rest args)
-		   (format t "~&~%copying reference file~@[:~{ ~a~}~]~%"
+		   (asc-format "~&~%copying reference file~@[:~{ ~a~}~]~%"
 			   args)
 		   (let ((before (get-internal-real-time)))
 		     (apply #'http-copy-file url temp-file-name args)
-		     (format t "time = ~s msecs~%"
+		     (asc-format "time = ~s msecs"
 			     (- (get-internal-real-time) before)))
-		   (format t "comparing ~a~%" temp-file-name)
+		   (asc-format "comparing ~a" temp-file-name)
 		   (test t (excl::compare-files reference-file temp-file-name))
 		   (delete-file temp-file-name)
-		   (format  t "~%compare finished~%")
+		   (asc-format "compare finished")
 		   ))
 	      (doit :progress-function #'progress)
 	      ;;*** no need to do this so many times:
@@ -2150,6 +2280,6 @@
 
     
 (if* user::*do-aserve-test* 
-   then (test-aserve *test-timeouts*)
+   then (user::test-aserve-n :n user::*do-aserve-test*)
    else (format t 
-		" (net.aserve.test::test-aserve) will run the aserve test~%"))
+		" (user::test-aserve-n) will run the aserve test~%"))
