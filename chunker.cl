@@ -250,7 +250,7 @@
                                            then (return))))
                                 (setf (unchunking-state p) :need-count))
                         (setf (unchunking-count p) count)
-                        (return-from device-read i))
+                        (return-from device-read (- i start)))
                      (setf bytes-read (- (read-sequence buffer ins :start i :end (min (+ i count) end))
                                          i))))))))))
 
