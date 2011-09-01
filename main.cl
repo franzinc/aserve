@@ -1542,6 +1542,7 @@ by keyword symbols and not by strings"
 			    (debug-format :info "request over, keep socket alive~%")
 			    (force-output-noblock sock)
 			    (setf (car chars-seen) nil)  ; for next use
+			    (excl::socket-bytes-written (request-socket req) 0)
 		       else (return))))))
     ;; do it in two stages since each one could error and both have
     ;; to be attempted
