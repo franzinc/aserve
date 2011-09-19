@@ -1,5 +1,5 @@
 #+(version= 8 2)
-(sys:defpatch "aserve" 11
+(sys:defpatch "aserve" 12
   "v1: version 1.2.67, implement keep-alive in allegroserve client;
 v2: 1.2.68, obey keep-alive requests for PUT and POST requests;
 v3: 1.2.69, make logging though method specialized on wserver class;
@@ -16,7 +16,8 @@ v7: 1.3.7: Add :default-actions to webactions,
 v8: 1.3.8: fix problem w/response handler using string output streams;
 v9: 1.3.9: speed up unchunking-streams;
 v10: 1.3.10: fix buffer boundary error in unchunking-streams.
-v11: 1.3.11: fix log reporting of content-length when using keep-alive."
+v11: 1.3.11: fix log reporting of content-length when using keep-alive.
+v12: 1.3.12: make aserve compatible with patch inflate.003."
   :type :system
   :post-loadable t)
 

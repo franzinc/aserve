@@ -244,11 +244,15 @@
     
         ; if data is content-encoded, then decode
         (if* (client-request-content-encoding creq)
-           then (setq socket
-                      (make-instance 'net.aserve::inflate-stream
-                                     :input-handle socket
-                                     :skip-gzip-header t
-                                     :content-length (and (integerp left) left)))
+           then (setq socket (make-instance
+				 'net.aserve::inflate-stream
+			       :input-handle socket
+			       ;; bug20472. :skip-gzip-header deprecated
+			       ;; in code/inflate.003 patch for 8.2
+			       ;; and will be gone in 9.0.
+			       #-(version>= 9 0) :skip-gzip-header
+			       #-(version>= 9 0) t
+			       :content-length (and (integerp left) left)))
                 (setf (client-request-bytes-left creq) :unknown))
     
         (setf (client-request-response-stream creq) socket))))
