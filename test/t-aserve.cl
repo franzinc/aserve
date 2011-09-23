@@ -85,8 +85,9 @@
       util.test:*error-protect-tests*   nil)
 
 
-; set to nil before loading the test to prevent the test from auto-running
-; or set to the number of threads/servers to run simultaneously
+; Set to nil before loading the test to prevent the test from auto-running
+; or set to the number of threads/servers to run simultaneously.
+; Default is to run one server in the main thread.
 (defvar user::*do-aserve-test* 0)
 
 ; if true run timeout test
@@ -94,6 +95,7 @@
 
 
 (defclass aserve-test-config ()
+  ;; Keep a separate test config for each server.
   (
    (name    :reader asc-name :initarg :name :initform "")
    (index   :reader asc-index :initarg :index :initform "")
@@ -146,9 +148,16 @@
 				 (direct t) (proxy t) (proxyproxy t) (ssl t)
 				 (name "ast") (log-name nil l-n-p)
 			   &aux wname)
-  (setq *aserve-test-configs* (make-array (case n ((nil 0) 1) (t n))))
+  (typecase n
+    ((integer 0) nil)
+    (otherwise 
+     ;; In case someone sets *do-aserve-test* to t.
+     (setq n 0)))
+  (setq *aserve-test-configs* (make-array (if (eql n 0) 1 n)))
   (case n
-    ((nil 0)
+    (0
+     ;; In simple one-thread test, log server name only if requested
+     ;; explicitly.
      (if l-n-p
 	 (setq *log-wserver-name* log-name)
        (setq *log-wserver-name* nil))
