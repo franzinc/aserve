@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 12))
+(defparameter *aserve-version* '(1 3 13))
 
 (eval-when (eval load)
     (require :sock)
@@ -2545,7 +2545,7 @@ in get-multipart-sequence"))
   ;;
   ;;
   (let ((alist (request-query-alist req))
-	(signature (cons post uri)))
+	(signature (list post uri external-format)))
     
     (if* (not (eq alist :empty))
        then (let ((given-sig (getf (request-reply-plist req) 
