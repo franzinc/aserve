@@ -1223,8 +1223,11 @@ by keyword symbols and not by strings"
 			       else "aserve")
 			    (atomic-incf *thread-index*))
 	      :initial-bindings
+	      #+(version>= 9 0 :alpha 44)
 	      `((*wserver*  . ',*wserver*)
-		#+ignore (*debug-io* . ',(wserver-terminal-io *wserver*))
+		,@excl:*required-top-level-bindings*)
+	      #-(version>= 9 0 :alpha 44)
+	      `((*wserver*  . ',*wserver*)
 		,@excl:*cl-default-special-bindings*))
       #'http-accept-thread)))
 
@@ -1240,9 +1243,11 @@ by keyword symbols and not by strings"
 			  else "aserve")))
 	 (proc (mp:make-process :name name
 				:initial-bindings
+				#+(version>= 9 0 :alpha 44)
 				`((*wserver*  . ',*wserver*)
-				  #+ignore (*debug-io* . ',(wserver-terminal-io 
-							    *wserver*))
+				  ,@excl:*required-top-level-bindings*)
+				#-(version>= 9 0 :alpha 44)
+				`((*wserver*  . ',*wserver*)
 				  ,@excl:*cl-default-special-bindings*)
 				)))
     (mp:process-preset proc #'http-worker-thread)
