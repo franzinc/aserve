@@ -1554,19 +1554,9 @@ or \"foo.com:8000\", not ~s" proxy))
 		  
       
 
-(defparameter cookie-separator
-    ;; useful for separating cookies, one per line
-    (make-array 10 :element-type 'character
-		:initial-contents '(#\return
-				    #\linefeed 
-				    #\C
-				    #\o
-				    #\o
-				    #\k
-				    #\i
-				    #\e
-				    #\:
-				    #\space)))
+; rfc6265 says that all cookies are one line separated by this:
+(defparameter cookie-separator "; ")
+    
 
 (defmethod compute-cookie-string (uri (jar cookie-jar))
   ;; compute a string of the applicable cookies.
