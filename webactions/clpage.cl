@@ -780,7 +780,7 @@ to separate the module part from the function name part, ~s doesn't" name))
     
     `(setf (gethash ,function
 		    (find-clp-module ,module :create t))
-       #'(lambda ,args ,@body))))
+       (named-function (:clp ,name) (lambda ,args ,@body)))))
 
 
 
