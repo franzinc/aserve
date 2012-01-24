@@ -316,6 +316,8 @@
 			certificate-password
 			ca-file
 			ca-directory
+                        crl-file
+                        crl-check
 			verify
 			max-depth
 			connection ; existing socket to the server
@@ -352,6 +354,8 @@
 	       :certificate-password certificate-password
 	       :ca-file ca-file
 	       :ca-directory ca-directory
+               :crl-file crl-file
+               :crl-check crl-check
 	       :verify verify
 	       :max-depth max-depth
 	       :connection connection
@@ -672,6 +676,8 @@
 				 certificate-password
 				 ca-file
 				 ca-directory
+                                 crl-file
+                                 crl-check
 				 verify
 				 max-depth
 				 connection
@@ -681,7 +687,7 @@
   
 
   (declare (ignorable timeout certificate key certificate-password ca-file 
-		      ca-directory verify max-depth ssl-method))
+		      ca-directory crl-file crl-check verify max-depth ssl-method))
   
   
   (if* (and connection (not use-socket))
@@ -777,6 +783,8 @@ or \"foo.com:8000\", not ~s" proxy))
 			       :certificate-password certificate-password
 			       :ca-file ca-file
 			       :ca-directory ca-directory
+                               :crl-file crl-file
+                               :crl-check crl-check
 			       :verify verify
 			       :method (or ssl-method :sslv23)
 			       :max-depth max-depth))

@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 14))
+(defparameter *aserve-version* '(1 3 15))
 
 (eval-when (eval load)
     (require :sock)
@@ -954,6 +954,8 @@ by keyword symbols and not by strings"
 		   verify
 		   ca-file
 		   ca-directory
+                   crl-file
+                   crl-check
 		   max-depth
 		   os-processes	 ; to fork and run multiple instances
 		   (external-format nil efp); to set external format
@@ -969,8 +971,8 @@ by keyword symbols and not by strings"
 
   (declare (ignore debug))  ; for now
 
-  (declare (ignorable ssl-key verify ca-file ca-directory max-depth
-		      ssl-method))
+  (declare (ignorable ssl-key verify ca-file ca-directory crl-file crl-check
+                      max-depth ssl-method))
   
   (if* debug-stream 
      then (setq *aserve-debug-stream* 
@@ -1001,6 +1003,8 @@ by keyword symbols and not by strings"
 			 :verify verify
 			 :ca-file ca-file
 			 :ca-directory ca-directory
+                         :crl-file crl-file
+                         :crl-check crl-check
 			 :method ssl-method
 			 :max-depth max-depth)
 		#-(version>= 8 0)
