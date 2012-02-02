@@ -703,7 +703,10 @@
   (let* ((buff (get-sresource *header-block-sresource*))
 	 (end (read-headers-into-buffer sock buff)))
     (if* end
-       then (prog1 (parse-and-listify-header-block buff end)
+       then (debug-format :xmit-client-response-headers "~a"
+                          (octets-to-string buff :end end
+                                            :external-format :octets))
+            (prog1 (parse-and-listify-header-block buff end)
 	      (free-sresource *header-block-sresource* buff))
        else (free-sresource *header-block-sresource* buff)
 	    (error "Incomplete headers sent by server"))))

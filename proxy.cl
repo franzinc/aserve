@@ -506,18 +506,6 @@ cached connection = ~s~%" cond cached-connection))
 	    
 	    (setq outend (add-trailing-crlf outbuf 1))
 
-	    (if-debug-action :xmit
-			     (format *debug-stream* "proxy converted headers toward server~%")
-			     (dotimes (i outend)
-			       (write-char (code-char (aref outbuf i)) *debug-stream*))
-			     (format *debug-stream* "---- end---~%")
-			     (force-output *debug-stream*))
-  
-  
-  
-		   
-		   
-		   
 	    ; time to make a call to the server
 	    (handler-case
 		(multiple-value-setq (sock cached-connection)
@@ -555,6 +543,7 @@ cached connection = ~s~%" cond cached-connection))
 	    
 	    (let ((firstbuf (get-header-block))
 		  (ind 0)
+                  rest-of-headers-ind
 		  (cmdstrings
 		   '((:get . #.(make-array 3
 					   :element-type '(unsigned-byte 8)
@@ -615,7 +604,7 @@ cached connection = ~s~%" cond cached-connection))
 			    (setf (ausb8 firstbuf i) 
 			      (char-int (schar str i))))
 			  (incf ind (length str))))
-		
+
 		(setf (ausb8 firstbuf ind) #.(char-int #\space))
 		(incf ind)
 		
@@ -649,26 +638,32 @@ cached connection = ~s~%" cond cached-connection))
 		(setf (ausb8 firstbuf ind) #.(char-int #\linefeed))
 		(incf ind)
 		    
+                (debug-format :xmit-proxy-client-request-command "~s"
+                              (octets-to-string firstbuf :end ind
+                                                :external-format :octets))
+                (setq rest-of-headers-ind ind)
 		    
 		; now add as much of the headers as we can 
 		(do ((i 0 (1+ i))
 		     (tocopy (min (- (length firstbuf) ind) outend)))
 		    ((>= i tocopy)
-		     
-		     ; 
-		     (if-debug-action 
-		      :xmit
-		      (format *debug-stream* "about to send~%")
-		      (dotimes (i ind)
-			(write-char (code-char (ausb8 firstbuf i))
-				    *debug-stream*))
-		      (format *debug-stream* "<endof xmission>~%"))
-		     (write-sequence firstbuf sock :end ind)
-		     (if* (< i outend)
-			then ; still more from original buffer left
-			     (write-sequence outbuf sock
-					     :start i
-					     :end outend))
+
+                     (maybe-accumulate-log (:xmit-proxy-client-request-headers "~s")
+                      (debug-format :xmit-proxy-client-request-headers "~a"
+                                    (octets-to-string firstbuf
+                                                      :start rest-of-headers-ind
+                                                      :end ind
+                                                      :external-format :octets))
+                      (write-sequence firstbuf sock :end ind)
+                      (if* (< i outend)
+                         then ; still more from original buffer left
+                              (debug-format :xmit-proxy-client-request-headers "~a"
+                                            (octets-to-string
+                                             outbuf :start i :end outend
+                                             :external-format :octets))
+                              (write-sequence outbuf sock
+                                                     :start i
+                                                     :end outend)))
 		     )
 		      
 		  (setf (ausb8 firstbuf ind) (ausb8 outbuf i))
@@ -678,10 +673,12 @@ cached connection = ~s~%" cond cached-connection))
 
 	    
 	    
-	    
 	    ; now the body if any
 	    (if* request-body
-	       then (write-sequence request-body sock))
+	       then (debug-format :xmit-proxy-client-request-body "~s"
+                                  (octets-to-string request-body
+                                                    :external-format :octets))
+                    (write-sequence request-body sock))
     
 	    (force-output sock)
 	  
@@ -696,6 +693,9 @@ cached connection = ~s~%" cond cached-connection))
 		;
 		; now read the response and the following headers
 		(setq outend (read-headers-into-buffer sock outbuf))
+                (debug-format :xmit-proxy-client-response-headers "~s"
+                              (octets-to-string outbuf :end outend
+                                                :external-format :octets))
 
 		(if* (null outend)
 		   then ; response coming back was truncated
@@ -790,23 +790,22 @@ cached connection = ~s~%" cond cached-connection))
 
 	      (setq cliend (add-trailing-crlf clibuf 2))
 
-	  
-	      (if-debug-action 
-	       :xmit
-	       (format *debug-stream* "~%~%proxy converted headers toward client~%")
-	       (dotimes (i cliend)
-		 (write-char (code-char (aref clibuf i)) 
-			     *debug-stream*))
-	       (format *debug-stream* "---- end---~%")
-	       (force-output *debug-stream*))
-
 	      ; do the response
 	      (setq state :post-send)
 	      
 	      (if* respond
 		 then (ignore-errors
 		       (let ((rsock (request-socket req)))
-		
+
+                         (debug-format
+                          :xmit-proxy-server-response-headers
+                          "~s"
+                          (concatenate 'string
+                                       (format nil "HTTP/1.1 ~d ~a~a" response
+                                               (and comment (octets-to-string comment)) *crlf*)
+                                       (octets-to-string clibuf :end cliend
+                                                         :external-format :octets)))
+
 			 (format rsock "HTTP/1.1 ~d ~a~a" response (and comment (octets-to-string comment)) *crlf*)
       
 			 (write-sequence clibuf rsock :end cliend)
@@ -977,11 +976,15 @@ cached connection = ~s~%" cond cached-connection))
 (defun write-body-buffers (sock buffers length)
   ;; write all the data in the buffers to the socket
   (if* (> length 0)
-     then (let ((len (if* buffers then (length (car buffers)))))
-	    (dolist (buff buffers)
-	      (write-sequence buff sock :end (min length len))
-	      (decf length len)
-	      (if* (<= length 0) then (return))))))
+     then (maybe-accumulate-log (:xmit-proxy-server-response-body "~s")
+            (let ((len (if* buffers then (length (car buffers)))))
+              (dolist (buff buffers)
+                (debug-format :xmit-proxy-server-response-body "~a"
+                              (octets-to-string buff :end (min length len)
+                                                :external-format :octets))
+                (write-sequence buff sock :end (min length len))
+                (decf length len)
+                (if* (<= length 0) then (return)))))))
 
     
 (defun proxy-failure-response (req ent)

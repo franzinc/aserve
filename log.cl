@@ -35,6 +35,29 @@
 
 (in-package :net.aserve)
 
+(defun log1 (category level message &key (logger *logger*))
+  (log1* logger category level message))
+
+(defgeneric log1* (logger category level message)
+  (:documentation "This the new, extensible logger interface to which
+all others defer. By default, category :access is handled by
+log-request* while the rest goes to logmess-stream. Note message is
+not necessarily a string: for instance it is a request object
+for :access which allows for more flexibility in presentation.")
+  (:method (logger category level message)
+    (declare (ignore logger))
+    (logmess-stream category level message *debug-stream*))
+  (:method (logger (category (eql :xmit-server-response-headers)) level message)
+    (declare (ignore logger))
+    ;; time is :pre or :post depending on whether the headers are
+    ;; generated before or after the body
+    (destructuring-bind (time string) message
+      (logmess-stream category level (format nil "~a ~s" time string)
+                      *debug-stream*)))
+  (:method (logger (category (eql :access)) level (request http-request))
+    (declare (ignore logger level))
+    (log-request* request)))
+
 (defvar *enable-logging* t) ; to turn on/off the standard logging method
 
 (defvar *save-commands* nil) ; if true then a stream to which to write commands
@@ -43,21 +66,27 @@
   (log-for-wserver *wserver* message format))
 
 (defmethod log-for-wserver ((wserver wserver) message format)
-  ;; send log message to the default vhost's error stream 
-  (logmess-stream message (vhost-error-stream (wserver-default-vhost wserver)) format))
+  ;; send log message to the default vhost's error stream
+  (let ((*debug-stream* (vhost-error-stream (wserver-default-vhost wserver)))
+        (*debug-format* format))
+    (log1 :aserve :info message)))
 
-(defmethod logmess-stream (message stream &optional (format :long))
+(defvar *log-time-zone* 0)
+
+(defmethod logmess-stream (category level message stream
+                           &optional (format *debug-format*))
   ;; send the log message to the given stream which should be a
   ;; stream object and not a stream indicator (like t)
   ;; If the stream has a lock use that.
+  (declare (ignore level))
   (multiple-value-bind (csec cmin chour cday cmonth cyear)
-      (decode-universal-time (get-universal-time))
+      (decode-universal-time (get-universal-time) *log-time-zone*)
     (let* ((*print-pretty* nil)
 	   (str (ecase format
                   (:long
                    (format
-                    nil "~a: ~2,'0d/~2,'0d/~2,'0d - ~2,'0d:~2,'0d:~2,'0d - ~a~%"
-                    (mp:process-name sys:*current-process*)
+                    nil "[~a] ~a: ~2,'0d/~2,'0d/~2,'0d - ~2,'0d:~2,'0d:~2,'0d - ~a~%"
+                    category (mp:process-name sys:*current-process*)
                     cmonth cday (mod cyear 100) chour cmin csec
                     message))
                   (:brief
@@ -72,51 +101,11 @@
 	 else (write-sequence str stream)
 	      (finish-output stream)))))
 
-
 (defmethod log-request ((req http-request))
   ;; after the request has been processed, write out log line
   (if* *enable-logging*
-     then (let* ((ipaddr (socket:remote-host (request-socket req)))
-		 (time   (request-reply-date req))
-		 (code   (let ((obj (request-reply-code req)))
-			   (if* obj
-			      then (response-number obj)
-			      else 999)))
-		 (length  (or (request-reply-content-length req)
-			      #+(and allegro (version>= 6))
-			      (excl::socket-bytes-written 
-			       (request-socket req))))
-	
-		 (stream (vhost-log-stream (request-vhost req)))
-		
-		 (lock (and (streamp stream)
-			    (getf (excl::stream-property-list stream) 
-				  :lock))))
-
-	    (macrolet ((do-log ()
-			 '(progn (format stream
-				  "~A~A~a - - [~a] ~s ~s ~s~%"
-				  (if* *log-wserver-name* 
-				     then (wserver-name *wserver*) 
-				     else "")
-				  (if* *log-wserver-name* 
-				     then " " 
-				     else "")
-				  (socket:ipaddr-to-dotted ipaddr)
-				  (maybe-universal-time-to-date time)
-				  (request-raw-request req)
-				  code
-				  (or length -1))
-			   (force-output stream))))
-			 
-	      (if* lock
-		 then (mp:with-process-lock (lock)
-			; in case stream switched out while we weren't busy
-			; get the stream again
-			(setq stream (vhost-log-stream (request-vhost req)))
-			(do-log))
-		 else (do-log)))))
-  
+     then ;; By default this ends up calling log-request*.
+          (log1 :access :info req))
   (if* *save-commands*
      then (multiple-value-bind (ok whole uri-string)
 	      (match-re "^[^ ]+\\s+([^ ]+)" (request-raw-request req))
@@ -133,15 +122,49 @@
 		    (let ((bod (request-request-body req)))
 		      (and (not (equal "" bod)) bod))
 		    (multiple-value-list (get-basic-authorization req))
-		    (header-slot-value req :content-type)
-		    ))
-	  (force-output *save-commands*))
-		  
-	  
-  )
+		    (header-slot-value req :content-type)))
+	  (force-output *save-commands*)))
 
-	    	
-    
+(defun log-request* (req)
+  (let* ((entry (format-access-log-entry req))
+         (stream (vhost-log-stream (request-vhost req)))
+         (lock (and (streamp stream)
+                    (getf (excl::stream-property-list stream) 
+                          :lock))))
+    (macrolet ((do-log ()
+                 '(progn (format stream "~a~%" entry)
+                   (force-output stream))))
+      (if* lock
+         then (mp:with-process-lock (lock)
+                ; in case stream switched out while we weren't busy
+                ; get the stream again
+                (setq stream (vhost-log-stream (request-vhost req)))
+                (do-log))
+         else (do-log)))))
+
+(defun format-access-log-entry (req)
+  (let* ((ipaddr (socket:remote-host (request-socket req)))
+         (time   (request-reply-date req))
+         (code   (let ((obj (request-reply-code req)))
+                   (if* obj
+                      then (response-number obj)
+                      else 999)))
+         (length (or (request-reply-content-length req)
+                     #+(and allegro (version>= 6))
+                     (excl::socket-bytes-written 
+                      (request-socket req)))))
+    (format nil "~A~A~a - - [~a] ~s ~s ~s"
+            (if* *log-wserver-name* 
+               then (wserver-name *wserver*) 
+               else "")
+            (if* *log-wserver-name* 
+               then " " 
+               else "")
+            (socket:ipaddr-to-dotted ipaddr)
+            (maybe-universal-time-to-date time)
+            (request-raw-request req)
+            code
+            (or length -1))))
     
 (defun log-proxy (uri level action extra)
   ;; log information from the proxy module
@@ -158,7 +181,3 @@
 	      else (net.uri:render-uri uri nil))
 	   extra)
    :brief))
-
-    
-  
-

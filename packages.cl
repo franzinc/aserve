@@ -20,7 +20,8 @@ v11: 1.3.11: fix log reporting of content-length when using keep-alive.
 v12: 1.3.12: make aserve compatible with patch inflate.003,
              request-query cache includes external-format as a key,
              send cookies on one line as per rfc6265,
-             add support for ssl CRLs."
+             add support for ssl CRLs.
+v13: 1.3.13: improve debugging facilities."
   :type :system
   :post-loadable t)
 

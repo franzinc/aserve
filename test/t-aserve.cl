@@ -77,7 +77,8 @@
   )
 
 (defparameter *aserve-set-full-debug*  nil) ; :all and :notrap are useful
-(net.aserve::debug-on *aserve-set-full-debug*)
+(when *aserve-set-full-debug*
+  (apply #'net.aserve::debug-on *aserve-set-full-debug*))
 
 ; to trap errors when they happen uncomment this
 #+ignore 
@@ -320,7 +321,8 @@
 			:listeners 20 ; so keep-alive will be possible
 			))); let the system pick a port
     (setq *wserver* wserver)
-    (net.aserve::debug-on *aserve-set-full-debug*)
+    (when *aserve-set-full-debug*
+      (apply #'net.aserve::debug-on *aserve-set-full-debug*))
     (logmess (format nil "wserver name is now ~A" (wserver-name *wserver*)))
     (unpublish :all t) ; flush anything published
     (setf (asc x-ssl) ssl)
@@ -340,7 +342,8 @@
 			       :proxy t
 			       :proxy-proxy (asc x-proxy)))
   (let ((*wserver* (asc proxy-wserver)))
-    (net.aserve::debug-on *aserve-set-full-debug*)
+    (when *aserve-set-full-debug*
+      (apply #'net.aserve::debug-on *aserve-set-full-debug*))
     (logmess (format nil "proxy wserver name is ~A" (wserver-name *wserver*))))
   
   (push (asc x-proxy) (asc save-x-proxy))
@@ -2289,8 +2292,21 @@
 	      (doit :protocol :http/1.0))
 	  (ignore-errors (delete-file temp-file-name)))))))
 
-    
+;; (net.aserve::debug-on :xmit)
+;; (net.aserve::debug-off :body)
+
+;; truncate long bodies
+(let ((body-kinds (net.aserve::expand-kinds '(:body))))
+  (defmethod net.aserve::logmess1 :around (category level message)
+    (call-next-method category level
+                      (if (and (member category body-kinds)
+                               (< 100 (length message)))
+                          (concatenate 'string (subseq message 0 100) "...")
+                          message))))
+
 (if* user::*do-aserve-test* 
-   then (user::test-aserve-n :n user::*do-aserve-test*)
+   then (when (excl.osi:getenv "ASERVE_LOG_XMIT")
+          (net.aserve::debug-on :xmit))
+        (user::test-aserve-n :n user::*do-aserve-test*)
    else (format t 
 		" (user::test-aserve-n) will run the aserve test~%"))

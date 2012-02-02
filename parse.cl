@@ -182,22 +182,25 @@
   ;; return nil if we don't get all the way to the crlf crlf
   (let ((buff (get-sresource *header-block-sresource*))
 	(end))
-	       
+    
     (setf (request-header-block req) buff)
     ;; read in all the headers, stop at the last crlf
     (if* (setq end (read-headers-into-buffer sock buff))
-       then (let ((otherheaders (parse-header-block buff 0 end)))
+       then (debug-format :xmit-server-request-headers "~s"
+                          (octets-to-string buff :end end
+                                            :external-format :octets))
+            (let ((otherheaders (parse-header-block buff 0 end)))
 	      
-	      (if* otherheaders
-		 then ; non standard headers present...store
-		      ; separately
-		      (dolist (otherheader otherheaders)
-			(setf (car otherheader) 
-			  (header-keywordify (car otherheader))))
-		      
-		      (setf (request-headers req)
-			(append (request-headers req) otherheaders))))
-		       
+              (if* otherheaders
+                 then ; non standard headers present...store
+                      ; separately
+                      (dolist (otherheader otherheaders)
+                        (setf (car otherheader) 
+                              (header-keywordify (car otherheader))))
+                                
+                      (setf (request-headers req)
+                            (append (request-headers req) otherheaders))))
+            
 	    t)))
 	 
 (defvar *headername-to-kwd* nil)
@@ -234,8 +237,7 @@
   ;;
   (let ((len (- (length buff) 500)) ; leave space for index at end
 	(i 0)
-	(state 2)
-	(echo (member :xmit *debug-current*)))
+	(state 2))
 	
     (loop
       (if* (>= i len) 
@@ -289,10 +291,6 @@
 			(if* (not (eq (aref buff i) #.(char-code #\return)))
 			   then (incf i)))
 		; i points to the [cr] lf
-		(if* echo 
-		   then (write-sequence buff *debug-stream*
-					:start 0
-					:end i))
 		(return i))))))
 
 	  

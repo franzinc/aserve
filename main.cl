@@ -55,105 +55,260 @@
 	    (cadr *aserve-version*)
 	    (caddr *aserve-version*)))
 	    
-;;;;;;;  debug support 
+;;;;;;;  debug support
 
-(defparameter *debug-all* nil)	; all of the debugging switches
-(defparameter *debug-log* nil)  ; all debugging switches that write info
-				; to the *debug-stream*
+;; An alist of kind and the superkinds it belongs to. 
+(defparameter *debug-kinds* ())
+
 (defparameter *debug-current*  nil)	; current switches set
 
 (defparameter *debug-stream* *initial-terminal-io*)
 
+(defparameter *debug-format* :long)
+
 ; set to true to automatically close sockets about to be gc'ed
 ; open sockets should never be subject to gc unless there's a bug
 ; in the code leading to leaks.
-(defvar *watch-for-open-sockets* t) 
+(defvar *watch-for-open-sockets* t)
 
-(defmacro define-debug-kind (name class what)
-  `(progn (ecase ,class
-	    (:all (pushnew ,name *debug-all*))
-	    (:log (pushnew ,name *debug-log*)
-		  (pushnew ,name *debug-all*)))
-	  (setf (get ,name 'debug-description) ,what)))
+(defun find-kind-entry (kind)
+  (find kind *debug-kinds* :key #'car))
 
-(define-debug-kind :notrap :all 
-  "If set than errors in handlers cause a break loop to be entered")
+(defun add-new-kind (kind superkinds documentation)
+  (if* (find-kind-entry kind)
+     then (error "Debug kind ~s already defined." kind))
+  (dolist (superkind superkinds)
+    (if* (null (find-kind-entry superkind))
+       then (error "Can't find superkind ~s for ~s." superkind kind)))
+  (push (cons kind superkinds) *debug-kinds*)
+  (setf (get kind 'debug-description) documentation))
 
-(define-debug-kind :xmit   :log
-  "If set then most of the traffic between clients and servers is also sent to the debug stream")
+(defmacro define-debug-kind (kind superkinds documentation)
+  `(add-new-kind ,kind ',superkinds ,documentation))
 
-(define-debug-kind :info   :log
-  "General information")
+(define-debug-kind :all ()
+  "The mother of all debug features.")
 
-(define-debug-kind :zoom-on-error :all
-  "If set then print a zoom to the vhost-error-stream when an error occurs in a handler")
-    
+(define-debug-kind :notrap (:all)
+  "If set than errors in handlers cause a break loop to be entered.")
+
+(define-debug-kind :zoom-on-error (:all)
+  "If set then print a zoom to the vhost-error-stream when an error occurs in a handler.")
+
+(define-debug-kind :log (:all)
+  "Category of features that write some kind of log.")
+
+(define-debug-kind :xmit (:log)
+  "Category of features that log the traffic between clients, servers.")
+
+(define-debug-kind :info (:log)
+  "General information.")
+
+(define-debug-kind :client (:all)
+  "Category of features that log client communication.")
+
+(define-debug-kind :server (:all)
+  "Category of features that log server communication.")
+
+(define-debug-kind :proxy (:all)
+  "Category of features that log proxy communication.")
+
+(define-debug-kind :request (:all)
+  "Category of features that log requests.")
+
+(define-debug-kind :response (:all)
+  "Category of features that log responses.")
+
+(define-debug-kind :command (:all)
+  "Category of features that log http request commands.")
+
+(define-debug-kind :headers (:all)
+  "Category of features that log request/response headers.")
+
+(define-debug-kind :body (:all)
+  "Category of features that log request/response bodies.")
+
+
+(define-debug-kind :xmit-client-request-command
+    (:xmit :client :request :command)
+  "If set then print the client request commands.")
+
+(define-debug-kind :xmit-client-request-headers
+    (:xmit :client :request :headers)
+  "If set then print the client request headers.")
+
+(define-debug-kind :xmit-client-request-body
+    (:xmit :client :request :body)
+  "If set then print the client request bodies.")
+
+(define-debug-kind :xmit-client-response-headers
+    (:xmit :client :response :headers)
+  "If set then print the client response headers.")
+
+(define-debug-kind :xmit-client-response-body
+    (:xmit :client :response :body)
+  "If set then print the client response bodies.")
+
+
+(define-debug-kind :xmit-server-request-command
+    (:xmit :server :request :command)
+  "If set then print the server request commands.")
+
+(define-debug-kind :xmit-server-request-headers
+    (:xmit :server :request :headers)
+  "If set then print the server request headers.")
+
+(define-debug-kind :xmit-server-request-body
+    (:xmit :server :request :body)
+  "If set then print the server request bodies.")
+
+(define-debug-kind :xmit-server-response-headers
+    (:xmit :server :response :headers)
+  "If set then print the server response headers.")
+
+(define-debug-kind :xmit-server-response-body
+    (:xmit :server :response :body)
+  "If set then print the server response bodies.")
+
+;; These are parallell to the client and server kinds, from the point
+;; of view of the proxy. That is, :xmit-proxy-client-request-command
+;; is what the proxy sends on as a client to the real server.
+
+(define-debug-kind :xmit-proxy-client-request-command
+    (:xmit :proxy :client :request :command)
+  "If set then print the proxy request command sent to the real server.")
+
+(define-debug-kind :xmit-proxy-client-request-headers
+    (:xmit :proxy :client :request :headers)
+  "If set then print the proxy request headers sent to the real server.")
+
+(define-debug-kind :xmit-proxy-client-request-body
+    (:xmit :proxy :client :request :body)
+  "If set then print the proxy request bodies sent to the real server.")
+
+(define-debug-kind :xmit-proxy-client-response-headers
+    (:xmit :proxy :client :response :headers)
+  "If set then print the proxy response headers sent by the real server.")
+
+(define-debug-kind :xmit-proxy-client-response-body
+    (:xmit :proxy :client :response :body)
+  "If set then print the proxy response bodies sent by the real server.")
+
+;; What the proxy as a server sends to the real client. Note there are
+;; no :xmit-proxy-server-request-* kinds, because at the time of
+;; reading the request it's not yet known whether it's the going to be
+;; proxied so these show up as :xmit-server-request-*.
+
+(define-debug-kind :xmit-proxy-server-response-headers
+    (:xmit :proxy :server :response :headers)
+  "If set then print the proxy response headers sent to the client.")
+
+(define-debug-kind :xmit-proxy-server-response-body
+    (:xmit :proxy :server :response :body)
+  "If set then print the proxy response bodies sent by the client.")
+
+(defun expand-kinds (kinds)
+  (dolist (kind kinds)
+    (if* (null (find-kind-entry kind))
+       then (error "Can't find kind ~s." kind)))
+  (let ((kinds kinds))
+    (loop for entry in (reverse *debug-kinds*)
+          do (destructuring-bind (kind &rest superkinds) entry
+               (when (intersection superkinds kinds)
+                 (pushnew kind kinds))))
+    kinds))
 
 (defun debug-on (&rest args)
   ;; add the given debug kinds to the log list
   (if* (null args)
      then (note-debug-set)
-     else (dolist (arg args)
-	    (case arg
-	      (:all (setq *debug-current* *debug-all*))
-	      (:log (setq *debug-current*
-		      (union *debug-current* *debug-log*)))
-	      (t (pushnew arg *debug-current*))))))
+     else (setq *debug-current*
+                (union *debug-current* (expand-kinds args)))))
 
 (defun debug-off (&rest args)
   ;; turn off the debugging
   (if* (null args)
      then (note-debug-set)
-     else (dolist (arg args)
-	    (case arg
-	      (:all (setq *debug-current* nil))
-	      (:log (setq *debug-current*
-		      (set-difference *debug-current* *debug-log*)))
-	      (t (setq *debug-current* (remove arg *debug-current*)))))))
+     else (setq *debug-current*
+                (set-difference *debug-current* (expand-kinds args)))))
 
 (defun note-debug-set ()
   ;; describe what debugging switches exist and if they are on
   ;; and off
-  (dolist (kind *debug-all*)
-    (format t "~7s ~4a  ~a~%" 
-	    kind
-	    (if* (member kind *debug-current*)
-	       then "on"
-	       else "off")
-	    (get kind 'debug-description))))
-
-	    
-
-(defmacro debug-format (kind &rest args)
-  ;; do the format to *debug-stream* if the kind of this info
-  ;; is matched by the value of *debug-current*
-  `(if* (member ,kind *debug-current* :test #'eq)
-      then (write-sequence 
-	    (concatenate 'string
-	      (format nil "d> (~a): " (mp:process-name sys:*current-process*))
-	      (format nil ,@args))
-	    *debug-stream*)))
+  (dolist (entry (reverse *debug-kinds*))
+    (destructuring-bind (kind &rest superkinds) entry
+      (format t "~40s ~4a~%    ~a~%~a"
+              kind
+              (if* (member kind *debug-current*)
+                 then "on"
+                 else "off")
+              (get kind 'debug-description)
+              (if* superkinds
+                 then (format nil "    (parent categories: ~{~s~^, ~})~%"
+                                  superkinds)
+                 else "")))))
 
 
-(defmacro format-dif (debug-key &rest args)
-  ;; do the format and also do the same format to the 
-  ;; debug stream if the given debug keyword is set
-  ;; do the format and then send to *initial-terminal-io*
-  `(progn (format ,@args)
-	  (if* (member ,debug-key *debug-current* :test #'eq)
-	     then ; do extra consing to ensure that it all be written out 
-		  ; at once
-		  (write-sequence
-		   (concatenate 'string 
-		     (format nil "x>(~a): " 
-			     (mp:process-name sys:*current-process*))
-		     (format nil ,@(cdr args)))
-		   *debug-stream*))))
+(defun format-debug-message (kind stream format args)
+  (declare (ignore kind))
+  (apply #'format stream format args))
 
 (defmacro if-debug-action (kind &body body)
   ;; only do if the debug value is high enough
-  `(progn (if* (member ,kind *debug-current* :test #'eq)
-	     then ,@body)))
+  `(if* (member ,kind *debug-current* :test #'eq)
+      then ,@body))
+
+;; An alist that maps debug kinds to streams. See
+;; maybe-accumulate-log.
+(defvar *accumulating-kinds-and-streams* ())
+
+(defun accumulator-stream-for-kind (kind)
+  (cdr (assoc kind *accumulating-kinds-and-streams*)))
+
+(defmacro debug-format (kind format &rest args)
+  ;; do the format to *debug-stream* if the kind of this info
+  ;; is matched by the value of *debug-current*
+  `(if-debug-action ,kind
+     (let ((accumulator-stream (accumulator-stream-for-kind ,kind)))
+       (if accumulator-stream
+           (format accumulator-stream ,format ,@args)
+           (log1 ,kind :info (format-debug-message ,kind nil ,format
+                                                   (list ,@args)))))))
+
+(defmacro maybe-accumulate-log ((debug-action sink) &body body)
+  (let ((debug-output-stream (gensym "debug-output-stream"))
+        (tag (gensym "tag"))
+        (%sink (gensym "sink")))
+    `(flet ((body ()
+              ,@body))
+       (let ((,%sink ,sink))
+         (catch ',tag
+           (or (if-debug-action ,debug-action
+                 (with-output-to-buffer (,debug-output-stream)
+                   (unwind-protect
+                        (let ((*accumulating-kinds-and-streams*
+                                (or (if-debug-action ,debug-action
+                                      (cons (cons ,debug-action
+                                                  ,debug-output-stream)
+                                            *accumulating-kinds-and-streams*))
+                                    *accumulating-kinds-and-streams*)))
+                          (throw ',tag (body)))
+                     (let ((string (multiple-value-bind (buffer length)
+                                       (get-output-stream-buffer
+                                        ,debug-output-stream)
+                                     (octets-to-string
+                                      buffer :end length
+                                      :external-format :octets))))
+                       (if (functionp ,%sink)
+                           (funcall ,%sink string)
+                           (debug-format ,debug-action ,%sink string))))))
+               (body)))))))
+
+(defmacro format-dif (kind &rest args)
+  ;; do the format and also do the same format to the 
+  ;; debug stream if the given debug keyword is set
+  `(progn (format ,@args)
+          (debug-format ,kind ,@(cdr args))))
 
 (defun check-for-open-socket-before-gc (socket)
   (if* (open-stream-p socket)
@@ -283,6 +438,13 @@
     :initform nil
     :accessor wserver-filters)
    
+   (logger
+    ;; on opaque object that's passed to log1* on which it can
+    ;; dispatch
+    :initarg :logger
+    :initform t
+    :accessor wserver-logger)
+
    (log-function
     ;; function to call after the request is done to 
     ;; do the logging
@@ -530,6 +692,16 @@
 External-format `~s' passed to make-http-client-request filters line endings.
 Problems with protocol may occur." (ef-name ef)))))
 
+(defun check-external-format (external-format)
+  (declare (ignorable external-format))
+  #+(and allegro (version>= 6 0 pre-final 1))
+  (if* (and (streamp *html-stream*)
+            (not (eq external-format
+                     (stream-external-format *html-stream*))))
+     then (warn-if-crlf external-format)
+          (setf (stream-external-format *html-stream*)
+                external-format)))
+
 (defmacro with-http-body ((req ent
 			   &key headers 
 				(external-format 
@@ -540,7 +712,7 @@ Problems with protocol may occur." (ef-name ef)))))
 	(g-ent (gensym))
 	(g-headers (gensym))
 	(g-external-format (gensym))
-	)
+	(g-old-request-reply-stream (gensym)))
     `(let ((,g-req ,req)
 	   (,g-ent ,ent)
 	   (,g-headers ,headers)
@@ -556,16 +728,26 @@ Problems with protocol may occur." (ef-name ef)))))
 	  then (bulk-set-reply-headers ,g-req ,g-headers))
        (send-response-headers ,g-req ,g-ent :pre)
        (if* (not (member :omit-body (request-reply-strategy ,g-req) 
-			 :test #'eq))
-	  then (let ((*html-stream* (request-reply-stream ,g-req)))
-		 #+(and allegro (version>= 6 0 pre-final 1))
-		 (if* (and (streamp *html-stream*)
-			   (not (eq ,g-external-format
-				    (stream-external-format *html-stream*))))
-		    then (warn-if-crlf ,g-external-format)
-			 (setf (stream-external-format *html-stream*)
-			   ,g-external-format))
-		 (progn ,@body)))
+                         :test #'eq))
+          then (if* (member :xmit-server-response-body *debug-current*)
+                  then (maybe-accumulate-log (:xmit-server-response-body "~s")
+                         (let ((,g-old-request-reply-stream
+                                 (request-reply-stream ,g-req)))
+                           (unwind-protect
+                                (let ((*html-stream*
+                                        (make-broadcast-stream
+                                         (accumulator-stream-for-kind
+                                          :xmit-server-response-body)
+                                         (request-reply-stream ,g-req))))
+                                  (check-external-format ,g-external-format)
+                                  (setf (request-reply-stream ,g-req)
+                                        *html-stream*)
+                                  ,@body)
+                             (setf (request-reply-stream ,g-req)
+                                   ,g-old-request-reply-stream))))
+                  else (let ((*html-stream* (request-reply-stream ,g-req)))
+                         (check-external-format ,g-external-format)
+                         ,@body)))
        
        (if* (member :keep-alive (request-reply-strategy ,g-req) :test #'eq)
 	  then ; force the body to be read so we can continue
@@ -1207,6 +1389,21 @@ by keyword symbols and not by strings"
 	      nil)))
       (close main-socket))))
 
+;; Bound to wserver-logger if that's set when logging for a particular
+;; wserver. Log messages coming from the client use the global value.
+(defvar *logger* nil)
+
+(defun initial-bindings ()
+  #+(version>= 9 0 :alpha 44)
+  `((*wserver*  . ',*wserver*)
+    (*logger* . ',(or (wserver-logger *wserver*)
+                      *logger*))
+    ,@excl:*required-top-level-bindings*)
+  #-(version>= 9 0 :alpha 44)
+  `((*wserver*  . ',*wserver*)
+    (*logger* . ',(or (wserver-logger *wserver*)
+                      *logger*))
+    ,@excl:*cl-default-special-bindings*))
 	
 (defun start-lisp-thread-server (listeners)
   ;; start a server that consists of a set of lisp threads for
@@ -1226,13 +1423,7 @@ by keyword symbols and not by strings"
 			       then (wserver-name *wserver*) 
 			       else "aserve")
 			    (atomic-incf *thread-index*))
-	      :initial-bindings
-	      #+(version>= 9 0 :alpha 44)
-	      `((*wserver*  . ',*wserver*)
-		,@excl:*required-top-level-bindings*)
-	      #-(version>= 9 0 :alpha 44)
-	      `((*wserver*  . ',*wserver*)
-		,@excl:*cl-default-special-bindings*))
+	      :initial-bindings (initial-bindings))
       #'http-accept-thread)))
 
 ;; make-worker-thread wasn't thread-safe before smp. I'm assuming that's
@@ -1246,14 +1437,7 @@ by keyword symbols and not by strings"
 			  then (wserver-name *wserver*) 
 			  else "aserve")))
 	 (proc (mp:make-process :name name
-				:initial-bindings
-				#+(version>= 9 0 :alpha 44)
-				`((*wserver*  . ',*wserver*)
-				  ,@excl:*required-top-level-bindings*)
-				#-(version>= 9 0 :alpha 44)
-				`((*wserver*  . ',*wserver*)
-				  ,@excl:*cl-default-special-bindings*)
-				)))
+                                :initial-bindings (initial-bindings))))
     (mp:process-preset proc #'http-worker-thread)
     (push proc (wserver-worker-threads *wserver*))
     (enqueue (wserver-free-worker-threads *wserver*) proc)
@@ -1500,7 +1684,7 @@ by keyword symbols and not by strings"
 	   (multiple-value-setq (req error-obj)
              (ignore-errors
                (with-timeout-local ((wserver-read-request-timeout *wserver*)
-                                    (debug-format :info "request timed out on read~%")
+                                    (debug-format :info "request timed out on read")
                                     (return-from process-connection nil))
                  (read-http-request sock chars-seen))))
 	  
@@ -1537,8 +1721,8 @@ by keyword symbols and not by strings"
 		  (setf (request-reply-date req) (get-universal-time))
 		  
 		  (force-output-noblock (request-socket req))
-		  
-		  (log-request req)
+
+                  (log-request req)
 		  
 		  (setq *worker-request* nil)
 		  (free-req-header-block req)
@@ -1548,7 +1732,7 @@ by keyword symbols and not by strings"
 				 (request-reply-strategy req)
 				 :test #'eq)
 		       then ; continue to use it
-			    (debug-format :info "request over, keep socket alive~%")
+			    (debug-format :info "request over, keep socket alive")
 			    (force-output-noblock sock)
 			    (setf (car chars-seen) nil)  ; for next use
 			    (excl::socket-bytes-written (request-socket req) 0)
@@ -1599,16 +1783,13 @@ by keyword symbols and not by strings"
       
 	    
 	    (debug-format  :info "got line of size ~d: " end)
-	    (if-debug-action :info
-			     (dotimes (i end) (write-char (schar buffer i) 
-							  *initial-terminal-io*))
-			     (terpri *initial-terminal-io*) (force-output *initial-terminal-io*))
-      
-	    (if* (not (eql 0 end))
+            
+            (if* (not (eql 0 end))
 	       then (return) ; out of loop
 		    ))
 	  
 	  (setq raw-cmd (buffer-substr buffer 0 end))
+          (debug-format :xmit-server-request-command "~s" raw-cmd)
 	  
 	  (multiple-value-bind (cmd uri protocol)
 	      (parse-http-command buffer end)
@@ -1644,7 +1825,7 @@ by keyword symbols and not by strings"
 		      #+ignore (null (read-request-headers req sock buffer))
 		      (null (new-read-request-headers req sock))
 		      )
-	       then (debug-format :info "no headers, ignore~%")
+	       then (debug-format :info "no headers, ignore")
 		    (return-from read-http-request nil))
 	    
 	    ; insert the host name and port into the uri
@@ -1719,7 +1900,7 @@ by keyword symbols and not by strings"
 	  ;;  cache it for later too
 	  (or (request-request-body req)
 	      (setf (request-request-body req)
-		(get-request-body-retrieve req)))))
+		(get-request-body-retrieve-and-maybe-log req)))))
     (if* (and ef-supplied result) ; spr27296
        then (values
 	     (octets-to-string
@@ -1727,6 +1908,10 @@ by keyword symbols and not by strings"
 	      :external-format external-format))
        else result)))
 
+(defun get-request-body-retrieve-and-maybe-log (req)
+  (let ((body (get-request-body-retrieve req)))
+    (debug-format :xmit-server-request-body "~s" body)
+    body))
 
 (defun get-request-body-retrieve (req)
   ;; get the guts of the body into a string.
@@ -2045,11 +2230,10 @@ by keyword symbols and not by strings"
 		      (if* (<= pos end)
 			 then ; no bytes read, eof
 			      nil
-			 else 
-			      (if-debug-action 
-			       :xmit
-			       (format t "~%multipart read ~d bytes~%" 
-				       (- pos end))
+			 else (debug-format :info "multipart read ~d bytes" 
+                                             (- pos end))
+			      (if-debug-action :xmit
+                                
 			       (do ((i end (1+ i)))
 				   ((>= i pos))
 				 (write-char (code-char (aref mpbuffer i))))
@@ -2493,7 +2677,7 @@ in get-multipart-sequence"))
     (loop
       (let ((ch (read-char sock nil :eof)))
 	(if* (eq ch :eof)
-	   then (debug-format :info"eof on socket~%")
+	   then (debug-format :info "eof on socket")
 		(free-request-buffer buffer)
 		(return-from read-sock-line nil))
 
@@ -2505,16 +2689,7 @@ in get-multipart-sequence"))
 		   then (decf start) ; back up to toss out return
 			)
 		(setf (schar buffer start) #\null) ; null terminate
-		
-		; debug output
-		; dump out buffer
-		(debug-format :info "read on socket: ")
-		(if-debug-action :info
-				 (dotimes (i start)
-				   (write-char (schar buffer i) *initial-terminal-io*))
-				 (terpri *initial-terminal-io*))
-		;; end debug
-			
+
 		(return-from read-sock-line (values buffer start))
 	   else ; store character
 		(if* (>= start max)
