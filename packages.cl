@@ -17,8 +17,8 @@ v8: 1.3.8: fix problem w/response handler using string output streams;
 v9: 1.3.9: speed up unchunking-streams;
 v10: 1.3.10: fix buffer boundary error in unchunking-streams.
 v11: 1.3.11: fix log reporting of content-length when using keep-alive.
-v12: 1.3.12: make aserve compatible with patch inflate.003.
-v13: 1.3.13: request-query cache includes external-format as a key,
+v12: 1.3.12: make aserve compatible with patch inflate.003,
+             request-query cache includes external-format as a key,
              send cookies on one line as per rfc6265,
              add support for ssl CRLs."
   :type :system
