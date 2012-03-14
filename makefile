@@ -15,7 +15,7 @@ ifndef mlisp
 ifeq ($(on_windows),yes)
 mlisp = "/cygdrive/c/Program Files/acl81/mlisp.exe" +B +cn
 else
-mlisp = /fi/cl/8.1/bin/mlisp
+mlisp = /fi/cl/8.2/bin/mlisp
 endif
 endif
 
@@ -32,6 +32,19 @@ test: FORCE
 	echo '(setq excl::*break-on-warnings* t)' >> build.tmp
 	echo '(setq util.test::*break-on-test-failures* t)' >> build.tmp
 	echo '(load "load.cl")' >> build.tmp
+	echo '(dribble "test.out")' >> build.tmp
+	echo '(time (load "test/t-aserve.cl"))' >> build.tmp
+	echo '(exit util.test::*test-errors*)' >> build.tmp
+# -batch must come before -L, since arguments are evaluated from left to right
+	$(mlisp) -batch -L build.tmp -kill
+
+test-from-asdf: FORCE
+	rm -f build.tmp
+	echo '(setq excl::*break-on-warnings* t)' >> build.tmp
+	echo '(require :tester)' >> build.tmp
+	echo '(setq util.test::*break-on-test-failures* t)' >> build.tmp
+	echo '(require :asdf)' >> build.tmp
+	echo "(asdf:operate 'asdf:load-op :aserve)" >> build.tmp
 	echo '(dribble "test.out")' >> build.tmp
 	echo '(time (load "test/t-aserve.cl"))' >> build.tmp
 	echo '(exit util.test::*test-errors*)' >> build.tmp

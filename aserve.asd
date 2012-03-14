@@ -27,6 +27,7 @@
    (:cl-file "client")
    (:cl-file "proxy")
    (:cl-file "cgi")
+   (:cl-file "chunker")
    (:cl-file "playback")
 
    (:static-file "README.md")
