@@ -258,24 +258,41 @@
   `(if* (member ,kind *debug-current* :test #'eq)
       then ,@body))
 
-;; An alist that maps debug kinds to streams. See
-;; maybe-accumulate-log.
-(defvar *accumulating-kinds-and-streams* ())
+;; For logging bodies (and also to nicely accumulate multiple debug
+;; messages of the same kind into a single one, we need
+;; with-output-to-buffer that supports growable arrays which was first
+;; available as a patch to acl 8.2. If that feature is not supported
+;; in the lisp, we print an explanatory message to *error-output* and
+;; go on without being able to log dynamically computed bodies (i.e.
+;; those that aren't published files). Also, since accumulation
+;; doesn't work, one can have several entries for the same logical
+;; thing.
+(eval-when (:compile-toplevel)
+  (defparameter *with-output-to-buffer-can-grow-array*
+    (null (nth-value 1 (ignore-errors
+                        (compile nil '(lambda ()
+                                       (with-output-to-buffer (s)))))))))
 
-(defun accumulator-stream-for-kind (kind)
-  (cdr (assoc kind *accumulating-kinds-and-streams*)))
+#+#.(cl:if net.aserve::*with-output-to-buffer-can-grow-array* '(and) '(or))
+(progn
+  ;; An alist that maps debug kinds to streams. See
+  ;; maybe-accumulate-log.
+  (defvar *accumulating-kinds-and-streams* ())
 
-(defmacro debug-format (kind format &rest args)
-  ;; do the format to *debug-stream* if the kind of this info
-  ;; is matched by the value of *debug-current*
-  `(if-debug-action ,kind
-     (let ((accumulator-stream (accumulator-stream-for-kind ,kind)))
-       (if accumulator-stream
-           (format accumulator-stream ,format ,@args)
-           (log1 ,kind :info (format-debug-message ,kind nil ,format
-                                                   (list ,@args)))))))
+  (defun accumulator-stream-for-kind (kind)
+    (cdr (assoc kind *accumulating-kinds-and-streams*)))
 
-(defmacro maybe-accumulate-log ((debug-action sink) &body body)
+  (defmacro debug-format (kind format &rest args)
+    ;; do the format to *debug-stream* if the kind of this info
+    ;; is matched by the value of *debug-current*
+    `(if-debug-action ,kind
+       (let ((accumulator-stream (accumulator-stream-for-kind ,kind)))
+         (if accumulator-stream
+             (format accumulator-stream ,format ,@args)
+             (log1 ,kind :info (format-debug-message ,kind nil ,format
+                                                     (list ,@args)))))))
+
+  (defmacro maybe-accumulate-log ((debug-action sink) &body body)
   (let ((debug-output-stream (gensym "debug-output-stream"))
         (tag (gensym "tag"))
         (%sink (gensym "sink")))
@@ -302,7 +319,53 @@
                        (if (functionp ,%sink)
                            (funcall ,%sink string)
                            (debug-format ,debug-action ,%sink string))))))
-               (body)))))))
+               (body))))))))
+
+;; This doesn't accumulate at all. It's a bandaid for lisps without a
+;; with-output-to-buffer capable of growing buffers.
+#-#.(cl:if net.aserve::*with-output-to-buffer-can-grow-array* '(and) '(or))
+(progn
+  (format
+   *error-output*
+   "NOTE: This lisp does not support with-output-to-buffer with growable arrays.
+Logging dynamically computed bodies will not be possible and headers, bodies
+will be logged with one log entry per line in some cases.")
+
+  (defvar *accumulating-kinds-and-sinks* ())
+
+  (defun accumulator-sink-for-kind (kind)
+    (cdr (assoc kind *accumulating-kinds-and-sinks*)))
+
+  (defmacro debug-format (kind format &rest args)
+    ;; do the format to *debug-stream* if the kind of this info
+    ;; is matched by the value of *debug-current*
+    `(if-debug-action ,kind
+       (let ((accumulator-sink (accumulator-sink-for-kind ,kind))
+             (message (format-debug-message ,kind nil ,format
+                                            (list ,@args))))
+         (if* (functionp accumulator-sink)
+            then (let ((*accumulating-kinds-and-sinks*
+                         (remove ,kind *accumulating-kinds-and-sinks*
+                                 :key #'car)))
+                   (funcall accumulator-sink message))
+            else (log1 ,kind :info (format nil (or accumulator-sink "~a")
+                                               message))))))
+
+  (defmacro maybe-accumulate-log ((debug-action sink) &body body)
+    (let ((tag (gensym "tag"))
+          (%sink (gensym "sink")))
+      `(flet ((body ()
+                ,@body))
+         (let ((,%sink ,sink))
+           (catch ',tag
+             (or (if-debug-action ,debug-action
+                   (let ((*accumulating-kinds-and-sinks*
+                           (or (if-debug-action ,debug-action
+                                 (cons (cons ,debug-action ,%sink)
+                                       *accumulating-kinds-and-sinks*))
+                               *accumulating-kinds-and-sinks*)))
+                     (throw ',tag (body))))
+                 (body))))))))
 
 (defmacro format-dif (kind &rest args)
   ;; do the format and also do the same format to the 
@@ -713,6 +776,7 @@ Problems with protocol may occur." (ef-name ef)))))
 	(g-headers (gensym))
 	(g-external-format (gensym))
 	(g-old-request-reply-stream (gensym)))
+    (declare (ignorable g-old-request-reply-stream))
     `(let ((,g-req ,req)
 	   (,g-ent ,ent)
 	   (,g-headers ,headers)
@@ -729,7 +793,8 @@ Problems with protocol may occur." (ef-name ef)))))
        (send-response-headers ,g-req ,g-ent :pre)
        (if* (not (member :omit-body (request-reply-strategy ,g-req) 
                          :test #'eq))
-          then (if* (member :xmit-server-response-body *debug-current*)
+          then #+#.(cl:if net.aserve::*with-output-to-buffer-can-grow-array* '(and) '(or))
+               (if* (member :xmit-server-response-body *debug-current*)
                   then (maybe-accumulate-log (:xmit-server-response-body "~s")
                          (let ((,g-old-request-reply-stream
                                  (request-reply-stream ,g-req)))
@@ -747,7 +812,11 @@ Problems with protocol may occur." (ef-name ef)))))
                                    ,g-old-request-reply-stream))))
                   else (let ((*html-stream* (request-reply-stream ,g-req)))
                          (check-external-format ,g-external-format)
-                         ,@body)))
+                         ,@body))
+               #-#.(cl:if net.aserve::*with-output-to-buffer-can-grow-array* '(and) '(or))
+               (let ((*html-stream* (request-reply-stream ,g-req)))
+                 (check-external-format ,g-external-format)
+                 ,@body))
        
        (if* (member :keep-alive (request-reply-strategy ,g-req) :test #'eq)
 	  then ; force the body to be read so we can continue

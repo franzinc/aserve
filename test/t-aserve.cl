@@ -2297,8 +2297,8 @@
 
 ;; truncate long bodies
 (let ((body-kinds (net.aserve::expand-kinds '(:body))))
-  (defmethod net.aserve::logmess1 :around (category level message)
-    (call-next-method category level
+  (defmethod net.aserve::log1* :around (logger category level message)
+    (call-next-method logger category level
                       (if (and (member category body-kinds)
                                (< 100 (length message)))
                           (concatenate 'string (subseq message 0 100) "...")
