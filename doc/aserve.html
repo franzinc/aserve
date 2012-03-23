@@ -4360,7 +4360,7 @@ enabled.</p>
 debugging-features-to-disable)</font></strong></p>
 <p>This function turns off the given list of features.</p>
 <p>&nbsp;</p>
-<p>The list of debug features are:</p>
+<p>The list of debug features are given below. We flag three of particular interest:</p>
 <table border="1" width="100%">
   <tbody>
     <tr>
@@ -4389,13 +4389,113 @@ the timeout is reached.</td>
   </tbody>
 </table>
 <p>&nbsp;</p>
-<p>Two pseudo debug features are <strong>:all</strong> and <strong>:log.</strong>.
-&nbsp;
-Specifying
-<strong>:all </strong>to <strong>debug-on</strong> or <strong>debug-off</strong>
-&nbsp; is the same as listing all of the debug features.&nbsp;&nbsp;
-Specifying <strong>:log</strong>
-is the same as specifying all features except <strong>:notrap.</strong></p>
-<p>&nbsp;</p>
+<p>
+Here are all features showing their parent features. Turning on a
+parent feature enables the child features. Some features have multiple
+parents.
+</p>
+<p>
+Note there are no :xmit-proxy-server-request-* categories, because at
+the time of reading the request it's not yet known whether it's the
+going to be proxied so these show up as :xmit-server-request-*.
+</p>
+
+<pre>
+:all                                     
+    The parent of all debug features.
+:notrap                                  
+    If set than errors in handlers cause a break loop to be entered.
+    (parent categories: :all)
+:zoom-on-error                           
+    If set then print a zoom to the vhost-error-stream when an error occurs in a handler.
+    (parent categories: :all)
+:log                                     
+    Category of features that write some kind of log.
+    (parent categories: :all)
+:xmit                                    
+    Category of features that log the traffic between clients, servers.
+    (parent categories: :log)
+:info                                    
+    General information.
+    (parent categories: :log)
+:client                                  
+    Category of features that log client communication.
+    (parent categories: :all)
+:server                                  
+    Category of features that log server communication.
+    (parent categories: :all)
+:proxy                                   
+    Category of features that log proxy communication.
+    (parent categories: :all)
+:request                                 
+    Category of features that log requests.
+    (parent categories: :all)
+:response                                
+    Category of features that log responses.
+    (parent categories: :all)
+:command                                 
+    Category of features that log http request commands.
+    (parent categories: :all)
+:headers                                 
+    Category of features that log request/response headers.
+    (parent categories: :all)
+:body                                    
+    Category of features that log request/response bodies.
+    (parent categories: :all)
+:xmit-client-request-command             
+    If set then print the client request commands.
+    (parent categories: :xmit, :client, :request, :command)
+:xmit-client-request-headers             
+    If set then print the client request headers.
+    (parent categories: :xmit, :client, :request, :headers)
+:xmit-client-request-body                
+    If set then print the client request bodies.
+    (parent categories: :xmit, :client, :request, :body)
+:xmit-client-response-headers            
+    If set then print the client response headers.
+    (parent categories: :xmit, :client, :response, :headers)
+:xmit-client-response-body               
+    If set then print the client response bodies.
+    (parent categories: :xmit, :client, :response, :body)
+:xmit-server-request-command             
+    If set then print the server request commands.
+    (parent categories: :xmit, :server, :request, :command)
+:xmit-server-request-headers             
+    If set then print the server request headers.
+    (parent categories: :xmit, :server, :request, :headers)
+:xmit-server-request-body                
+    If set then print the server request bodies.
+    (parent categories: :xmit, :server, :request, :body)
+:xmit-server-response-headers            
+    If set then print the server response headers.
+    (parent categories: :xmit, :server, :response, :headers)
+:xmit-server-response-body               
+    If set then print the server response bodies.
+    (parent categories: :xmit, :server, :response, :body)
+:xmit-proxy-client-request-command       
+    If set then print the proxy request command sent to the real server.
+    (parent categories: :xmit, :proxy, :client, :request, :command)
+:xmit-proxy-client-request-headers       
+    If set then print the proxy request headers sent to the real server.
+    (parent categories: :xmit, :proxy, :client, :request, :headers)
+:xmit-proxy-client-request-body          
+    If set then print the proxy request bodies sent to the real server.
+    (parent categories: :xmit, :proxy, :client, :request, :body)
+:xmit-proxy-client-response-headers      
+    If set then print the proxy response headers sent by the real server.
+    (parent categories: :xmit, :proxy, :client, :response, :headers)
+:xmit-proxy-client-response-body         
+    If set then print the proxy response bodies sent by the real server.
+    (parent categories: :xmit, :proxy, :client, :response, :body)
+:xmit-proxy-server-response-headers      
+    If set then print the proxy response headers sent to the client.
+    (parent categories: :xmit, :proxy, :server, :response, :headers)
+:xmit-proxy-server-response-body         
+    If set then print the proxy response bodies sent by the client.
+    (parent categories: :xmit, :proxy, :server, :response, :body)
+</pre>
+
+
+
 </body>
 </html>
