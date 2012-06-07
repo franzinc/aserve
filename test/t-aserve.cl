@@ -148,7 +148,9 @@
 (defun user::test-aserve-n (&key n (test-timeouts *test-timeouts*) (delay 0) logs
 				 (direct t) (proxy t) (proxyproxy t) (ssl t)
 				 (name "ast") (log-name nil l-n-p)
-			   &aux wname)
+				 (wait t) ; wait for tests to finish
+				 (exit nil) ; ignored if wait=nil
+			    &aux wname)
   (typecase n
     ((integer 0) nil)
     (otherwise 
@@ -165,48 +167,63 @@
      (test-aserve test-timeouts :direct direct :proxy proxy :proxyproxy proxyproxy 
 		  :ssl ssl))
     (otherwise
-     (when (cond (l-n-p (setq *log-wserver-name* log-name))
-		 ((eql n 1) (setq *log-wserver-name* nil))
-		 (t  (setq *log-wserver-name* user::*default-log-wserver-name*)))
-       (when (boundp 'util.test::*test-report-thread*)
-	 (set 'util.test::*test-report-thread* t)))	 
-     (dotimes (i n)
-       (mp:process-run-function
-	(setq wname (format nil "~A~A" i name))
-	(lambda (i name)
-	  (let* (os
-		 clean 
-		 (*standard-output*
-		  (if logs
-		      (setq os
+     (let ((procs '()))
+       (when (cond (l-n-p (setq *log-wserver-name* log-name))
+		   ((eql n 1) (setq *log-wserver-name* nil))
+		   (t  (setq *log-wserver-name* user::*default-log-wserver-name*)))
+	 (when (boundp 'util.test::*test-report-thread*)
+	   (set 'util.test::*test-report-thread* t)))	 
+       (dotimes (i n)
+	 (push
+	  (mp:process-run-function
+	      (setq wname (format nil "~A~A" i name))
+	    (lambda (i name)
+	      (let* (os
+		     clean 
+		     (*standard-output*
+		      (if logs
+			  (setq os
 			    (open (format nil "~A~A.log" logs i) :direction :output
 				  :if-exists :supersede))
-		    *standard-output*))
-		 (*aserve-test-config* 
-		  (setf (aref *aserve-test-configs* i)
+			*standard-output*))
+		     (*aserve-test-config* 
+		      (setf (aref *aserve-test-configs* i)
 			(make-instance 'aserve-test-config
-				       :name name :index i
-				       :test-timeouts test-timeouts)))
-		 (*wserver* (apply #'make-instance 'wserver 
-				   (when user::*default-log-wserver-name* (list :name name)))))
-	    (unwind-protect
-		(let ()
-		  (asc-format "~&~%============ STARTING SERVER ~A ~A ~%~%" i name)
-		  (setf (asc wserver) *wserver*)
-		  (test-aserve test-timeouts
-			       :direct direct :proxy proxy :proxyproxy proxyproxy :ssl ssl)
-		  (setq clean t))
-	      (asc-format "~&~%============ ENDING SERVER ~A ~A ~A ~%~%" i name 
-			  (if clean "normally" "ABRUPTLY"))
-	      (when os (close os))
-	      (setf (asc done) (if clean :clean :abrupt))
-	      (dotimes (j (length *aserve-test-configs*)
-			  (format *initial-terminal-io* "~&~%~%ALL SERVERS ENDED~%~%"))
-		(or (asc-done (aref *aserve-test-configs* j)) (return)))
-	      )))
-	i wname)
-       (sleep delay))))
-  )
+			  :name name :index i
+			  :test-timeouts test-timeouts)))
+		     (*wserver* (apply #'make-instance 'wserver 
+				       (when user::*default-log-wserver-name* (list :name name)))))
+		(unwind-protect
+		    (let ()
+		      (asc-format "~&~%============ STARTING SERVER ~A ~A ~%~%" i name)
+		      (setf (asc wserver) *wserver*)
+		      (test-aserve test-timeouts
+				   :direct direct :proxy proxy :proxyproxy proxyproxy :ssl ssl)
+		      (setq clean t))
+		  (asc-format "~&~%============ ENDING SERVER ~A ~A ~A ~%~%" i name 
+			      (if clean "normally" "ABRUPTLY"))
+		  (when os (close os))
+		  (setf (asc done) (if clean :clean :abrupt))
+		  (dotimes (j (length *aserve-test-configs*)
+			     (format *initial-terminal-io* "~&~%~%ALL SERVERS ENDED~%~%"))
+		    (or (asc-done (aref *aserve-test-configs* j)) (return)))
+		  )))
+	    i wname)
+	  procs)
+	 ;; should be able to handle a delay = 0
+	 (sleep delay))
+
+       (when wait
+	 (dolist (p procs)
+	   (mp:process-wait
+	    (format nil "waiting for ~a"
+		    (mp:process-name p))
+	    (lambda (p) (eq :terminated (mp::process-state p)))
+	    p))))))
+  (when wait
+    (if* exit
+       then (exit util.test::*test-errors* :quiet t)
+       else util.test::*test-errors*)))
 
 (defvar *asc-lock* (mp:make-process-lock :name "asc"))
 (defun asc-format (fmt &rest args)
@@ -381,9 +398,6 @@
        ,v2)))
 
 ;-------- publish-file tests
-
-(defvar *dummy-file-value* nil)
-(defvar *dummy-file-name*  "aservetest.xx")
 
 (defun build-dummy-file (length line-length name compress)
   ;; write a dummy file named  name  (if name isn't nil)

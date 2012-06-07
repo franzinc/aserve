@@ -330,22 +330,3 @@
 	    (let ((count (read-sequence buffer in)))
 	      (if* (<= count 0) then (return))
 	      (write-sequence buffer p :end count))))))))
-
-
-(defun run-aserve-tests (&key (nservers 1) exit)
-  (time
-   (let ((processes '()))
-     (dotimes (i nservers)
-       (push (mp:process-run-function
-		 (format nil "aserve test#~d" (1+ i))
-	       (lambda () (time (load "test/t-aserve.cl"))))
-	     processes))
-     (dolist (p processes)
-       (mp:process-wait
-	(format nil "waiting for ~a"
-		(mp:process-name p))
-	(lambda (p) (eq :terminated (mp::process-state p)))
-	p))
-     (if* exit
-	then (exit util.test::*test-errors* :quiet t)
-	else util.test::*test-errors*))))

@@ -32,11 +32,13 @@ NSERVERS = 1
 
 test: FORCE
 	rm -f build.tmp
+	echo '(dribble "test.out")' >> build.tmp
 	echo '(setq excl::*break-on-warnings* t)' >> build.tmp
 	echo '(setq util.test::*break-on-test-failures* t)' >> build.tmp
 	echo '(load "load.cl")' >> build.tmp
-	echo '(dribble "test.out")' >> build.tmp
-	echo '(run-aserve-tests :nservers $(NSERVERS) :exit t)' >> build.tmp
+	echo '(setq user::*do-aserve-test* nil)' >> build.tmp
+	echo '(load "test/t-aserve.cl")' >> build.tmp
+	echo '(time (test-aserve-n :n $(NSERVERS) :exit t))' >> build.tmp
 # -batch must come before -L, since arguments are evaluated from left to right
 	$(mlisp) -batch -L build.tmp -kill
 
