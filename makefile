@@ -8,63 +8,74 @@ on_windows = $(shell if test -d "c:/"; then echo yes; else echo no; fi)
 use_dcl = $(shell if test -f ../dcl.dxl; then echo yes; else echo no; fi)
 
 ifeq ($(use_dcl),yes)
-mlisp = ../lisp -I dcl.dxl
+mlisp = ../lisp
+image = dcl.dxl
 endif
 
-ifndef mlisp
 ifeq ($(on_windows),yes)
-mlisp = "/cygdrive/c/Program Files/acl81/mlisp.exe" +B +cn
+mlisp ?= "/cygdrive/c/acl82/mlisp.exe"
 else
-mlisp = /fi/cl/8.2/bin/mlisp
+mlisp ?= /fi/cl/8.2/bin/mlisp
 endif
+
+image ?= mlisp.dxl
+
+ifeq ($(on_windows),yes)
+mlisp += +B +cn +P # +M
 endif
+mlisp += -I $(image)
+
+# -batch must come before -L, since arguments are evaluated from left to right
+mlisp += -batch
 
 build: FORCE
 	rm -f build.tmp
 	echo '(setq excl::*break-on-warnings* t)' >> build.tmp
 	echo '(load "load.cl")' >> build.tmp
 	echo '(make-aserve.fasl)' >> build.tmp
-# -batch must come before -L, since arguments are evaluated from left to right
-	$(mlisp) -batch -L build.tmp -kill
+	$(mlisp) -L build.tmp -kill
 
-# On an SMP machine with SML ACL, adjust values for number of processors.
-NSERVERS = 1
+# Can be used to change the number of parallel test runs:
+#NSERVERS = :n 1
 
-test: FORCE
-	rm -f build.tmp
-	echo '(dribble "test.out")' >> build.tmp
-	echo '(setq excl::*break-on-warnings* t)' >> build.tmp
-	echo '(setq util.test::*break-on-test-failures* t)' >> build.tmp
-	echo '(load "load.cl")' >> build.tmp
-	echo '(setq user::*do-aserve-test* nil)' >> build.tmp
-	echo '(load "test/t-aserve.cl")' >> build.tmp
-	echo '(time (test-aserve-n :n $(NSERVERS) :exit t))' >> build.tmp
-# -batch must come before -L, since arguments are evaluated from left to right
-	$(mlisp) -batch -L build.tmp -kill
+test.tmp: FORCE
+	rm -f test.tmp
+	echo '(dribble "test.out")' >> test.tmp
+	echo '(setq excl::*break-on-warnings* t)' >> test.tmp
+	echo '(setq util.test::*break-on-test-failures* t)' >> test.tmp
+	echo '(load "load.cl")' >> test.tmp
+	echo '(setq user::*do-aserve-test* nil)' >> test.tmp
+	echo '(load "test/t-aserve.cl")' >> test.tmp
+
+test: test.tmp
+	echo '(time (test-aserve-n :n 1 :exit t))' >> test.tmp
+	$(mlisp) -L test.tmp -kill
+
+testsmp: test.tmp
+	echo '(time (test-aserve-n $(NSERVERS) :exit t))' >> test.tmp
+	$(mlisp) -L test.tmp -kill
 
 test-from-asdf: FORCE
 	rm -f build.tmp
+	echo '(dribble "test.out")' >> build.tmp
 	echo '(setq excl::*break-on-warnings* t)' >> build.tmp
 	echo '(require :tester)' >> build.tmp
 	echo '(setq util.test::*break-on-test-failures* t)' >> build.tmp
 	echo '(require :asdf)' >> build.tmp
 	echo "(asdf:operate 'asdf:load-op :aserve)" >> build.tmp
-	echo '(dribble "test.out")' >> build.tmp
 	echo '(time (load "test/t-aserve.cl"))' >> build.tmp
 	echo '(exit util.test::*test-errors*)' >> build.tmp
-# -batch must come before -L, since arguments are evaluated from left to right
-	$(mlisp) -batch -L build.tmp -kill
+	$(mlisp) -L build.tmp -kill
 
 srcdist: FORCE
 	rm -f build.tmp
 	echo '(setq excl::*break-on-warnings* t)' >> build.tmp
 	echo '(load "load.cl")' >> build.tmp
 	echo '(make-src-distribution "aserve")' >> build.tmp
-# -batch must come before -L, since arguments are evaluated from left to right
-	$(mlisp) -batch -L build.tmp -kill
+	$(mlisp) -L build.tmp -kill
 
 clean:	FORCE
-	rm -f build.tmp
+	rm -f *.tmp
 	find . -name '*.fasl' -print | xargs rm -f
 
 cleanall distclean: clean

@@ -145,7 +145,11 @@
 	       (mp:process-thread mp:*current-process*)))
     ""))
 
-(defun user::test-aserve-n (&key n (test-timeouts *test-timeouts*) (delay 0) logs
+(defun user::test-aserve-n (&key (n
+				  #+(and smp microsoft-32) 2
+				  #-(and smp microsoft-32) 5
+				  #-smp 1)
+				 (test-timeouts *test-timeouts*) (delay 0) logs
 				 (direct t) (proxy t) (proxyproxy t) (ssl t)
 				 (name "ast") (log-name nil l-n-p)
 				 (wait t) ; wait for tests to finish
@@ -221,9 +225,11 @@
 	    (lambda (p) (eq :terminated (mp::process-state p)))
 	    p))))))
   (when wait
-    (if* exit
-       then (exit util.test::*test-errors* :quiet t)
-       else util.test::*test-errors*)))
+    (let ((code (+ util.test::*test-unexpected-failures*
+		   util.test::*test-errors*)))
+      (if* exit
+	 then (exit code :quiet t)
+	 else code))))
 
 (defvar *asc-lock* (mp:make-process-lock :name "asc"))
 (defun asc-format (fmt &rest args)
