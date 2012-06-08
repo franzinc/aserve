@@ -55,6 +55,10 @@ testsmp: test.tmp
 	echo '(time (test-aserve-n $(NSERVERS) :exit t))' >> test.tmp
 	$(mlisp) -L test.tmp -kill
 
+stress: test.tmp
+	echo '(time (test-aserve-n $(NSERVERS) :exit t))' >> test.tmp
+	../bin/repeat.sh 10 $(mlisp) -L test.tmp -kill
+
 test-from-asdf: FORCE
 	rm -f build.tmp
 	echo '(dribble "test.out")' >> build.tmp
