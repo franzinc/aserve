@@ -148,7 +148,9 @@
 (defun user::test-aserve-n (&key (n
 				  #+(and smp microsoft-32) 2
 				  #-(and smp microsoft-32) 5
-				  #-smp 1)
+				  #+(and (not (and smp microsoft-32))
+                                         (and smp microsoft-32))
+                                  1)
 				 (test-timeouts *test-timeouts*) (delay 0) logs
 				 (direct t) (proxy t) (proxyproxy t) (ssl t)
 				 (name "ast") (log-name nil l-n-p)
