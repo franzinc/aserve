@@ -79,7 +79,7 @@ srcdist: FORCE
 	$(mlisp) -L build.tmp -kill
 
 clean:	FORCE
-	rm -f *.tmp
+	rm -f *.tmp *.gz
 	find . -name '*.fasl' -print | xargs rm -f
 
 cleanall distclean: clean
