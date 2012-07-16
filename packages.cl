@@ -1,5 +1,11 @@
+#+(version= 9 0)
+(sys:defpatch "aserve" 1
+  "v1: 1.3.16: fix freeing freed buffer."
+  :type :system
+  :post-loadable t)
+
 #+(version= 8 2)
-(sys:defpatch "aserve" 13
+(sys:defpatch "aserve" 14
   "v1: version 1.2.67, implement keep-alive in allegroserve client;
 v2: 1.2.68, obey keep-alive requests for PUT and POST requests;
 v3: 1.2.69, make logging though method specialized on wserver class;
@@ -21,7 +27,8 @@ v12: 1.3.12: make aserve compatible with patch inflate.003,
              request-query cache includes external-format as a key,
              send cookies on one line as per rfc6265,
              add support for ssl CRLs.
-v13: 1.3.13: improve debugging facilities."
+v13: 1.3.13: improve debugging facilities;
+v14: 1.3.16: fix freeing freed buffer."
   :type :system
   :post-loadable t)
 

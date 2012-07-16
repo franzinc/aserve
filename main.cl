@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 15))
+(defparameter *aserve-version* '(1 3 16))
 
 (eval-when (eval load)
     (require :sock)
@@ -1841,9 +1841,16 @@ by keyword symbols and not by strings"
 	    ; we handle the case of a blank line before the command
 	    ; since the spec says that we should (even though we don't have to)
 
-	      
-	    (multiple-value-setq (buffer end)
-	      (read-sock-line sock buffer 0 chars-seen))
+
+	    (let ((nbuffer buffer))
+	      ;; read-sock-line will not return if an error is
+	      ;; signalled in it in which case it may have freed
+	      ;; the buffer passed to it already.  So we play
+	      ;; it safe and ensure that buffer is nil to prevent
+	      ;; the freeing in the cleanup form below.
+	      (setq buffer nil)
+	      (multiple-value-setq (buffer end)
+		(read-sock-line sock nbuffer 0 chars-seen)))
 	      
       
 	    (if* (null end)
