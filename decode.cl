@@ -605,7 +605,7 @@
 			 :fill-pointer 0
 			 :adjustable t))
 	(arr *base64-decode*))
-    (declare (type (simple-array (unsigned-byte 8) 128) arr))
+    (declare (type (simple-array (unsigned-byte 8) (128)) arr))
     (do ((i 0 (+ i 4))
 	 (cha)
 	 (chb))
