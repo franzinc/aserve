@@ -111,6 +111,10 @@ without compression.  Original error loading deflate was:~:@>~%~a~%" c)
 (defpackage :net.aserve
   (:use :common-lisp :excl :net.html.generator :net.uri :util.zip)
   (:export
+   #:allegroserve-error
+   #:allegroserve-error-action
+   #:allegroserve-error-result
+   #:allegroserve-error-identifier
    #:authorize
    #:authorizer
    #:base64-decode

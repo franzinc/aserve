@@ -320,4 +320,24 @@
 ;;;;;; end of smp-aware macro definitions
 			 
 
-
+(define-condition allegroserve-error (error)
+  (;; what was being attempted with the error occured
+   (action :initarg :action :reader allegroserve-error-action
+	   :initform "unspecified")
+   
+   ;; describing the result that is considered an error
+   (result :initarg :result :reader allegroserve-error-result
+	   :initform "unspecified")
+   
+   ; a keyword unique to each error
+   (identifier :initarg :identifier :reader allegroserve-error-identifier
+	       :initform nil))
+  (:report
+   (lambda (con stream)
+     (with-slots (action result identifier) con
+       (format stream
+	       "~@<~a resulted in error ~s :  ~a.~:@>"
+	       action
+	       identifier
+	       result)))))
+   

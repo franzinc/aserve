@@ -643,8 +643,12 @@
   ;; to wrap around a call to make-socket
   ;;
   `(mp:with-timeout ((or ,timeout 99999999)
-		     (error "Connecting to host ~a port ~a timed out after ~s seconds"
-			    ,host ,port ,timeout))
+		     (error 'allegroserve-error
+			    :action (format nil "connecting to a socket at ~s:~s"
+					    ,host ,port)
+			    :result (format nil "exceeded timeout of ~s seconds"
+					    ,timeout)
+			    :identifier :connect-timeout))
      ,@body))
 
 
