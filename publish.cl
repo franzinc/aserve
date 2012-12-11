@@ -1466,7 +1466,9 @@
 			  (setq accepts (compute-accepted-encodings 
 					 req :as-keywords t))
 			  (setq compressed-file-comp
-			    (find-compressed-version (file ent) accepts)))
+			    (find-compressed-version 
+			     (excl::merge-to-physical (file ent)) 
+			     accepts)))
 		   then (send-file-back req 
 					ent
 					(car compressed-file-comp) ; name
