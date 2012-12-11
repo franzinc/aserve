@@ -1,11 +1,13 @@
 #+(version= 9 0)
-(sys:defpatch "aserve" 1
-  "v1: 1.3.16: fix freeing freed buffer."
+(sys:defpatch "aserve" 2
+  "v1: 1.3.16: fix freeing freed buffer;
+v2: 1.3.18: introduce allegroserve-error condition object,
+    fix compression with logical pathnames."
   :type :system
   :post-loadable t)
 
 #+(version= 8 2)
-(sys:defpatch "aserve" 14
+(sys:defpatch "aserve" 15
   "v1: version 1.2.67, implement keep-alive in allegroserve client;
 v2: 1.2.68, obey keep-alive requests for PUT and POST requests;
 v3: 1.2.69, make logging though method specialized on wserver class;
@@ -28,7 +30,9 @@ v12: 1.3.12: make aserve compatible with patch inflate.003,
              send cookies on one line as per rfc6265,
              add support for ssl CRLs.
 v13: 1.3.13: improve debugging facilities;
-v14: 1.3.16: fix freeing freed buffer."
+v14: 1.3.16: fix freeing freed buffer;
+v2: 1.3.18: introduce allegroserve-error condition object,
+    fix compression with logical pathnames."
   :type :system
   :post-loadable t)
 
@@ -38,16 +42,6 @@ v14: 1.3.16: fix freeing freed buffer."
 v2: version 1.2.58, fix problem introduced in 1.2.56 where the response date 
   is always the zero universal time & correctly send out the comment after
   the result code."
-  :type :system
-  :post-loadable t)
-
-#+(version= 8 0)
-(sys:defpatch "aserve" 5
-  "v1: version 1.2.45;
-v2: version 1.2.46;
-v3: version 1.2.47;
-v4: version 1.2.48, handle HTTP `204 No Content';
-v5: version 1.2.50, Enhanced SSL client/server support."
   :type :system
   :post-loadable t)
 
