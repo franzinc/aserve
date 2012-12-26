@@ -1,14 +1,16 @@
 #+(version= 9 0)
-(sys:defpatch "aserve" 3
+(sys:defpatch "aserve" 4
   "v1: 1.3.16: fix freeing freed buffer;
 v2: 1.3.18: introduce allegroserve-error condition object,
     fix compression with logical pathnames;
-v3: add timeout for reading request header."
+v3: add timeout for reading request header.
+v4: 1.3.20: handle connection reset and aborted errors
+    properly in the client;"
   :type :system
   :post-loadable t)
 
 #+(version= 8 2)
-(sys:defpatch "aserve" 16
+(sys:defpatch "aserve" 17
   "v1: version 1.2.67, implement keep-alive in allegroserve client;
 v2: 1.2.68, obey keep-alive requests for PUT and POST requests;
 v3: 1.2.69, make logging though method specialized on wserver class;
@@ -34,7 +36,10 @@ v13: 1.3.13: improve debugging facilities;
 v14: 1.3.16: fix freeing freed buffer;
 v15: 1.3.18: introduce allegroserve-error condition object,
     fix compression with logical pathnames;
-v16: add timeout for reading request header."
+v16: add timeout for reading request header.
+    fix compression with logical pathnames.
+v17: 1.3.20: handle connection reset and aborted errors
+    properly in the client;"
   :type :system
   :post-loadable t)
 

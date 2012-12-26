@@ -1617,6 +1617,7 @@ by keyword symbols and not by strings"
   ;; by peer 
   (if* (typep c 'stream-error)
      then (or (eq (stream-error-identifier c) :connection-reset)
+              (eq (stream-error-identifier c) :connection-aborted)
 	      #+unix (eq (stream-error-code c) 32) ; sigpipe
 	      #+aix (eq (stream-error-code c) 73) 
 	      )))

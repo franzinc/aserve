@@ -377,7 +377,7 @@
 		   
                      nil)
 		    
-                 then ; got eof right away.. likely due to bogus
+                 then ; got eof .. likely due to bogus
                       ; saved connection... so try again with
                       ; no saved connection
                       (ignore-errors (close connection))
@@ -1286,7 +1286,16 @@ or \"foo.com:8000\", not ~s" proxy))
        else val)))
 
     
-  
+(defmacro ignore-connection-reset-and-abort (&body body)
+  (let ((tag (gensym)))
+    `(catch ',tag
+       (handler-bind
+           ((socket-error
+              (lambda (e)
+                (when (member (stream-error-identifier e)
+                              '(:connection-reset :connection-aborted))
+                  (throw ',tag nil)))))
+         ,@body))))
 
 
 (defun read-socket-line (socket buffer max)
@@ -1299,7 +1308,7 @@ or \"foo.com:8000\", not ~s" proxy))
   ;;
   (let ((i 0))
     (loop
-      (let ((ch (read-char socket nil nil)))
+      (let ((ch (ignore-connection-reset-and-abort (read-char socket nil nil))))
 	(if* (null ch)
 	   then ; eof from socket
 		(if* (> i 0)
