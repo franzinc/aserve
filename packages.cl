@@ -200,6 +200,7 @@ without compression.  Original error loading deflate was:~:@>~%~a~%" c)
    #:wserver-enable-keep-alive
    #:wserver-external-format
    #:wserver-filters
+   #:wserver-header-read-timeout
    #:wserver-locators
    #:wserver-io-timeout
    #:wserver-log-function
@@ -211,6 +212,7 @@ without compression.  Original error loading deflate was:~:@>~%~a~%" c)
 
    #:*aserve-version*
    #:*default-aserve-external-format*
+   #:*http-header-read-timeout*
    #:*http-io-timeout*
    #:*http-response-timeout*
    #:*mime-types*

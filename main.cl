@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 18))
+(defparameter *aserve-version* '(1 3 19))
 
 (eval-when (eval load)
     (require :sock)
@@ -413,6 +413,8 @@ will be logged with one log entry per line in some cases.")
 
 (defvar *read-request-timeout* 20)
 (defvar *read-request-body-timeout* 60)
+(defvar *http-header-read-timeout* 60) ; seconds for complete header read
+
 (defvar *http-response-timeout* 
     #+io-timeout 300 ; 5 minutes for timeout if we support i/o timeouts
     #-io-timeout 120 ; 2 minutes if we use this for i/o timeouts too.
@@ -560,7 +562,13 @@ will be logged with one log entry per line in some cases.")
     :initarg :io-timeout
     :initform *http-io-timeout*
     :accessor wserver-io-timeout)
-    
+
+   (header-read-timeout
+    ;; max time to read headers
+    :initarg :header-read-timeout
+    :initform *http-header-read-timeout*
+    :accessor wserver-header-read-timeout)
+   
    ;;
    ;; -- internal slots --
    ;;
@@ -1750,12 +1758,16 @@ by keyword symbols and not by strings"
 	
 	;; get first command
 	(loop
-	   (multiple-value-setq (req error-obj)
-             (ignore-errors
+	  (multiple-value-setq (req error-obj)
+	    (ignore-errors
+	     (mp:with-timeout ((wserver-header-read-timeout *wserver*)
+			       (debug-format :info "total header read timeout")
+			       (return-from process-connection nil))
+			     
                (with-timeout-local ((wserver-read-request-timeout *wserver*)
                                     (debug-format :info "request timed out on read")
                                     (return-from process-connection nil))
-                 (read-http-request sock chars-seen))))
+                 (read-http-request sock chars-seen)))))
 	  
 	  (if* (null req)
 	     then ; end of file, means do nothing
