@@ -1,13 +1,14 @@
 #+(version= 9 0)
-(sys:defpatch "aserve" 2
+(sys:defpatch "aserve" 3
   "v1: 1.3.16: fix freeing freed buffer;
 v2: 1.3.18: introduce allegroserve-error condition object,
-    fix compression with logical pathnames."
+    fix compression with logical pathnames;
+v3: add timeout for reading request header."
   :type :system
   :post-loadable t)
 
 #+(version= 8 2)
-(sys:defpatch "aserve" 15
+(sys:defpatch "aserve" 16
   "v1: version 1.2.67, implement keep-alive in allegroserve client;
 v2: 1.2.68, obey keep-alive requests for PUT and POST requests;
 v3: 1.2.69, make logging though method specialized on wserver class;
@@ -28,11 +29,12 @@ v11: 1.3.11: fix log reporting of content-length when using keep-alive.
 v12: 1.3.12: make aserve compatible with patch inflate.003,
              request-query cache includes external-format as a key,
              send cookies on one line as per rfc6265,
-             add support for ssl CRLs.
+             add support for ssl CRLs;
 v13: 1.3.13: improve debugging facilities;
 v14: 1.3.16: fix freeing freed buffer;
-v2: 1.3.18: introduce allegroserve-error condition object,
-    fix compression with logical pathnames."
+v15: 1.3.18: introduce allegroserve-error condition object,
+    fix compression with logical pathnames;
+v16: add timeout for reading request header."
   :type :system
   :post-loadable t)
 
