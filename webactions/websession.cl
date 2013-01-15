@@ -3,7 +3,7 @@
 ;; websession.cl
 ;; session support for webactions
 ;;
-;; copyright (c) 2003-2012 Franz Inc, Oakland, CA - All rights reserved.
+;; copyright (c) 2003-2013 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
