@@ -2900,7 +2900,7 @@ in get-multipart-sequence"))
 	       (setq res 
 		 (+ (* 10 res)
 		    (- (char-code (schar str i)) #.(char-code #\0))))))))
-    ;; check preferred type first (rfc1123 (formerly refc822)):
+    ;; check preferred type first (rfc1123 (formerly rfc822)):
     ;;  	Sun, 06 Nov 1994 08:49:37 GMT
     (multiple-value-bind (ok whole
 			  day
