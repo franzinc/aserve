@@ -1,4 +1,5 @@
 .git-branch-name
-build.tmp
-test.out
+/build.tmp
+/test.out
+/test.tmp
 /aserve-src
