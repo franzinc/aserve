@@ -334,7 +334,8 @@
 	   :name :proxy
 	   :extra (make-instance 'computed-entity
 		    :function #'(lambda (req ent)
-				  (if* (authorize-proxy-request req ent server)
+				  (if* (authorize-proxy-request 
+					req ent (wserver-proxy-control server))
 				     then (do-proxy-request req ent)
 				     else (denied-request req)))
 		    :extra (if* proxy-proxy
@@ -357,12 +358,11 @@
      then ; compute entity object
 	  (locator-extra locator)))
 
-(defmethod authorize-proxy-request ((req http-request) (ent entity) (server wserver))
+
+(defmethod authorize-proxy-request ((req http-request) (ent entity) (proxy-control proxy-control))
   ;; return true iff this proxy request can be done
   ;;
-  (let ((proxy-control (wserver-proxy-control server)))
-    (if* proxy-control
-       then ; first check where request is from
+        ; first check where request is from
 	    (let ((location (proxy-control-location proxy-control)))
 	      (if* location
 		 then (if* (null (authorize location req ent))
@@ -377,9 +377,13 @@
 			 elseif (hash-table-p destinations)
 			   then (gethash hostname destinations)))
 		 else t ; ok by default
-		      ))
-       else t ; ok by default
-	    )))
+		      )))
+
+(defmethod authorize-proxy-request ((req http-request) (ent entity) (no-proxy-control (eql nil)))
+  
+  t)
+
+
 				
 				
 				
