@@ -150,6 +150,9 @@ without compression.  Original error loading deflate was:~:@>~%~a~%" c)
    #:parse-multipart-header
    #:password-authorizer  ; class
    #:process-entity
+   #:proxy-control	; class
+   #:proxy-control-location
+   #:proxy-control-destinations
    #:publish
    #:publish-file
    #:publish-directory

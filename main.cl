@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 19))
+(defparameter *aserve-version* '(1 3 20))
 
 (eval-when (eval load)
     (require :sock)
@@ -624,6 +624,12 @@ will be logged with one log entry per line in some cases.")
     :initform nil
     :accessor wserver-pcache)
 
+   (proxy-control
+    ;; nil o proxy-control object if we want to 
+    ;; filter which proxies are allowed
+    :initform nil
+    :accessor wserver-proxy-control)
+   
    (shutdown-hooks
     ;; list of functions to call, passing this wserver object as an arg
     ;; when the server shuts down
@@ -1283,7 +1289,9 @@ by keyword symbols and not by strings"
   (shutdown :server server) 
 
   (if* proxy 
-     then (enable-proxy :server server :proxy-proxy proxy-proxy))
+     then (enable-proxy :server server :proxy-proxy proxy-proxy)
+	  (if* (typep proxy 'proxy-control)
+	     then (setf (wserver-proxy-control server) proxy)))
 
   (if* (and (or restore-cache cache)
 	    os-processes)

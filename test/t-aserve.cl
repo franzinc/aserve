@@ -153,6 +153,7 @@
                                   1)
 				 (test-timeouts *test-timeouts*) (delay 0) logs
 				 (direct t) (proxy t) (proxyproxy t) (ssl t)
+				 (proxy-auth t)
 				 (name "ast") (log-name nil l-n-p)
 				 (wait t) ; wait for tests to finish
 				 (exit nil) ; ignored if wait=nil
@@ -171,7 +172,7 @@
 	 (setq *log-wserver-name* log-name)
        (setq *log-wserver-name* nil))
      (test-aserve test-timeouts :direct direct :proxy proxy :proxyproxy proxyproxy 
-		  :ssl ssl))
+		  :ssl ssl :proxy-auth proxy-auth))
     (otherwise
      (let ((procs '()))
        (when (cond (l-n-p (setq *log-wserver-name* log-name))
@@ -204,7 +205,9 @@
 		      (asc-format "~&~%============ STARTING SERVER ~A ~A ~%~%" i name)
 		      (setf (asc wserver) *wserver*)
 		      (test-aserve test-timeouts
-				   :direct direct :proxy proxy :proxyproxy proxyproxy :ssl ssl)
+				   :direct direct :proxy proxy :proxyproxy proxyproxy :ssl ssl
+				   :proxy-auth proxy-auth
+				   )
 		      (setq clean t))
 		  (asc-format "~&~%============ ENDING SERVER ~A ~A ~A ~%~%" i name 
 			      (if clean "normally" "ABRUPTLY"))
@@ -245,7 +248,8 @@
     (t (format t "~&~A ~A~%" (asp-index) (apply #'format nil fmt args))))))
 			
 
-(defun test-aserve (test-timeouts &key (direct t) (proxy t) (proxyproxy t) (ssl t))
+(defun test-aserve (test-timeouts &key (direct t) (proxy t) (proxyproxy t) (ssl t)
+				       (proxy-auth t))
   ;; run the allegroserve tests three ways:
   ;;  1. normally
   ;   2. through an allegroserve proxy to test the proxy
@@ -280,49 +284,56 @@
 		     #+unix
 		     (test-publish-file port t) ; with compression
 		     
-		   (test-publish-directory port)
-		   (test-publish-computed port)
-		   (test-publish-multi port)
-		   (test-publish-prefix port)
-		   (test-authorization port)
-		   (test-encoding)
-		   (test-forms port)
-		   (test-client port)
-		   (test-cgi port)
-		   (test-http-copy-file port)
-                   (test-client-unicode-content-length)
-		   (if* (member :ics *features*)
-		      then (test-international port)
-			   (test-spr27296))
-		   (if* test-timeouts 
-		      then (test-timeouts port))))
-	    (when direct
-	      (asc-format "~%~%===== test direct ~%~%")
-	      (do-tests))
+		     (test-publish-directory port)
+		     (test-publish-computed port)
+		     (test-publish-multi port)
+		     (test-publish-prefix port)
+		     (test-authorization port)
+		     (test-encoding)
+		     (test-forms port)
+		     (test-client port)
+		     (test-cgi port)
+		     (test-http-copy-file port)
+		     (test-client-unicode-content-length)
+		     (if* (member :ics *features*)
+			then (test-international port)
+			     (test-spr27296))
+		     (if* test-timeouts 
+			then (test-timeouts port))))
 	    
-	    (when proxy
-	      (asc-format "~%~%===== test through proxy ~%~%")
-	      (start-proxy-running)
-	      (do-tests))
 	    
-	    (when proxyproxy
-	      (asc-format "~%~%===== test through proxy to proxy~%~%")
-	      (start-proxy-running)
-	      (do-tests))
+		    
+	    (if*  direct
+	       then (asc-format "~%~%===== test direct ~%~%")
+		    (do-tests))
 	    
-	    (when ssl
-	      (asc-format "~%>> checking to see if ssl is present~%~%")
-	      (if* (errorset (as-require :ssl))
-		   then ; we have ssl capability, run tests through ssl
-		   (stop-proxy-running)
-		   (stop-proxy-running)
-		   (stop-aserve-running)
-		   (asc-format "~%~%===== test through ssl ~%~%")
-		   (setq port (start-aserve-running 
-			       (merge-pathnames 
-				"server.pem" *aserve-load-truename*)))
-		   (do-tests)
-		   else (asc-format "~%>> it isn't so ssl tests skipped~%~%")))
+	    (if* proxy-auth
+	       then (asc-format "~%~%===== test proxy authorization ~%~%")
+		    (test-proxy-auth))
+	    
+	    (if* proxy
+	       then (asc-format "~%~%===== test through proxy ~%~%")
+		    (start-proxy-running t)
+		    (do-tests))
+	    
+	    (if* proxyproxy
+	       then (asc-format "~%~%===== test through proxy to proxy~%~%")
+		    (start-proxy-running t)
+		    (do-tests))
+	    
+	    (if* ssl
+	       then (asc-format "~%>> checking to see if ssl is present~%~%")
+		    (if* (errorset (as-require :ssl))
+		       then ; we have ssl capability, run tests through ssl
+			    (stop-proxy-running)
+			    (stop-proxy-running)
+			    (stop-aserve-running)
+			    (asc-format "~%~%===== test through ssl ~%~%")
+			    (setq port (start-aserve-running 
+					(merge-pathnames 
+					 "server.pem" *aserve-load-truename*)))
+			    (do-tests)
+		       else (asc-format "~%>> it isn't so ssl tests skipped~%~%")))
 	    ) ;;; end body of unwind-protect 
 	; cleanup forms:
 	(stop-aserve-running)
@@ -336,7 +347,7 @@
 	  (asc-format "Errors:    ~d" util.test::*test-errors*)
 	  (asc-format "Successes: ~d~%" util.test::*test-successes*)
 	  (asc-format "Unexpected failures: ~d~%" 
-		  util.test::*test-unexpected-failures*)))
+		      util.test::*test-unexpected-failures*)))
     
 
 
@@ -358,13 +369,13 @@
   (shutdown))
 
 
-(defun start-proxy-running ()
+(defun start-proxy-running (proxy)
   ;; start another web server to be the proxy
   (push (asc proxy-wserver) (asc save-proxy-wserver))
   
   (setf (asc proxy-wserver) (start :server :new 
 			       :port nil 
-			       :proxy t
+			       :proxy proxy
 			       :proxy-proxy (asc x-proxy)))
   (let ((*wserver* (asc proxy-wserver)))
     (when *aserve-set-full-debug*
@@ -2313,6 +2324,65 @@
 	      (doit :buffer-size 8192)
 	      (doit :protocol :http/1.0))
 	  (ignore-errors (delete-file temp-file-name)))))))
+
+
+(defun test-proxy-auth ()
+  ;; we only test proxy authorization once, not once
+  ;; for each kind of test we do 
+  
+  ; allow all
+  (start-proxy-running t)
+  (test 200 (values2 (x-do-http-request "http://www.franz.com")))
+  (stop-proxy-running)
+  
+  ; allow from localhost
+  (start-proxy-running (make-instance 'proxy-control
+			 :location (make-instance 'location-authorizer
+				     :patterns '((:accept "127.1")
+						 :deny))))
+  (test 200 (and :second (values2 (x-do-http-request "http://www.franz.com"))))
+  (stop-proxy-running)
+  
+  
+  ; disallow from localhost
+  (start-proxy-running (make-instance 'proxy-control
+			 :location (make-instance 'location-authorizer
+				     :patterns '((:accept "192.168.111.222")
+						 (:deny "127.1")
+						 :deny))))
+  (test 404 (and :second (values2 (x-do-http-request "http://www.franz.com"))))
+  (stop-proxy-running)
+  
+  ; allow to franz.com
+  (start-proxy-running (make-instance 'proxy-control
+			 :destinations '("www.franz.com")))
+  (test 200 (and :third (values2 (x-do-http-request "http://www.franz.com"))))
+  (test 404 (and :fouth (values2 (x-do-http-request "http://franz.com"))))
+  (stop-proxy-running)
+  
+  
+  ; allow using a hash table
+  (let ((ht (make-hash-table :test #'equalp)))
+    (dolist (site '("www.franz.com" "franz.com"))
+      (setf (gethash site ht) t))
+    
+    (start-proxy-running (make-instance 'proxy-control
+			 :destinations ht))
+    (test 200 (and :fifth (values2 (x-do-http-request "http://www.franz.com"))))
+    (test 200 (and :sixth (values2 (x-do-http-request "http://franz.com"))))
+    (test 404 (and :seventh (values2 (x-do-http-request "http://cnn.com"))))
+    (stop-proxy-running)))
+    
+    
+    
+  
+
+
+  
+  
+  
+  
+			 
 
 ;; (net.aserve::debug-on :xmit)
 ;; (net.aserve::debug-off :body)

@@ -305,6 +305,26 @@
   ())
 
 
+(defclass proxy-control ()
+  ;; used to control if proxy will operate or will send back a 500 error
+  
+  
+  (
+   ;; nil or a location-authorizer object to do request location checking
+   (location  :initarg :location :accessor proxy-control-location
+	      :initform nil)
+   
+   ;; nil  (meaning everything allowed)
+   ;; or a non-empty list of hostname to which proxying is allowed, or a hash table of
+   ;; hostnames to which proxying is allwoed
+   
+   (destinations :initarg :destinations
+		 :accessor proxy-control-destinations
+		 :initform nil)
+   
+  ))
+
+
 
 (defun enable-proxy (&key (server *wserver*)
 			  proxy-proxy)
@@ -314,7 +334,9 @@
 	   :name :proxy
 	   :extra (make-instance 'computed-entity
 		    :function #'(lambda (req ent)
-				  (do-proxy-request req ent))
+				  (if* (authorize-proxy-request req ent server)
+				     then (do-proxy-request req ent)
+				     else (denied-request req)))
 		    :extra (if* proxy-proxy
 			      then (multiple-value-bind (host port)
 				       (get-host-port proxy-proxy)
@@ -335,6 +357,37 @@
      then ; compute entity object
 	  (locator-extra locator)))
 
+(defun authorize-proxy-request (req ent server)
+  ;; return true iff this proxy request can be done
+  ;;
+  (let ((proxy-control (wserver-proxy-control server)))
+    (if* proxy-control
+       then ; first check where request is from
+	    (let ((location (proxy-control-location proxy-control)))
+	      (if* location
+		 then (if* (null (authorize location req ent))
+			 then (return-from authorize-proxy-request nil))))
+	    
+	    ; and now where it's going
+	    (let ((destinations (proxy-control-destinations proxy-control)))
+	      (if* destinations
+		 then (let ((hostname (net.uri:uri-host (request-raw-uri req))))
+			(if* (consp destinations)
+			   then (member hostname destinations :test #'equalp)
+			 elseif (hash-table-p destinations)
+			   then (gethash hostname destinations)))
+		 else t ; ok by default
+		      ))
+       else t ; ok by default
+	    )))
+				
+				
+				
+		      
+			      
+		      
+	    
+  
 
 (defun do-proxy-request (req ent)
   ;; a request has come in which has a uri with a scheme part,
