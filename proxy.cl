@@ -357,7 +357,7 @@
      then ; compute entity object
 	  (locator-extra locator)))
 
-(defun authorize-proxy-request (req ent server)
+(defmethod authorize-proxy-request ((req http-request) (ent entity) (server wserver))
   ;; return true iff this proxy request can be done
   ;;
   (let ((proxy-control (wserver-proxy-control server)))

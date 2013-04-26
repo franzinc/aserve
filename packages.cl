@@ -117,6 +117,7 @@ without compression.  Original error loading deflate was:~:@>~%~a~%" c)
    #:allegroserve-error-result
    #:allegroserve-error-identifier
    #:authorize
+   #:authorize-proxy-request
    #:authorizer
    #:base64-decode
    #:base64-encode
