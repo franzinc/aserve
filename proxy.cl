@@ -362,22 +362,36 @@
 (defmethod authorize-proxy-request ((req http-request) (ent entity) (proxy-control proxy-control))
   ;; return true iff this proxy request can be done
   ;;
-        ; first check where request is from
-	    (let ((location (proxy-control-location proxy-control)))
-	      (if* location
-		 then (if* (null (authorize location req ent))
-			 then (return-from authorize-proxy-request nil))))
+  ; first check where request is from
+  (let ((location (proxy-control-location proxy-control)))
+    (if* location
+       then (if* (null (authorize location req ent))
+	       then (return-from authorize-proxy-request nil))))
 	    
-	    ; and now where it's going
-	    (let ((destinations (proxy-control-destinations proxy-control)))
-	      (if* destinations
-		 then (let ((hostname (net.uri:uri-host (request-raw-uri req))))
-			(if* (consp destinations)
-			   then (member hostname destinations :test #'equalp)
-			 elseif (hash-table-p destinations)
-			   then (gethash hostname destinations)))
-		 else t ; ok by default
-		      )))
+  ; and now where it's going
+  (let ((destinations (proxy-control-destinations proxy-control)))
+    (if* destinations
+       then (let ((hostname (net.uri:uri-host (request-raw-uri req)))
+		  (port     (net.uri:uri-port (request-raw-uri req))))
+	      (if* (consp destinations)
+		 then ; ("hostname" port1 port2 ...)
+		      (dolist (dest destinations)
+			(if* (consp dest)
+			   then (if* (and (equalp (car dest) hostname)
+					  (member (or port 80)
+						  (cdr dest)))
+				   then (return t))
+			 elseif (equalp dest hostname)
+			   then (return t)))
+	       elseif (hash-table-p destinations)
+		 then (let ((ports (gethash hostname destinations)))
+			; ports is t (for all) or a list
+			; of valid ports
+			(or (eq ports t)
+			    (and (consp ports)
+				 (member (or port 80) ports))))))
+       else t ; ok by default
+	    )))
 
 (defmethod authorize-proxy-request ((req http-request) (ent entity) (no-proxy-control (eql nil)))
   

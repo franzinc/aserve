@@ -2355,22 +2355,45 @@
   
   ; allow to franz.com
   (start-proxy-running (make-instance 'proxy-control
-			 :destinations '("www.franz.com")))
+			 :destinations '("www.franz.com"
+					 ("franz.com" 333 80) ; 
+					 ("www.whitehouse.gov" 222) ; only 222
+					 ("www.cnn.com") ; no ports specified
+					 )))
   (test 200 (and :third (values2 (x-do-http-request "http://www.franz.com"))))
-  (test 404 (and :fouth (values2 (x-do-http-request "http://franz.com"))))
+  (test 404 (and :fouth (values2 (x-do-http-request "http://www.noaa.gov"))))
+  (test 404 (values2 (x-do-http-request "http://www.noaa.gov:444")))
+  (test 200 (values2 (x-do-http-request "http://franz.com")))
+  (test 200 (values2 (x-do-http-request "http://franz.com:80")))
+  (test 404 (values2 (x-do-http-request "http://www.whitehouse.gov")))
+  (test 404 (values2 (x-do-http-request "http://www.cnn.com")))
+  
   (stop-proxy-running)
   
-  
+  (format t "proxy authorization using hash table for destination~%")
   ; allow using a hash table
   (let ((ht (make-hash-table :test #'equalp)))
-    (dolist (site '("www.franz.com" "franz.com"))
-      (setf (gethash site ht) t))
+    (dolist (site '("www.franz.com" 
+		    ("franz.com" 333 80)
+		    ("www.whitehouse.gov" 222)
+		    ("www.cnn.com")))
+		    
+      (setf (gethash (if* (consp site) then (car site) else site) ht) 
+	(if* (consp site) 
+	   then (cdr site) 
+	   else t)))
     
     (start-proxy-running (make-instance 'proxy-control
-			 :destinations ht))
-    (test 200 (and :fifth (values2 (x-do-http-request "http://www.franz.com"))))
-    (test 200 (and :sixth (values2 (x-do-http-request "http://franz.com"))))
-    (test 404 (and :seventh (values2 (x-do-http-request "http://cnn.com"))))
+			   :destinations ht))
+    
+    (test 200 (and :third (values2 (x-do-http-request "http://www.franz.com"))))
+    (test 404 (and :fouth (values2 (x-do-http-request "http://www.noaa.gov"))))
+    (test 404 (values2 (x-do-http-request "http://www.noaa.gov:444")))
+    (test 200 (values2 (x-do-http-request "http://franz.com")))
+    (test 200 (values2 (x-do-http-request "http://franz.com:80")))
+    (test 404 (values2 (x-do-http-request "http://www.whitehouse.gov")))
+    (test 404 (values2 (x-do-http-request "http://www.cnn.com")))
+    
     (stop-proxy-running)))
     
     
