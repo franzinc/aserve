@@ -1,11 +1,12 @@
 #+(version= 9 0)
-(sys:defpatch "aserve" 4
+(sys:defpatch "aserve" 5
   "v1: 1.3.16: fix freeing freed buffer;
 v2: 1.3.18: introduce allegroserve-error condition object,
     fix compression with logical pathnames;
 v3: add timeout for reading request header.
 v4: 1.3.20: handle connection reset and aborted errors
-    properly in the client;"
+    properly in the client;
+v5: 1.3.21: new proxy control."
   :type :system
   :post-loadable t)
 
