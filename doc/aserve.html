@@ -137,8 +137,10 @@ Files</a><font face="Courier New"><br>
 &nbsp; <a href="#f-client-request-read-close">client-request-close</a><br>
 &nbsp; <a href="#f-compute-digest-authorization">compute-digest-authorization</a><br>
 &nbsp; <a href="#f-uriencode-string">uriencode-string</a></font><br>
-<a href="#proxy">Proxy</a><br>
+<a href="#proxy">Proxy</a><br><font face="Courier New">
 &nbsp; <a href="#c-proxy-control">proxy-control</a><br>
+&nbsp; <a href="#f-authorize-proxy-request">f-authorize-proxy-request</a>
+</font><br>
 <a href="#cache">Cache</a><br>
 <a href="#filters">Request Filters</a><br>
 <a href="#virtual_hosts">Virtual Hosts</a><br>
@@ -3572,12 +3574,37 @@ described in detail in another part of this document.
 </p>
 <p>
 <b>destinations</b>: this slot is set with the :destinations initarg
-or the <b>proxy-control-destinations</b> accessor. The value is nil
-(meaning all destinations are allowed) or is a non-empty list of
-strings naming the allowed hosts or is an equalp hash-table.  In the
-hash-table the hostnames are the keys to the hash table and the value
-should be some true value.
+or the <b>proxy-control-destinations</b> accessor. The value can be:
 </p>
+<ol>
+<li>
+nil, which means all destinations are allowed.  This the default.
+</li>
+<li>
+A list of strings or lists. 
+<p>
+Strings should be the names of the host to which proxying is allowed. It will
+be compared in a case insensitive way to the host part of the URI in
+the proxy request. Just specifying a hostname allows proxying to a
+server running on any port of that host.
+</p>
+<p>
+Lists should be of the form (hostname port1 port2 ..) where the portN
+are integers.  This allows access to servers running on only those
+ports of the host. Example: ("internal.franz.com" 80 8080) allows
+proxying to ports 80 and 8080 on internal.franz.com.  When a proxy
+request does not specify any ports,
+e.g. ("http://internal.franz.com/blah/blah"), that is interpreted as
+allowing port 80 only (rather than allowing no ports, which can be
+achieved by not including the hostname in the list).
+</p>
+</li>
+<li>
+An equalp hash table where the keys are the hostnames and the values
+have the form (1) t (meaning all ports are proxyable) or (2) a list of
+integers (meaning that only proxying to those ports is allowed).
+</li>
+</ol>
 
 <h3>
 Example:
@@ -3604,6 +3631,48 @@ The proxy will only proxy requests that begin "http://www.cnn.com/",
 <p>
 If the list of allowed sites to proxy is large it's best to use a hash table to store them:
 </p>
+<pre>
+(setq ht (make-hash-table :test #'equalp))
+
+(dolist (site '("www.cnn.com" "edition.cnn.com" "svcs.cnn.com" "ads.cnn.com"
+                ("i.cdn.turner.com" 80 8000 9300)
+                "i2.cdn.turner.com"
+                ))
+  (setf (gethash (if* (consp site) then (car site) else site)  ht)
+    (if* (consp site) then (cdr site) else t)))
+
+;; followed by
+
+(make-instance 'proxy-control :destinations ht)
+</pre>
+<p>
+You can alter the proxy-control object while AllegoServe is running in
+order to change the authorization of the proxy.
+</p>
+<p><a name="f-authorize-proxy-request"></a><strong><font face="Courier New">authorize-proxy-request ((req http-request) (ent entity) (pc proxy-contol))</font></strong>
+<br>
+<strong><font face="Courier New">authorize-proxy-request ((req http-request) (ent entity) (pc (eql nil)))</font></strong>
+</p>
+<p>
+For each HTTP request that has the form of a proxy request the generic
+function <b>authorize-proxy-request</b> is called, passing the request
+and entity objects and the value of (wserver-proxy-control wserver).
+</p>
+<p>
+(wserver-proxy-control wserver) is set to the value of the :proxy
+argument to <b>net.aserve:start</b> if that value is of type
+proxy-control, otherwise it is set to nil.
+
+There are two primary methods, one for <b><i>pc</i></b> being a
+proxy-control and one for <b><i>pc</i></b> being nil.  TThe first uses
+the location and description slots of the proxy-control object as
+described above to return true if proxying is authorized.
+</p>
+<p>
+The second simply returns true since without a proxy-control object
+all proxying is permitted.
+</p>
+ 
 <p>&nbsp;</p>
 <hr>
 <h2><a name="cache"></a>Cache</h2>
