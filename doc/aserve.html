@@ -139,7 +139,7 @@ Files</a><font face="Courier New"><br>
 &nbsp; <a href="#f-uriencode-string">uriencode-string</a></font><br>
 <a href="#proxy">Proxy</a><br><font face="Courier New">
 &nbsp; <a href="#c-proxy-control">proxy-control</a><br>
-&nbsp; <a href="#f-authorize-proxy-request">f-authorize-proxy-request</a>
+&nbsp; <a href="#f-authorize-proxy-request">authorize-proxy-request</a>
 </font><br>
 <a href="#cache">Cache</a><br>
 <a href="#filters">Request Filters</a><br>
@@ -3553,8 +3553,8 @@ The proxy-control object has two fields:
 </p>
 <ol>
 <li>
-<b>location</b> - controls which machines on the internet can use the
-proxy
+<b>location</b> - controls which machines on the internet or the local
+net can use the proxy
 </li>
 <li>
 <b>destinations</b> - controls which sites AllegroServe will contact
@@ -3592,11 +3592,10 @@ server running on any port of that host.
 Lists should be of the form (hostname port1 port2 ..) where the portN
 are integers.  This allows access to servers running on only those
 ports of the host. Example: ("internal.franz.com" 80 8080) allows
-proxying to ports 80 and 8080 on internal.franz.com.  When a proxy
-request does not specify any ports,
-e.g. ("http://internal.franz.com/blah/blah"), that is interpreted as
-allowing port 80 only (rather than allowing no ports, which can be
-achieved by not including the hostname in the list).
+proxying to ports 80 and 8080 on internal.franz.com. If no ports are
+specified in the list format, e.g. ("www.franz.com"), then no ports
+are opened and the effect is the same (when <i>destinations</i> is non-nil)
+as not listing that hostname at all.
 </p>
 </li>
 <li>
@@ -3605,6 +3604,18 @@ have the form (1) t (meaning all ports are proxyable) or (2) a list of
 integers (meaning that only proxying to those ports is allowed).
 </li>
 </ol>
+
+<p>
+Proxy
+requests which do not specify any ports, 
+e.g. ("http://internal.franz.com/blah/blah"), are interpreted as
+requesting port 80.
+</p>
+<p>
+The host specified in a proxy request must match exactly (except that
+case is ignored). Thus specifying "franz.com" will only match
+requests for "franz.com" and not "www.franz.com"
+</p>
 
 <h3>
 Example:
@@ -3625,7 +3636,7 @@ address 127.1) and it will accept any IP in the range 192.168.1.0 to
 machine is located.
 </p>
 <p>
-The proxy will only proxy requests that begin "http://www.cnn.com/",
+The proxy will only accept proxy requests that begin "http://www.cnn.com/",
 "http://edition.cnn.com/", etc.
 </p>
 <p>
