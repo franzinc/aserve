@@ -698,7 +698,11 @@ no map for webaction with default-actions ~s"
        then ; must restart it
 	    (setq *webaction-cleanup-process*
 	      (mp:process-run-function "session reaper" 
-		'webaction-cleanup-process)))))
+		'webaction-cleanup-process))
+	    (setf (mp:process-keeps-lisp-alive-p *webaction-cleanup-process*) nil)
+	    
+	    *webaction-cleanup-process*
+	    )))
 
 
   

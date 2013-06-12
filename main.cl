@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 21))
+(defparameter *aserve-version* '(1 3 22))
 
 (eval-when (eval load)
     (require :sock)
@@ -1509,7 +1509,12 @@ by keyword symbols and not by strings"
 			       else "aserve")
 			    (atomic-incf *thread-index*))
 	      :initial-bindings (initial-bindings))
-      #'http-accept-thread)))
+      #'http-accept-thread))
+  
+  (setf (mp:process-keeps-lisp-alive-p (wserver-accept-thread *wserver*)) nil)
+  
+  (wserver-accept-thread *wserver*)
+  )
 
 ;; make-worker-thread wasn't thread-safe before smp. I'm assuming that's
 ;; ok, which it will be if only one thread ever calls it, and leaving it
@@ -1529,6 +1534,7 @@ by keyword symbols and not by strings"
     (incf-free-workers *wserver* 1)
     (setf (getf (mp:process-property-list proc) 'short-name) 
       (format nil "w~d" thx))
+    (setf (mp:process-keeps-lisp-alive-p proc) nil)
     ))
 
 
