@@ -105,6 +105,13 @@
     :initarg :content-encoding
     :initform nil
     :accessor client-request-content-encoding)
+   
+   (deferred-content
+    ;; content we are delaying the transmission of due to
+    ;; an Expect: 100-continue header.
+    :initarg :deferred-content
+    :initform nil
+    :accessor client-request-deferred-content)
    ))
 
 
@@ -371,9 +378,13 @@
                                                    :throw-on-eof
                                                    (and connection
                                                         'premature-eof))
-                     ;; if it's a continue, then start the read again
+		     ;; if it's a continue, then deliver any content we're holding
+		     ;; onto and start the read again
                      (if* (not (eql 100 (client-request-response-code creq)))
-                        then (return))
+                        then (return)
+			else (let ((sock (client-request-socket creq)))
+			       (send-request-body sock (client-request-deferred-content creq))
+			       (force-output sock)))
 		   
                      nil)
 		    
@@ -662,6 +673,20 @@
               (setq ,%success t))
          (when (and ,stream (not ,%success))
            (ignore-errors (close ,stream :abort t)))))))
+
+(defun send-request-body (sock content)
+  (if* content
+     then ; content can be a vector or a list of vectors
+	  (dolist (cont content)
+	    (net.aserve::debug-format
+	     :info "client sending content of ~d characters/bytes"
+	     (length cont))
+	    (net.aserve::debug-format
+	     :xmit-client-request-body
+	     "~s" (if (stringp cont)
+		      cont
+		    (octets-to-string cont :external-format :octets)))
+	    (write-sequence cont sock))))
 
 (defun make-http-client-request (uri &rest args
 				 &key 
@@ -1005,29 +1030,28 @@
       ; this has to be done differently so that if it looks like we're
       ; going to block doing the write we start another process do the
       ; the write.  
-      (if* content
-         then ; content can be a vector a list of vectors
-              (dolist (cont content)
-                (net.aserve::debug-format
-                 :info "client sending content of ~d characters/bytes"
-                 (length cont))
-                (net.aserve::debug-format
-                 :xmit-client-request-body
-                 "~s" (if (stringp cont)
-                          cont
-                          (octets-to-string cont :external-format :octets)))
-                (write-sequence cont sock)))
-      
-      
-      (force-output sock)
-      
-      (make-instance 'client-request
-        :uri uri
-        :socket sock
-        :cookies cookies
-        :method method
-        :return-connection (if* keep-alive then :maybe)
-        ))))
+
+      ;; if there is an 'Expect: 100-continue' header, store the content
+      ;; in the request header so it can be delivered upon receipt of a
+      ;; 100 response.
+      (let ((cont (cdr (assoc "Expect" headers :test #'string-equal)))
+	    deferred-content)
+	(if* (and cont (match-re "\\b100-continue\\b" cont :case-fold t :return nil))
+	   then (setf deferred-content content)
+		(net.aserve::debug-format
+		 :xmit-client-request-body
+		 "deferring delivery of request body due to Expect header.")
+	   else (send-request-body sock content))
+            
+	(force-output sock)
+
+	(make-instance 'client-request
+	  :uri uri
+	  :socket sock
+	  :cookies cookies
+	  :method method
+	  :return-connection (if* keep-alive then :maybe)
+	  :deferred-content deferred-content)))))
 
 
 (defun uri-path-etc (uri)

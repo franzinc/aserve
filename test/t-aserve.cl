@@ -295,6 +295,8 @@
 		     (test-cgi port)
 		     (test-http-copy-file port)
 		     (test-client-unicode-content-length)
+		     (test-expect-header-responses)
+
 		     (if* (member :ics *features*)
 			then (test-international port)
 			     (test-spr27296))
@@ -2395,9 +2397,87 @@
     (test 404 (values2 (x-do-http-request "http://www.cnn.com")))
     
     (stop-proxy-running)))
+
+
+(defun test-expect-header-responses ()
+  (let* ((server (start :port nil :server :new
+			:external-format (crlf-base-ef :utf8)))
+	 (base (format nil "http://localhost:~a" 
+		       (socket:local-port (net.aserve::wserver-socket *wserver*)))))
+    (let ((*wserver* server))
+      (logmess
+       (format nil "test-expect-header-responses wserver name is ~A"
+	       (wserver-name *wserver*))))
+    ;; verify that a 100 Continue is sent only if valid user:pass is provided
+    (publish :path "/secret-auth"
+	     :content-type "text/html"
+	     :authorizer (make-instance 'password-authorizer
+			   :allowed '(("foo2" . "bar2"))
+			   :realm  "SecretAuth")
+	     :function
+	     #'(lambda (req ent)
+		 (with-http-response (req ent)
+		   (with-http-body (req ent)
+		     (html (:head (:title "Secret page"))
+			   (:body "You made it to the secret page"))))))
+    ;; verify 100 Continue is returned depending on request method.
+    (publish :path "/noauth"
+	     :content-type "text/html"
+	     :function
+	     #'(lambda (req ent)
+		 (with-http-response (req ent)
+		   (with-http-body (req ent)
+		     (html (:head (:title "Secret page"))
+			   (:body "You made it to the secret page"))))))
+
+    ;; post methods manually send a 100-continue
+    ;; put methods fetch from the body to trigger the auto 100-continue
+    ;;     response if there's a 100-continue expect header.
+    (publish :path "/no-auto"
+	     :content-type "text/html"
+	     :will-handle-expect-continue t
+	     :function
+	     #'(lambda (req ent)
+		 (with-http-response (req ent)
+		   (with-http-body (req ent)
+		     (case (request-method req)
+		       (:post (when (request-has-continue-expectation req)
+				(send-100-continue req))
+			      (html "post success"))
+		       (:put ;; test that we will auto-send continue response.
+			     ;; force a read of the request body
+			(request-query-value "body" req)
+			(html "put success"))
+		       (t (html "non put/post success")))))))
     
-    
-    
+    (let ((tests '(("/does-not-exist" :post nil t 404)
+		   ("/secret-auth" :post nil t 401)
+		   ("/secret-auth" :post ("foo2" . "wrongpass") t 401)
+		   ("/secret-auth" :post ("foo2" . "bar2") t 100)
+		   ("/secret-auth" :get ("foo2" . "bar2") t 200)
+		   ("/noauth" :get nil t 200)
+		   ("/noauth" :put nil t 100)
+		   ("/no-auto" :get nil t 200)
+		   ("/no-auto" :put nil t 100)
+		   ("/no-auto" :put nil nil 200)
+		   ("/no-auto" :post nil t 100)
+		   ("/no-auto" :post nil nil 200)
+		   )))
+      (loop for (path method auth expect-hdr expected-code) in tests
+	  do (let* ((body-p (member method '(:put :post)))
+		    (body (when body-p (query-to-form-urlencoded '(("body" . "stuff")))))
+		   (creq (make-http-client-request
+			  (format nil "~a~a" base path)
+			  :method method
+			  :ssl (asc x-ssl)
+			  :basic-authorization auth
+			  :content (when body-p body)
+			  :content-type (when body-p "application/x-www-form-urlencoded")
+			  :headers (when expect-hdr '(("Expect" . "100-continue"))))))
+	       (unwind-protect 
+		   (progn (read-client-response-headers creq)
+			  (test expected-code (client-request-response-code creq)))
+		 (client-request-close creq)))))))
   
 
 

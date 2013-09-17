@@ -343,7 +343,8 @@
 				       (get-host-port proxy-proxy)
 				     (if* (null host)
 					then (error "bad host port specification: ~s" proxy-proxy))
-				     (cons host port)))))))
+				     (cons host port)))
+		    :will-handle-expect-continue t))))
 	   
   
     ; must be first as other locators may not ignore absolute proxy urls

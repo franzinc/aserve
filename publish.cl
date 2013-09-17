@@ -113,6 +113,14 @@
    
    ; extra holds random info we need for a particular entity
    (extra    :initarg :extra  :reader entity-extra)
+   
+   ;; should aserve auto-send a 100 Continue response for
+   ;; this entity if an 'Expect: 100-continue' header is
+   ;; in the request.
+   (will-handle-expect-continue
+    :initarg :will-handle-expect-continue
+    :initform nil
+    :reader entity-will-handle-expect-continue)
    ))
 
 
@@ -695,6 +703,7 @@
 		     hook
 		     headers
 		     (compress t)
+		     will-handle-expect-continue
 		     )
   ;; publish the given url
   ;; if file is given then it specifies a file to return
@@ -726,6 +735,7 @@
 			 :hook hook
 			 :headers headers
 			 :compress compress
+			 :will-handle-expect-continue will-handle-expect-continue
 			 )))
 	      (publish-entity ent locator path hval)))))
 
@@ -740,6 +750,7 @@
 			    plist
 			    headers
 			    (compress t)
+			    will-handle-expect-continue
 			    )
   ;; publish a handler for all urls with a certain prefix
   ;; 
@@ -770,6 +781,7 @@
 			 :timeout timeout
 			 :headers headers
 			 :compress compress
+			 :will-handle-expect-continue will-handle-expect-continue
 			 )))
 	      (publish-prefix-entity ent prefix locator  hval
 				     host-p nil)
@@ -791,6 +803,7 @@
 			  hook
 			  headers
 			  (compress t)
+			  will-handle-expect-continue
 			  )
 			  
   ;; return the given file as the value of the url
@@ -850,6 +863,7 @@
 			    :hook hook
 			    :headers headers
 			    :compress compress
+			    :will-handle-expect-continue will-handle-expect-continue
 			    ))))
        else (setq ent (make-instance (or class 'file-entity)
 			:host hval 
@@ -864,6 +878,7 @@
 			:hook hook
 			:headers headers
 			:compress compress
+			:will-handle-expect-continue will-handle-expect-continue
 			)))
 
     (publish-entity ent locator path hval)))
@@ -893,6 +908,7 @@
 			       headers
 			       (compress t)
 			       hidden-index-redirect
+			       will-handle-expect-continue
 			       )
   
   ;; make a whole directory available
@@ -928,6 +944,7 @@
 	       :headers headers
 	       :compress compress
 	       :hidden-index-redirect hidden-index-redirect
+	       :will-handle-expect-continue will-handle-expect-continue
 	       )))
     
     (publish-prefix-entity ent prefix locator host host-p nil)
@@ -1020,7 +1037,8 @@
 			   plist
 			   hook
 			   headers
-			  (compress t)
+			   (compress t)
+			   will-handle-expect-continue
 			   )
   
   (if* (null locator)
@@ -1079,6 +1097,7 @@
 		:hook hook
 		:headers headers
 		:compress compress
+		:will-handle-expect-continue will-handle-expect-continue
 		)))
     (publish-entity ent locator path hval)))
 
@@ -1219,6 +1238,13 @@
 	   else ; failed to authorize
 		(return-from authorize-and-process nil))))
     
+    (when (member (request-method req) '(:put :post))
+      (let ((cont (header-slot-value req :expect)))
+	(setf (request-has-continue-expectation req)
+	  (and cont (match-re "\\b100-continue\\b" cont :case-fold t :return nil))))
+      (unless (entity-will-handle-expect-continue ent)
+	(send-100-continue req)))
+
     ; all authorization ok. try to run it and return the 
     ; value representing its exit status
     (process-entity req ent)))
@@ -2666,8 +2692,6 @@
  			  (setf (request-reply-stream req) (excl::inner-stream reply-stream)))
  			(and reply-stream (force-output reply-stream)))))))))
 
-      	
-      
 (defmethod compute-response-stream ((req http-request) (ent file-entity))
   ;; send directly to the socket since we already know the length
   ;;

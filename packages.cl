@@ -1,5 +1,5 @@
 #+(version= 9 0)
-(sys:defpatch "aserve" 6
+(sys:defpatch "aserve" 7
   "v1: 1.3.16: fix freeing freed buffer;
 v2: 1.3.18: introduce allegroserve-error condition object,
     fix compression with logical pathnames;
@@ -8,12 +8,14 @@ v4: 1.3.20: handle connection reset and aborted errors
     properly in the client;
 v5: 1.3.21: new proxy control.
 v6: 1.3.23: fixes socket leak in client when the the writing
-    of the initial headers and body fails"
+    of the initial headers and body fails.
+v7: 1.3.24: Move 100-continue expectation handling until after authorization
+    and an entity has been found. Allow disabling of auto handling per entity."
   :type :system
   :post-loadable t)
 
 #+(version= 8 2)
-(sys:defpatch "aserve" 18
+(sys:defpatch "aserve" 19
   "v1: version 1.2.67, implement keep-alive in allegroserve client;
 v2: 1.2.68, obey keep-alive requests for PUT and POST requests;
 v3: 1.2.69, make logging though method specialized on wserver class;
@@ -44,7 +46,9 @@ v16: add timeout for reading request header.
 v17: 1.3.20: handle connection reset and aborted errors
     properly in the client;
 v18: 1.3.23: fixes socket leak in client when the the writing
-    of the initial headers and body fails"
+    of the initial headers and body fails.
+v19: 1.3.24: Move 100-continue expectation handling until after authorization
+    and an entity has been found. Allow disabling of auto handling per entity."
   :type :system
   :post-loadable t)
 
@@ -197,6 +201,9 @@ without compression.  Original error loading deflate was:~:@>~%~a~%" c)
    #:request-reply-protocol-string
    #:request-reply-strategy
    #:request-reply-stream
+   #:request-has-continue-expectation
+   
+   #:send-100-continue
    
    #:set-cookie-header
    #:shutdown

@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 23))
+(defparameter *aserve-version* '(1 3 24))
 
 (eval-when (eval load)
     (require :sock)
@@ -1137,7 +1137,9 @@ by keyword symbols and not by strings"
     ;; Thus for now we're always http/1.1
     :initform "HTTP/1.1"
     :accessor request-reply-protocol-string)
-   )
+
+   (has-expect-continue :accessor request-has-continue-expectation
+			:initform nil))
   
   
 		
@@ -1166,8 +1168,10 @@ by keyword symbols and not by strings"
 (defparameter *response-bad-request* (make-resp 400 "Bad Request"))
 (defparameter *response-unauthorized* (make-resp 401 "Unauthorized"))
 (defparameter *response-not-found* (make-resp 404 "Not Found"))
+(defparameter *response-method-not-allowed* (make-resp 405 "Method Not Allowed"))
 (defparameter *response-requested-range-not-satisfiable*
     (make-resp 416 "Requested range not satisfiable"))
+(defparameter *response-expectation-failed* (make-resp 417 "Expectation Failed"))
 (defparameter *response-internal-server-error*
     (make-resp 500 "Internal Server Error"))
 (defparameter *response-not-implemented* (make-resp 501 "Not Implemented"))
@@ -1186,7 +1190,9 @@ by keyword symbols and not by strings"
 	  *response-bad-request*
 	  *response-unauthorized*
 	  *response-not-found*
+	  *response-method-not-allowed*
 	  *response-requested-range-not-satisfiable*
+	  *response-expectation-failed*
 	  *response-partial-content*
 	  ))
 
@@ -1808,11 +1814,7 @@ by keyword symbols and not by strings"
 		  (setq *worker-request* req) 
 		  
 		  (setf (request-request-date req) (get-universal-time))
-		  (if* (let ((cont (header-slot-value req :expect)))
-                         (and cont (match-re "\\b100-continue\\b" cont :case-fold t)))
-		     then (format sock "~a 100 Continue~a~a"
-		                  (request-protocol-string req) *crlf* *crlf*)
-		          (force-output sock))
+
 		  (handle-request req)
 		  (setf (request-reply-date req) (get-universal-time))
 		  
@@ -1994,7 +1996,15 @@ by keyword symbols and not by strings"
       ("CONNECT " . :connect)))
   
 
-	    
+
+(defmethod send-100-continue ((req http-request))
+  (when (request-has-continue-expectation req)
+    (let ((sock (request-socket req)))
+      (format sock "~a 100 Continue~a~a"
+	      (request-protocol-string req) *crlf* *crlf*)
+      (force-output sock)
+      (setf (request-has-continue-expectation req) nil))))
+
 
 (defmethod get-request-body ((req http-request)
 			     &key (external-format :octets ef-supplied))
@@ -2030,7 +2040,10 @@ by keyword symbols and not by strings"
     
     (unwind-protect
 	(if* (member (request-method req) '(:put :post))
-	   then (multiple-value-bind (length believe-it)
+	   then (when (request-has-continue-expectation req)
+		  (send-100-continue req))
+		  
+		(multiple-value-bind (length believe-it)
 		    (header-slot-value-integer req :content-length)
 		  (if* believe-it
 		     then	; we know the length
