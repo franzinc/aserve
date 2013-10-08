@@ -2739,7 +2739,7 @@ response.&nbsp;&nbsp;&nbsp; This is the most convenient function to use
 to retrieve a web
 page.</p>
 <p>If you need more control over the process you can use the functions:
-<strong>make-http-request</strong>,
+<strong>make-http-client-request</strong>,
 <strong>read-client-response-headers </strong>and <strong>client-request-read-sequence</strong>.</p>
 <p>&nbsp;</p>
 <p><a name="f-do-http-request"></a><strong><font face="Courier New">(do-http-request
@@ -3428,7 +3428,7 @@ characters.</p>
 <p>&nbsp;</p>
 <p><a name="f-client-request-read-close"></a><font face="Courier New"><strong>(client-request-close
 client-request)</strong></font></p>
-<p>The client-request object returned by make-http-request is
+<p>The client-request object returned by <b>make-http-client-request</b> is
 closed.&nbsp;&nbsp; This
 returns the resources used by this connection to the operating
 system.&nbsp; </p>
