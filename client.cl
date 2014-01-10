@@ -315,6 +315,8 @@
 			user-agent
 			(external-format *default-aserve-external-format*)
 			ssl		; do an ssl connection
+			ssl-args	; plist of make-ssl-client-stream args
+					; overrides other ssl args when specified
 			skip-body ; fcn of request object
 			ssl-method
 			timeout
@@ -354,6 +356,7 @@
 	       :user-agent user-agent
 	       :external-format external-format
 	       :ssl ssl
+	       :ssl-args ssl-args
 	       :ssl-method ssl-method
 	       :timeout timeout
 	       :certificate certificate
@@ -709,6 +712,7 @@
 				 (external-format 
 				  *default-aserve-external-format*)
 				 ssl
+				 ssl-args
 				 ssl-method
 				 timeout
 				 certificate
@@ -815,18 +819,19 @@
                                       )))
               (if* ssl
                  then #+(version>= 8 0)
-                      (setq sock
-                        (funcall 'socket::make-ssl-client-stream sock 
-                                 :certificate certificate
-                                 :key key
-                                 :certificate-password certificate-password
-                                 :ca-file ca-file
-                                 :ca-directory ca-directory
-                                 :crl-file crl-file
-                                 :crl-check crl-check
-                                 :verify verify
-                                 :method (or ssl-method :sslv23)
-                                 :max-depth max-depth))
+		      (let ((args (or ssl-args
+				      (list :certificate certificate
+					    :key key
+					    :certificate-password certificate-password
+					    :ca-file ca-file
+					    :ca-directory ca-directory
+					    :crl-file crl-file
+					    :crl-check crl-check
+					    :verify verify
+					    :method (or ssl-method :sslv23)
+					    :max-depth max-depth))))
+			(setq sock
+			  (apply 'socket::make-ssl-client-stream sock args)))
                       #-(version>= 8 0)
                       (setq sock
                         (funcall 'socket::make-ssl-client-stream sock))))

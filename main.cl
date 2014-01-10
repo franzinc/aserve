@@ -1219,6 +1219,8 @@ by keyword symbols and not by strings"
 		   debug-stream  ; stream to which to send debug messages
 		   accept-hook
 		   ssl		 ; enable ssl
+		   ssl-args	 ; plist of make-ssl-server-stream args
+		                 ; overrides other ssl args when specified
 		   ssl-key       ; File containing private key. 
 		   ssl-password  ; for ssl: pswd to decode priv key
 		   (ssl-method :sslv23) ; protocols for ssl server
@@ -1267,17 +1269,18 @@ by keyword symbols and not by strings"
 	  (setq accept-hook 
 	    #'(lambda (socket)
 		#+(version>= 8 0)
-		(funcall 'socket::make-ssl-server-stream socket
-			 :certificate ssl
-			 :certificate-password ssl-password
-			 :key ssl-key
-			 :verify verify
-			 :ca-file ca-file
-			 :ca-directory ca-directory
-                         :crl-file crl-file
-                         :crl-check crl-check
-			 :method ssl-method
-			 :max-depth max-depth)
+		(let ((args (or ssl-args
+				(list :certificate ssl
+				      :certificate-password ssl-password
+				      :key ssl-key
+				      :verify verify
+				      :ca-file ca-file
+				      :ca-directory ca-directory
+				      :crl-file crl-file
+				      :crl-check crl-check
+				      :method ssl-method
+				      :max-depth max-depth))))
+		  (apply 'socket::make-ssl-server-stream socket args))
 		#-(version>= 8 0)
 		(funcall 'socket::make-ssl-server-stream socket
 			 :certificate ssl
