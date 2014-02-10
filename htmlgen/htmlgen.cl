@@ -647,7 +647,6 @@
 (def-std-html :dt        t nil)
 
 (def-std-html :em        t nil)
-(def-std-html :embed     t nil)
 
 (def-std-html :fieldset        t nil)
 (def-std-html :font        t nil)
@@ -674,7 +673,6 @@
 (def-std-html :isindex    nil nil)
 
 (def-std-html :kbd  	t nil)
-(def-std-html :keygen  	nil nil)
 
 (def-std-html :label  	t nil)
 (def-std-html :layer  	t nil)
@@ -771,5 +769,5 @@
 (def-std-html :menuitem	 	t nil)
 (def-std-html :details	 	t nil)
 (def-std-html :datalist	 	t nil)
-(def-std-html :keygen	 	t nil)
+(def-std-html :keygen	 	nil nil)
 (def-std-html :output	 	t nil)

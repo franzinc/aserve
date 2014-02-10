@@ -30,6 +30,8 @@ mlisp += -batch
 
 build: FORCE
 	rm -f build.tmp
+	echo '(setq *record-source-file-info* t)' >> build.tmp
+	echo '(setq *load-source-file-info* t)' >> build.tmp
 	echo '(setq excl::*break-on-warnings* t)' >> build.tmp
 	echo '(load "load.cl")' >> build.tmp
 	echo '(make-aserve.fasl)' >> build.tmp
