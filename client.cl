@@ -859,10 +859,15 @@
                  ; must not blast a uri we were passed
                  (if* (not fresh-uri)
                     then (setq uri (net.uri:copy-uri uri)))
-                 (setf (net.uri:uri-query uri) (query-to-form-urlencoded
-                                                query
-                                                :external-format
-                                                external-format)))
+                 (setf (net.uri:uri-query uri)
+                       ;; rfe12963: append query to the query part
+                       ;; instead of clobbering it.
+                       (query-to-form-urlencoded
+                        (append (form-urlencoded-to-query
+                                 (net.uri:uri-query uri)
+                                 :external-format external-format)
+                                query)
+                        :external-format external-format)))
                 (:post    ; make the content
                  (if* content
                     then (error "Can't specify both query ~s and content ~s"

@@ -1,5 +1,5 @@
 #+(version= 9 0)
-(sys:defpatch "aserve" 8
+(sys:defpatch "aserve" 9
   "v1: 1.3.16: fix freeing freed buffer;
 v2: 1.3.18: introduce allegroserve-error condition object,
     fix compression with logical pathnames;
@@ -12,12 +12,14 @@ v6: 1.3.23: fixes socket leak in client when the the writing
 v7: 1.3.24: Move 100-continue expectation handling until after authorization
     and an entity has been found. Allow disabling of auto handling per entity.
 v8: 1.3.25: fix keep-alive timeout header: use wserver-header-read-timeout
-    instead of wserver-read-request-timeout."
+    instead of wserver-read-request-timeout.
+v9: 1.3.26: Make do-http-request merge the query part of the uri of GET and
+    PUT requests with the query argument."
   :type :system
   :post-loadable t)
 
 #+(version= 8 2)
-(sys:defpatch "aserve" 20
+(sys:defpatch "aserve" 21
   "v1: version 1.2.67, implement keep-alive in allegroserve client;
 v2: 1.2.68, obey keep-alive requests for PUT and POST requests;
 v3: 1.2.69, make logging though method specialized on wserver class;
@@ -52,7 +54,9 @@ v18: 1.3.23: fixes socket leak in client when the the writing
 v19: 1.3.24: Move 100-continue expectation handling until after authorization
     and an entity has been found. Allow disabling of auto handling per entity.
 v20: 1.3.25: fix keep-alive timeout header: use wserver-header-read-timeout
-    instead of wserver-read-request-timeout."
+    instead of wserver-read-request-timeout.
+v21: 1.3.26: Make do-http-request merge the query part of the uri of GET and
+    PUT requests with the query argument."
   :type :system
   :post-loadable t)
 

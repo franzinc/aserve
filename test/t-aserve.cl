@@ -1189,6 +1189,9 @@
 		 
 		 ;; also test here the setf'ing of query values
 		 (test nil (request-query-value "flurber" req))
+                 (if* (eql (request-method req) :get)
+                    then (test "sammy c" (request-query-value "marketing" req)
+                                         :test #'equal))
 		 (setf (request-query-value "flurber" req) "ziftp")
 		 (test "ziftp" (request-query-value "flurber" req)
 		       :test #'equal)
@@ -1208,9 +1211,13 @@
 			      :test #'equal))
     
     
-    ; - use query arg
-    (x-do-http-request (format nil "~a/form-tester-both" prefix-local)
-      :query uri-var-vals)
+    ; - use query arg, but place a part of the query directly into
+    ; the uri to test merging (rfe12963)
+    (destructuring-bind (var . val) (first uri-var-vals)
+      (x-do-http-request (format nil "~a/form-tester-both?~a" prefix-local
+                                 (net.aserve:query-to-form-urlencoded
+                                  (subseq uri-var-vals 0 1)))
+                         :query (rest uri-var-vals)))
 			     
     (test nil (set-difference uri-var-vals req-query-res
 			      :test #'equal))  
