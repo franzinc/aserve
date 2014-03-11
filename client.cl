@@ -854,29 +854,27 @@
               
       
       (if* query
-         then (case method
-                ((:get :put)  ; add info the uri
-                 ; must not blast a uri we were passed
-                 (if* (not fresh-uri)
-                    then (setq uri (net.uri:copy-uri uri)))
-                 (setf (net.uri:uri-query uri)
-                       ;; rfe12963: append query to the query part
-                       ;; instead of clobbering it.
-                       (query-to-form-urlencoded
-                        (append (form-urlencoded-to-query
-                                 (net.uri:uri-query uri)
-                                 :external-format external-format)
-                                query)
-                        :external-format external-format)))
-                (:post    ; make the content
-                 (if* content
-                    then (error "Can't specify both query ~s and content ~s"
-                                query content))
-                 (setq content (query-to-form-urlencoded
-                                query :external-format external-format)
-                       content-type "application/x-www-form-urlencoded"))))
-                   
-  
+         then (if* (eq method :post)
+                 then (if* content
+                         then (error "Can't specify both query ~s and content ~s"
+                                     query content))
+                      (setq content (query-to-form-urlencoded
+                                     query :external-format external-format)
+                            content-type "application/x-www-form-urlencoded")
+                 else ; add info the uri
+                      ; must not blast a uri we were passed
+                      (if* (not fresh-uri)
+                         then (setq uri (net.uri:copy-uri uri)))
+                      (setf (net.uri:uri-query uri)
+                            ;; rfe12963: append query to the query
+                            ;; part instead of clobbering it.
+                            (query-to-form-urlencoded
+                             (append (form-urlencoded-to-query
+                                      (net.uri:uri-query uri)
+                                      :external-format external-format)
+                                     query)
+                             :external-format external-format))))
+
       (let ((command (format nil "~a ~a ~a"
                              (string-upcase (string method))
                              (if* (eq method :connect)
