@@ -13,7 +13,7 @@ v7: 1.3.24: Move 100-continue expectation handling until after authorization
     and an entity has been found. Allow disabling of auto handling per entity.
 v8: 1.3.25: fix keep-alive timeout header: use wserver-header-read-timeout
     instead of wserver-read-request-timeout.
-v9: 1.3.26: Make do-http-request merge the query part of the uri of non-POST
+v9: 1.3.26: Make do-http-request merge the query part of the uri of
     requests with the query argument."
   :type :system
   :post-loadable t)
@@ -55,7 +55,7 @@ v19: 1.3.24: Move 100-continue expectation handling until after authorization
     and an entity has been found. Allow disabling of auto handling per entity.
 v20: 1.3.25: fix keep-alive timeout header: use wserver-header-read-timeout
     instead of wserver-read-request-timeout.
-v21: 1.3.26: Make do-http-request merge the query part of the uri of non-POST
+v21: 1.3.26: Make do-http-request merge the query part of the uri of
     requests with the query argument."
   :type :system
   :post-loadable t)

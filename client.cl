@@ -854,10 +854,8 @@
               
       
       (if* query
-         then (if* (eq method :post)
-                 then (if* content
-                         then (error "Can't specify both query ~s and content ~s"
-                                     query content))
+         then (if* (and (eq method :post) (not content))
+                 then ;; bug22337. add query to the body and set the content-type
                       (setq content (query-to-form-urlencoded
                                      query :external-format external-format)
                             content-type "application/x-www-form-urlencoded")
