@@ -251,8 +251,10 @@
                                 (setf (unchunking-state p) :need-count))
                         (setf (unchunking-count p) count)
                         (return-from device-read (- i start)))
-                     (setf bytes-read (- (read-sequence buffer ins :start i :end (min (+ i count) end))
-                                         i))))))))))
+                     (let ((res (read-vector buffer ins :start i :end (min (+ i count) end))))
+                       (if* (= res i)
+                          then (return-from device-read -1))
+                       (setf bytes-read (- res i)))))))))))
 
 
 (defmethod device-close ((p unchunking-stream) abort)

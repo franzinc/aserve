@@ -1,5 +1,5 @@
 #+(version= 9 0)
-(sys:defpatch "aserve" 9
+(sys:defpatch "aserve" 10
   "v1: 1.3.16: fix freeing freed buffer;
 v2: 1.3.18: introduce allegroserve-error condition object,
     fix compression with logical pathnames;
@@ -14,12 +14,14 @@ v7: 1.3.24: Move 100-continue expectation handling until after authorization
 v8: 1.3.25: fix keep-alive timeout header: use wserver-header-read-timeout
     instead of wserver-read-request-timeout.
 v9: 1.3.26: Make do-http-request merge the query part of the uri of
-    requests with the query argument."
+    requests with the query argument.
+v10: 1.3.27: Make clients reading a chunked response detect an unexpected eof
+    instead of busy looping."
   :type :system
   :post-loadable t)
 
 #+(version= 8 2)
-(sys:defpatch "aserve" 21
+(sys:defpatch "aserve" 22
   "v1: version 1.2.67, implement keep-alive in allegroserve client;
 v2: 1.2.68, obey keep-alive requests for PUT and POST requests;
 v3: 1.2.69, make logging though method specialized on wserver class;
@@ -56,7 +58,9 @@ v19: 1.3.24: Move 100-continue expectation handling until after authorization
 v20: 1.3.25: fix keep-alive timeout header: use wserver-header-read-timeout
     instead of wserver-read-request-timeout.
 v21: 1.3.26: Make do-http-request merge the query part of the uri of
-    requests with the query argument."
+    requests with the query argument.
+v22: 1.3.27: Make clients reading a chunked response detect an unexpected eof
+    instead of busy looping."
   :type :system
   :post-loadable t)
 
