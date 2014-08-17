@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 27))
+(defparameter *aserve-version* '(1 3 28))
 
 (eval-when (eval load)
     (require :sock)
@@ -1169,6 +1169,7 @@ by keyword symbols and not by strings"
 (defparameter *response-unauthorized* (make-resp 401 "Unauthorized"))
 (defparameter *response-not-found* (make-resp 404 "Not Found"))
 (defparameter *response-method-not-allowed* (make-resp 405 "Method Not Allowed"))
+(defparameter *response-request-timeout* (make-resp 408 "Request Timeout"))
 (defparameter *response-requested-range-not-satisfiable*
     (make-resp 416 "Requested range not satisfiable"))
 (defparameter *response-expectation-failed* (make-resp 417 "Expectation Failed"))
@@ -1181,7 +1182,9 @@ by keyword symbols and not by strings"
 	  *response-ok*
 	  *response-created*
 	  *response-accepted*
+	  *response-non-authoritative-information*
 	  *response-no-content*
+	  *response-partial-content*
 	  *response-moved-permanently*
 	  *response-found*
 	  *response-see-other*
@@ -1191,9 +1194,11 @@ by keyword symbols and not by strings"
 	  *response-unauthorized*
 	  *response-not-found*
 	  *response-method-not-allowed*
+	  *response-request-timeout*
 	  *response-requested-range-not-satisfiable*
 	  *response-expectation-failed*
-	  *response-partial-content*
+	  *response-internal-server-error*
+	  *response-not-implemented*
 	  ))
 
 (defvar *crlf* (make-array 2 :element-type 'character :initial-contents
@@ -1774,7 +1779,7 @@ by keyword symbols and not by strings"
   ;;
   
   (unwind-protect
-      (let (req error-obj (chars-seen (list nil)))
+      (let (req error-obj error-response (chars-seen (list nil)))
 
 	;; run the accept hook on the socket if there is one
 	(let ((ahook (wserver-accept-hook *wserver*)))
@@ -1782,16 +1787,16 @@ by keyword symbols and not by strings"
 	
 	;; get first command
 	(loop
-	  (multiple-value-setq (req error-obj)
+	  (multiple-value-setq (req error-obj error-response)
 	    (ignore-errors
 	     (mp:with-timeout ((wserver-header-read-timeout *wserver*)
 			       (debug-format :info "total header read timeout")
-			       (return-from process-connection nil))
+			       (values nil nil *response-request-timeout*))
 			     
-               (with-timeout-local ((wserver-read-request-timeout *wserver*)
-                                    (debug-format :info "request timed out on read")
-                                    (return-from process-connection nil))
-                 (read-http-request sock chars-seen)))))
+	       (with-timeout-local ((wserver-read-request-timeout *wserver*)
+				    (debug-format :info "request timed out on read")
+				    (values nil nil *response-request-timeout*))
+		 (read-http-request sock chars-seen)))))
 	  
 	  (if* (null req)
 	     then ; end of file, means do nothing
@@ -1808,8 +1813,11 @@ by keyword symbols and not by strings"
 		  ; notify the client if it's still listening
 		  (if* (car chars-seen)
 		     then (ignore-errors
-			   (format sock "HTTP/1.0 400 Bad Request~a~a" 
-				   *crlf* *crlf*)
+			   (let ((code (or error-response *response-bad-request*)))
+			     (format sock "HTTP/1.0 ~d  ~a~aContent-Length: 0~aConnection: close~a~a"
+				     (response-number code)
+				     (response-desc code)
+				     *crlf* *crlf* *crlf* *crlf*))
 			   (force-output sock)))
 		   
 		  (return-from process-connection nil)

@@ -291,7 +291,9 @@
        then (error "Body already read."))))
 
       
-    
+;; bug22596
+(defparameter *default-retry-on-timeout* nil)
+
 (defun do-http-request (uri 
 			&rest args
 			&key 
@@ -306,7 +308,8 @@
 			cookies ; nil or a cookie-jar
 			(redirect 5) ; auto redirect if needed
 			(redirect-methods '(:get :head))
-			basic-authorization  ; (name . password)
+			(retry-on-timeout *default-retry-on-timeout*)
+			basic-authorization ; (name . password)
 			digest-authorization ; digest-authorization object
 			(keep-alive (eq method :connect))  ; if true, set con to keep alive
 			headers	    ; extra header lines, alist
@@ -437,8 +440,22 @@
 				   :recursing-call t
 				   args))))
 		  
-		  
-	  
+	  ;; auto-retry if request times out.
+	  (if* (and (eq (client-request-response-code creq)
+			#.(net.aserve::response-number *response-request-timeout*))
+		    (if (integerp retry-on-timeout)
+			(> retry-on-timeout 0)
+		      retry-on-timeout))
+	     then (net.aserve::debug-format :info "Received 408 response. Retrying request because retry-on-timeout is ~a.." retry-on-timeout)
+		  (apply #'do-http-request
+			   uri
+			   :retry-on-timeout
+			   (if* (integerp retry-on-timeout)
+			      then (1- retry-on-timeout)
+			      else retry-on-timeout)
+			   :recursing-call t
+			   args))
+
 	  (if* (or (and (null new-location) 
 			; not called when redirecting
 			(if* (functionp skip-body)
