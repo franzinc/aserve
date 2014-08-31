@@ -1,5 +1,5 @@
 #+(version= 9 0)
-(sys:defpatch "aserve" 11
+(sys:defpatch "aserve" 12
   "v1: 1.3.16: fix freeing freed buffer;
 v2: 1.3.18: introduce allegroserve-error condition object,
     fix compression with logical pathnames;
@@ -18,12 +18,13 @@ v9: 1.3.26: Make do-http-request merge the query part of the uri of
 v10: 1.3.27: Make clients reading a chunked response detect an unexpected eof
     instead of busy looping.
 v11: 1.3.28: Have server send a 408 Request Timeout response on timeout
-    instead of closing connection. Allow client to auto-retry."
+    instead of closing connection. Allow client to auto-retry.
+v12: 1.3.28: Fix bug in retry-on-timeout code in do-http-request."
   :type :system
   :post-loadable t)
 
 #+(version= 8 2)
-(sys:defpatch "aserve" 23
+(sys:defpatch "aserve" 24
   "v1: version 1.2.67, implement keep-alive in allegroserve client;
 v2: 1.2.68, obey keep-alive requests for PUT and POST requests;
 v3: 1.2.69, make logging though method specialized on wserver class;
@@ -64,7 +65,8 @@ v21: 1.3.26: Make do-http-request merge the query part of the uri of
 v22: 1.3.27: Make clients reading a chunked response detect an unexpected eof
     instead of busy looping.
 v23: 1.3.28: Have server send a 408 Request Timeout response on timeout
-    instead of closing connection. Allow client to auto-retry."
+    instead of closing connection. Allow client to auto-retry.
+v24: 1.3.28: Fix bug in retry-on-timeout code in do-http-request."
   :type :system
   :post-loadable t)
 

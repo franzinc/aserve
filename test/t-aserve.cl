@@ -296,6 +296,7 @@
 		     (test-http-copy-file port)
 		     (test-client-unicode-content-length)
 		     (test-expect-header-responses)
+		     (test-retry-on-timeout port)
 
 		     (if* (member :ics *features*)
 			then (test-international port)
@@ -2488,7 +2489,45 @@
   
 
 
+(defun test-retry-on-timeout (port)
+  (let ((test-url (format nil "http://localhost:~a/3-times" port))
+	(reset-url (format nil "http://localhost:~a/3-times/reset" port))
+	(counter 0))
+    ;; returns 2 408 responses, then returns a 200.
+    (publish :path "/3-times"
+	     :content-type "text/plain"
+	     :function
+	     #'(lambda (req ent)
+		 (incf counter)
+		 (if* (< counter 3)
+		    then (with-http-response (req ent :response *response-request-timeout*)
+			   (with-http-body (req ent)))
+		    else (setf counter 0)
+			 (with-http-response (req ent)
+			   (with-http-body (req ent)
+			     (html "Success"))))))
   
+    (publish :path "/3-times/reset"
+	     :content-type "text/plain"
+	     :function
+	     #'(lambda (req ent)
+		 (setf counter 0)
+		 (with-http-response (req ent)
+		   (with-http-body (req ent)
+		     (html "OK")))))
+    
+    (flet ((test-code (expected-code &rest request-args)
+	     (print (list :testing expected-code request-args))
+	     (multiple-value-bind (resp code)
+		 (apply #'x-do-http-request request-args)
+	       (test expected-code code))))
+
+      ;; default retries in nil
+      (test-code 408 test-url)
+      (x-do-http-request reset-url)
+      (test-code 408 test-url :retry-on-timeout 1)
+      (x-do-http-request reset-url)
+      (test-code 200 test-url :retry-on-timeout 3))))
   
   
   

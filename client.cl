@@ -447,14 +447,15 @@
 			(> retry-on-timeout 0)
 		      retry-on-timeout))
 	     then (net.aserve::debug-format :info "Received 408 response. Retrying request because retry-on-timeout is ~a.." retry-on-timeout)
-		  (apply #'do-http-request
+		  (return-from do-http-request
+		    (apply #'do-http-request
 			   uri
 			   :retry-on-timeout
 			   (if* (integerp retry-on-timeout)
 			      then (1- retry-on-timeout)
 			      else retry-on-timeout)
 			   :recursing-call t
-			   args))
+			   args)))
 
 	  (if* (or (and (null new-location) 
 			; not called when redirecting
