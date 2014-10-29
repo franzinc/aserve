@@ -721,21 +721,21 @@ cached connection = ~s~%" cond cached-connection))
 		    ((>= i tocopy)
 
                      (maybe-accumulate-log (:xmit-proxy-client-request-headers "~s")
-                      (debug-format :xmit-proxy-client-request-headers "~a"
-                                    (octets-to-string firstbuf
-                                                      :start rest-of-headers-ind
-                                                      :end ind
-                                                      :external-format :octets))
-                      (write-sequence firstbuf sock :end ind)
-                      (if* (< i outend)
-                         then ; still more from original buffer left
-                              (debug-format :xmit-proxy-client-request-headers "~a"
-                                            (octets-to-string
-                                             outbuf :start i :end outend
-                                             :external-format :octets))
-                              (write-sequence outbuf sock
-                                                     :start i
-                                                     :end outend)))
+					   (debug-format :xmit-proxy-client-request-headers "~a"
+							 (octets-to-string firstbuf
+									   :start rest-of-headers-ind
+									   :end ind
+									   :external-format :octets))
+					   (write-sequence firstbuf sock :end ind)
+					   (if* (< i outend)
+					      then ; still more from original buffer left
+						   (debug-format :xmit-proxy-client-request-headers "~a"
+								 (octets-to-string
+								  outbuf :start i :end outend
+								  :external-format :octets))
+						   (write-sequence outbuf sock
+								   :start i
+								   :end outend)))
 		     )
 		      
 		  (setf (ausb8 firstbuf ind) (ausb8 outbuf i))
@@ -820,8 +820,8 @@ cached connection = ~s~%" cond cached-connection))
 		      (if* (and given-content-length
 				(not (eql body-length given-content-length)))
 			 then (warn "content-length ~s but body length ~d"
-				    given-content-length body-length)
-			      (setq given-content-length body-length)))
+				    given-content-length body-length))
+		      (setq given-content-length body-length))
 	      
 	      
 	      (setf (request-reply-content-length req) 
@@ -873,10 +873,10 @@ cached connection = ~s~%" cond cached-connection))
                           :xmit-proxy-server-response-headers
                           "~s"
                           (concatenate 'string
-                                       (format nil "HTTP/1.1 ~d ~a~a" response
-                                               (and comment (octets-to-string comment)) *crlf*)
-                                       (octets-to-string clibuf :end cliend
-                                                         :external-format :octets)))
+			    (format nil "HTTP/1.1 ~d ~a~a" response
+				    (and comment (octets-to-string comment)) *crlf*)
+			    (octets-to-string clibuf :end cliend
+					      :external-format :octets)))
 
 			 (format rsock "HTTP/1.1 ~d ~a~a" response (and comment (octets-to-string comment)) *crlf*)
       
