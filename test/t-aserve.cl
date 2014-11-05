@@ -901,7 +901,15 @@
 	  (values2 (x-do-http-request (format nil "~a/secret" prefix-local)
 				      :basic-authorization '("xxfoo" . "bar"))))
     
-
+    ; test auth precedence, basic-auth over userinfo
+    (test 401
+	  (values2 (x-do-http-request (format nil "http://foo:bar@localhost:~a/secret" port)
+				      :basic-authorization '("xxfoo" . "bar"))))
+    
+    ; auth via userinfo
+    (test 200
+	  (values2 (x-do-http-request (format nil "http://foo:bar@localhost:~a/secret" port))))
+    
 
     
     ;; manual authorization testing, testing via ip address

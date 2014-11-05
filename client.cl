@@ -983,15 +983,20 @@
                 (if* str
                    then (net.aserve::format-dif :xmit-client-request-headers
                                                 sock "Cookie: ~a~a" str crlf))))
-  
+
+	;; bug22805
+	(when (and (not basic-authorization) (net.uri:uri-userinfo uri))
+	  (let ((userinfo (delimited-string-to-list (net.uri:uri-userinfo uri) #\:)))
+	    (setf basic-authorization (cons (first userinfo) (or (second userinfo) "")))))
+	
         (if* basic-authorization
            then (net.aserve::format-dif :xmit-client-request-headers
                                         sock "Authorization: Basic ~a~a"
-                                      (base64-encode
-                                       (format nil "~a:~a" 
-                                               (car basic-authorization)
-                                               (cdr basic-authorization)))
-                                      crlf))
+					(base64-encode
+					 (format nil "~a:~a" 
+						 (car basic-authorization)
+						 (cdr basic-authorization)))
+					crlf))
         
         (if* proxy-basic-authorization
            then (net.aserve::format-dif :xmit-client-request-headers
@@ -1085,6 +1090,7 @@
     (setf (net.uri:uri-scheme nuri) nil)
     (setf (net.uri:uri-host nuri) nil)
     (setf (net.uri:uri-port nuri) nil)
+    (setf (net.uri:uri-userinfo nuri) nil)
     (if* (null (net.uri:uri-path nuri))
        then (setf (net.uri:uri-path nuri) "/"))
     
