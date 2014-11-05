@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 29))
+(defparameter *aserve-version* '(1 3 30))
 
 (eval-when (eval load)
     (require :sock)
@@ -1228,7 +1228,7 @@ by keyword symbols and not by strings"
 		                 ; overrides other ssl args when specified
 		   ssl-key       ; File containing private key. 
 		   ssl-password  ; for ssl: pswd to decode priv key
-		   (ssl-method :sslv23) ; protocols for ssl server
+		   ssl-method	 ; protocols for ssl server
 		   verify
 		   ca-file
 		   ca-directory
@@ -1264,38 +1264,46 @@ by keyword symbols and not by strings"
 
   (if* efp then (setf (wserver-external-format server) external-format))
 	  
-  (if* ssl
-     then (if* (pathnamep ssl)
-	     then (setq ssl (namestring ssl)))
+  (when (or ssl ssl-args)
+    (flet ((string-or-pathname-p (arg)
+	     (or (stringp arg) (pathnamep arg)))
+	   (bad-cert (var)
+	     (error "The ~s parameter should be a string or pathname holding the filename of the certificate and private key file" var)))
+      (if* ssl-args
+	 then (let ((cert (getf ssl-args :certificate)))
+		(when (not cert)
+		  (error "ssl-args is missing a :certificate parameter."))
+		(when (not (string-or-pathname-p cert))
+		  (bad-cert :certificate))))
+      (if* ssl
+	 then (when (not (string-or-pathname-p ssl))
+		(bad-cert :ssl))))
 	  
-	  (if* (not (stringp ssl))
-	     then (error "The ssl argument should be a string or pathname holding the filename of the certificate and private key file"))
-	  
-	  (setq accept-hook 
-	    #'(lambda (socket)
-		#+(version>= 8 0)
-		(let ((args (or ssl-args
-				(list :certificate ssl
-				      :certificate-password ssl-password
-				      :key ssl-key
-				      :verify verify
-				      :ca-file ca-file
-				      :ca-directory ca-directory
-				      :crl-file crl-file
-				      :crl-check crl-check
-				      :method ssl-method
-				      :max-depth max-depth))))
-		  (apply 'socket::make-ssl-server-stream socket args))
-		#-(version>= 8 0)
-		(funcall 'socket::make-ssl-server-stream socket
-			 :certificate ssl
-			 :certificate-password ssl-password)
-		))
+    (setq accept-hook 
+      #'(lambda (socket)
+	  #+(version>= 8 0)
+	  (let ((args (or ssl-args
+			  (list :certificate ssl
+				:certificate-password ssl-password
+				:key ssl-key
+				:verify verify
+				:ca-file ca-file
+				:ca-directory ca-directory
+				:crl-file crl-file
+				:crl-check crl-check
+				:method ssl-method
+				:max-depth max-depth))))
+	    (apply 'socket::make-ssl-server-stream socket args))
+	  #-(version>= 8 0)
+	  (funcall 'socket::make-ssl-server-stream socket
+		   :certificate ssl
+		   :certificate-password ssl-password)
+	  ))
 	    
-	  (if* (not port-p)
-	     then ; ssl defaults to port 443
-		  (setq port 443)))
-	    
+    (if* (not port-p)
+       then ;; ssl defaults to port 443
+	    (setq port 443)))
+
   (setf (wserver-accept-hook server) accept-hook)
   
   

@@ -838,16 +838,17 @@
               (if* ssl
                  then #+(version>= 8 0)
 		      (let ((args (or ssl-args
-				      (list :certificate certificate
-					    :key key
-					    :certificate-password certificate-password
-					    :ca-file ca-file
-					    :ca-directory ca-directory
-					    :crl-file crl-file
-					    :crl-check crl-check
-					    :verify verify
-					    :method (or ssl-method :sslv23)
-					    :max-depth max-depth))))
+				      (append (list :certificate certificate
+						    :key key
+						    :certificate-password certificate-password
+						    :ca-file ca-file
+						    :ca-directory ca-directory
+						    :crl-file crl-file
+						    :crl-check crl-check
+						    :verify verify
+						    :max-depth max-depth)
+					      (when ssl-method
+						(list :ssl-method ssl-method))))))
 			(setq sock
 			  (apply 'socket::make-ssl-client-stream sock args)))
                       #-(version>= 8 0)
