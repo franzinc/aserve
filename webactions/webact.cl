@@ -125,6 +125,8 @@
 				    (external-format
 				     *default-aserve-external-format*)
 				    (default-actions nil)
+				    (timeout #+io-timeout #.(* 100 24 60 60)
+					     #-io-timeout nil)
 				    )
   ;; create a webaction project
   ;; and publish all prefixes
@@ -143,6 +145,7 @@
 			     :class 'webaction-entity
 			     :server server
 			     :host host
+			     :timeout timeout
 			     :authorizer authorizer
 			     ))
 	(wa (or (gethash name *name-to-webaction*)

@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 30))
+(defparameter *aserve-version* '(1 3 31))
 
 (eval-when (eval load)
     (require :sock)
