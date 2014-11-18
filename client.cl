@@ -315,6 +315,7 @@
 			headers	    ; extra header lines, alist
 			proxy	    ; naming proxy server to access through
 			proxy-basic-authorization  ; (name . password)
+			no-proxy    ; list of domains to not proxy
 			user-agent
 			(external-format *default-aserve-external-format*)
 			ssl		; do an ssl connection
@@ -355,6 +356,7 @@
 	       :keep-alive keep-alive
 	       :headers headers
 	       :proxy proxy
+	       :no-proxy no-proxy
 	       :proxy-basic-authorization proxy-basic-authorization
 	       :user-agent user-agent
 	       :external-format external-format
@@ -726,6 +728,7 @@
 				 headers
 				 proxy
 				 proxy-basic-authorization
+				 no-proxy
 				 user-agent
 				 (external-format 
 				  *default-aserve-external-format*)
@@ -797,6 +800,28 @@
               ; default the port to what's appropriate for http or https
               (setq port (or (net.uri:uri-port uri) scheme-default-port)))
       
+      (if* proxy
+	 then ; see if the no-proxy list disables
+	      ; the proxy for this call
+	      (if* (and no-proxy (atom no-proxy))
+		 then ; in case just a single string given
+		      (setq no-proxy (list no-proxy)))
+	      
+	      (dolist (nop no-proxy)
+		(if* (stringp nop)
+		   then (let ((pos (search nop host
+					   :from-end t
+					   :test #'char-equal)))
+			  (if* (and pos
+				    (eql pos
+					 (- (length host)
+					    (length nop))))
+			     then ; match at the end
+				  ; turn off proxy
+				  (setq proxy nil)
+				  (return))))))
+				  
+	      
       (if* proxy
          then ; sent request through a proxy server
               (assert (stringp proxy) (proxy) 
