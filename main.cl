@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 32))
+(defparameter *aserve-version* '(1 3 33))
 
 (eval-when (eval load)
     (require :sock)
@@ -1264,17 +1264,26 @@ by keyword symbols and not by strings"
 
   (if* efp then (setf (wserver-external-format server) external-format))
 	  
+  ;; the only required ssl arg is a certificate. check that a certificate has been specified here, so
+  ;; that we can error immediately instead of when the first https connection is attempted.
+  
+  ;; ssl must be a string or pathmame pointing at a cert, or ssl-args must be specified
+  ;; and include a :certificate that is a string-or-pathname or a :context that is an excl::ssl-context
   (when (or ssl ssl-args)
     (flet ((string-or-pathname-p (arg)
 	     (or (stringp arg) (pathnamep arg)))
 	   (bad-cert (var)
 	     (error "The ~s parameter should be a string or pathname holding the filename of the certificate and private key file" var)))
       (if* ssl-args
-	 then (let ((cert (getf ssl-args :certificate)))
-		(when (not cert)
-		  (error "ssl-args is missing a :certificate parameter."))
-		(when (not (string-or-pathname-p cert))
-		  (bad-cert :certificate))))
+	 then (let ((cert (getf ssl-args :certificate))
+		    (context (getf ssl-args :context)))
+		(when (not (or cert context))
+		  (error "ssl-args is missing a :certificate or :context parameter."))
+		(when (and cert (not (string-or-pathname-p cert)))
+		  (bad-cert :certificate))
+		(when (and context (not (typep context 'excl::ssl-context)))
+		  (error "Invalid :context argument ~a." context))))
+      ;; for backward compatibility. ssl-args is preferred.
       (if* ssl
 	 then (when (not (string-or-pathname-p ssl))
 		(bad-cert :ssl))))
