@@ -22,10 +22,19 @@
 ;; http://www.gnu.org/copyleft/lesser.txt (until superseded by a newer
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
-;;
 
-;; $Id: clpage.cl,v 1.13 2007/08/28 15:28:12 jkf Exp $
+#+(version= 9 0)
+(sys:defpatch "webactions" 1
+  "v1: add timeout to webaction-project."
 
+  :type :system
+  :post-loadable t)
+
+#+(version= 8 2)
+(sys:defpatch "webactions" 1
+  "v1: add timeout to webaction-project."
+  :type :system
+  :post-loadable t)
 
 (eval-when (compile load eval) (require :aserve))
 
