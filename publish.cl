@@ -1540,6 +1540,27 @@
 		      
 		  
 
+; this is stack allocated so don't make it too big
+(defparameter *send-buffer-lock* (mp:make-process-lock))
+(defconstant  *send-buffer-size* #.(* 16 1024))
+
+(defvar *send-buffers* nil)
+
+(defun alloc-send-buffer ()
+  (mp:with-process-lock (*send-buffer-lock*)
+    (let ((buff (pop *send-buffers*)))
+      (if* buff
+	 thenret
+	 else (make-array *send-buffer-size* :element-type '(unsigned-byte 8))))))
+
+(defun free-send-buffer (buffer)
+  (mp:with-process-lock (*send-buffer-lock*)
+    (push buffer *send-buffers*)))
+
+
+	      
+  
+
 (defun send-file-back (req ent filename encoding cache-ok)
   (let (p range)
 		
@@ -1561,11 +1582,7 @@
 	  (let ((size (excl::filesys-size (stream-input-fn p)))
 		(lastmod (excl::filesys-write-date 
 			  (stream-input-fn p)))
-		(buffer (make-array 1024 
-				    :element-type '(unsigned-byte 8))))
-	    (declare (dynamic-extent buffer))
-
-			
+		(buffer nil))
 				
 			
 	    (setf (last-modified ent) lastmod
@@ -1584,6 +1601,9 @@
 		    (return-from send-file-back :retry))
 			      
 
+
+	    (setq buffer (alloc-send-buffer))
+	    
 	    (if* (setq range (header-slot-value req :range))
 	       then (setq range (parse-range-value range))
 		    (if* (not (eql (length range) 1))
@@ -1594,9 +1614,12 @@
 			    (setq range nil)))
 	    (if* range
 	       then (return-from send-file-back
-		      (return-file-range-response
-		       req ent range buffer p size)))
-			      
+		      (prog1 (return-file-range-response
+			      req ent range buffer p size)
+			(free-send-buffer buffer))))
+
+	    
+	    
 		      
 	    (with-http-response (req ent :format :binary)
 
@@ -1616,17 +1639,25 @@
 	       
 			
 	      (run-entity-hook req ent nil)
-			
+
+	      
+	      
+	      
 	      (with-http-body (req ent)
 		(loop
 		  (if* (<= size 0) then (return))
 		  (let ((got (read-sequence buffer 
 					    p :end 
-					    (min size 1024))))
+					    (min size (length buffer)))))
 		    (if* (<= got 0) then (return))
 		    (write-sequence buffer (request-reply-stream req)
 				    :end got)
-		    (decf size got)))))))
+		    (decf size got))))
+	      
+	      
+	      (free-send-buffer buffer)
+	      
+	      )))
 		      
 		      
 		
@@ -1681,7 +1712,7 @@
 		  (loop
 		    (if* (<= left 0) then (return))
 		    (let ((got (read-sequence buffer p :end
-					      (min left 1024))))
+					      (min left (length buffer)))))
 		      (if* (<= got 0) then (return))
 		      (write-sequence buffer *html-stream*
 				      :end got)

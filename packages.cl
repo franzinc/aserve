@@ -1,6 +1,8 @@
 #+(version= 9 0)
-(sys:defpatch "aserve" 15
-  "v15: 1.3.32: add no-proxy argument to do-http-request. Fix buggy argument checking for ssl arguments ;
+(sys:defpatch "aserve" 16
+  
+  "v16: 1.3.33: speed up serving of files;
+v15: 1.3.32: add no-proxy argument to do-http-request. Fix buggy argument checking for ssl arguments ;
 v14: 1.3.30: For https, use defaults of the underlying ssl module;
 v13: 1.3.29: proxy now returns content-length;
 v12: 1.3.28: Fix bug in retry-on-timeout code in do-http-request;
@@ -20,8 +22,9 @@ v1: 1.3.16: fix freeing freed buffer."
   :post-loadable t)
 
 #+(version= 8 2)
-(sys:defpatch "aserve" 27
-  "v27: 1.3.32: add no-proxy argument to do-http-request. Fix buggy argument checking for ssl arguments;
+(sys:defpatch "aserve" 28
+  "v28: 1.3.33: speed up serving of files;
+v27: 1.3.32: add no-proxy argument to do-http-request. Fix buggy argument checking for ssl arguments;
 v26: 1.3.30: For https, use defaults of the underlying ssl module.
 v25: 1.3.29: proxy now returns content-length;
 v24: 1.3.28: Fix bug in retry-on-timeout code in do-http-request;
