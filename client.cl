@@ -1249,6 +1249,10 @@
       (progn (put-header-line-buffer buff2 buff)))))
 		  
 
+
+
+(defvar *client-request-creq* nil)
+
 (defmethod client-request-read-sequence (buffer
 					 (creq client-request)
 					 &key
@@ -1273,9 +1277,14 @@
 		      ;; This is a bit of a hack -- ACL doesn't seem to expose a
 		      ;; sane interface for determining the amount of bytes a
 		      ;; character requires in a given encoding.
-                      (flet ((char-size (ch)
-                               (setf (char dummy-str 0) ch)
-                               (native-string-sizeof dummy-str)))
+		      ;; Use macrolet instead of flet to avoid making a closure
+		      ;; in this frquently used path. [bug23176]
+                      (macrolet ((char-size
+				  (ch)
+				  (or (and ch (symbolp ch)) (error "(char-size sym)"))
+				  `(progn
+				     (setf (char dummy-str 0) ,ch)
+				     (native-string-sizeof dummy-str))))
                         (loop
 			  (setf (aref buffer pos) ch)
 			  (incf pos)
@@ -1301,33 +1310,32 @@
 			      ans)))
      elseif (or (eq bytes-left :chunked)
 		(eq bytes-left :unknown))
-       then (handler-case
-                (do ((i start (1+ i))
-                     (stringp (stringp buffer))
-                     (debug-on (member :xmit-client-response-body
-                                       net.aserve::*debug-current*
-                                       :test #'eq)))
-                    ((>= i end) (setq last end))
-                  (setq last i)
-                  (let ((ch (if* stringp
-                               then (read-char socket nil nil)
-                               else (read-byte socket nil nil))))
-                    (if* (null ch)
-                       then (setf (client-request-bytes-left creq) :eof)
-                            (return)
-                       else (if* debug-on
-                               then (net.aserve::debug-format
-                                     :xmit-client-response-body "~a"
-                                                                (if* (characterp ch) 
-                                                                   then ch
-                                                                   else (code-char ch))))
-                            (setf (aref buffer i) ch))))
-	      (excl::socket-chunking-end-of-file
-		  (cond)
-		(declare (ignore cond))
-		; remember that there is no more data left
-                (setf (client-request-bytes-left creq) :eof)		
-		nil))
+       then (let ((*client-request-creq* creq))
+	      (catch 'client-request-chunk-eof-catch
+		;; This was a handler-case that creates a closure for each error 
+		;; clause.  [bug23176]
+		(handler-bind
+		 ((excl::socket-chunking-end-of-file #'client-request-throw-eof))
+		 (do ((i start (1+ i))
+		      (stringp (stringp buffer))
+		      (debug-on (member :xmit-client-response-body
+					net.aserve::*debug-current*
+					:test #'eq)))
+		     ((>= i end) (setq last end))
+		   (setq last i)
+		   (let ((ch (if* stringp
+				  then (read-char socket nil nil)
+				  else (read-byte socket nil nil))))
+		     (if* (null ch)
+			  then (setf (client-request-bytes-left creq) :eof)
+			  (return)
+			  else (if* debug-on
+				    then (net.aserve::debug-format
+					  :xmit-client-response-body "~a"
+					  (if* (characterp ch) 
+					       then ch
+					       else (code-char ch))))
+			  (setf (aref buffer i) ch)))))))
 	    ; we return zero on eof, regarless of the value of start
 	    ; I think that this is ok, the spec isn't completely clear
 	    (if* (eql last start) 
@@ -1337,6 +1345,12 @@
        then 0
        else (error "socket not setup for read correctly")
 	    )))
+
+(defun client-request-throw-eof (x)
+  (declare (ignore x))
+  (setf (client-request-bytes-left *client-request-creq*) :eof)
+  (throw 'client-request-chunk-eof-catch nil))
+
   
 
 (defmethod client-request-close ((creq client-request))
