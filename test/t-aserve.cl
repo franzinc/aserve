@@ -146,13 +146,11 @@
     ""))
 
 (defun user::test-aserve-n (&key (n
-				  ;; On non-smp this test is not
-				  ;; significant.
-				  #-smp 2
-				  ;; On 32-bit platforms, there may be
-				  ;; a shortage of threads.
-				  #+(and smp (not 64bit)) 3
-				  #+(and smp 64bit) 5
+				  ;; In 10.0 beta testing, ran into malloc issues creating
+				  ;; a lot of threads. These minimal settings should allow
+				  ;; tests to run successfully on all platforms. [bug23208]
+				  #+(and smp 64bit) 3
+				  #-(and smp 64bit) 2
 				  )
 				 (test-timeouts *test-timeouts*) (delay 0) logs
 				 (direct t) (proxy t) (proxyproxy t) (ssl t)
@@ -163,6 +161,7 @@
 			    &aux wname)
   (typecase n
     ((integer 0) nil)
+    (null (return-from user::test-aserve-n nil))
     (otherwise 
      ;; In case someone sets *do-aserve-test* to t.
      (setq n 0)))
@@ -2565,4 +2564,4 @@
           (net.aserve::debug-on :xmit))
         (user::test-aserve-n :n user::*do-aserve-test*)
    else (format t 
-		" (user::test-aserve-n) will run the aserve test~%"))
+		" (user::test-aserve-n :n 0) will run the aserve test~%"))
