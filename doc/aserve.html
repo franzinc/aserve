@@ -2397,6 +2397,9 @@ this cookie to be sent.</li>
   <li><strong>secure</strong> - either true or false.&nbsp; If true
 then this cookie will only be sent if the connection is through a
 secure socket</li>
+  <li><strong>http-only</strong> - either true or false.&nbsp; If true
+then this cookie will only be sent with the HttpOnly flag in the cookie
+specification</li>
 </ol>
 <p>&nbsp;</p>
 <p><a name="f-set-cookie-header"></a><strong><font face="Courier New">(set-cookie-header
@@ -2408,6 +2411,7 @@ expires
 domain
 path
 secure
+http-only
 encode-value
 external-format)</font></strong></p>
 <p>This function must be called before <strong>with-http-body</strong>.&nbsp;&nbsp;
@@ -2470,6 +2474,9 @@ is
 <strong>nil</strong>
 then this cookie will expire when the user quits their web browser.<br>
 <strong>secure</strong> should be true or false.&nbsp; Any non-nil
+value is interpreted as
+true. The default value is false.<br>
+<strong>http-only</strong> should be true or false.&nbsp; Any non-nil
 value is interpreted as
 true. The default value is false.<br>
 The <strong>external-format</strong> is used to convert bytes to
@@ -3296,6 +3303,11 @@ a future release we may make this a universal time]</td>
       <td width="29%">cookie-item-secure</td>
       <td width="71%">true if this cookie should only be sent over a
 secure connection.</td>
+    </tr>
+    <tr>
+      <td width="29%">cookie-item-http-only</td>
+      <td width="71%">true if this cookie should only be sent with the HttpOnly
+flag.</td>
     </tr>
   </tbody>
 </table>

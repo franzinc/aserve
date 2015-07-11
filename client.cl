@@ -1594,6 +1594,7 @@
   value	    ; the value of this cookie
   expires   ; when this cookie expires
   secure    ; t if can only be sent over a secure server
+  http-only ; t if http-only cookie
   )
 
 
@@ -1649,6 +1650,7 @@
 		 :value (or (cadr namevalue) "")
 		 :secure (net.aserve::assoc-paramval "secure" others)
 		 :expires (cdr (net.aserve::assoc-paramval "expires" others))
+		 :http-only (net.aserve::assoc-paramval "httponly" others)
 		 )))
       ; now put in the cookie jar
       (let ((domain-vals (assoc domain (cookie-jar-items jar) :test #'equal)))

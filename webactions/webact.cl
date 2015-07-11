@@ -100,6 +100,8 @@
    ;; default actions when there is no map match
    (default-actions :initform nil
      :accessor webaction-default-actions)
+   ;; use http-only cookies
+   (use-http-only-cookies :initform t :accessor webaction-use-http-only-cookies)
    ))
 
 (defparameter *webactions-version* "1.12")
@@ -125,6 +127,7 @@
 				    (external-format
 				     *default-aserve-external-format*)
 				    (default-actions nil)
+				    (use-http-only-cookies t)
 				    (timeout #+io-timeout #.(* 100 24 60 60)
 					     #-io-timeout nil)
 				    )
@@ -161,6 +164,7 @@
     (setf (webaction-external-format wa) external-format)
     (setf (webaction-clp-content-type wa) clp-content-type)
     (setf (webaction-default-actions wa) default-actions)
+    (setf (webaction-use-http-only-cookies wa) use-http-only-cookies)
     
     (if* (and reap-interval (integerp reap-interval) (> reap-interval 0))
        then (setq *session-reap-interval* reap-interval))

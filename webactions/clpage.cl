@@ -212,10 +212,12 @@
 		(or sm  ; sm already known, otherwise compute it
 		    (and (setq wa (getf (entity-plist ent) 'webaction))
 			 (setq sm (webaction-websession-master wa)))))
-	 then (set-cookie-header req 
-				 :name (sm-cookie-name sm)
-				 :value (websession-key websession)
-				 :path (webaction-project-prefix wa)))
+	 then (set-cookie-header
+	       req 
+	       :name (sm-cookie-name sm)
+	       :value (websession-key websession)
+	       :path (webaction-project-prefix wa)
+	       :http-only (webaction-use-http-only-cookies wa)))
       (setf (reply-header-slot-value req :cache-control) "no-cache")
       (setf (reply-header-slot-value req :pragma) "no-cache")
       

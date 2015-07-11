@@ -327,7 +327,7 @@ destination index <br>
 &nbsp;sessions session-lifetime reap-interval reap-hook-function server
 authorizer<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-host access-file clp-content-type default-actions external-format)</span><br>
+host access-file clp-content-type default-actions external-format use-http-only-cookies)</span><br>
 <br>
 <span style="font-weight: bold;">webaction-project</span> creates
 project data structures and executes calls to <span
@@ -425,6 +425,9 @@ map.&nbsp; The default is <span style="font-weight: bold;">nil </span>
 <span style="font-weight: bold;">external-format</span> - the external
 format used when sending data back to the browser.&nbsp;&nbsp; The
 default is the value of *default-aserve-external-format*<br>
+<span style="font-weight: bold;">use-http-only-cookies</span> - a boolean value
+(nil or non-nil) that determines whether the cookies automatically set by
+webactions will have the HttpOnly flag set.<br>
 <br>
 <br>
 A web site is &nbsp;a collection of pages and images, &nbsp;each page

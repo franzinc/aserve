@@ -2751,7 +2751,7 @@
 (defmethod set-cookie-header ((req http-request)
 			      &key name value expires domain 
 				   (path "/")
-				   secure
+				   secure http-only
 				   (external-format 
 				    *default-aserve-external-format*)
 				   (encode-value t)
@@ -2768,6 +2768,7 @@
   ;; domain must have at least two periods (i.e. us  ".franz.com" rather
   ;; than "franz.com".... as netscape why this is important
   ;; secure is either true or false
+  ;; http-only is either true or false
   ;;
   (let (res)
     
@@ -2807,6 +2808,11 @@
        then (setq res (concatenate 'string
 			res
 			"; secure")))
+    
+    (if* http-only
+       then (setq res (concatenate 'string
+			res
+			"; HttpOnly")))
     
     ; add to the end
     (setf (request-reply-headers req)

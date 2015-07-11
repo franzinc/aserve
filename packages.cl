@@ -286,6 +286,7 @@ without compression.  Original error loading deflate was:~:@>~%~a~%" c)
    #:compute-digest-authorization
    #:cookie-item
    #:cookie-item-expires
+   #:cookie-item-http-only
    #:cookie-item-name
    #:cookie-item-path
    #:cookie-item-secure
