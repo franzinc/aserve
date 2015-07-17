@@ -63,6 +63,7 @@ v2: version 1.2.58, fix problem introduced in 1.2.56 where the response date
   :type :system
   :post-loadable t)
 
+
 ;; -*- mode: common-lisp; package: net.aserve -*-
 ;;
 ;; packages.cl
@@ -297,3 +298,13 @@ without compression.  Original error loading deflate was:~:@>~%~a~%" c)
    #:make-http-client-request
    #:read-client-response-headers
    ))
+
+;; These functions must be undefined in case new aserve is loaded on
+;;   top of older aserve in 8.1. [bug23328] 
+#+(version= 8 1)
+(eval-when (compile load eval)
+  (fmakunbound 'net.aserve::logmess)
+  (fmakunbound 'net.aserve::logmess-stream)
+  (fmakunbound 'net.aserve.client::read-client-response-headers)
+  )
+

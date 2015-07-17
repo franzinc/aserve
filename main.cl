@@ -1298,8 +1298,8 @@ by keyword symbols and not by strings"
 				:verify verify
 				:ca-file ca-file
 				:ca-directory ca-directory
-				:crl-file crl-file
-				:crl-check crl-check
+				#+(version>= 8 2) :crl-file #+(version>= 8 2) crl-file
+				#+(version>= 8 2) :crl-check #+(version>= 8 2) crl-check
 				:method ssl-method
 				:max-depth max-depth))))
 	    (apply 'socket::make-ssl-server-stream socket args))

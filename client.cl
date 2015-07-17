@@ -868,8 +868,9 @@
 						    :certificate-password certificate-password
 						    :ca-file ca-file
 						    :ca-directory ca-directory
-						    :crl-file crl-file
-						    :crl-check crl-check
+						    ;; These args are not available in 8.1. [bug23328] 
+						    #+(version>= 8 2) :crl-file #+(version>= 8 2) crl-file
+						    #+(version>= 8 2) :crl-check #+(version>= 8 2) crl-check
 						    :verify verify
 						    :max-depth max-depth)
 					      (when ssl-method
