@@ -359,7 +359,7 @@
 (defun start-aserve-running (&optional ssl)
   ;; start aserve, return the port on which we've started aserve
   (let ((wserver (start :port nil :server :new :ssl-args (and ssl (list :certificate ssl))
-			:listeners 20 ; so keep-alive will be possible
+			:listeners 20 ; must be at least 3 for keep-alive to be possible
 			))); let the system pick a port
     (setq *wserver* wserver)
     (when *aserve-set-full-debug*

@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 34))
+(defparameter *aserve-version* '(1 3 35))
 
 (eval-when (eval load)
     (require :sock)
@@ -589,6 +589,15 @@ will be logged with one log entry per line in some cases.")
    (free-workers    ;; estimate of the number of workers that are idle
     :initform 0
     :accessor wserver-free-workers)
+
+   (n-workers
+    :initform 0
+    :accessor wserver-n-workers)
+
+   (max-n-workers
+    :initform nil
+    :initarg :max-n-workers
+    :reader wserver-max-n-workers)
      
    (accept-thread   ;; thread accepting connetions and dispatching
     :initform nil
@@ -1211,6 +1220,7 @@ by keyword symbols and not by strings"
 (defun start (&key (port 80 port-p) 
 		   host
 		   (listeners 5)
+                   max-listeners
 		   (chunking t)
 		   (keep-alive t)
 		   (server *wserver*)
@@ -1428,7 +1438,7 @@ by keyword symbols and not by strings"
       (if* (or (null listeners) (eq 0 listeners))
 	 then (start-simple-server)
        elseif (and (fixnump listeners) (> listeners 0))
-	 then (start-lisp-thread-server listeners)
+	 then (start-lisp-thread-server listeners max-listeners)
 	 else (error "listeners should be nil or a non-negative fixnum, not ~s"
 		     listeners)))
     
@@ -1521,13 +1531,18 @@ by keyword symbols and not by strings"
                       *logger*))
     ,@excl:*cl-default-special-bindings*))
 	
-(defun start-lisp-thread-server (listeners)
+(defun start-lisp-thread-server (listeners max-listeners)
   ;; start a server that consists of a set of lisp threads for
   ;; doing work and a lisp thread for accepting connections
   ;; and farming out the work
+
+  (when max-listeners
+    (setq listeners (min listeners max-listeners)))
+  (setf (slot-value *wserver* 'max-n-workers) max-listeners)
   
   ; create worker threads
   (setf (wserver-free-workers *wserver*) 0)
+  (setf (wserver-n-workers *wserver*) 0)
   (dotimes (i listeners) (make-worker-thread))
   
   
@@ -1547,6 +1562,11 @@ by keyword symbols and not by strings"
   (wserver-accept-thread *wserver*)
   )
 
+(defun below-max-n-workers-p (wserver)
+  (or (null (wserver-max-n-workers wserver))
+      (< (wserver-n-workers wserver)
+         (wserver-max-n-workers wserver))))
+
 ;; make-worker-thread wasn't thread-safe before smp. I'm assuming that's
 ;; ok, which it will be if only one thread ever calls it, and leaving it
 ;; non-thread-safe in the smp version. 
@@ -1563,6 +1583,7 @@ by keyword symbols and not by strings"
     (push proc (wserver-worker-threads *wserver*))
     (enqueue (wserver-free-worker-threads *wserver*) proc)
     (incf-free-workers *wserver* 1)
+    (incf (wserver-n-workers *wserver*))
     (setf (getf (mp:process-property-list proc) 'short-name) 
       (format nil "w~d" thx))
     (setf (mp:process-keeps-lisp-alive-p proc) nil)
@@ -1722,26 +1743,27 @@ by keyword symbols and not by strings"
 		(let ((looped 0))
 		  (loop
                     (multiple-value-bind (worker found-worker-p) (dequeue (wserver-free-worker-threads server) :wait 1)
-                      (if* (not found-worker-p)
-                           then (case looped
-                                  (0 nil)
-                                  ((1 2 3) (logmess "all threads busy, pause")
-                                   (if* (>= (incf busy-sleeps) 4)
-                                        then ; we've waited too many times
-                                        (setq busy-sleeps 0)
-                                        (logmess "too many sleeps, will create a new thread")
-                                        (make-worker-thread)))
-			     
-                                  (4 (logmess "forced to create new thread")
-                                     (make-worker-thread))
-		    
-                                  (5 (logmess "can't even create new thread, quitting")
-                                     (return-from http-accept-thread nil)))
-			   
-                           (incf looped)
-                           else (incf-free-workers server -1)
-                           (mp:process-add-run-reason worker sock)
-                           (return))))))
+                      (if* found-worker-p
+                         then (incf-free-workers server -1)
+                              (mp:process-add-run-reason worker sock)
+                              (return)
+                       elseif (below-max-n-workers-p server)
+                         then (case looped
+                                (0 nil)
+                                ((1 2 3) (logmess "all threads busy, pause")
+                                 (if* (>= (incf busy-sleeps) 4)
+                                    then ; we've waited too many times
+                                         (setq busy-sleeps 0)
+                                         (logmess "too many sleeps, will create a new thread")
+                                         (make-worker-thread)))
+                                (4
+                                 (logmess "forced to create new thread")
+                                 (make-worker-thread))
+                                (5
+                                 (logmess "can't even create new thread, quitting")
+                                 (return-from http-accept-thread nil)))
+                         else (logmess "all threads busy, pause"))
+                      (incf looped)))))
 	  
 	    (error (cond)
 	      (logmess (format nil "accept: error ~s on accept ~a" 

@@ -220,7 +220,7 @@ used to start the
 server running.</p>
 <p><strong><font face="Courier New"><a name="f-start"></a>(start
 &amp;key port host
-listeners chunking keep-alive server setuid setgid <br>
+listeners max-listeners chunking keep-alive server setuid setgid <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 debug proxy proxy-proxy
 cache restore-cache accept-hook ssl ssl-password<br>
@@ -258,31 +258,21 @@ integer IP address.</li>
   <li><span style="font-weight: bold;">listeners</span> -- the number
 of threads to process http
 requests.&nbsp;&nbsp;&nbsp;&nbsp; If a value isn't given for the <strong>:listeners</strong>
-argument then 5 is assumed. &nbsp; If&nbsp; the value is <strong>nil </strong>or
-
-
-
-
-
-
-
-
-
-    <strong>0 </strong>then the server runs in <em>simple server mode<strong>
-    </strong></em>in which the <strong>start</strong> function doesn't
-return - instead it processes the requests itself, one at a time.&nbsp;
-If a positive number is given as the value of <strong>:listeners</strong>
-then the server runs in <em>threaded server mode<strong>.</strong></em><strong>
-    </strong>&nbsp; In this mode separate lisp lightweight processes
-are started to handle requests from clients, the number of request
-handling threads is equal to the value of the <strong>:listeners</strong>
-keyword argument.&nbsp; In this mode the <strong>start </strong>function
-returns
-after
-starting
-the
-other
-threads.</li>
+argument then 5 is assumed. &nbsp; If&nbsp; the value is <strong>nil</strong> or
+<strong>0 </strong>then the server runs in <em>simple server
+mode</em>in which the <strong>start</strong> function doesn't return -
+instead it processes the requests itself, one at a time. If a positive
+number is given as the value of <strong>:listeners</strong> then the
+server runs in <em>threaded server mode.</em> In this mode separate
+lisp threads are started to handle requests from clients and after
+which the <strong>start</strong> function returns. The number of
+request handling threads is initially equal to the value of
+the <strong>:listeners</strong> keyword argument.&nbsp; Note that
+under high load more threads may be created to keep the server
+operating smoothly. See also <strong>:max-listeners</strong>.</li>
+  <li><span style="font-weight: bold;">max-listeners</span> -- If not
+<strong>nil</strong>, then it is a hard limit on the number of threads
+that process HTTP requests. The default is <strong>nil</strong>.</li>
   <li><span style="font-weight: bold;">chunking</span> -- if true then
 the server will use the chunked transfer
 encoding when it's possible to do so.&nbsp; This is an optimization and
