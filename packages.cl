@@ -139,6 +139,8 @@ without compression.  Original error loading deflate was:~:@>~%~a~%" c)
    #:authorizer
    #:base64-decode
    #:base64-encode
+   #:can-set-trailers-p
+   #:chunking-stream-trailers
    #:compute-strategy
    #:computed-entity
    ;; don't export, these should be private
@@ -181,6 +183,7 @@ without compression.  Original error loading deflate was:~:@>~%~a~%" c)
    #:reply-header-slot-value 
    #:run-cgi-program
    #:set-basic-authorization
+   #:set-trailers
    #:standard-locator
    #:unpublish-locator
    #:vhost
@@ -218,6 +221,7 @@ without compression.  Original error loading deflate was:~:@>~%~a~%" c)
    #:shutdown
    #:split-into-words
    #:start
+   #:unchunking-trailers
    #:uridecode-string
    #:uriencode-string
    #:unpublish

@@ -2340,7 +2340,53 @@
 			res)
 		 else string-ans)))))
 
-				
+
+(defun check-trailers-ok (req trailers)
+  ;; determine if trailers are allowed for this request
+  ;; and if so if the trailers arguement is correctly formed
+  ;;
+  ;;
+  (let ((str (header-slot-value req :te)))
+    (if* (and str (search "trailers" str))
+       then (let (res)
+	      (if* (consp trailers)
+		 then (dolist (trailer trailers)
+			(if* (or (stringp trailer)
+				 (symbolp trailer))
+			   then ; put in kwd package
+				(push (cons (header-kwdize trailer) nil) res)
+			 elseif (and (consp trailer)
+				     (or (stringp (car trailer))
+					 (symbolp (car trailer)))
+				     (or (null (cdr trailer))
+					 (stringp (cdr trailer))))
+			   then (push (cons (header-kwdize (car trailer)) (cdr trailer))
+				      res)
+			   else (error "bad trailer ~s in trailers list ~s"
+				       trailer trailers)))
+	       elseif (null trailers)
+		 thenret
+		 else (error "bad trailers argument ~s" trailers))
+	      
+	      ;; we may have some trailers
+	      (setf (request-reply-trailers req) res)))))
+
+(defun header-kwdize (item)
+  ;; convert to keyword if string, allow any symbol through..
+  ;; all else is an error
+  (if* (stringp item)
+     then (case *current-case-mode*
+	    ((:case-sensitive-lower :case-insensitive-lower)
+	     (setq item (string-downcase item)))
+	    ((:case-insensitive-upper :case-sensitive-upper)
+	     (setq item (string-upcase item))))
+	  (intern item (symbol-package :foo))
+   elseif (symbolp item)
+     then item
+     else (error "non string or symbol: ~s" item)))
+
+	    
+	    
 				
 ;; strategies
 ;;   The server has to let the client know when it's sent the entire
@@ -2357,32 +2403,36 @@
 ;; inputs
 ;;   head or other request  - 
 ;;   keep-alive-possible - requested by client and we have resources
+;;   content length specified or not
 ;;   transfer mode :binary, or not
-;;
-;; head request         
-;;			(:use-socket-stream :omit-body [:keep-alive])
-;;
-;; other req, 
-;;     http/1.1, 
-;;          no-content-length
-;;		binary-or-not
-;;                      -> (:chunked :use-socket-stream [:keep-alive])
-;;     http/1.0
-;;	    no-content-length
-;;	        -> (:use-socket-stream)
-;;     http/1.0 or http/1.1
-;;          content-length
-;;		binary
-;;			-> (:use-socket-stream [:keep-alive])
-;;		text
-;;		  keep-alive
-;;			-> (:string-output-stream :keep-alive :post-headers)
-;;		  not keep alive
-;;                      -> (:use-socket-stream)
+;;   compression possible or not
 ;;
 ;;
-;; 
-    
+;; head
+;;     ([:keep-alive] :use-socket-stream :omit-body)
+;;
+;; http/1.1
+;;   no content length
+;;   chunking allowed
+;;      ([:keep-alive] :chunked :use-socket-stream)
+;;    
+;; otherwise:
+;;   keep-alive
+;;	binary
+;;         content-length
+;;		(:keep-alive :use-socket-stream)
+;;         no content length   (so close after sending)
+;;		(:use-socket-stream)
+;;	text
+;;	    (:string-output-stream :keep-alive :post-headers)
+;;   no keep-alive
+;;	    (:use-socket-stream)
+;;
+;; If compression possible and :use-socket-stream is in strategy
+;; then prepend this:
+;;    (:compress  (:gzip | :deflate) ,@strategy)
+;;
+;;	
 	    
     
 (defmethod compute-strategy ((req http-request) (ent entity) format)
@@ -2517,71 +2567,72 @@
   (with-timeout-local (60 (logmess "timeout during header send")
 			  ;;(setf (request-reply-keep-alive req) nil)
 			  (throw 'with-http-response nil))
-    (maybe-accumulate-log (:xmit-server-response-headers
-                           (lambda (string)
-                             (log1 :xmit-server-response-headers :info
-                                   (list time string))))
-      (with-standard-io-syntax
+    (maybe-accumulate-log 
+     (:xmit-server-response-headers
+      (lambda (string)
+	(log1 :xmit-server-response-headers :info
+	      (list time string))))
+     (with-standard-io-syntax
        (let* ((sock (request-socket req))
- 	     (hsock) ; to send headers
- 	     (reply-stream (request-reply-stream req))
- 	     (strategy (request-reply-strategy req))
- 	     (extra-headers (request-reply-headers req))
- 	     (post-headers (member :post-headers strategy :test #'eq))
- 	     (content)
- 	     (*print-readably* nil) ; set by w-s-io-syntax and not desired
- 	     (chunked-p (member :chunked strategy :test #'eq))
- 	     (compress (let ((ent (member :compress strategy :test #'eq)))
- 			 (cadr ent) ; will be :gzip or :deflate or nil
- 			 ))
- 	     (code (request-reply-code req))
- 	     (send-headers
- 	      (if* post-headers
- 		 then (eq time :post)
- 		 else (eq time :pre))
- 	      )
- 	     (sos-ef) ; string output stream external format
- 	     ;(ssl-p (wserver-ssl *wserver*))
-             )
+	      (hsock) ; to send headers
+	      (reply-stream (request-reply-stream req))
+	      (strategy (request-reply-strategy req))
+	      (extra-headers (request-reply-headers req))
+	      (post-headers (member :post-headers strategy :test #'eq))
+	      (content)
+	      (*print-readably* nil) ; set by w-s-io-syntax and not desired
+	      (chunked-p (member :chunked strategy :test #'eq))
+	      (compress (let ((ent (member :compress strategy :test #'eq)))
+			  (cadr ent) ; will be :gzip or :deflate or nil
+			  ))
+	      (code (request-reply-code req))
+	      (send-headers
+	       (if* post-headers
+		  then (eq time :post)
+		  else (eq time :pre))
+	       )
+	      (sos-ef) ; string output stream external format
+	      ;(ssl-p (wserver-ssl *wserver*))
+	      )
        
 
  		
- 	(setq hsock sock)
- 	(if* (and send-headers (member :delay-headers strategy :test #'eq))
- 	   then ; must capture the headers in a string output stream
- 		(setq hsock (make-string-output-stream)))
+	 (setq hsock sock)
+	 (if* (and send-headers (member :delay-headers strategy :test #'eq))
+	    then ; must capture the headers in a string output stream
+		 (setq hsock (make-string-output-stream)))
  	
        
- 	(if* send-headers
- 	   then (format-dif :xmit-server-response-headers hsock "~a ~d  ~a~a"
- 			    (request-reply-protocol-string req)
- 			    (response-number code)
- 			    (response-desc   code)
- 			    *crlf*))
+	 (if* send-headers
+	    then (format-dif :xmit-server-response-headers hsock "~a ~d  ~a~a"
+			     (request-reply-protocol-string req)
+			     (response-number code)
+			     (response-desc   code)
+			     *crlf*))
        
- 	(if* (and post-headers
- 		  (eq time :post)
- 		  (member :string-output-stream strategy :test #'eq)
- 		  )
- 	   then ; must get data to send from the string output stream
- 		(setq content 
- 		  (if* (request-reply-stream req)
- 		     then (setq sos-ef (stream-external-format 
- 					(request-reply-stream req)))
- 			  (get-output-stream-string 
- 			   (request-reply-stream req))
+	 (if* (and post-headers
+		   (eq time :post)
+		   (member :string-output-stream strategy :test #'eq)
+		   )
+	    then ; must get data to send from the string output stream
+		 (setq content 
+		   (if* (request-reply-stream req)
+		      then (setq sos-ef (stream-external-format 
+					 (request-reply-stream req)))
+			   (get-output-stream-string 
+			    (request-reply-stream req))
  			
- 		     else ; no stream created since no body given
- 			  ""))
+		      else ; no stream created since no body given
+			   ""))
  	      
- 		(if* (and sos-ef (not (eq (stream-external-format sock) sos-ef)))
- 		   then ; must do ext format conversion now
- 			; so we can compute the length
- 			(setq content
- 			  (string-to-octets content :external-format sos-ef
- 					    :null-terminate nil)))
+		 (if* (and sos-ef (not (eq (stream-external-format sock) sos-ef)))
+		    then ; must do ext format conversion now
+			 ; so we can compute the length
+			 (setq content
+			   (string-to-octets content :external-format sos-ef
+					     :null-terminate nil)))
  	      
- 		(setf (request-reply-content-length req) (length content)))
+		 (setf (request-reply-content-length req) (length content)))
        	
  	(if* (and send-headers
  		  (not (eq (request-protocol req) :http/0.9)))
@@ -2606,132 +2657,142 @@
  				    *aserve-version-string*
  				    *crlf*))
        
- 		(if* (request-reply-content-type req)
- 		   then (format-dif :xmit-server-response-headers
- 				    hsock "Content-Type: ~a~a" 
- 				    (request-reply-content-type req)
- 				    *crlf*))
+		 (if* (request-reply-content-type req)
+		    then (format-dif :xmit-server-response-headers
+				     hsock "Content-Type: ~a~a" 
+				     (request-reply-content-type req)
+				     *crlf*))
 
- 		(if* chunked-p
- 		   then (format-dif :xmit-server-response-headers
- 				    hsock "Transfer-Encoding: chunked~a"
- 				    *crlf*))
+		 (if* chunked-p
+		    then (format-dif :xmit-server-response-headers
+				     hsock "Transfer-Encoding: chunked~a"
+				     *crlf*))
 
- 		(if* compress
- 		   then (format-dif :xmit-server-response-headers
- 				    hsock "Content-Encoding: ~a~a"
- 				    compress
- 				    *crlf*))
+		 (if* compress
+		    then (format-dif :xmit-server-response-headers
+				     hsock "Content-Encoding: ~a~a"
+				     compress
+				     *crlf*))
  			
- 		(if* (and (not chunked-p)
- 			  (request-reply-content-length req))
- 		   then (format-dif :xmit-server-response-headers
-                                    hsock "Content-Length: ~d~a"
- 				    (request-reply-content-length req)      
- 				    *crlf*)
- 			(debug-format :info
- 				      "~d ~s - ~d bytes" 
- 				      (response-number code)
- 				      (response-desc   code)
- 				      (request-reply-content-length req))
- 		 elseif chunked-p
- 		   then (debug-format :info "~d ~s - chunked" 
- 				      (response-number code)
- 				      (response-desc   code)
- 				      )
- 		   else (debug-format :info
- 				      "~d ~s - unknown length" 
- 				      (response-number code)
- 				      (response-desc   code)
- 				      ))
+		 (if* (and (not chunked-p)
+			   (request-reply-content-length req))
+		    then (format-dif :xmit-server-response-headers
+				     hsock "Content-Length: ~d~a"
+				     (request-reply-content-length req)      
+				     *crlf*)
+			 (debug-format :info
+				       "~d ~s - ~d bytes" 
+				       (response-number code)
+				       (response-desc   code)
+				       (request-reply-content-length req))
+		  elseif chunked-p
+		    then (if* (request-reply-trailers req)
+			    then (format-dif :xmit-server-response-headers
+					     hsock "Trailer: ~{~a ~}~a" 
+					     (mapcar #'car (request-reply-trailers req))
+					     *crlf*))
+				
+			 (debug-format :info "~d ~s - chunked" 
+				       (response-number code)
+				       (response-desc   code)
+				       )
+		    else (debug-format :info
+				       "~d ~s - unknown length" 
+				       (response-number code)
+				       (response-desc   code)
+				       ))
 
-                (dolist (head (request-reply-headers req))
- 		  (format-dif :xmit-server-response-headers
-                              hsock "~a: ~a~a"
- 			      (car head)
- 			      (cdr head)
- 			      *crlf*))
-                (format hsock "~a" *crlf*)
-                (force-output hsock)
- 		; clear bytes written count so we can count data bytes
- 		; transferred
- 		#+(and allegro (version>= 6))
- 		(excl::socket-bytes-written hsock 0) 
- 		)
+		 (dolist (head (request-reply-headers req))
+		   (format-dif :xmit-server-response-headers
+			       hsock "~a: ~a~a"
+			       (car head)
+			       (cdr head)
+			       *crlf*))
+		 (format hsock "~a" *crlf*)
+		 (force-output hsock)
+		 ; clear bytes written count so we can count data bytes
+		 ; transferred
+		 #+(and allegro (version>= 6))
+		 (excl::socket-bytes-written hsock 0) 
+		 )
 
- 	(if* (and send-headers (member :delay-headers strategy :test #'eq))
- 	   then ; headers are now in a string output stream
+	 (if* (and send-headers (member :delay-headers strategy :test #'eq))
+	    then ; headers are now in a string output stream
  		
  		
- 		(let ((header-content
- 		       (string-to-octets
- 			(get-output-stream-string hsock)
- 			:null-terminate nil
- 			:external-format :octets
- 			)))
+		 (let ((header-content
+			(string-to-octets
+			 (get-output-stream-string hsock)
+			 :null-terminate nil
+			 :external-format :octets
+			 )))
  		  
- 		  (setq reply-stream
- 		    (setf (request-reply-stream req)
- 		      (make-instance 'prepend-stream
- 			:content header-content
- 			:output-handle reply-stream)))))
+		   (setq reply-stream
+		     (setf (request-reply-stream req)
+		       (make-instance 'prepend-stream
+			 :content header-content
+			 :output-handle reply-stream)))))
  		    
  		
  	
  	
- 	(if* (and send-headers chunked-p (eq time :pre))
- 	   then (force-output hsock)
- 		; do chunking
- 		(setq reply-stream
- 		  (make-instance 'chunking-stream 
- 		    :output-handle reply-stream))
- 		(setf (request-reply-stream req) 
- 		  reply-stream))
+	 (if* (and send-headers chunked-p (eq time :pre))
+	    then (force-output hsock)
+		 ; do chunking
+		 (setq reply-stream
+		   (make-instance 'chunking-stream 
+		     :output-handle reply-stream))
+		 (setf (request-reply-stream req) 
+		   reply-stream)
+		 (setf (chunking-stream-trailers reply-stream)
+		   (request-reply-trailers req))
+		 )
+	
  			
  		
        
 
- 	(if* (and send-headers compress (eq time :pre))
- 	   then (setq reply-stream
- 		  (setf (request-reply-stream req)
- 		    (make-instance 'deflate-stream
- 		      :target reply-stream
- 		      :compress compress
- 		      ))))
+	 (if* (and send-headers compress (eq time :pre))
+	    then (setq reply-stream
+		   (setf (request-reply-stream req)
+		     (make-instance 'deflate-stream
+		       :target reply-stream
+		       :compress compress
+		       ))))
  		
  		
- 	; if we did post-headers then there's a string input
- 	; stream to dump out.
- 	(if* content
- 	   then (write-sequence content sock))
+	 ; if we did post-headers then there's a string input
+	 ; stream to dump out.
+	 (if* content
+	    then (write-sequence content sock))
 
-        (if* (and (eq time :post) (prepend-stream-p reply-stream))
- 	   then (force-output reply-stream)
- 		(close reply-stream) ; close prepend stream only
- 		(setq reply-stream
- 		  (setf (request-reply-stream req)
- 		    (prepend-stream-inner-stream reply-stream))))
+	 (if* (and (eq time :post) (prepend-stream-p reply-stream))
+	    then (force-output reply-stream)
+		 (close reply-stream) ; close prepend stream only
+		 (setq reply-stream
+		   (setf (request-reply-stream req)
+		     (prepend-stream-inner-stream reply-stream))))
  		
- 	(if* (and  compress (eq time :post))
- 	   then (if* reply-stream
- 		   then (force-output reply-stream)
+	 (if* (and  compress (eq time :post))
+	    then (if* reply-stream
+		    then (force-output reply-stream)
  		
- 			(close reply-stream)  ; close deflate stream
+			 (close reply-stream)  ; close deflate stream
  		
- 			(setq reply-stream
- 			  (setf (request-reply-stream req) (excl::inner-stream reply-stream)))
- 			(and reply-stream (force-output reply-stream))))
+			 (setq reply-stream
+			   (setf (request-reply-stream req) (excl::inner-stream reply-stream)))
+			 (and reply-stream (force-output reply-stream))))
  				      
- 	;; if we're chunking then shut that off
- 	(if* (and chunked-p (eq time :post))
- 	   then ; unwrap the chunked stream
+	 ;; if we're chunking then shut that off
+	 (if* (and chunked-p (eq time :post))
+	    then ; unwrap the chunked stream
  		
- 		(if* reply-stream
- 		   then (force-output reply-stream)
- 			(close reply-stream) ; send chunking eof
- 			(setq reply-stream
- 			  (setf (request-reply-stream req) (excl::inner-stream reply-stream)))
- 			(and reply-stream (force-output reply-stream)))))))))
+		 (if* reply-stream
+		    then (force-output reply-stream)
+			 (close reply-stream) ; send chunking eof
+			 (setq reply-stream
+			   (setf (request-reply-stream req) (excl::inner-stream reply-stream)))
+			 (and reply-stream (force-output reply-stream)))))))))
 
 (defmethod compute-response-stream ((req http-request) (ent file-entity))
   ;; send directly to the socket since we already know the length

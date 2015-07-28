@@ -516,7 +516,7 @@
 			 
 				 (setf (svref ans hnum) cur))
 			  else ; unknown header
-			       (push (cons otherheadername
+			       (push (cons (header-kwdize otherheadername)
 					   (buffer-subseq-to-string
 					    buff beginhv back))
 				     otherheaders))
@@ -525,6 +525,7 @@
 		       (setq beginhv nil)
 		       (setq state 0))
 		else (setq state 2))))))
+      
     
       otherheaders)))
 

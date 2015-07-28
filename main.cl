@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 36))
+(defparameter *aserve-version* '(1 3 37))
 
 (eval-when (eval load)
     (require :sock)
@@ -731,6 +731,7 @@ will be logged with one log entry per line in some cases.")
 				    (response '*response-ok*)
 				    content-type
 				    format
+				    trailers
 				    )
 			      &body body)
   ;;
@@ -741,7 +742,9 @@ will be logged with one log entry per line in some cases.")
 	(g-ent (gensym))
 	(g-timeout (gensym))
 	(g-format (gensym))
-	(g-check-modified (gensym)))
+	(g-check-modified (gensym))
+	(g-trailers (gensym))
+	)
     `(let* ((,g-req ,req)
 	    (,g-ent ,ent)
 	    (,g-format ,format)
@@ -751,9 +754,11 @@ will be logged with one log entry per line in some cases.")
 			       (entity-timeout ,g-ent)
 			       (wserver-response-timeout *wserver*))))
 	    (,g-check-modified ,check-modified)
+	    (,g-trailers ,trailers)
 	    )
        (catch 'with-http-response
 	 ;(format t "timeout is ~d~%" ,g-timeout)
+	 (if* ,g-trailers then (check-trailers-ok ,g-req ,g-trailers))
 	 (compute-strategy ,g-req ,g-ent ,g-format)
 	 (up-to-date-check ,g-check-modified ,g-req ,g-ent)
 	 (mp::with-timeout ((if* (and (fixnump ,g-timeout)  ; ok w-t
@@ -1118,6 +1123,10 @@ by keyword symbols and not by strings"
    (reply-headers  ;; alist of headers to send out
     :initform nil
     :accessor request-reply-headers)
+   
+   (reply-trailers
+    :initform nil
+    :accessor request-reply-trailers)
    
    (reply-content-type ;; mime type of the response
     :initform nil

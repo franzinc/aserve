@@ -320,7 +320,7 @@
 			(external-format *default-aserve-external-format*)
 			ssl		; do an ssl connection
 			ssl-args	; plist of make-ssl-client-stream args
-					; overrides other ssl args when specified
+			; overrides other ssl args when specified
 			skip-body ; fcn of request object
 			ssl-method
 			timeout
@@ -334,6 +334,7 @@
 			verify
 			max-depth
 			connection ; existing socket to the server
+			read-body-hook
 			
 			;; internal
 			recursing-call ; true if we are calling ourself
@@ -380,29 +381,29 @@
 	(let (new-location) 
 
           (net.aserve::maybe-accumulate-log (:xmit-client-response-headers "~s")
-            (loop
-              (if* (catch 'premature-eof
-                     (read-client-response-headers creq
-                                                   :throw-on-eof
-                                                   (and connection
-                                                        'premature-eof))
-		     ;; if it's a continue, then deliver any content we're holding
-		     ;; onto and start the read again
-                     (if* (not (eql 100 (client-request-response-code creq)))
-                        then (return)
-			else (let ((sock (client-request-socket creq)))
-			       (send-request-body sock (client-request-deferred-content creq))
-			       (force-output sock)))
+					    (loop
+					      (if* (catch 'premature-eof
+						     (read-client-response-headers creq
+										   :throw-on-eof
+										   (and connection
+											'premature-eof))
+						     ;; if it's a continue, then deliver any content we're holding
+						     ;; onto and start the read again
+						     (if* (not (eql 100 (client-request-response-code creq)))
+							then (return)
+							else (let ((sock (client-request-socket creq)))
+							       (send-request-body sock (client-request-deferred-content creq))
+							       (force-output sock)))
 		   
-                     nil)
+						     nil)
 		    
-                 then ; got eof .. likely due to bogus
-                      ; saved connection... so try again with
-                      ; no saved connection
-                      (ignore-errors (close connection))
-                      (setf (getf args :connection) nil)
-                      (return-from do-http-request
-                        (apply 'do-http-request uri args)))))
+						 then ; got eof .. likely due to bogus
+						      ; saved connection... so try again with
+						      ; no saved connection
+						      (ignore-errors (close connection))
+						      (setf (getf args :connection) nil)
+						      (return-from do-http-request
+							(apply 'do-http-request uri args)))))
 	  
 	  (if* (equal "close" (cdr (assoc :connection 
 					  (client-request-headers creq))))
@@ -486,33 +487,46 @@
 			  (client-request-socket creq))
 		     )))
 	  
-          (let ((body (read-response-body creq :format format)))
-            (net.aserve::debug-format :xmit-client-response-body "~s" body)
-	    (if* new-location
-	       then			; must do a redirect to get to the real site
-		    (client-request-close creq)
-		    (apply #'do-http-request
-			   (net.uri:merge-uris new-location uri)
-			   :redirect
-			   (if* (integerp redirect)
-			      then (1- redirect)
-			      else redirect)
-			   args)
-	       else
-		    (values 
-		     body
-		     (client-request-response-code creq)
-		     (client-request-headers  creq)
-		     (client-request-uri creq)
-		     (and (client-request-return-connection creq)
-			  (setf (client-request-return-connection creq)
-			    :yes)
-			  (client-request-socket creq))
-		     ))))
+	  (if* read-body-hook
+	     then (funcall read-body-hook creq :format format)
+	     else (let ((body (read-response-body creq :format format)))
+		    (net.aserve::debug-format :xmit-client-response-body "~s" body)
+		    
+		    
+		    
+		    (if* new-location
+		       then			; must do a redirect to get to the real site
+			    (client-request-close creq)
+			    (apply #'do-http-request
+				   (net.uri:merge-uris new-location uri)
+				   :redirect
+				   (if* (integerp redirect)
+				      then (1- redirect)
+				      else redirect)
+				   args)
+		       else (if* (client-request-return-connection creq)
+			       then (setf (client-request-return-connection creq)
+				      :yes)
+			       else (client-request-close creq))
+				    
+			    (values 
+			     body
+			     (client-request-response-code creq)
+			     (client-request-headers  creq)
+			     (client-request-uri creq)
+			     (client-request-socket creq)
+			     )))))
       
       ;; protected form:
-      (client-request-close creq))))
+      (and (not read-body-hook) (client-request-close creq)))))
 
+(defun convert-trailers (trailers)
+  ;; trailers looks like (("Foo" . "foo value") ("Bar" . "bar value"))
+  ;; need to change header names to keyword symbols in lower case
+  (mapcar #'(lambda (trailer)
+	      (cons (intern (string-downcase (car trailer)) (symbol-package :foo))
+		    (cdr trailer)))
+	  trailers))
 
 
 
@@ -1358,7 +1372,13 @@
   (let ((sock (client-request-socket creq)))
     (if* (and sock (not (eq (client-request-return-connection creq) 
 			    :yes)))
-       then (setf (client-request-socket creq) nil)
+       then (let ((trailers (convert-trailers (net.aserve::unchunking-trailers 
+					       (client-request-response-stream creq)))))
+	      (if* trailers
+		 then (setf (client-request-headers  creq)
+			(append (client-request-headers  creq) trailers))))
+		      
+	    (setf (client-request-socket creq) nil)
 	    (ignore-errors (force-output sock))
 	    (ignore-errors (close sock)))))
 

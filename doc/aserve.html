@@ -69,7 +69,9 @@ Files</a><font face="Courier New"><br>
 &nbsp; <a href="#f-get-request-body">get-request-body</a><br>
 &nbsp; <a href="#f-header-slot-value">header-slot-value</a><br>
 &nbsp; <a href="#f-reply-header-slot-value">reply-header-slot-value</a><br>
-&nbsp; <a href="#f-request-query">request-query</a></font><br>
+&nbsp; <a href="#f-request-query">request-query</a><br>
+&nbsp; <a href="#f-set-trailers">set-trailers</a><br>
+&nbsp; <a href="#f-can-set-trailers-p">can-set-trailers-p</a></font><br>
 &nbsp;&nbsp;&nbsp; <font face="Courier New"><a
  href="#f-request-query-value">request-query-value</a><br>
 </font><a href="#request-variables">Request Variables</a><font
@@ -1302,7 +1304,7 @@ are these:</p>
 <hr>
 <p align="left"><a name="f-with-http-response"></a><strong><font
  face="Courier New">(with-http-response
-(req ent &amp;key timeout check-modified format response content-type) <br>
+(req ent &amp;key timeout check-modified format response content-type trailers) <br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 &amp;rest
 body)</font></strong></p>
@@ -1371,6 +1373,20 @@ support text calls as
 well.&nbsp; If you specify <strong>:text</strong> then you may end up
 with a stream that
 supports only text operations.</p>
+<p>
+The <b>trailers</b> specifies which header lines will be found in the trailer instead.
+It also allows one to specify a value for the trailer (which may be changed
+using the <b>set-trailers</b> function).  All trailers you intend to send must be declared here.
+<br>
+<b>trailers</b> is list of strings, symbols or a cons of a string or symbol and a string.
+For example:<br>
+<font face="Courier New">(:foo "bar" (:baz . "123123") ("bof" . "456"))</font><br>
+Trailers, like headers, are denoted by keyword symbols, with names being
+all in the case of the lisp (lower case for Modern lisps and upper case for ANSi lisps).
+The conversion between strings denoting trailer and the keyword symbol is done
+by AllegroServe in the appropriate manner
+
+</p>
 <p align="left">An http response consists of a line describing the
 response code, followed
 by headers (unless it's the HTTP/0.9 protocol in which case there are
@@ -1574,7 +1590,34 @@ is returned.
 &nbsp; If the given key <em>is</em> present in the query but doesn't
 have an associated
 value then the empty string is returned.</p>
+<br>
+<br>
+<p><a name="f-set-trailers"></a><font face="Courier New"><strong>(set-trailers req-or-stream trailers)</strong></font></p>
+<p>
+Set values for the trailers sent after the response.
+<p>
+<b>req-or-stream</b> can be a request object or a stream.  If a request object is passed then the reply stream for the request is used.
+<p>
+<b>trailers</b> is an assoc list.
+The keys are the trailer names and the values are strings.
+for example:
+<br>
+<font face="Courier New">((:x-frob . "frib") (:content-type "text/plain"))</font>
+<br>
+You can only specify values for trailers that you've already declared with the trailers argument to with-http-response.
+Trailers can only be sent if the response uses chunked transfer encoding but that is the standard encoding for HTTP/1.1 so this is rarely going to be an issue.  You can use the <b>can-set-trailers-p</b> function to check if it's possible to set the trailers for this request.  If set-trailers cannot set the trailers it does nothing.
+
+<br>
+<br>
+<p><a name="f-can-set-trailers-p"></a><font face="Courier New"><strong>(can-set-trailers-p req-or-stream)</strong></font></p>
+Return true if the <b>set-trailers</b> function can be used to set the trailers for this response.
+Trailers can only be set for chunking streams, or gzip streams which send their data to chunking streams.
+It's very likely that trailers can be set. This function allows you to test be sure.
+
+
 <hr>
+
+
 <h2><a name="request-variables"></a>Request Variables</h2>
 <p>Every request has zero or or more <span style="font-style: italic;">request
 variables</span>.&nbsp;&nbsp; A request variable is named by a lisp

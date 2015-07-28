@@ -36,7 +36,15 @@
 ; stream that reads the input and chunks the data to the output
 
 (def-stream-class chunking-stream (single-channel-simple-stream)
-  ())
+  ((trailers :initform nil :accessor chunking-stream-trailers)
+   (eof-sent :initform nil :accessor chunking-stream-eof-sent)))
+
+
+(defmethod chunking-stream-trailers (stream)
+  ;; so this will return nil for non chunkers
+  (declare (ignore stream))
+  nil)
+
 
 (defvar *binary-crlf*
     (make-array 2 :element-type '(unsigned-byte 8)
@@ -46,6 +54,7 @@
 
 (defmethod device-open ((p chunking-stream) dummy options)
   (declare (ignore dummy))
+  
   (let ((output-handle (getf options :output-handle)))
     
     (setf (slot-value p 'excl::input-handle) nil)
@@ -62,7 +71,15 @@
 	  (make-array (* 4 1024) :element-type '(unsigned-byte 8))))
     
     (setf (slot-value p 'excl::control-out) excl::*std-control-out-table*)
-    
+
+    ;; this is so that if a deflate stream is sending data to the chunker
+    ;; the deflate stream will know to send a chunking eof when the deflate
+    ;; stream is closed.  It doesn't want to close the chunking stream since
+    ;; due to the logic in publish.cl there may be further attempts to 
+    ;; force-output the chunking stream and close it.
+    (locally
+	(declare (special sys::*deflate-target-stream-close-hook*))
+      (setq sys::*deflate-target-stream-close-hook* 'send-chunking-eof))
     t))
 
 
@@ -100,20 +117,105 @@
   ;;
   ;; note: we don't close the inner stream
   ;;
-  (let ((inner-stream (slot-value p 'excl::output-handle)))
-    
-    (if* (not abort) then (force-output p))
+  
+  (if* (not abort) 
+     then (force-output p)
+          (send-chunking-eof p))
+  p)
+	  
+  
+  
 
-    ; chunking eof
-    (write-char #\0 inner-stream)
-    (write-sequence *binary-crlf* inner-stream)
-    (write-sequence *binary-crlf* inner-stream)
-    (force-output inner-stream)
-    p))
+(defmethod send-chunking-eof ((p chunking-stream))
+  (if* (not (chunking-stream-eof-sent p))
+     then (let ((inner-stream (slot-value p 'excl::output-handle)))
+    
+
+	    ; chunking eof
+	    (write-char #\0 inner-stream)
+	    (write-sequence *binary-crlf* inner-stream)
+	    (dolist (trailer (chunking-stream-trailers p))
+	      (write-sequence (string (car trailer)) inner-stream)
+	      (write-sequence ": " inner-stream)
+	      (if* (cdr trailer) then (write-sequence (cdr trailer) inner-stream))
+	      (write-sequence *binary-crlf* inner-stream))
+	    (write-sequence *binary-crlf* inner-stream)
+	    (force-output inner-stream)
+	    
+	    (setf (chunking-stream-eof-sent p) t))))
+
+(defmethod send-chunking-eof (p)
+  ;; do nothing for other kinds of streams
+  p
+  )
+
+	  
+  
 
 (without-package-locks
 (defmethod excl::inner-stream ((p chunking-stream))
   (slot-value p 'excl::output-handle)))
+
+
+(defmethod set-trailers (p  trailers)
+  ;; by default we can't set trailers
+  (declare (ignore p trailers))
+  ;; do nothing
+  nil
+  )
+
+(defmethod can-set-trailers-p (p)
+  (declare (ignore p))
+  nil
+  )
+
+
+(defmethod set-trailers ((p deflate-stream) trailers)
+  (set-trailers (deflate-target-stream p) trailers))
+
+(defmethod can-set-trailers-p ((p deflate-stream))
+  (can-set-trailers-p (deflate-target-stream p)))
+
+
+(defmethod set-trailers ((p chunking-stream) trailers)
+  ;; Set the values only for the trailers we've already declared
+  ;;
+  (let ((saved-trailers (chunking-stream-trailers p)))
+    (if* (consp trailers)
+       then (dolist (trailer trailers)
+	      (if* (and (consp trailer)
+			(or (stringp (car trailer))
+			    (symbolp (car trailer)))
+			(stringp (cdr trailer)))
+		 then (let ((ent (assoc (header-kwdize (car trailer)) saved-trailers
+					:test #'eq)))
+			(if* ent
+			   then (setf (cdr ent) (cdr trailer)))))))))
+(defmethod can-set-trailers-p ((p chunking-stream))
+  t)
+
+
+
+
+
+(defmethod set-trailers ((req http-request) trailers)
+  (set-trailers (request-reply-stream req) trailers))
+
+(defmethod can-set-trailers-p ((req http-request))
+  (can-set-trailers-p (request-reply-stream req)))
+
+
+
+		      
+
+
+
+
+
+
+
+
+
 
 
 ;;; un chunking
@@ -129,8 +231,19 @@
   ((state :initform :need-count
 	  :accessor unchunking-state)
    (count  :initform 0
-	   :accessor unchunking-count)))
+	   :accessor unchunking-count)
+   (trailers :initform nil
+	     :accessor unchunking-trailers)
+   ))
 
+(defmethod unchunking-trailers ((stream inflate-stream))
+  (unchunking-trailers (slot-value stream 'excl::input-handle)))
+
+(defmethod unchunking-trailers (stream)
+  ;; so this returns nil if stream isn't a chunker
+  (declare (ignore stream))
+  nil
+  )
 
 (defmethod device-open ((p unchunking-stream) dummy options)
   (declare (ignore dummy))
@@ -208,19 +321,9 @@
 
 	   (if* (zerop count)
 	      then ; chunking eof, read trailers and trailing crlf
-		   (let ((seen-stuff-on-line nil))
-		     (loop 
-		       (let ((ch (read-byte ins nil nil)))
-			 (if* (null ch) then (error "premature eof before chunking data"))
-			 (if* (eq ch #.(char-int #\newline))
-			    then (if* (not seen-stuff-on-line)
-				    then (return)
-				    else (setq seen-stuff-on-line nil) ; reset
-					 )
-			  elseif (eq ch #.(char-int #\return))
-			    then nil ;ignore
-			    else (setq seen-stuff-on-line t)))))
-		 
+ 
+		   ; read any trailers
+		   (setf (unchunking-trailers p) (read-trailers ins))
 		   ; return signal of eof
 		   (setf (unchunking-state p) :eof)
 		   (return-from device-read -1)
@@ -256,6 +359,57 @@
                           then (return-from device-read -1))
                        (setf bytes-read (- res i)))))))))))
 
+(defun read-trailers (ins)
+  ;; read the trailers from the unchunking stream
+  (let ((trailers)
+	(header)
+	(value))
+    (loop
+      (let ((ch (read-byte ins nil nil)))
+	(if* (null ch) then (error "premature eof before chunking data"))
+	(if* (eq ch #.(char-int #\newline))
+	   then ; see if we've seen a header value
+		(if* header
+		   then (setq header (make-array (length header)
+						 :element-type 'character
+						 :initial-contents (nreverse header))
+			      value  (if* value
+					then (let ((value (nreverse value)))
+					       ; eliminate leading blanks
+					       (loop
+						 (if* (eq #\space (car value))
+						    then (pop value)
+						    else (return)))
+					       (setq value
+						 (make-array (length value)
+							     :element-type 'character
+							     :initial-contents 
+							     value)))
+					else (setq value "")))
+			(push (cons header value) trailers)
+			(setq header nil  value nil)
+		   else ; blank line, end of trailers
+			(return trailers))
+
+	 elseif (eq ch #.(char-int #\return))
+	   then nil ;ignore
+	   else (if* (eq ch #.(char-int #\:))
+		   then (if* value
+			   then (push (code-char ch) value)
+			 elseif header
+			   then (push  #\space value)
+			   else ; colon beginning a line.. bogus
+				; so create a header
+				(setq header (list #\x #\x #\x)
+				      value (list #\space)))
+		 elseif value
+		   then (push (code-char ch) value)
+		   else (push (code-char ch) header)))))))
+			
+					
+				
+  
+
 
 (defmethod device-close ((p unchunking-stream) abort)
   (declare (ignore abort))
@@ -277,7 +431,8 @@
    p))
 
 
-	 
+
+
 		     
 	 
 	     

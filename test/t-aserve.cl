@@ -505,7 +505,7 @@
 		    :test #'equal)
 	      
 	      (test "testval"
-		    (cdr (assoc "testhead" headers :test #'equal))
+		    (cdr (assoc :testhead headers :test #'equal))
 		    :test #'equal)
 	      
 	      #+ignore (if* (eq protocol :http/1.1)
@@ -561,7 +561,7 @@
 		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
 	    (test "testval"
-		    (cdr (assoc "testhead" headers :test #'equal))
+		    (cdr (assoc :testhead headers :test #'equal))
 		    :test #'equal)
 	    #+ignore (if* (eq protocol :http/1.1)
 			then (test "chunked"
@@ -765,7 +765,7 @@
 				 :keep-alive keep-alive)
 	    (test 200 code)
 	    (test "testval"
-		    (cdr (assoc "testhead" headers :test #'equal))
+		    (cdr (assoc :testhead headers :test #'equal))
 		    :test #'equal)
 	    (test (format nil "text/plain" port)
 		  (cdr (assoc :content-type headers :test #'eq))
@@ -816,7 +816,7 @@
       (declare (ignore body))
       
       (test 200 code)
-      (test "zipzip" (cdr (assoc "snortsnort" headers :test #'equalp))
+      (test "zipzip" (cdr (assoc :|snortsnort| headers :test #'equalp))
 	    :test #'equal))
     
     ;; test that if an error occurs we don't send out the
@@ -1676,7 +1676,7 @@
       (declare (ignore body))
       (test 200 code)
       (test "testvval"
-		    (cdr (assoc "testvdir" headers :test #'equal))
+		    (cdr (assoc :testvdir headers :test #'equal))
 		    :test #'equal))
     
     (test 1 got-reps)   ; hook fired
@@ -2020,7 +2020,7 @@
 	(declare (ignore body))
 	(test 200 code)
 	(test "testval"
-	      (cdr (assoc "testhead" headers :test #'equal))
+	      (cdr (assoc :testhead headers :test #'equal))
 	      :test #'equal))
       
       (test 3 got-here)
