@@ -605,7 +605,11 @@
       ("video/x-ms-asf" "asf" "asx") ("video/x-ms-wm" "wm")
       ("video/x-ms-wmv" "wmv") ("video/x-ms-wmx" "wmx")
       ("video/x-ms-wvx" "wvx") ("video/x-msvideo" "avi")
-      ("video/x-sgi-movie" "movie") ("x-conference/x-cooltalk" "ice")))
+      ("video/x-sgi-movie" "movie") ("x-conference/x-cooltalk" "ice")
+      ;; hand-added by cox 27-jul-2015.  video/mp4 entry is in ubuntu 15.04's
+      ;; /etc/mime.types
+      ("video/mp4" "mp4")
+      ))
 
 (defvar *mime-types* nil)
 
@@ -2598,7 +2602,7 @@
  		(if* (not (assoc :server extra-headers :test #'eq))
  		   then ; put out default server info
  			(format-dif :xmit-server-response-headers
-                                    hsock "Server: AllegroServe/~a~a" 
+                                    hsock *server-fmt* 
  				    *aserve-version-string*
  				    *crlf*))
        

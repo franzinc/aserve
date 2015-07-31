@@ -1213,6 +1213,10 @@ by keyword symbols and not by strings"
 (defvar *crlf* (make-array 2 :element-type 'character :initial-contents
 			   '(#\return #\linefeed)))
 
+;; Set this as a variable so that the header can be suppressed (by setting this
+;; to "") to make security scanners happy.
+(defvar *server-fmt* "Server: AllegroServe/~a~a")
+
 
 
 				    

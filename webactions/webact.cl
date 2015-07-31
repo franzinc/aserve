@@ -101,7 +101,8 @@
    (default-actions :initform nil
      :accessor webaction-default-actions)
    ;; use http-only cookies
-   (use-http-only-cookies :initform t :accessor webaction-use-http-only-cookies)
+   (use-http-only-cookies
+    :initform nil :accessor webaction-use-http-only-cookies)
    ))
 
 (defparameter *webactions-version* "1.12")
@@ -127,7 +128,7 @@
 				    (external-format
 				     *default-aserve-external-format*)
 				    (default-actions nil)
-				    (use-http-only-cookies t)
+				    (use-http-only-cookies nil)
 				    (timeout #+io-timeout #.(* 100 24 60 60)
 					     #-io-timeout nil)
 				    )
