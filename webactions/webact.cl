@@ -100,7 +100,7 @@
     :initform nil :accessor webaction-use-http-only-cookies)
    ))
 
-(defparameter *webactions-version* "1.13")
+(defparameter *webactions-version* "1.14")
 	      
 (defvar *name-to-webaction* (make-hash-table :test #'equal))
 
@@ -500,8 +500,12 @@ no map for webaction with default-actions ~s"
 				       :use-actions default-actions))
 			       else (if* failed-following
 				       then (logmess
-					     (format nil "no map for webaction ~s"
-						     failed-following)))
+					     (format 
+					      nil "~a: no map for webaction ~s"
+					      (socket:ipaddr-to-dotted
+					       (socket:remote-host
+						(request-socket req)))
+					      failed-following)))
 				    (return-from webaction-entity
 				      (failed-request req))))))
 
