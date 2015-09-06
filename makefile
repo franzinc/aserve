@@ -3,6 +3,12 @@
 
 SHELL = sh
 
+## First, so it can set variables and even change the default rule
+makefile_local = $(shell if test -f makefile.local;then echo makefile.local;fi)
+ifneq ($(makefile_local),)
+include $(makefile_local)
+endif
+
 on_windows = $(shell if test -d "c:/"; then echo yes; else echo no; fi)
 
 use_dcl = $(shell if test -f ../dcl.dxl; then echo yes; else echo no; fi)
@@ -92,3 +98,9 @@ tags: FORCE
 	find . -name '*.cl' -print | xargs etags -a
 
 FORCE:
+
+## last, for including new rules which are not the default
+makefile_last = $(shell if test -f makefile.last;then echo makefile.last;fi)
+ifneq ($(makefile_last),)
+include $(makefile_last)
+endif

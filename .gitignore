@@ -1,5 +1,8 @@
+*.fasl
 .git-branch-name
 /build.tmp
 /test.out
 /test.tmp
 /aserve-src
+/makefile.local
+/makefile.last
