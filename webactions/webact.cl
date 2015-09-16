@@ -3,7 +3,7 @@
 ;; webaction.cl
 ;; framework for building dynamic web sites
 ;;
-;; copyright (c) 2003-2013 Franz Inc, Oakland, CA - All rights reserved.
+;; copyright (c) 2003-2015 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
@@ -22,11 +22,6 @@
 ;; http://www.gnu.org/copyleft/lesser.txt (until superseded by a newer
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
-;;
-
-;; $Id: webact.cl,v 1.17 2007/04/17 22:05:04 layer Exp $
-
-
 
 (defpackage :net.aserve
   (:export 
@@ -105,7 +100,7 @@
     :initform nil :accessor webaction-use-http-only-cookies)
    ))
 
-(defparameter *webactions-version* "1.12")
+(defparameter *webactions-version* "1.13")
 	      
 (defvar *name-to-webaction* (make-hash-table :test #'equal))
 

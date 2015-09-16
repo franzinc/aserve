@@ -1,7 +1,38 @@
+;; -*- mode: common-lisp; package: net.aserve -*-
+;;
+;; packages.cl
+;;
+;; copyright (c) 1986-2005 Franz Inc, Berkeley, CA  - All rights reserved.
+;; copyright (c) 2002-2015 Franz Inc, Oakland, CA - All rights reserved.
+;;
+;; This code is free software; you can redistribute it and/or
+;; modify it under the terms of the version 2.1 of
+;; the GNU Lesser General Public License as published by 
+;; the Free Software Foundation, as clarified by the AllegroServe
+;; prequel found in license-allegroserve.txt.
+;;
+;; This code is distributed in the hope that it will be useful,
+;; but without any warranty; without even the implied warranty of
+;; merchantability or fitness for a particular purpose.  See the GNU
+;; Lesser General Public License for more details.
+;;
+;; Version 2.1 of the GNU Lesser General Public License is in the file 
+;; license-lgpl.txt that was distributed with this file.
+;; If it is not present, you can access it from
+;; http://www.gnu.org/copyleft/lesser.txt (until superseded by a newer
+;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
+;; Suite 330, Boston, MA  02111-1307  USA
+
+#+(version= 10 0)
+(sys:defpatch "aserve" 1
+  "v1: 1.3.36: cosmetic: bump version #; code same as 10.0 initial release."
+  :type :system
+  :post-loadable t)
+
 #+(version= 9 0)
-(sys:defpatch "aserve" 17
-  
-  "v17: 1.3.35: add max-listeners arg to net.aserve:start. Increase max header size to 8192;
+(sys:defpatch "aserve" 18
+  "v18: 1.3.36: add http-only cookies;
+v17: 1.3.35: add max-listeners arg to net.aserve:start. Increase max header size to 8192;
 v16: 1.3.33: speed up serving of files;
 v15: 1.3.32: add no-proxy argument to do-http-request. Fix buggy argument checking for ssl arguments ;
 v14: 1.3.30: For https, use defaults of the underlying ssl module;
@@ -18,7 +49,6 @@ v4: 1.3.20: handle connection reset and aborted errors properly in the client;
 v3: add timeout for reading request header;
 v2: 1.3.18: introduce allegroserve-error condition object, fix compression with logical pathnames;
 v1: 1.3.16: fix freeing freed buffer."
-
   :type :system
   :post-loadable t)
 
@@ -64,32 +94,6 @@ v2: version 1.2.58, fix problem introduced in 1.2.56 where the response date
   the result code."
   :type :system
   :post-loadable t)
-
-
-;; -*- mode: common-lisp; package: net.aserve -*-
-;;
-;; packages.cl
-;;
-;; copyright (c) 1986-2005 Franz Inc, Berkeley, CA  - All rights reserved.
-;; copyright (c) 2002-2013 Franz Inc, Oakland, CA - All rights reserved.
-;;
-;; This code is free software; you can redistribute it and/or
-;; modify it under the terms of the version 2.1 of
-;; the GNU Lesser General Public License as published by 
-;; the Free Software Foundation, as clarified by the AllegroServe
-;; prequel found in license-allegroserve.txt.
-;;
-;; This code is distributed in the hope that it will be useful,
-;; but without any warranty; without even the implied warranty of
-;; merchantability or fitness for a particular purpose.  See the GNU
-;; Lesser General Public License for more details.
-;;
-;; Version 2.1 of the GNU Lesser General Public License is in the file 
-;; license-lgpl.txt that was distributed with this file.
-;; If it is not present, you can access it from
-;; http://www.gnu.org/copyleft/lesser.txt (until superseded by a newer
-;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
-;; Suite 330, Boston, MA  02111-1307  USA
 
 ;; Description:
 ;;   packages and exports for AllegroServe

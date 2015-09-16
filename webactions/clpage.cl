@@ -23,10 +23,16 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 
-#+(version= 9 0)
+#+(version= 10 0)
 (sys:defpatch "webactions" 1
-  "v1: add timeout to webaction-project."
+  "v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
+  :type :system
+  :post-loadable t)
 
+#+(version= 9 0)
+(sys:defpatch "webactions" 2
+  "v2: 1.13: use http-only cookies feature of aserve;
+v1: add timeout to webaction-project."
   :type :system
   :post-loadable t)
 
