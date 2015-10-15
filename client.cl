@@ -530,33 +530,16 @@
 
 
 
-
-
-(defun http-copy-file (url pathname
-		       &rest args
-		       &key (if-does-not-exist :error)
-			    proxy
-			    proxy-basic-authorization
-			    (redirect 5)
-			    (buffer-size 1024)
-			    (headers nil)
-			    (protocol :http/1.1)
-			    (basic-authorization nil)
-			    (progress-function nil)
-			    (tmp-name-function
-			     (lambda (pathname)
-			       (format nil "~a.tmp" pathname)))
-			    timeout
-		       &aux (redirect-codes
-			     '(#.(net.aserve::response-number
-				  *response-found*)
-			       #.(net.aserve::response-number
-				  *response-moved-permanently*)
-			       #.(net.aserve::response-number
-				  *response-see-other*))))
+(defun http-copy-file (url pathname &rest args &key 
+					       proxy
+					       proxy-basic-authorization
+					       (headers nil)
+					       (protocol :http/1.1)
+					       (basic-authorization nil)
+					       progress-function
+		       &allow-other-keys)
   (ensure-directories-exist pathname)
-  (let ((uri (net.uri:parse-uri url))
-	(creq 
+  (let ((creq 
 	 (make-http-client-request
 	  url
 	  :headers headers
@@ -564,57 +547,102 @@
 	  :basic-authorization basic-authorization
 	  :proxy proxy
 	  :proxy-basic-authorization proxy-basic-authorization))
-	(buf (make-array buffer-size :element-type '(unsigned-byte 8)))
-	end
-	code
-	new-location
-	s
-	tmp-pathname
-	(bytes-read 0)
-	size
-	temp
 	progress-at)
+
+    (if* progress-function
+       then (let ((size (bytes-at-url url
+				      :proxy proxy
+				      :proxy-basic-authorization proxy-basic-authorization
+				      :headers headers
+				      :protocol protocol
+				      :basic-authorization basic-authorization)))
+	      (do ((n 9 (1- n))
+		   (size size))
+		  ((= n 0))
+		(push (truncate (* size (/ n 10))) progress-at))))
+    
+    (net.aserve::maybe-accumulate-log 
+     (:xmit-client-response-headers "~s")
+     (loop
+       (read-client-response-headers creq)
+       ;; if it's a continue, then start the read again
+       (if* (not (eql 100 (client-request-response-code creq)))
+	  then (return))))
+
+    (dolist (arg '(:proxy :proxy-basic-authorization :headers
+		    :protocol :basic-authorization))
+      (remf args arg))
+
+    (apply #'http-copy-file-request creq pathname :progress-at progress-at args)))
+
+
+(defun bytes-at-url (url &key
+		     proxy
+		     proxy-basic-authorization
+		     (headers nil)
+		     (protocol :http/1.1)
+		     (basic-authorization nil))
+  "Return the size of the URL using a HEAD request."
+  (multiple-value-bind (res code hdrs)
+      (do-http-request url
+	:method :head
+	:proxy proxy
+	:proxy-basic-authorization proxy-basic-authorization
+	:headers headers
+	:protocol protocol
+	:basic-authorization basic-authorization)
+    (declare (ignore res))
+    (let (size temp)
+      (if* (not (eql 200 code))
+	   then (error "~a: code ~a" url code))
+      (handler-case
+	  (setq size
+		(parse-integer
+		 (or (setq temp
+			   (cdr (assoc :content-length hdrs :test #'eq)))
+		     (error "Cannot determine content length for ~a."
+			    url))))
+	(error ()
+	  (error "Cannot parse content-length: ~a." temp)))
+      size)))
+
+(defun http-copy-file-request (creq pathname
+			       &rest args
+			       &key (if-does-not-exist :error)
+			       (redirect 5)
+			       (buffer-size 1024)
+			       (progress-function nil)
+			       (tmp-name-function
+				(lambda (pathname)
+				  (format nil "~a.tmp" pathname)))
+			       progress-at
+			       size
+			       timeout
+			       &aux (redirect-codes
+				     '(#.(net.aserve::response-number
+					  *response-found*)
+				       #.(net.aserve::response-number
+					  *response-moved-permanently*)
+				       #.(net.aserve::response-number
+					  *response-see-other*))))
+  "Copy the data from the CREQ into PATHNAME."
+  (ensure-directories-exist pathname)
+  (let* ((url (client-request-uri creq))
+	 (uri (net.uri:parse-uri url))
+	 (buf (make-array buffer-size :element-type '(unsigned-byte 8)))
+	 end
+	 code
+	 new-location
+	 s
+	 tmp-pathname
+	 (bytes-read 0))
     (unwind-protect
 	(progn
-	  (if* progress-function
-	     then (multiple-value-bind (res code hdrs)
-		      (do-http-request url
-			:method :head
-			:proxy proxy
-			:proxy-basic-authorization proxy-basic-authorization
-			:headers headers
-			:protocol protocol
-			:basic-authorization basic-authorization)
-		    (declare (ignore res))
-		    (if* (not (eql 200 code))
-		       then (error "~a: code ~a" url code))
-		    (handler-case
-			(setq size
-			  (parse-integer
-			   (or (setq temp
-				 (cdr (assoc :content-length hdrs :test #'eq)))
-			       (error "Cannot determine content length for ~a."
-				      url))))
-		      (error ()
-			(error "Cannot parse content-length: ~a." temp)))
-	      
-		    (do ((n 9 (1- n))
-			 (size size))
-			((= n 0))
-		      (push (truncate (* size (/ n 10))) progress-at))))
-	  
 	  (setq tmp-pathname (funcall tmp-name-function pathname))
 	  (setq s (open tmp-pathname :direction :output
 			;; bug16130: in case one was left laying around:
 			:if-exists :supersede))
 
-          (net.aserve::maybe-accumulate-log (:xmit-client-response-headers "~s")
-           (loop
-             (read-client-response-headers creq)
-             ;; if it's a continue, then start the read again
-             (if* (not (eql 100 (client-request-response-code creq)))
-                then (return))))
-	  
 	  (if* (and (member (client-request-response-code creq)
 			    redirect-codes :test #'eq)
 		    redirect
@@ -656,7 +684,7 @@
 		  ;; created above, 0 length
 		  (delete-file tmp-pathname)
 		  (setq new-location (net.uri:merge-uris new-location url))
-		  (return-from http-copy-file
+		  (return-from http-copy-file-request
 		    (apply #'http-copy-file new-location pathname
 			   :redirect (if* (integerp redirect)
 					then (1- redirect)
@@ -667,7 +695,7 @@
 		    (if* (eq :error if-does-not-exist)
 		       then (error fs url)
 		       else (warn fs url)
-			    (return-from http-copy-file nil)))
+			    (return-from http-copy-file-request nil)))
 	   elseif (not (eql 200 code))
 	     then (error "Bad code from webserver: ~s." code))
 	  
@@ -682,6 +710,8 @@
 	      (ignore-errors (delete-file pathname)))
       (client-request-close creq))
     t))
+
+
 
 
 

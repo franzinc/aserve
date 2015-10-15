@@ -1225,6 +1225,7 @@
     ; - use query arg, but place a part of the query directly into
     ; the uri to test merging (rfe12963)
     (destructuring-bind (var . val) (first uri-var-vals)
+      (declare (ignore var val))
       (x-do-http-request (format nil "~a/form-tester-both?~a" prefix-local
                                  (net.aserve:query-to-form-urlencoded
                                   (subseq uri-var-vals 0 1)))
@@ -2534,6 +2535,7 @@
 	     (print (list :testing expected-code request-args))
 	     (multiple-value-bind (resp code)
 		 (apply #'x-do-http-request request-args)
+	       (declare (ignore resp))
 	       (test expected-code code))))
 
       ;; default retries in nil
