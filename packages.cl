@@ -24,14 +24,16 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 
 #+(version= 10 0)
-(sys:defpatch "aserve" 1
-  "v1: 1.3.36: cosmetic: bump version #; code same as 10.0 initial release."
+(sys:defpatch "aserve" 2
+  "v2: 1.3.37: add trailer support
+v1: 1.3.36: cosmetic: bump version #; code same as 10.0 initial release."
   :type :system
   :post-loadable t)
 
 #+(version= 9 0)
-(sys:defpatch "aserve" 18
-  "v18: 1.3.36: add http-only cookies;
+(sys:defpatch "aserve" 19
+  "v19: 1.3.37: add trailer support
+v18: 1.3.36: add http-only cookies;
 v17: 1.3.35: add max-listeners arg to net.aserve:start. Increase max header size to 8192;
 v16: 1.3.33: speed up serving of files;
 v15: 1.3.32: add no-proxy argument to do-http-request. Fix buggy argument checking for ssl arguments ;
@@ -53,8 +55,9 @@ v1: 1.3.16: fix freeing freed buffer."
   :post-loadable t)
 
 #+(version= 8 2)
-(sys:defpatch "aserve" 29
-  "v29: 1.3.35: add max-listeners arg to net.aserve:start. Increase max header size to 8192;
+(sys:defpatch "aserve" 30
+  "v30: 1.3.37: add trailer support
+v29: 1.3.35: add max-listeners arg to net.aserve:start. Increase max header size to 8192;
 v28: 1.3.33: speed up serving of files;
 v27: 1.3.32: add no-proxy argument to do-http-request. Fix buggy argument checking for ssl arguments;
 v26: 1.3.30: For https, use defaults of the underlying ssl module.
