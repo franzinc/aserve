@@ -169,10 +169,11 @@
   nil
   )
 
-
+#+zlib-deflate
 (defmethod set-trailers ((p deflate-stream) trailers)
   (set-trailers (deflate-target-stream p) trailers))
 
+#+zlib-deflate
 (defmethod can-set-trailers-p ((p deflate-stream))
   (can-set-trailers-p (deflate-target-stream p)))
 
