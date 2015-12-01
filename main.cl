@@ -420,9 +420,8 @@ will be logged with one log entry per line in some cases.")
     #-io-timeout 120 ; 2 minutes if we use this for i/o timeouts too.
     )
 
-; this is only useful on acl6.1 where we do timeout on I/O operations
 (defvar *http-io-timeout* 120
-    "The number of seconds that a read or write to the socket can be
+  "The number of seconds that a read or write to the socket can be
 blocked before we give up and assume the client on the other side has
 died. Use nil to specify no timeout.")
 
