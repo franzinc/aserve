@@ -421,7 +421,10 @@ will be logged with one log entry per line in some cases.")
     )
 
 ; this is only useful on acl6.1 where we do timeout on I/O operations
-(defvar *http-io-timeout* 120)
+(defvar *http-io-timeout* 120
+    "The number of seconds that a read or write to the socket can be
+blocked before we give up and assume the client on the other side has
+died. Use nil to specify no timeout.")
 
 ; usually set to the default server object created when aserve is loaded.
 ; users may wish to set or bind this variable to a different server
