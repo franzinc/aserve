@@ -918,7 +918,8 @@
 						    :verify verify
 						    :max-depth max-depth)
 					      (when ssl-method
-						(list :ssl-method ssl-method))))))
+						;; [bug23838] Called fn expect :method as the keyword.
+						(list :method ssl-method))))))
 			(setq sock
 			  (apply 'socket::make-ssl-client-stream sock args)))
                       #-(version>= 8 0)

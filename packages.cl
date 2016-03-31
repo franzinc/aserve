@@ -24,15 +24,17 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 
 #+(version= 10 0)
-(sys:defpatch "aserve" 2
-  "v2: 1.3.37: add trailer support
+(sys:defpatch "aserve" 3
+  "v3: 1.3.38: call make-ssl-client-stream with :method instead of :ssl-method;
+v2: 1.3.37: add trailer support
 v1: 1.3.36: cosmetic: bump version #; code same as 10.0 initial release."
   :type :system
   :post-loadable t)
 
 #+(version= 9 0)
-(sys:defpatch "aserve" 19
-  "v19: 1.3.37: add trailer support
+(sys:defpatch "aserve" 20
+  "v20: 1.3.38: call make-ssl-client-stream with :method instead of :ssl-method;
+v19: 1.3.37: add trailer support
 v18: 1.3.36: add http-only cookies;
 v17: 1.3.35: add max-listeners arg to net.aserve:start. Increase max header size to 8192;
 v16: 1.3.33: speed up serving of files;
@@ -55,8 +57,9 @@ v1: 1.3.16: fix freeing freed buffer."
   :post-loadable t)
 
 #+(version= 8 2)
-(sys:defpatch "aserve" 30
-  "v30: 1.3.37: add trailer support
+(sys:defpatch "aserve" 31
+  "v31: 1.3.38: call make-ssl-client-stream with :method instead of :ssl-method;
+v30: 1.3.37: add trailer support
 v29: 1.3.35: add max-listeners arg to net.aserve:start. Increase max header size to 8192;
 v28: 1.3.33: speed up serving of files;
 v27: 1.3.32: add no-proxy argument to do-http-request. Fix buggy argument checking for ssl arguments;
