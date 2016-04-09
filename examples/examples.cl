@@ -23,7 +23,6 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: examples.cl,v 1.41 2008/02/04 19:03:59 jkf Exp $
 
 ;; Description:
 ;;   Allegro iServe examples

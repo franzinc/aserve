@@ -23,7 +23,6 @@
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
-;; $Id: http.cl,v 1.5 2007/04/17 22:05:04 layer Exp $
 
 (in-package :net.aserve)
 

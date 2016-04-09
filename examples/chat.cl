@@ -23,7 +23,6 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: chat.cl,v 1.22 2007/04/17 22:05:04 layer Exp $
 
 ;; Description:
 ;;   aserve chat program

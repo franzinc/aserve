@@ -24,7 +24,6 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: time.cl,v 1.5 2007/04/17 22:05:04 layer Exp $
 
 (in-package :net.aserve)
 

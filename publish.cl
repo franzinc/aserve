@@ -3,7 +3,7 @@
 ;; publish.cl
 ;;
 ;; copyright (c) 1986-2005 Franz Inc, Berkeley, CA  - All rights reserved.
-;; copyright (c) 2000-2013 Franz Inc, Oakland, CA - All rights reserved.
+;; copyright (c) 2000-2016 Franz Inc, Oakland, CA - All rights reserved.
 ;;
 ;; This code is free software; you can redistribute it and/or
 ;; modify it under the terms of the version 2.1 of
@@ -22,9 +22,6 @@
 ;; http://www.gnu.org/copyleft/lesser.txt (until superseded by a newer
 ;; version) or write to the Free Software Foundation, Inc., 59 Temple Place, 
 ;; Suite 330, Boston, MA  02111-1307  USA
-;;
-;;
-;; $Id: publish.cl,v 1.89 2008/05/22 18:14:59 layer Exp $
 
 ;; Description:
 ;;   publishing urls

@@ -24,7 +24,6 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: client.cl,v 1.58 2007/12/26 19:02:27 jkf Exp $
 
 ;; Description:
 ;;   http client code.

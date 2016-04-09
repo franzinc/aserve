@@ -24,7 +24,6 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 ;;
 ;;
-;; $Id: headers.cl,v 1.31 2008/01/28 17:52:21 jkf Exp $
 
 ;; Description:
 ;;   header parsing

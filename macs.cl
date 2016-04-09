@@ -25,7 +25,6 @@
 ;;
 
 ;;
-;; $Id: macs.cl,v 1.21 2007/04/17 22:05:04 layer Exp $
 
 ;; Description:
 ;;   useful internal macros
