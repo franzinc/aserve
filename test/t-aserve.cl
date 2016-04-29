@@ -264,7 +264,8 @@
 	util.test::*test-unexpected-failures* 0)
   (with-tests (:name "aserve")
     (let* ((*wserver* *wserver*)
-	   (port (start-aserve-running)))
+	   (port (start-aserve-running))
+           (https nil))
       (asc-format "server started on port ~d" port)
       (unwind-protect 
 	  (labels ((do-tests ()
@@ -299,7 +300,8 @@
 		     (test-client-unicode-content-length)
 		     (test-expect-header-responses)
 		     (test-retry-on-timeout port)
-
+                     (test-chunked-request port https)
+                     
 		     (if* (member :ics *features*)
 			then (test-international port)
 			     (test-spr27296))
@@ -337,6 +339,7 @@
 			    (setq port (start-aserve-running 
 					(merge-pathnames 
 					 "server.pem" *aserve-load-truename*)))
+                            (setq https t)
 			    (do-tests)
 		       else (asc-format "~%>> it isn't so ssl tests skipped~%~%")))
 	    ) ;;; end body of unwind-protect 
@@ -410,6 +413,29 @@
   (apply #'do-http-request uri :proxy (asc x-proxy) 
 	 :compress (asc x-compress)
 	 :ssl (asc x-ssl) args))
+
+
+
+(defun x-make-http-client-request (uri &rest args)
+  ;; add a proxy arg
+  (apply #'make-http-client-request uri :proxy (asc x-proxy) 
+	 :compress (asc x-compress)
+	 :ssl (asc x-ssl) args))
+
+
+
+(defun chunk-encode-string (text &optional trailers)
+  "Encodes TEXT using HTTP/1.1 chunk encoding.
+TRAILERS is an alist of headers, both keys and values should be strings.
+Returns a vector."
+  (with-output-to-buffer (result)
+    (let ((chunker
+           (make-instance 'net.aserve::chunking-stream
+             :output-handle result))) 
+      (setf (chunking-stream-trailers chunker) trailers)
+      (unwind-protect 
+          (write-string text chunker)
+        (close chunker)))))
 
 
 
@@ -2545,7 +2571,36 @@
       (x-do-http-request reset-url)
       (test-code 200 test-url :retry-on-timeout 3))))
   
-  
+(defun test-chunked-request (port https)
+  ;; A bug in chunked SSL streams caused chunked request bodies
+  ;; to not be read correctly by the server.
+  (publish :path "/echo" :content-type "text/plain" 
+           :function 
+           #'(lambda (req ent)
+               (with-http-response (req ent)
+                 (with-http-body (req ent)
+                   (write-sequence (get-request-body req) *html-stream*)
+                   ;; Only available after get-request-body...
+                   (let ((header (header-slot-value req :x-trailer-test)))
+                     (test "trailer test" header :test #'string=))))))
+  (let* ((url (format nil "http~@[s~*~]://localhost:~a/echo" https port))
+         (req (x-make-http-client-request 
+               url 
+               :method :post
+               :content-type "text/plain"
+               :accept "text/plain"
+               :content-length "i have no idea, sorry!"
+               :content (chunk-encode-string 
+                         "TEST" 
+                         '(("x-trailer-test" . "trailer test")))
+               :headers '((:transfer-encoding . "chunked"))
+               :timeout 10)))
+    (read-client-response-headers req)
+    (test 200 (client-request-response-code req))
+    (let ((body (read-response-body req)))
+      (test "TEST" body :test #'string=))
+    (net.aserve.client:client-request-close req)))
+
   
 			 
 

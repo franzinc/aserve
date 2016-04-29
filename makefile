@@ -50,6 +50,7 @@ test.tmp: FORCE
 	rm -f test.tmp
 	echo '(dribble "test.out")' >> test.tmp
 	echo '(setq excl::*break-on-warnings* t)' >> test.tmp
+	echo '(require :tester)' >> test.tmp
 	echo '(setq util.test::*break-on-test-failures* t)' >> test.tmp
 	echo '(load "load.cl")' >> test.tmp
 	echo '(setq user::*do-aserve-test* nil)' >> test.tmp

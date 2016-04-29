@@ -24,8 +24,9 @@
 ;; Suite 330, Boston, MA  02111-1307  USA
 
 #+(version= 10 0)
-(sys:defpatch "aserve" 3
-  "v3: 1.3.38: call make-ssl-client-stream with :method instead of :ssl-method;
+(sys:defpatch "aserve" 4
+  "v4: 1.3.39: workaround for a bug in decoding chunked request bodies over ssl.
+v3: 1.3.38: call make-ssl-client-stream with :method instead of :ssl-method;
 v2: 1.3.37: add trailer support
 v1: 1.3.36: cosmetic: bump version #; code same as 10.0 initial release."
   :type :system

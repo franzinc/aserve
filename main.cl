@@ -38,7 +38,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 38))
+(defparameter *aserve-version* '(1 3 39))
 
 (eval-when (eval load)
     (require :sock)
@@ -2097,6 +2097,9 @@ by keyword symbols and not by strings"
   ;; we'll always use the :octets external format to retrieve the string
   ;; so the characters may not be correct however later external
   ;; format processing will fix that.
+  ;; At this point decryption is taken care of by the sockets layer,
+  ;; but dechunking, decompression and other content transforms must
+  ;; be implemented here.
   (let ((original-ef (stream-external-format (request-socket req))))
     
     ; must read using the octets external format because the 
@@ -2144,8 +2147,6 @@ by keyword symbols and not by strings"
 		   elseif (equalp "chunked" (header-slot-value req
 							       :transfer-encoding))
 		     then ; chunked body
-			  (socket:socket-control (request-socket req)
-						 :input-chunking t)
 			  
 			  (with-timeout-local
 			      ((wserver-read-request-body-timeout *wserver*) nil)
@@ -2154,25 +2155,24 @@ by keyword symbols and not by strings"
 					:element-type 'character
 					:adjustable t
 					:fill-pointer 0))
-				  (sock (request-socket req))
+				  (sock (make-instance 
+                                            'unchunking-stream
+                                          :input-handle (request-socket req)))
 				  (ch))
-			      (handler-case 
-				  (loop (if* (eq :eof 
-						 (setq ch
-						   (read-char 
-						    sock nil :eof)))
-					   then ; should never happen
-						(return  ans)
-					   else (vector-push-extend
-						 ch ans)))
-				(excl::socket-chunking-end-of-file
-				    (cond)
-				  (declare (ignore cond))
-				  (socket:socket-control (request-socket req)
-							 :input-chunking nil)
-				  ans))))
-
-			  
+                              (loop (if* (eq :eof 
+                                             (setq ch (read-char sock nil :eof)))
+                                       then 
+                                            ;; Chunked requests may contain trailing 'headers'
+                                            (close sock) ;; this *only* closes the unchunker
+                                            (let ((trailers 
+                                                   (net.aserve.client::convert-trailers 
+                                                    (unchunking-trailers sock))))
+                                              (if* trailers
+                                                 then (setf (request-headers req)
+                                                        (append (request-headers req) trailers))))
+                                            (return ans)
+                                       else (vector-push-extend
+                                             ch ans)))))
 		     else	; no content length given
 			  
 			  (if* (keep-alive-specified req)
