@@ -1791,3 +1791,10 @@
     (if* (eq #\space ch) 
        thenret
        else (return ch))))
+
+(defmethod excl::socket-bytes-written ((stream client-request) &optional set)
+  (excl::socket-bytes-written (client-request-response-stream stream) set))
+
+(defmethod excl::socket-bytes-read ((stream client-request) &optional set)
+  (excl::socket-bytes-read (client-request-response-stream stream) set))
+

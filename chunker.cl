@@ -177,6 +177,14 @@
 (defmethod can-set-trailers-p ((p deflate-stream))
   (can-set-trailers-p (deflate-target-stream p)))
 
+#+zlib-deflate
+(defmethod excl::socket-bytes-written ((stream deflate-stream) &optional set)
+  (excl::socket-bytes-written (deflate-target-stream stream) set))
+
+#+zlib-deflate
+(defmethod excl::socket-bytes-read ((stream deflate-stream) &optional set)
+  (excl::socket-bytes-read (deflate-target-stream stream) set))
+
 
 (defmethod set-trailers ((p chunking-stream) trailers)
   ;; Set the values only for the trailers we've already declared
@@ -204,6 +212,12 @@
 
 (defmethod can-set-trailers-p ((req http-request))
   (can-set-trailers-p (request-reply-stream req)))
+
+(defmethod excl::socket-bytes-written ((stream http-request) &optional set)
+  (excl::socket-bytes-written (request-reply-stream stream) set))
+
+(defmethod excl::socket-bytes-read ((stream http-request) &optional set)
+  (excl::socket-bytes-read (request-reply-stream stream) set))
 
 
 
@@ -245,6 +259,12 @@
   (declare (ignore stream))
   nil
   )
+
+(defmethod socket-bytes-written ((stream unchunking-stream) &optional set)
+  (excl::socket-bytes-written (excl::stream-input-handle stream) set))
+
+(defmethod socket-bytes-read ((stream unchunking-stream) &optional set)
+  (excl::socket-bytes-read (excl::stream-input-handle stream) set))
 
 (defmethod device-open ((p unchunking-stream) dummy options)
   (declare (ignore dummy))
