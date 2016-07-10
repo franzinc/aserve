@@ -368,6 +368,9 @@ v1: add timeout to webaction-project."
 	       
 	       `(:clp "wa" "link"
 		      (("name" . ,dest)
+		       ;; added by cac 29jun16 -- pass to wa_link for
+		       ;; relative-path / webaction-destination fixup.
+		       ("filename" . ,filename)
 		       ,@(if* extra then 
 				 `(("extra" . ,extra))))
 		      nil))))

@@ -619,14 +619,15 @@ no map for webaction with default-actions ~s"
 		     then (return (cdr pp))))))))
 
 
-(defun locate-action-path (wa action-name websession)
+;; cac added &key filename for relative-pathname fixup.  29jun16
+(defun locate-action-path (wa action-name websession &key (filename nil))
   ;; return the full uri path for what action points to
   ;; if the action points to a page, otherwise return a pointer
   ;; to the action itself
   ;;** change -- always return a pointer to the action since
   ;;  that will allow the project to be redefined and not have
   ;;  the clp files reparsed.
-  (let* ((relative-path action-name)
+  (let* ((relative-path (relpath action-name wa filename))
 	 (prefix (webaction-project-prefix wa)))
     
     (relative-to-absolute-path 
@@ -640,6 +641,18 @@ no map for webaction with default-actions ~s"
 	       "~/")
 	else prefix)
      relative-path)))
+
+;; added by cac for relative pathname url rewrite fixup.  29jun16
+(defun relpath (action-name wa filename)
+  (if* filename
+     then (concatenate 'string
+	    (substitute #\/ #\\
+			(namestring (path-pathname
+				     (enough-namestring
+				      (merge-pathnames (pathname filename))
+				      (pathname (webaction-destination wa))))))
+	    action-name)
+     else action-name))
 
 
 (defun relative-to-absolute-path (prefix relative-path)

@@ -1,4 +1,4 @@
-;; -*- mode: common-lisp; package: net.aserve.test -*-
+;; -*- mode: common-lisp; package: net.aserve.testwa -*-
 ;;
 ;; t-webactions.cl
 ;;
@@ -64,6 +64,7 @@
       (unwind-protect 
 	  (flet ((do-tests ()
 		  (sitea-tests port)
+		  (siteb-tests port)
 		   ))
 	    (format t "~%~%===== test direct ~%~%")
 	    (do-tests)
@@ -294,6 +295,25 @@
   (html "{start_foo}")
   (emit-clp-entity req ent body)
   (html "{end_foo}"))
+
+;; Begin siteb (subdirectory) tests
+
+(defun siteb-tests (port)
+  (let ((prefix-local (format nil "http://localhost:~a" port)))
+    (load (concatenate 'string *test-dir* "siteb/project.cl"))
+
+    (multiple-value-bind (data retcode)
+	(x-do-http-request (format nil "~a/siteb/sub/file1.clp" prefix-local))
+      ;; Without bug fix, the rewritten line does not have "sub/".
+      (test "/sub/file2.html\">file2.html</a>" data
+	    :test #'(lambda (x y) (search x y))))
+    (multiple-value-bind (data retcode)
+	(x-do-http-request (format nil "~a/siteb/pageb" prefix-local))
+      ;; Without bug fix, the rewritten line does not have "sub/".
+      (test "/sub/file2.html\">file2.html</a>" data
+	    :test #'(lambda (x y) (search x y))))))
+
+;; End siteb (subdirectory) tests
 
 
 
