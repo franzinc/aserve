@@ -37,7 +37,10 @@
 	 (let ((name (locate-action-path
 		      wa 
 		      (cdr (assoc "name" args :test #'equal))
-		      session)))
+		      session
+		      ;; pass through any filename from clp parser for relative
+		      ;; url fixup.  cac 29jun16
+		      :filename (cdr (assoc "filename" args :test #'equal)))))
 	   (html (:princ name))
 	   (let ((extra (cdr (assoc "extra" args :test #'equal))))
 	     (if* extra
