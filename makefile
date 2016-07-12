@@ -19,9 +19,9 @@ image = dcl.dxl
 endif
 
 ifeq ($(on_windows),yes)
-mlisp ?= "/cygdrive/c/acl82/mlisp.exe"
+mlisp ?= "/cygdrive/c/acl100/mlisp.exe"
 else
-mlisp ?= /fi/cl/8.2/bin/mlisp
+mlisp ?= /fi/cl/10.0/bin/mlisp
 endif
 
 image ?= mlisp.dxl
