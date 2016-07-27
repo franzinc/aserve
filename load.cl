@@ -36,7 +36,7 @@
     ;; other files that make up the aserve dist
     '("README.md"
       "license-lgpl.txt"
-      "license-allegroserve.txt"
+      "LICENSE"
       "examples/examples.cl"
       "examples/foo.txt"
       "examples/fresh.jpg"

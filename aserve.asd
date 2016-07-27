@@ -34,7 +34,7 @@
    (:static-file "README.md")
    (:static-file "ChangeLog")
    (:static-file "license-lgpl.txt")
-   (:static-file "license-allegroserve.txt")
+   (:static-file "LICENSE")
    (:static-file "load"))
   :serial t)
 
