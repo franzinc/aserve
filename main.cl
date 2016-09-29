@@ -19,7 +19,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 41))
+(defparameter *aserve-version* '(1 3 42))
 
 (eval-when (eval load)
     (require :sock)
@@ -3393,5 +3393,135 @@ in get-multipart-sequence"))
 		  (getf (request-reply-plist req) 'variables))
 	    newvalue)))
 
+
+;===============
+
+;; Copied from AG code lisp/http/shared/http.cl
+;; Modified to remove defaults specific to AG, and to allow caller to
+;; parametrize some behavior.
+;; Streaming request bodies.    rfe14295
+
+;; API to access the body of a server request through a (possibly modified)
+;; stream.   Comparable to get-client-request-response-stream API for
+;; client requests.   Neither API is exported because each interacts too
+;; delicately with other Aserve internals.
+;;
+;; Even internally, the preferred usage is through the macro with-body-input-stream.
+;; Calls to get-request-body will return "" if the macro or function
+;; have been invoked for a request.  
+;; 
+   
+(defmacro with-body-input-stream ((var req &key if-unavailable encoding-table
+				       external-format)
+				  &body body)
+  ;; Evaluate body with var bound to a stream that may supply modified or
+  ;;  expanded characters or octets from the request socket.
+  ;;  Built-in functions take care of chunking and gzip compression.
+  ;;  The caller can supply other transformations.
+  ;;  If the stream is EQ to the request-socket, then no transformation
+  ;;  was done.
+  ;;
+  ;; if-unavailable  -- This expression is evaluated instead of the body,
+  ;;        if the stream is not available;  for example, if get-request-body
+  ;;        was already called.
+  ;; encoding-table  -- An a-list of entries of the form
+  ;;                       (encoding-name-string function)
+  ;;                    or (:otherwise function)
+  ;;        Each key in the a-list is matched to the content-encoding
+  ;;         header in the request.  
+  ;;         When a match is found, the function is called.
+  ;;
+  ;;        The function gets 3 arguments: request, stream, encoding-string.
+  ;;        It returns 3 values: 
+  ;;                   a (possibly modified) stream, 
+  ;;                   t if the stream must be closed by the caller (the macro does it),
+  ;;                   t if the caller must read to eof (the macro does this too).
+  ;; 
+  ;;         If a match is not found, then the :otherwise entry is used.
+  ;;         If the :otherwise entry is not present, the stream is returned
+  ;;            with external format :octets.
+  ;;
+  ;; If the stream is eq to the request socket, or if a user-supplied function returns
+  ;; a third value of nil, the body code is responsible for leaving the stream in the
+  ;; appropriate position.
+  ;;
+  ;; external-format  -- The default external format if content-type does not
+  ;;         specify a charset.  The default is *default-aserve-external-format*.
+
+  (let ((must-close (gensym)) (must-flush (gensym)))
+    `(multiple-value-bind (,var ,must-close ,must-flush)
+	 (get-body-input-stream ,req ,encoding-table ,external-format)
+       (if ,var
+	   (unwind-protect (progn ,@body)
+	     (when ,must-flush (exhaust-body-stream ,var))
+	     (when ,must-close (close ,var)))
+	 ,if-unavailable))))
+
+(defun get-body-input-stream (req encoding-table external-format)
+  ;; This function returns nil if the body stream is no longer available,
+  ;; otherwise it returns three values:
+  ;;       a stream as described above, 
+  ;;       t if the caller must close the stream before discarding it, or nil,
+  ;;       t if the caller must read to eof before closing, or nil.
+
+  (if (request-request-body req)
+      (values nil nil)
+    (let* ((length (parse-integer (header-slot-value req :content-length) :junk-allowed t))
+	   (str (cond (length
+		       (make-instance 'truncated-stream :byte-length length
+				      :input-handle (request-socket req)))
+		      ((equalp "chunked" (header-slot-value req :transfer-encoding))
+		       (make-instance 'unchunking-stream :input-handle (request-socket req)))
+		      (t (request-socket req))))
+	   (enc (header-slot-value req :content-encoding))
+	   entry must-close (must-flush t))
+      (cond
+       ((null enc)
+	(setf (stream-external-format str) 
+	      (request-character-encoding req external-format)))
+       ((or (string-equal enc "gzip") (string-equal enc "deflate"))
+	(setq str (make-instance 'util.zip:inflate-stream :input-handle str)))
+       ((setq entry (assoc enc encoding-table :test #'string-equal))
+	(multiple-value-setq (str must-close must-flush) (funcall (second entry) req str enc)))
+       ((setq entry (assoc :otherwise encoding-table))
+	(multiple-value-setq (str must-close must-flush) (funcall (second entry) req str enc)))
+       (t (setf (stream-external-format str) :octets)))
+      (setf (request-request-body req) "")
+      (values str must-close (if (eq str (request-socket req)) nil must-flush)))))
+
+
+(defun request-character-encoding (req external-format)
+  (let* ((type (header-slot-value req :content-type))
+         (charset (and type (nth-value 2 (match-re ";\\s+charset=([^;\\s]+)" type)))))
+    (or (when charset (find-external-format charset :errorp nil)) 
+	(when external-format (find-external-format external-format :errorp nil))
+	(find-external-format *default-aserve-external-format*))))
+
+(def-stream-class truncated-stream (terminal-simple-stream)
+  ((remaining :initarg :byte-length :accessor octets-remaining)))
+
+(defmethod print-object ((obj truncated-stream) stream)
+  (print-unreadable-object (obj stream :type t :identity t)
+    (format stream "~:d remaining" (octets-remaining obj))))
+
+(defmethod device-read ((stream truncated-stream) buffer start end blocking)
+  (with-stream-class (truncated-stream stream)
+    (unless buffer
+      (setf buffer (sm excl::buffer stream)))
+    (let ((rem (octets-remaining stream)))
+      (when (zerop rem) (return-from device-read -1))
+      (when (> (length buffer) rem) (setf end (+ start rem)))
+      (let ((read (call-next-method stream buffer start end blocking)))
+        (when (> read 0) (decf (octets-remaining stream) read))
+        read))))
+
+(defmethod device-close ((stream truncated-stream) abort)
+  (declare (ignore abort))
+  t) ;; Closing the wrapper should not close the inner stream
+
+(defun exhaust-body-stream (stream)
+  (handler-case (loop (read-byte stream))
+    (end-of-file ())
+    (stream-closed-error ())))
 
 

@@ -283,6 +283,7 @@
 		     (test-expect-header-responses)
 		     (test-retry-on-timeout port)
                      (test-chunked-request port https)
+		     (test-server-request-body port :https https)
                      
 		     (if* (member :ics *features*)
 			then (test-international port)
@@ -2583,8 +2584,111 @@ Returns a vector."
       (test "TEST" body :test #'string=))
     (net.aserve.client:client-request-close req)))
 
-  
-			 
+
+(defun test-server-request-body (port &key https verbose)
+  ;; Test with-body-input-stream.  rfe14295
+  (or port (setq port (start-aserve-running)))
+  (flet ((stream-sender
+	  (url 
+	   &aux
+	   (req (make-http-client-request
+		 url :method :post :content-length (+ (* 30 50) 10)))
+	   (sock (client-request-socket req))
+	   b)
+	  (dotimes (i 30)
+	    (when verbose (format t "~&stream-sender: send random chars.~%"))
+	    (dotimes (i 50) (write-char (code-char (+ 32 (random 28))) sock))
+	    (force-output sock)
+	    (sleep 0.5))
+	  (dotimes (i 10) (write-char #\= sock))
+	  (force-output sock)
+	  (when verbose (format t "~&stream-sender: sent ==========.~%"))
+	  (read-client-response-headers req)
+	  (setq b (read-response-body req))
+	  (test 200 (client-request-response-code req))
+	  (when verbose (print (list :REPLY b)))
+	  (client-request-close req)
+	  b)
+	 (stream-reader
+	  (req ent &aux b)
+	  (with-http-response
+	   (req ent)
+	   (with-http-body 
+	    (req ent)
+	    (when verbose (format t "~&stream-reader: started body.~%"))
+	    (setq b (get-request-body req))
+	    (when verbose (format t "~&stream-reader: received body.~%"))
+	    (if (search "=========" b) (setq b "OK") (setq b (length b)))
+	    (html (:html (:body (:princ b)))))))
+	 (streaming-reader
+	  (req ent &aux b clen)
+	  (with-http-response
+	   (req ent)
+	   (with-http-body 
+	    (req ent)
+	    (when verbose (format t "~&stream-reader: started body.~%"))
+	    (setq clen (header-slot-value req :content-length))
+	    (when verbose (format t "~&stream-reader: Content-length is ~S.~%" clen))
+	    (setq clen (ignore-errors (parse-integer (header-slot-value req :content-length))))
+	    (when verbose (format t "~&stream-reader: expecting ~A bytes.~%" clen))
+
+	    (net.aserve::with-body-input-stream
+	     (s req)
+	     (dotimes (i (* 2 (or clen 10000)) (setq b "OK"))
+	       (when (eql 99 (mod i 100))
+		 (when verbose (format t "~&stream-reader: after ~A bytes.~%" i)))
+	       (or (setq b (read-byte s nil nil)) (return (setq b (list "after" i)))))
+	     )
+
+	    (when verbose (format t "~&stream-reader: received body ~S.~%" b))
+	    (html (:html (:body (:princ b)))))))
+	 (chunked-sender
+	  (url 
+	   &aux
+	   (data (with-output-to-string
+		   (s)
+		   (dotimes (i 30)
+		     (dotimes (i 50) (write-char (code-char (+ 32 (random 28))) s)))
+		   (dotimes (i 10) (write-char #\= s))))
+	   (req (make-http-client-request
+		 url :method :post
+		 :headers '((:transfer-encoding . "chunked"))
+		 :content-length "i have no idea, sorry!"
+		 :content (chunk-encode-string 
+			   data
+			   '(("x-trailer-test" . "trailer test")))
+		 ))
+	   b)
+	  (when verbose (format t "~&stream-sender: sent ==========.~%"))
+	  (read-client-response-headers req)
+	  (setq b (read-response-body req))
+	  (test 200 (client-request-response-code req))
+	  (when verbose (print (list :REPLY b)))
+	  (client-request-close req)
+	  b)
+	 )
+    (if https (setq https "s") (setq https ""))
+    (let (b)
+      (format t "~&Test with-body-input-stream ...~%")
+
+      (when verbose (format t "~&Basic stream reader test.~%"))
+      (publish :path "/stream1" :function #'stream-reader)
+      (sleep 1)
+      (setq b (stream-sender (format nil "http~A://localhost:~A/stream1" https port)))
+      (test nil (null (search "OK" b)))
+
+      (when verbose (format t "~&Simple streaming reader test.~%"))
+      (publish :path "/stream2" :function #'streaming-reader)
+      (sleep 1)
+      (setq b (stream-sender (format nil "http~A://localhost:~A/stream2" https port)))
+      (test nil (null (search "after 1510" b)))
+
+      (when verbose (format t "~&Chunked streaming reader test.~%"))
+      (publish :path "/stream3" :function #'streaming-reader)
+      (sleep 1)
+      (setq b (chunked-sender (format nil "http~A://localhost:~A/stream3" https port)))
+      (test nil (null (search "after 1510" b)))
+      )))
 
 ;; (net.aserve::debug-on :xmit)
 ;; (net.aserve::debug-off :body)
