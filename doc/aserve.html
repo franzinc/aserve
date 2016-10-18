@@ -2803,7 +2803,6 @@ basic-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 digest-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-keep-alive
 headers
 proxy
 proxy-basic-authorization<br>
@@ -3001,15 +3000,6 @@ credentials.<br>
       </td>
     </tr>
     <tr>
-      <td width="22%">keep-alive</td>
-      <td width="16%">nil</td>
-      <td width="62%">If true then the web server will be told to keep
-the connection alive. &nbsp;&nbsp; Since <strong>do-http-request</strong>
-closes the connection after the request this option currently does no
-more than allow us to experiment with how a web server responds to a
-keep-alive request.</td>
-    </tr>
-    <tr>
       <td width="22%">headers</td>
       <td width="16%">nil</td>
       <td width="62%">an alist of conses <font face="Courier New">(header-name
@@ -3064,7 +3054,7 @@ format.</td>
       </td>
       <td style="vertical-align: top;">nil<br>
       </td>
-      <td style="vertical-align: top;">if true then the client will
+      <td style="vertical-align: top;">If true then the client will
 request that the server keep alive the connection.&nbsp; If the server
 agrees then that socket connection is returned as the fifth value.<br>
       </td>
