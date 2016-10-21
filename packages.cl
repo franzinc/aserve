@@ -107,16 +107,15 @@ v2: version 1.2.58, fix problem introduced in 1.2.56 where the response date
   (require :streamc)
   (require :inflate))
 
-sys::
 (eval-when (compile load eval)
-  (defvar *user-warned-about-deflate* nil)
+  (defvar sys::*user-warned-about-deflate* nil)
   (handler-case (require :deflate)
     (error (c)
-      (if* (null *user-warned-about-deflate*)
+      (if* (null sys::*user-warned-about-deflate*)
 	 then (format t "~&NOTE: ~@<the deflate module could not be loaded, so ~
 server compression is disabled.  AllegroServe is completely functional ~
-without compression.  Original error loading deflate was:~:@>~%~a~%" c)
-	      (setq *user-warned-about-deflate* t)))))
+without compression.  Original error loading deflate was:~%~a~%~:@>" c)
+	      (setq sys::*user-warned-about-deflate* t)))))
 
 (defpackage :net.aserve
   (:use :common-lisp :excl :net.html.generator :net.uri :util.zip)
