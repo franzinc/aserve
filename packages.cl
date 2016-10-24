@@ -5,8 +5,9 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 0)
-(sys:defpatch "aserve" 7
-  "v7: 1.3.42: internal improvements to server body access;
+(sys:defpatch "aserve" 8
+  "v8: 1.3.43: don't log when client closes connection early;
+v7: 1.3.42: internal improvements to server body access;
 v6: 1.3.41: fix multi-directory clp file rewriting;
 v5: 1.3.40: add methods for socket-bytes-read|written;
 v4: 1.3.39: workaround for a bug in decoding chunked request bodies over ssl.

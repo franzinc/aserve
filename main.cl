@@ -19,7 +19,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 42))
+(defparameter *aserve-version* '(1 3 43))
 
 (eval-when (eval load)
     (require :sock)
@@ -1680,6 +1680,7 @@ by keyword symbols and not by strings"
   (if* (typep c 'stream-error)
      then (or (eq (stream-error-identifier c) :connection-reset)
               (eq (stream-error-identifier c) :connection-aborted)
+	      (typep c 'stream-closed-error)
 	      #+unix (eq (stream-error-code c) 32) ; sigpipe
 	      #+aix (eq (stream-error-code c) 73) 
 	      )))
