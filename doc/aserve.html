@@ -230,7 +230,7 @@ cache restore-cache accept-hook ssl ssl-password<br>
 os-processes
 external-format compress<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-ssl-key ssl-password ssl-method ca-file ca-directory verify max-depth)</font></strong></p>
+ssl-key ssl-password ssl-method test-ssl ca-file ca-directory verify max-depth)</font></strong></p>
 <p>If no arguments are given then <strong>start</strong>&nbsp; starts
 a multi-threaded web
 server on port 80, which is the standard web server
@@ -358,6 +358,12 @@ this is the key to decrypt it.</li>
   <li><span style="font-weight: bold;">ssl-method</span> - see <a
  href="#ssltls">SSL/TLS</a> for the use of this argument.<br>
   </li>
+  <li><span style="font-weight: bold;">test-ssl</span> - If the use of SSL is
+    specified by other arguments then this will cause an SSL test to immediately
+    be done and if it fails an error will be signalled.  This allows you to
+    verify the SSL certificate is valid before the start function returns.   The default value for <strong>test-ssl</strong> is nil (meaning perform no test).
+  </li>
+  
   <li><span style="font-weight: bold;">os-processes</span> - if given
 it should be an integer number of
 operating system processes in which to run AllegroServe.&nbsp; This is

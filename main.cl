@@ -19,7 +19,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 43))
+(defparameter *aserve-version* '(1 3 44))
 
 (eval-when (eval load)
     (require :sock)
@@ -1231,10 +1231,11 @@ by keyword symbols and not by strings"
 		   accept-hook
 		   ssl		 ; enable ssl
 		   ssl-args	 ; plist of make-ssl-server-stream args
-		                 ; overrides other ssl args when specified
+		   ; overrides other ssl args when specified
 		   ssl-key       ; File containing private key. 
 		   ssl-password  ; for ssl: pswd to decode priv key
 		   ssl-method	 ; protocols for ssl server
+		   test-ssl      ; test ssl cert on startup
 		   verify
 		   ca-file
 		   ca-directory
@@ -1314,6 +1315,25 @@ by keyword symbols and not by strings"
 		   :certificate ssl
 		   :certificate-password ssl-password)
 	  ))
+
+    (if* test-ssl
+       then ;; test the accept hook to see if the
+	    ;; certificates are correct
+	    (let (csock psock sock)
+	      (unwind-protect 
+		  (progn
+		    (setq psock (socket:make-socket :connect :passive))
+		    (setq csock (socket:make-socket
+				 :connect :active
+				 :remote-host "127.1"
+				 :remote-port (socket:local-port psock)))
+		    (setq sock (socket:accept-connection psock))
+		    ;; if the verification fails the appropriate
+		    ;; error will be signalled
+		    (funcall accept-hook sock))
+		(progn (and sock  (close sock))
+		       (and psock (close psock))
+		       (and csock (close csock))))))
 	    
     (if* (not port-p)
        then ;; ssl defaults to port 443

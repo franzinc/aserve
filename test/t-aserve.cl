@@ -330,7 +330,11 @@
 	(stop-aserve-running)
 	(stop-proxy-running)
 	(stop-proxy-running)
-	)))
+	))
+    
+    (if* (and ssl (errorset (as-require :ssl)))
+       then (test-aserve-extra-ssl))
+    )
   (if* (or (> util.test::*test-errors* 0)
 	   (> util.test::*test-successes* 0)
 	   (> util.test::*test-unexpected-failures* 0))
@@ -342,9 +346,11 @@
     
 
 
-(defun start-aserve-running (&optional ssl)
+(defun start-aserve-running (&optional ssl (test-ssl t))
   ;; start aserve, return the port on which we've started aserve
-  (let ((wserver (start :port nil :server :new :ssl-args (and ssl (list :certificate ssl))
+  (let ((wserver (start :port nil :server :new :ssl-args (and ssl (list :certificate ssl)) 
+			:test-ssl test-ssl
+	
 			:listeners 20 ; must be at least 3 for keep-alive to be possible
 			))); let the system pick a port
     (setq *wserver* wserver)
@@ -2689,6 +2695,66 @@ Returns a vector."
       (setq b (chunked-sender (format nil "http~A://localhost:~A/stream3" https port)))
       (test nil (null (search "after 1510" b)))
       )))
+
+
+
+(defun test-aserve-extra-ssl ()
+  ;; tests run with no aserve server running
+  (let ((seen-error-1 nil) ; normal ssl start
+	(seen-error-2 nil) ; bogus pem file but don't test
+	(seen-error-3 nil) ; bogus pem file and do test
+	
+	)
+    (let (*wserver*)
+      
+      ; valid ssl startup
+      (handler-case 
+	  (net.aserve:start :ssl (merge-pathnames "server.pem" 
+						  *aserve-load-truename*)
+			    :server :new
+			    :port nil
+			    :test-ssl t)
+	(error (c)
+	  c
+	  (setq seen-error-1 t)))
+      
+      (test nil seen-error-1)
+      (and *wserver* (shutdown))
+      
+      (setq *wserver* nil)
+      
+      ;; bogus ssl cert but don't test
+      (handler-case 
+	  (net.aserve:start :ssl (merge-pathnames "not-exist-server.pem" 
+						  *aserve-load-truename*)
+			    :port nil
+			    :server :new
+			    )
+	(error (c)
+	  c
+	  (setq seen-error-2 t)))
+      
+      (test nil seen-error-2)
+      (and *wserver* (shutdown))
+      
+      (setq *wserver* nil)
+      
+      ;; bogus ssl cert and do test
+      (handler-case 
+	  (net.aserve:start :ssl (merge-pathnames "not-exist-server.pem" 
+						  *aserve-load-truename*)
+			    :port nil
+			    :server :new
+			    :test-ssl t)
+	(error (c)
+	  c
+	  (setq seen-error-3 t)))
+      
+      (test t seen-error-3)
+      (and *wserver* (shutdown)))))
+
+      
+      
 
 ;; (net.aserve::debug-on :xmit)
 ;; (net.aserve::debug-off :body)
