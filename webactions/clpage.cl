@@ -6,8 +6,9 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 0)
-(sys:defpatch "webactions" 1
-  "v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
+(sys:defpatch "webactions" 2
+  "v2: 1.15: update parsed time after parsing is finished;
+v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
   :type :system
   :post-loadable t)
 
@@ -226,8 +227,7 @@ v1: add timeout to webaction-project."
       (with-open-file (p (file ent)
 		       :direction :input
 		       :external-format (clp-entity-external-format ent))
-	(setf (clp-entity-file-write-date ent)
-	  (file-write-date (file ent)))
+	
 	(let* ((objects (parse-clp-guts p (file ent)))
 	       (dependencies (expand-clp-includes objects (file ent)
 						  (clp-entity-external-format ent))))
@@ -236,7 +236,13 @@ v1: add timeout to webaction-project."
 		    (mapcar #'(lambda (filename)
 				(cons filename (file-write-date filename)))
 			    dependencies)))
-	  (setf (clp-entity-objects ent) objects)))
+	  (setf (clp-entity-objects ent) objects)
+	  
+	  (setf (clp-entity-file-write-date ent)
+	    (file-write-date (file ent)))
+	  
+	  objects
+	  ))
       
     (error (c)
       (logmess (format nil "processing clp file ~s got error ~a"
