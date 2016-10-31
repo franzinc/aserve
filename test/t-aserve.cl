@@ -251,7 +251,7 @@
       (asc-format "server started on port ~d" port)
       (unwind-protect 
 	  (labels ((do-tests ()
-		     ; run test with and with compression
+		     ; run test with and without compression
 		     ; accepted by do-http-request
 		     (dolist (cv (if* (member :zlib-deflate *features*)
 				    then '(nil t)
