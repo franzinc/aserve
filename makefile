@@ -32,7 +32,7 @@ endif
 mlisp += -I $(image)
 
 # -batch must come before -L, since arguments are evaluated from left to right
-mlisp += -batch
+mlisp += -batch -backtrace-on-error
 
 build: FORCE
 	rm -f build.tmp
