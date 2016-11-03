@@ -798,7 +798,7 @@ Problems with protocol may occur." (ef-name ef)))))
 	   #+(and allegro (version>= 6 0 pre-final 1))
 	   (,g-external-format (find-external-format ,external-format))
 	   )
-       (declare (ignore-if-unused ,g-req ,g-ent ,g-external-format))
+       (declare (ignorable ,g-req ,g-ent ,g-external-format))
         
        (compute-response-stream ,g-req ,g-ent)
        (if* (entity-headers ,g-ent)
