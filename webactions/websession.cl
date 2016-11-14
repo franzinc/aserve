@@ -41,7 +41,12 @@
 		:reader sm-cookie-name)
    
    (websessions  :initform (make-hash-table :test #'equal)
-	      :reader sm-websessions)))
+		 :reader sm-websessions)))
+
+;; Mention class in make-instance after class def to avoid bug24329.
+(defun make-instance-websession-master+cookie-name+reap-hook-function  (name reap-hook-function)
+  (make-instance 'websession-master :name name :reap-hook-function reap-hook-function))
+
 
 
 (defclass websession ()
@@ -70,6 +75,9 @@
    (variables :initform nil
 	      :accessor websession-variables)))
 
+;; Mention class in make-instance after class def to avoid bug24329.
+(defun make-instance-websession+key+method (key method)
+  (make-instance 'websession :key key :method method))
 
 
 

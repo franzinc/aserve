@@ -5,8 +5,9 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 0)
-(sys:defpatch "aserve" 10
-  "v10: no version change, fix defpatch;
+(sys:defpatch "aserve" 11
+  "v11: 1.3.45 - avoid races in constructor initialization;
+v10: no version change, fix defpatch;
 v9: 1.3.44: add :test-ssl argument to start function;
 v8: 1.3.43: don't log when client closes connection early;
 v7: 1.3.42: internal improvements to server body access;

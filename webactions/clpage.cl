@@ -167,9 +167,7 @@ v1: add timeout to webaction-project."
 			 then (setf (websession-method websession)
 				:cookie))
 		 else ; no session found via cookie
-		      (setq websession (make-instance 'websession
-					 :key (next-websession-id sm)
-					 :method :cookie))
+		      (setq websession (make-instance-websession+key+method (next-websession-id sm) :cookie))
 		      (setf (gethash (websession-key websession)
 				     (sm-websessions sm))
 			websession)))

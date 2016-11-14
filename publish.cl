@@ -252,11 +252,19 @@
   ()
   (:default-initargs :info (make-hash-table :test #'equal)))
 
+;; Mention class in make-instance after class def to avoid bug24329.
+(defun make-instance-locator-exact+name (name)
+  (make-instance 'locator-exact :name name))
+
 
 (defclass locator-prefix (locator)
   ;; use to map prefixes to entities
   ()
   )
+
+;; Mention class in make-instance after class def to avoid bug24329.
+(defun make-instance-locator-prefix+name (name)
+  (make-instance 'locator-prefix :name name))
 
 
 ;; the info slot of a locator-prefix class is a list of
@@ -1918,16 +1926,14 @@
     (let ((ip (assoc :ip info :test #'eq)))
       (if* ip
 	 then (setq ip-authorizer 
-		(make-instance 'location-authorizer 
-		  :patterns (getf (cdr ip) :patterns)))))
+		(make-instance-location-authorizer+patterns (getf (cdr ip) :patterns)))))
     
     ; only one of ip and pswd allowed
     (let ((pswd (assoc :password info :test #'eq)))
       (if* pswd
 	 then (setq pswd-authorizer
-		(make-instance 'password-authorizer
-		  :realm (getf (cdr pswd) :realm)
-		  :allowed (getf (cdr pswd) :allowed)))))
+		(make-instance-password-authorizer+realm+allowed
+		 (getf (cdr pswd) :realm) (getf (cdr pswd) :allowed)))))
 
     ; check password second
     (if* pswd-authorizer
@@ -2707,9 +2713,8 @@
  		  
 		   (setq reply-stream
 		     (setf (request-reply-stream req)
-		       (make-instance 'prepend-stream
-			 :content header-content
-			 :output-handle reply-stream)))))
+		       (make-instance-prepend-stream+content+output-handle
+			header-content reply-stream)))))
  		    
  		
  	
@@ -2718,8 +2723,7 @@
 	    then (force-output hsock)
 		 ; do chunking
 		 (setq reply-stream
-		   (make-instance 'chunking-stream 
-		     :output-handle reply-stream))
+		   (make-instance-chunking-stream+output-handle reply-stream))
 		 (setf (request-reply-stream req) 
 		   reply-stream)
 		 (setf (chunking-stream-trailers reply-stream)
@@ -2924,6 +2928,10 @@
 	    :accessor prepend-stream-content))
   
   )
+
+;; Mention class in make-instance after class def to avoid bug24329.
+(defun make-instance-prepend-stream+content+output-handle (content output-handle)
+  (make-instance 'prepend-stream :content content :output-handle output-handle))
 
 
 (defmethod prepend-stream-p (stream)

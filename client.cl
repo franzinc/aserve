@@ -226,8 +226,7 @@
         ; the data is coming in chunked then unchunk it
         (if* (eq :chunked left)
            then (setq socket
-                      (make-instance 'net.aserve::unchunking-stream
-                                     :input-handle socket)))
+                      (net.aserve::make-instance-unchunking-stream+input-handle socket)))
     
         ; if data is content-encoded, then decode
         (if* (client-request-content-encoding creq)

@@ -36,6 +36,10 @@
 	   :initform "AllegroServe")
    ))
 
+;; Mention class in make-instance after class def to avoid bug24329.
+(defun make-instance-password-authorizer+realm+allowed (realm allowed)
+  (make-instance 'password-authorizer :realm realm :allowed allowed))
+
 
 
 (defmethod authorize ((auth password-authorizer) 
@@ -111,6 +115,11 @@
 	     ;; list of patterns to match
 	     :initarg :patterns
 	     :initform nil)))
+
+;; Mention class in make-instance after class def to avoid bug24329.
+(defun make-instance-location-authorizer+patterns (patterns)
+  (make-instance 'location-authorizer :patterns patterns))
+
 
 
 

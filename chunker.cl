@@ -20,6 +20,10 @@
   ((trailers :initform nil :accessor chunking-stream-trailers)
    (eof-sent :initform nil :accessor chunking-stream-eof-sent)))
 
+;; Mention class in make-instance after class def to avoid bug24329.
+(defun make-instance-chunking-stream+output-handle (output-handle)
+  (make-instance 'chunking-stream :output-handle output-handle))
+
 
 (defmethod chunking-stream-trailers (stream)
   ;; so this will return nil for non chunkers
@@ -231,6 +235,12 @@
    (trailers :initform nil
 	     :accessor unchunking-trailers)
    ))
+
+;; Mention class in make-instance after class def to avoid bug24329.
+(defun make-instance-unchunking-stream+input-handle (input-handle)
+  (make-instance 'unchunking-stream :input-handle input-handle))
+
+
 
 (defmethod unchunking-trailers ((stream inflate-stream))
   (unchunking-trailers (slot-value stream 'excl::input-handle)))

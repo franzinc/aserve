@@ -168,9 +168,7 @@
 	      sessions)
        then (initialize-websession-master
 	     (setf (webaction-websession-master wa)
-	       (make-instance 'websession-master
-		 :cookie-name name
-		 :reap-hook-function reap-hook-function
+	       (make-instance-websession-master+cookie-name+reap-hook-function name reap-hook-function
 		 ))))
     
     (if* (null sessions)
@@ -295,9 +293,7 @@
 		 then ; no session found, but this session id looks good
 		      ; and was probably created by another web server.
 		      ; so create a session object
-		      (setq websession (make-instance 'websession
-					 :key csessid
-					 :method :cookie))
+		      (setq websession (make-instance-websession+key+method csessid :cookie))
 		      (setf (gethash csessid (sm-websessions sm)) websession)))
       (if* websession 
 	 then  (setf (websession-from-req req) websession)))
@@ -336,9 +332,7 @@
 		
 	      (setf (websession-from-req req)
 		(setf (gethash key (sm-websessions sm))
-		  (setq websession (make-instance 'websession
-				     :key key
-				     :method :try-cookie))))))
+		  (setq websession (make-instance-websession+key+method key :try-cookie))))))
 		
 	      
 
@@ -571,9 +565,7 @@ no map for webaction with default-actions ~s"
 		       then ; add new session
 			    (setf (websession-from-req req)
 			      (setf (gethash sessid (sm-websessions sm))
-				(make-instance 'websession 
-				  :key sessid
-				  :method :try-cookie)))
+				(make-instance-websession+key+method sessid :try-cookie)))
 			    
 			    ))
 	  

@@ -19,7 +19,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 44))
+(defparameter *aserve-version* '(1 3 45))
 
 (eval-when (eval load)
     (require :sock)
@@ -472,10 +472,8 @@ died. Use nil to specify no timeout.")
    
    (locators
     ;; list of locators objects in search order
-    :initform (list (make-instance 'locator-exact
-		      :name :exact)
-		    (make-instance 'locator-prefix
-		      :name :prefix)) 
+    :initform (list (make-instance-locator-exact+name :exact)
+		    (make-instance-locator-prefix+name :prefix)) 
     :accessor wserver-locators)
 
    (filters
@@ -529,7 +527,7 @@ died. Use nil to specify no timeout.")
    (default-vhost
        ;; vhost representing situations with no virtual host
        :initarg :default-vhost
-     :initform (make-instance 'vhost)
+     :initform (make-instance-vhost-0)
      :accessor wserver-default-vhost)
 
    (response-timeout
@@ -696,6 +694,10 @@ died. Use nil to specify no timeout.")
 	   :initarg :plist
 	   :initform nil)
    ))
+
+;; Mention class in make-instance after class def to avoid bug24329.
+(defun make-instance-vhost-0 ()
+  (make-instance 'vhost))
 
 (defmethod print-object ((vhost vhost) stream)
   (print-unreadable-object (vhost stream :type t :identity t)
@@ -2156,9 +2158,7 @@ by keyword symbols and not by strings"
 					:element-type 'character
 					:adjustable t
 					:fill-pointer 0))
-				  (sock (make-instance 
-                                            'unchunking-stream
-                                          :input-handle (request-socket req)))
+				  (sock (make-instance-unchunking-stream+input-handle (request-socket req)))
 				  (ch))
                               (loop (if* (eq :eof 
                                              (setq ch (read-char sock nil :eof)))
@@ -3489,10 +3489,9 @@ in get-multipart-sequence"))
       (values nil nil)
     (let* ((length (parse-integer (header-slot-value req :content-length) :junk-allowed t))
 	   (str (cond (length
-		       (make-instance 'truncated-stream :byte-length length
-				      :input-handle (request-socket req)))
+		       (make-instance-truncated-stream+byte-length+input-handle length (request-socket req)))
 		      ((equalp "chunked" (header-slot-value req :transfer-encoding))
-		       (make-instance 'unchunking-stream :input-handle (request-socket req)))
+		       (make-instance-unchunking-stream+input-handle (request-socket req)))
 		      (t (request-socket req))))
 	   (enc (header-slot-value req :content-encoding))
 	   entry must-close (must-flush t))
@@ -3520,6 +3519,12 @@ in get-multipart-sequence"))
 
 (def-stream-class truncated-stream (terminal-simple-stream)
   ((remaining :initarg :byte-length :accessor octets-remaining)))
+
+;; Mention class in make-instance after class def to avoid bug24329.
+(defun make-instance-truncated-stream+byte-length+input-handle
+  (byte-length input-handle)
+  (make-instance 'truncated-stream :byte-length byte-length :input-handle input-handle))
+
 
 (defmethod print-object ((obj truncated-stream) stream)
   (print-unreadable-object (obj stream :type t :identity t)
