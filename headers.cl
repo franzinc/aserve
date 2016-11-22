@@ -277,7 +277,7 @@
 		 (if* size
 		    then (error "size can't be specifed for header index"))
 		 
-		 (make-array *header-count*))
+		 (make-array *header-count* :initial-element nil))
      :init #'(lambda (sresource buffer)
 	       (declare (ignore sresource))
 	       (dotimes (i (length buffer))
