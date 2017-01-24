@@ -5,9 +5,16 @@
 ;;
 ;; See the file LICENSE for the full license governing this code.
 
+#+(version= 10 1 beta)
+(sys:defpatch "webactions" 1
+  "v1: 1.16: fix misspelled initarg to websession-master."
+  :type :system
+  :post-loadable t)
+
 #+(version= 10 0)
-(sys:defpatch "webactions" 2
-  "v2: 1.15: update parsed time after parsing is finished;
+(sys:defpatch "webactions" 3
+  "v3: 1.16: fix misspelled initarg to websession-master;
+v2: 1.15: update parsed time after parsing is finished;
 v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
   :type :system
   :post-loadable t)

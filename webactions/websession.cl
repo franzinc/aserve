@@ -45,7 +45,7 @@
 
 ;; Mention class in make-instance after class def to avoid bug24329.
 (defun make-instance-websession-master+cookie-name+reap-hook-function  (name reap-hook-function)
-  (make-instance 'websession-master :name name :reap-hook-function reap-hook-function))
+  (make-instance 'websession-master :cookie-name name :reap-hook-function reap-hook-function))
 
 
 

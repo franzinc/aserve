@@ -82,7 +82,7 @@
     :initform nil :accessor webaction-use-http-only-cookies)
    ))
 
-(defparameter *webactions-version* "1.15")
+(defparameter *webactions-version* "1.16")
 	      
 (defvar *name-to-webaction* (make-hash-table :test #'equal))
 
