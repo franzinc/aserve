@@ -66,7 +66,9 @@ for :access which allows for more flexibility in presentation.")
                   (:long
                    (format
                     nil "[~a] ~a: ~2,'0d/~2,'0d/~2,'0d - ~2,'0d:~2,'0d:~2,'0d - ~a~%"
-                    category (mp:process-name sys:*current-process*)
+                    category 
+		    ;; Avoid bug24536 (*current-process* may be nil during finalization).
+		    (when sys:*current-process* (mp:process-name sys:*current-process*))
                     cmonth cday (mod cyear 100) chour cmin csec
                     message))
                   (:brief
@@ -151,9 +153,11 @@ for :access which allows for more flexibility in presentation.")
   ;;
   (logmess 
    (format nil "~a ~d ~a ~a~@[ ~s~]"
-	   (or (getf (mp:process-property-list mp:*current-process*)
-		     'short-name)
-	       (mp:process-name mp:*current-process*))
+	   ;; Avoid bug24536 (*current-process* may be nil during finalization). 
+	   (when mp:*current-process*
+	     (or (getf (mp:process-property-list mp:*current-process*)
+		       'short-name)
+		 (mp:process-name mp:*current-process*)))
 	   level
 	   action
 	   (if* (stringp uri) 
