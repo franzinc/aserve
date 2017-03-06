@@ -46,6 +46,8 @@ build: FORCE
 # Can be used to change the number of parallel test runs:
 #NSERVERS = :n 1
 
+COMPILE_TESTS = yes
+
 test.tmp: FORCE
 	rm -f test.tmp
 	echo '(dribble "test.out")' >> test.tmp
@@ -54,7 +56,11 @@ test.tmp: FORCE
 	echo '(setq util.test::*break-on-test-failures* t)' >> test.tmp
 	echo '(load "load.cl")' >> test.tmp
 	echo '(setq user::*do-aserve-test* nil)' >> test.tmp
+ifeq ($(COMPILE_TESTS),yes)
+	echo '(load (compile-file "test/t-aserve.cl"))' >> test.tmp
+else
 	echo '(load "test/t-aserve.cl")' >> test.tmp
+endif
 
 test: test.tmp
 	echo '(time (test-aserve-n :n 1 :exit t))' >> test.tmp
@@ -65,6 +71,7 @@ testsmp: test.tmp
 	$(mlisp) -L test.tmp -kill
 
 stress: test.tmp
+	echo '(net.aserve::debug-on :notrap)' >> test.tmp
 	echo '(time (test-aserve-n $(NSERVERS) :exit t))' >> test.tmp
 	../bin/repeat.sh 10 $(mlisp) -L test.tmp -kill
 
@@ -82,7 +89,11 @@ test-from-asdf: FORCE
 	echo '(setq util.test::*break-on-test-failures* t)' >> build.tmp
 	echo '(require :asdf)' >> build.tmp
 	echo "(asdf:operate 'asdf:load-op :aserve)" >> build.tmp
+ifeq ($(COMPILE_TESTS),yes)
+	echo '(time (load (compile-file "test/t-aserve.cl")))' >> build.tmp
+else
 	echo '(time (load "test/t-aserve.cl"))' >> build.tmp
+endif
 	echo '(exit util.test::*test-errors*)' >> build.tmp
 	$(mlisp) -L build.tmp -kill
 
