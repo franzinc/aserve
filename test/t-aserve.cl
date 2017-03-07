@@ -121,10 +121,15 @@
 
 (defun asp-index ()
   (if *log-wserver-name*
-      (format nil "~A[~A]" 
+      #-(version>= 10 1)
+      (format nil "~A[Bix=~A]"  ;; bug24565
 	      (mp:process-name mp:*current-process*)
 	      (sys::thread-bindstack-index
 	       (mp:process-thread mp:*current-process*)))
+      #+(version>= 10 1)
+      (format nil "~A[~A]" 
+	      (mp:process-name mp:*current-process*)
+	      (mp:process-sequence mp:*current-process*)) ;; bug24565
     ""))
 
 (defun user::test-aserve-n (&key (n
