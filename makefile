@@ -68,6 +68,12 @@ stress: test.tmp
 	echo '(time (test-aserve-n $(NSERVERS) :exit t))' >> test.tmp
 	../bin/repeat.sh 10 $(mlisp) -L test.tmp -kill
 
+stresswp: test.tmp
+	echo '(net.aserve::debug-on :notrap)' >> test.tmp
+	echo '(setq excl::*break-on-warnings* :pause)' >> test.tmp
+	echo '(time (test-aserve-n $(NSERVERS) :exit t))' >> test.tmp
+	../bin/repeat.sh 10 $(mlisp) -L test.tmp -kill
+
 test-from-asdf: FORCE
 	rm -f build.tmp
 	echo '(dribble "test.out")' >> build.tmp
