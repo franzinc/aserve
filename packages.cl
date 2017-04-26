@@ -4,9 +4,16 @@
 ;;
 ;; See the file LICENSE for the full license governing this code.
 
+#+(version= 10 1)
+(sys:defpatch "aserve" 1
+  "v1: 1.3.49: speed up read-sock-line."
+  :type :system
+  :post-loadable t)
+
 #+(version= 10 0)
-(sys:defpatch "aserve" 11
-  "v11: 1.3.45 - avoid races in constructor initialization;
+(sys:defpatch "aserve" 12
+  "v12: 1.3.49: speed up read-sock-line;
+v11: 1.3.45 - avoid races in constructor initialization;
 v10: no version change, fix defpatch;
 v9: 1.3.44: add :test-ssl argument to start function;
 v8: 1.3.43: don't log when client closes connection early;
@@ -42,51 +49,6 @@ v4: 1.3.20: handle connection reset and aborted errors properly in the client;
 v3: add timeout for reading request header;
 v2: 1.3.18: introduce allegroserve-error condition object, fix compression with logical pathnames;
 v1: 1.3.16: fix freeing freed buffer."
-  :type :system
-  :post-loadable t)
-
-#+(version= 8 2)
-(sys:defpatch "aserve" 31
-  "v31: 1.3.38: call make-ssl-client-stream with :method instead of :ssl-method;
-v30: 1.3.37: add trailer support
-v29: 1.3.35: add max-listeners arg to net.aserve:start. Increase max header size to 8192;
-v28: 1.3.33: speed up serving of files;
-v27: 1.3.32: add no-proxy argument to do-http-request. Fix buggy argument checking for ssl arguments;
-v26: 1.3.30: For https, use defaults of the underlying ssl module.
-v25: 1.3.29: proxy now returns content-length;
-v24: 1.3.28: Fix bug in retry-on-timeout code in do-http-request;
-v23: 1.3.28: Have server send a 408 Request Timeout response on timeout instead of closing connection. Allow client to auto-retry;
-v22: 1.3.27: Make clients reading a chunked response detect an unexpected eof instead of busy looping;
-v21: 1.3.26: Make do-http-request merge the query part of the uri of requests with the query argument;
-v20: 1.3.25: fix keep-alive timeout header: use wserver-header-read-timeout instead of wserver-read-request-timeout;
-v19: 1.3.24: Move 100-continue expectation handling until after authorization and an entity has been found. Allow disabling of auto handling per entity;
-v18: 1.3.23: fixes socket leak in client when the the writing of the initial headers and body fails;
-v17: 1.3.20: handle connection reset and aborted errors properly in the client;
-v16: add timeout for reading request header. Fix compression with logical pathnames;
-v15: 1.3.18: introduce allegroserve-error condition object, Fix compression with logical pathnames;
-v14: 1.3.16: fix freeing freed buffer;
-v13: 1.3.13: improve debugging facilities;
-v12: 1.3.12: make aserve compatible with patch inflate.003, request-query cache includes external-format as a key, send cookies on one line as per rfc6265, add support for ssl CRLs;
-v11: 1.3.11: fix log reporting of content-length when using keep-alive;
-v10: 1.3.10: fix buffer boundary error in unchunking-streams;
-v9: 1.3.9: speed up unchunking-streams;
-v8: 1.3.8: fix problem w/response handler using string output streams;
-v7: 1.3.7: Add :default-actions to webactions, Avoid polling in http-accept-thread, smp thread safety changes;
-v6: 1.3.5: doc updates, make client-request-read-sequence work with compressed responses, delay sending headers for computed entities, add option to do hidden redirect to an index file in a directory, fix prepend-headers so that it works on windows;
-v5: 1.3.1: compression support, publish-directory :destination can be a list of directories, and various SSL improvements;
-v4: 1.2.70: add support for Expect: 100-continue requests;
-v3: 1.2.69, make logging though method specialized on wserver class;
-v2: 1.2.68, obey keep-alive requests for PUT and POST requests;
-v1: version 1.2.67, implement keep-alive in allegroserve client."
-  :type :system
-  :post-loadable t)
-
-#+(version= 8 1)
-(sys:defpatch "aserve" 2
-  "v1: version 1.2.56, large request body & multipart content type & more;
-v2: version 1.2.58, fix problem introduced in 1.2.56 where the response date 
-  is always the zero universal time & correctly send out the comment after
-  the result code."
   :type :system
   :post-loadable t)
 

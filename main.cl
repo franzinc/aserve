@@ -19,7 +19,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 48))
+(defparameter *aserve-version* '(1 3 49))
 
 (eval-when (eval load)
     (require :sock)
@@ -2844,6 +2844,9 @@ in get-multipart-sequence"))
       
 
 (defun read-sock-line (sock buffer start chars-seen)
+  (declare (optimize (speed 3))
+	   (type fixnum start)
+	   (type (simple-array character (*)) buffer))
   ;; read a line of data into the socket buffer, starting at start.
   ;; return  buffer and index after last character in buffer.
   ;; get bigger buffer if needed.
@@ -2877,7 +2880,9 @@ in get-multipart-sequence"))
 	   else ; store character
 		(if* (>= start max)
 		   then ; must grow the string
-			(let ((new-buffer (get-request-buffer (+ max 1024))))
+			(let ((new-buffer (get-request-buffer (* max 2))))
+			  (declare (type (simple-array character (*))
+					 new-buffer))
 			  (if* (null new-buffer)
 			     then ;; too large, give up
 				  (free-request-buffer buffer)
