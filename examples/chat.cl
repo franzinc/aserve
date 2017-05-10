@@ -58,7 +58,7 @@
 ; setting *background-image* to an image url will put that url on
 ; the background of the top window
 ; e.g.
-;  (setq *background-image* "http://www.franz.com/~jkf/aserveback4.gif")
+;  (setq *background-image* "https://franz.com/~jkf/aserveback4.gif")
 ;  (setq *background-image* nil)
 ; set *recent-first* to true to make the newest messages show first
 ;

@@ -13,7 +13,7 @@ case $1 in
         ;;
 
     2) # redirect to franz.com, send some headers
-        echo 'Location: http://www.franz.com'
+        echo 'Location: https://franz.com'
         echo 'etag: 123hellomac'
 	echo
 	echo -n 'go to franz'

@@ -51,7 +51,7 @@ We've recently added these features:
  * Security up through TLS 1.0 (SSL 3.1).
 
 See [the latest Allegro CL Release
-Notes](http://www.franz.com/support/documentation/current/doc/release-notes.htm)
+Notes](https://franz.com/support/documentation/current/doc/release-notes.htm)
 for more information on AllegroServe changes.
 
 Author
@@ -139,7 +139,7 @@ Documentation
 
 For complete documentation see the contents of the doc directory, 
 which is part of this project or visit the online version of the
-[AllegroServe documentation](http://www.franz.com/support/documentation/current/doc/aserve/aserve.html).
+[AllegroServe documentation](https://franz.com/support/documentation/current/doc/aserve/aserve.html).
 
 ### Quick Start Documentation
 
@@ -193,7 +193,7 @@ See the webactions/doc/webactions.html file for more information.
 For other links that may be of interest are:
 
  * [Portable AllegroServe](http://sourceforge.net/projects/portableaserve)
- * [Source to the if* macro](http://www.franz.com/~jkf/ifstar.txt)
+ * [Source to the if* macro](https://franz.com/~jkf/ifstar.txt)
  * [CL-HTTP](http://www.ai.mit.edu/projects/iiip/doc/cl-http/home-page.html)
 
 Examples and Information

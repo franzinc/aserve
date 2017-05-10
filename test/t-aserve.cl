@@ -2119,7 +2119,7 @@ Returns a vector."
       (test t (not (null (search "go to franz" body))))
       
       (test 301 code)
-      (test "http://www.franz.com" (cdr (assoc :location headers))
+      (test "https://franz.com" (cdr (assoc :location headers))
 	    :test #'equal)
       (test "123hellomac" (cdr (assoc :etag headers))
 	    :test #'equal)
@@ -2371,71 +2371,68 @@ Returns a vector."
   ;; we only test proxy authorization once, not once
   ;; for each kind of test we do 
   
-  ; allow all
-  (start-proxy-running t)
-  (test 200 (values2 (x-do-http-request "http://www.franz.com")))
-  (stop-proxy-running)
+  (let ((test-url
+	 "http://franz.com/ftp/pri/layer/file-used-by-ws-test-suite.txt"))
+    ;; allow all
+    (start-proxy-running t)
+    (test 200 (values2 (x-do-http-request test-url)))
+    (stop-proxy-running)
   
-  ; allow from localhost
-  (start-proxy-running (make-instance 'proxy-control
-			 :location (make-instance 'location-authorizer
-				     :patterns '((:accept "127.1")
-						 :deny))))
-  (test 200 (and :second (values2 (x-do-http-request "http://www.franz.com"))))
-  (stop-proxy-running)
-  
-  
-  ; disallow from localhost
-  (start-proxy-running (make-instance 'proxy-control
-			 :location (make-instance 'location-authorizer
-				     :patterns '((:accept "192.168.111.222")
-						 (:deny "127.1")
-						 :deny))))
-  (test 404 (and :second (values2 (x-do-http-request "http://www.franz.com"))))
-  (stop-proxy-running)
-  
-  ; allow to franz.com
-  (start-proxy-running (make-instance 'proxy-control
-			 :destinations '("www.franz.com"
-					 ("franz.com" 333 80) ; 
-					 ("www.whitehouse.gov" 222) ; only 222
-					 ("www.cnn.com") ; no ports specified
-					 )))
-  (test 200 (and :third (values2 (x-do-http-request "http://www.franz.com"))))
-  (test 404 (and :fouth (values2 (x-do-http-request "http://www.noaa.gov"))))
-  (test 404 (values2 (x-do-http-request "http://www.noaa.gov:444")))
-  (test 200 (values2 (x-do-http-request "http://franz.com")))
-  (test 200 (values2 (x-do-http-request "http://franz.com:80")))
-  (test 404 (values2 (x-do-http-request "http://www.whitehouse.gov")))
-  (test 404 (values2 (x-do-http-request "http://www.cnn.com")))
-  
-  (stop-proxy-running)
-  
-  (format t "proxy authorization using hash table for destination~%")
-  ; allow using a hash table
-  (let ((ht (make-hash-table :test #'equalp)))
-    (dolist (site '("www.franz.com" 
-		    ("franz.com" 333 80)
-		    ("www.whitehouse.gov" 222)
-		    ("www.cnn.com")))
-		    
-      (setf (gethash (if* (consp site) then (car site) else site) ht) 
-	(if* (consp site) 
-	   then (cdr site) 
-	   else t)))
-    
+    ;; allow from localhost
     (start-proxy-running (make-instance 'proxy-control
-			   :destinations ht))
-    
-    (test 200 (and :third (values2 (x-do-http-request "http://www.franz.com"))))
+			   :location (make-instance 'location-authorizer
+				       :patterns '((:accept "127.1")
+						   :deny))))
+    (test 200 (and :second (values2 (x-do-http-request test-url))))
+    (stop-proxy-running)
+  
+  
+    ;; disallow from localhost
+    (start-proxy-running (make-instance 'proxy-control
+			   :location (make-instance 'location-authorizer
+				       :patterns '((:accept "192.168.111.222")
+						   (:deny "127.1")
+						   :deny))))
+    (test 404 (and :second (values2 (x-do-http-request test-url))))
+    (stop-proxy-running)
+  
+    ;; allow to franz.com
+    (start-proxy-running
+     (make-instance 'proxy-control
+       :destinations '("franz.com"
+		       ("franz.com" 333 80) ; 
+		       ("www.cnn.com")	; no ports specified
+		       )))
+    (test 200 (and :third (values2 (x-do-http-request test-url))))
     (test 404 (and :fouth (values2 (x-do-http-request "http://www.noaa.gov"))))
     (test 404 (values2 (x-do-http-request "http://www.noaa.gov:444")))
-    (test 200 (values2 (x-do-http-request "http://franz.com")))
-    (test 200 (values2 (x-do-http-request "http://franz.com:80")))
-    (test 404 (values2 (x-do-http-request "http://www.whitehouse.gov")))
+    (test 200 (values2 (x-do-http-request test-url)))
     (test 404 (values2 (x-do-http-request "http://www.cnn.com")))
+  
+    (stop-proxy-running)
+  
+    (format t "proxy authorization using hash table for destination~%")
+    ;; allow using a hash table
+    (let ((ht (make-hash-table :test #'equalp)))
+      (dolist (site '("franz.com" 
+		      ("franz.com" 333 80)
+		      ("www.cnn.com")))
+		    
+	(setf (gethash (if* (consp site) then (car site) else site) ht) 
+	  (if* (consp site) 
+	     then (cdr site) 
+	     else t)))
     
-    (stop-proxy-running)))
+      (start-proxy-running (make-instance 'proxy-control
+			     :destinations ht))
+    
+      (test 200 (and :third (values2 (x-do-http-request test-url))))
+      (test 404 (and :fouth (values2 (x-do-http-request "http://www.noaa.gov"))))
+      (test 404 (values2 (x-do-http-request "http://www.noaa.gov:444")))
+      (test 200 (values2 (x-do-http-request test-url)))
+      (test 404 (values2 (x-do-http-request "http://www.cnn.com")))
+    
+      (stop-proxy-running))))
 
 
 (defun test-expect-header-responses ()
