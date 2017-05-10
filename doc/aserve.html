@@ -67,6 +67,7 @@ Files</a><font face="Courier New"><br>
 <font face="Courier New">&nbsp; <a href="#f-with-http-response">with-http-response</a><br>
 &nbsp; <a href="#f-with-http-body">with-http-body</a><br>
 &nbsp; <a href="#f-get-request-body">get-request-body</a><br>
+&nbsp; <a href="#f-get-request-body-incremental">get-request-body-incremental</a><br>
 &nbsp; <a href="#f-header-slot-value">header-slot-value</a><br>
 &nbsp; <a href="#f-reply-header-slot-value">reply-header-slot-value</a><br>
 &nbsp; <a href="#f-request-query">request-query</a><br>
@@ -1500,6 +1501,31 @@ using the given external-format and then returned from this
 function.&nbsp;&nbsp; This
 reconversion does not affect the cached value.</p>
 <hr>
+<p><a name="f-get-request-body-incremental"></a><strong><font face="Courier New">(get-request-body-incremental
+request function
+&amp;key
+buffer)</font></strong></p>
+Reads the body of a PUT or POST <b>request</b> and passes it to a <b>function</b>
+given by the caller.   The function should take two arguments: vector and count.
+The vector is a simple-array of (unsigned-byte 8) and count is the number
+of bytes of data in the vector.   The final time the function
+is called the value of count will be zero indicating there is no more
+data to follow.
+The same vector will be passed on each call.
+<p>
+The caller can pass in a simple-array of (unsigned-byte 8) as the value
+of the <b>:buffer</b> argument.  If no buffer is supplied by the caller one will
+be allocated by the function.
+<p>
+This function or <b>get-request-body</b> can be called but not both.
+<p>
+This function treats the body of the request as a sequence of bytes.
+If you wish to convert it to a string you'll need to collect
+the whole body and call <b>octets-to-string</b> with the appropriate
+external format.
+<hr>
+
+
 <p><a name="f-header-slot-value"></a><strong><font face="Courier New">(header-slot-value
 request
 header-name)</font></strong></p>
@@ -1516,6 +1542,7 @@ header slot</p>
 a string..</em></p>
 <p>&nbsp;</p>
 <hr>
+
 <p><a name="f-reply-header-slot-value"></a><font face="Courier New"><strong>(reply-header-slot-value
 request
 header-name)</strong></font></p>

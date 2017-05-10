@@ -5,15 +5,17 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 2
-  "v2: 1.3.50: define deflate-stream methods all the time;
+(sys:defpatch "aserve" 3
+  "v3: 1.3.51 add get-request-body-incremental;
+v2: 1.3.50: define deflate-stream methods all the time;
 v1: 1.3.49: speed up read-sock-line."
   :type :system
   :post-loadable t)
 
 #+(version= 10 0)
-(sys:defpatch "aserve" 13
-  "v13: 1.3.50: define deflate-stream methods all the time;
+(sys:defpatch "aserve" 14
+  "v14: 1.3.51 add get-request-body-incremental;
+v13: 1.3.50: define deflate-stream methods all the time;
 v12: 1.3.49: speed up read-sock-line;
 v11: 1.3.45 - avoid races in constructor initialization;
 v10: no version change, fix defpatch;
@@ -119,6 +121,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:get-multipart-header
    #:get-multipart-sequence
    #:get-request-body
+   #:get-request-body-incremental
    #:handle-request
    #:handle-uri		; add-on component..
    #:header-slot-value

@@ -281,6 +281,7 @@
 		     (test-authorization port)
 		     (test-encoding)
 		     (test-forms port)
+		     (test-get-request-body-incr port)
 		     (test-client port)
 		     (test-cgi port)
 		     (test-http-copy-file port)
@@ -1411,6 +1412,63 @@ Returns a vector."
       :content "foo and bar"
       :content-type "text/plain")
     
+    ))
+
+(defvar *get-request-body-incr-value*
+    (let* ((size 16000)
+	   (vec (make-array size :element-type '(unsigned-byte 8))))
+      (dotimes (i size) (setf (aref vec i) (random 255)))
+      vec))
+
+(defun test-get-request-body-incr (port)
+  (net.aserve:publish 
+   :path "/get-request-body-incr-test"
+   :content-type "text/plain"
+   :function #'(lambda (req ent)
+		 (let (bufs
+		       got-zero
+		       after-zero)
+				    
+				    
+		   (get-request-body-incremental
+		    req #'(lambda (buffer size)
+			    (if* got-zero
+			       then ; never should get
+				    ; callback after zero
+				    (setq after-zero t))
+			    (if* (eql size 0)
+			       then (setq got-zero t)
+			       else (push (subseq buffer 0 size) bufs))))
+
+		   ; test that the callback function got a zero size
+		   (test t got-zero)
+		 
+		   ; test that the zero was the last value sent the
+		   ; callback function
+		   (test nil after-zero)
+		 
+		   ; test that the callback function received
+		   ; the correct value
+		   (let ((res (apply #'concatenate
+				     'vector
+				     (nreverse bufs))))
+		     (test t
+		      (equalp res *get-request-body-incr-value*))))
+				  
+
+		 ; response doesn't matter, we'e done the testing already
+   
+		 (with-http-response (req ent)
+		   (with-http-body (req ent)
+		     (net.html.generator:html "foo the bar")
+		     ))))
+  
+  (let ((prefix-local (format nil "http://localhost:~a" port)))
+    (x-do-http-request (format nil "~a/get-request-body-incr-test" 
+			       prefix-local)
+		       :method :put
+		       :content *get-request-body-incr-value*
+		       :content-type "application/binary")
     ))
     
 
