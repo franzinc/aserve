@@ -5,14 +5,16 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 1
-  "v1: 1.3.49: speed up read-sock-line."
+(sys:defpatch "aserve" 2
+  "v2: 1.3.50: define deflate-stream methods all the time;
+v1: 1.3.49: speed up read-sock-line."
   :type :system
   :post-loadable t)
 
 #+(version= 10 0)
-(sys:defpatch "aserve" 12
-  "v12: 1.3.49: speed up read-sock-line;
+(sys:defpatch "aserve" 13
+  "v13: 1.3.50: define deflate-stream methods all the time;
+v12: 1.3.49: speed up read-sock-line;
 v11: 1.3.45 - avoid races in constructor initialization;
 v10: no version change, fix defpatch;
 v9: 1.3.44: add :test-ssl argument to start function;
@@ -28,8 +30,9 @@ v1: 1.3.36: cosmetic: bump version #; code same as 10.0 initial release."
   :post-loadable t)
 
 #+(version= 9 0)
-(sys:defpatch "aserve" 20
-  "v20: 1.3.38: call make-ssl-client-stream with :method instead of :ssl-method;
+(sys:defpatch "aserve" 21
+  "v21: 1.3.50: define deflate-stream methods all the time;
+v20: 1.3.38: call make-ssl-client-stream with :method instead of :ssl-method;
 v19: 1.3.37: add trailer support
 v18: 1.3.36: add http-only cookies;
 v17: 1.3.35: add max-listeners arg to net.aserve:start. Increase max header size to 8192;
