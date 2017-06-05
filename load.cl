@@ -1,7 +1,14 @@
+(in-package :cl-user)
+
+;; load in aserve
+;;
+;; $Id: load.cl,v 1.69 2008/02/04 21:02:24 jkf Exp $
+;;
 ;; load in aserve
 
+
 ;
-; loading this file will compile and load AllegroServe and Webactions
+; loading this file will compile and load AllegroServe (+++mt NOT Webactions and examples)
 ;
 ; calling (make-aserve.fasl) will build
 ;   aserve.fasl  - just allegroserve
@@ -120,8 +127,7 @@
 ;(setq *features* (delete :hiper-socket *features*))
 
 (with-compilation-unit  nil
-  (dolist (file (append *aserve-files* *aserve-examples*
-			*webactions-files*))
+  (dolist (file *aserve-files*)
     #+allegro-cl-lite
     (progn
       ;; aServe doesn't work very well under 5.0.1 Lite due to
