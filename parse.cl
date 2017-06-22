@@ -18,6 +18,8 @@
 
 (in-package :net.aserve)
 
+(eval-when (compile) (declaim (optimize (speed 3))))
+
 (check-smp-consistency)
 
 ;; parseobj -- used for cons-free parsing of strings

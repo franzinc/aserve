@@ -14,6 +14,7 @@
 
 (in-package :net.aserve)
 
+(eval-when (compile) (declaim (optimize (speed 3))))
 
 (defclass entity ()
   ;; an object to be published

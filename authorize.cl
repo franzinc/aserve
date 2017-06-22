@@ -15,6 +15,8 @@
 
 (in-package :net.aserve)
 
+(eval-when (compile) (declaim (optimize (speed 3))))
+
 (defclass authorizer ()
   ;; denotes information on authorizing access to an entity
   ;; this is meant to be subclassed with the appropriate slots

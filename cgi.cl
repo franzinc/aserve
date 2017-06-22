@@ -16,6 +16,8 @@
 
 (in-package :net.aserve)
 
+(eval-when (compile) (declaim (optimize (speed 3))))
+
 (defun run-cgi-program (req ent program
 			&key
 			path-info

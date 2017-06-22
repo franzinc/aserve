@@ -5,16 +5,18 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 3
-  "v3: 1.3.51 add get-request-body-incremental;
+(sys:defpatch "aserve" 4
+  "v4: 1.3.52: optimize compilation for speed;
+v3: 1.3.51 add get-request-body-incremental;
 v2: 1.3.50: define deflate-stream methods all the time;
 v1: 1.3.49: speed up read-sock-line."
   :type :system
   :post-loadable t)
 
 #+(version= 10 0)
-(sys:defpatch "aserve" 14
-  "v14: 1.3.51 add get-request-body-incremental;
+(sys:defpatch "aserve" 15
+  "v15: 1.3.52: optimize compilation for speed;
+v14: 1.3.51 add get-request-body-incremental;
 v13: 1.3.50: define deflate-stream methods all the time;
 v12: 1.3.49: speed up read-sock-line;
 v11: 1.3.45 - avoid races in constructor initialization;
@@ -32,8 +34,9 @@ v1: 1.3.36: cosmetic: bump version #; code same as 10.0 initial release."
   :post-loadable t)
 
 #+(version= 9 0)
-(sys:defpatch "aserve" 21
-  "v21: 1.3.50: define deflate-stream methods all the time;
+(sys:defpatch "aserve" 22
+  "v22: 1.3.52: optimize compilation for speed;
+v21: 1.3.50: define deflate-stream methods all the time;
 v20: 1.3.38: call make-ssl-client-stream with :method instead of :ssl-method;
 v19: 1.3.37: add trailer support
 v18: 1.3.36: add http-only cookies;
@@ -69,6 +72,8 @@ v1: 1.3.16: fix freeing freed buffer."
 ;  standalone package
 ;
 (in-package :user)
+
+(eval-when (compile) (declaim (optimize (speed 3))))
 
 (eval-when (compile load eval)
   (require :osi)

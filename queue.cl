@@ -3,6 +3,8 @@
 
 (in-package :net.aserve)
 
+(eval-when (compile) (declaim (optimize (speed 3))))
+
 #+(version= 8 2)
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (handler-case (dequeue (make-instance 'mp:queue) :timeout 0 :empty-queue-result :foo)

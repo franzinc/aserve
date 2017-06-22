@@ -32,6 +32,8 @@
 
 (in-package :net.html.generator)
 
+(eval-when (compile) (declaim (optimize (speed 3))))
+
 ;; html generation
 
 (defvar *html-stream*)	; all output sent here

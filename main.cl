@@ -16,10 +16,12 @@
 
 (in-package :net.aserve)
 
+(eval-when (compile) (declaim (optimize (speed 3))))
+
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 51))
+(defparameter *aserve-version* '(1 3 52))
 
 (eval-when (eval load)
     (require :sock)

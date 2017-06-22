@@ -10,6 +10,8 @@
 
 (in-package :net.aserve)
 
+(eval-when (compile) (declaim (optimize (speed 3))))
+
 (def-clp-function clp_base (req ent args body)
   ;; put out a base tag for this page.
   ;; use this in the head section so that relative links to images

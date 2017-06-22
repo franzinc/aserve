@@ -18,13 +18,9 @@
 ;; just some simple stuff to allow us to test aserve
 ;;
 
-
-
-
-
-
-
 (in-package :net.aserve.client)
+
+(eval-when (compile) (declaim (optimize (speed 3))))
 
 (net.aserve::check-smp-consistency)
 

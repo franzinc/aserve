@@ -5,8 +5,6 @@
 ;; See the file LICENSE for the full license governing this code.
 ;;
 
-;;
-
 ;; Description:
 ;;   decode/encode code
 
@@ -14,8 +12,9 @@
 ;;- http://www.franz.com/~jkf/coding_standards.html
 ;;-
 
-
 (in-package :net.aserve)
+
+(eval-when (compile) (declaim (optimize (speed 3))))
 
 ;---------------- urlencoding ----------------
 ; there are two similar yet distinct encodings for character strings

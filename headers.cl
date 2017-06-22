@@ -13,8 +13,9 @@
 ;;- http://www.franz.com/~jkf/coding_standards.html
 ;;-
 
-
 (in-package :net.aserve)
+
+(eval-when (compile) (declaim (optimize (speed 3))))
 
 (defvar *header-byte-array*
     ;; unsigned-byte 8 vector contains the characters referenced by

@@ -10,6 +10,7 @@
 
 (in-package :net.aserve)
 
+(eval-when (compile) (declaim (optimize (speed 3))))
 
 (def-clp-function wa_link (req ent args body)
   (declare (ignore body))

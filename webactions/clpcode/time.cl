@@ -9,6 +9,7 @@
 
 (in-package :net.aserve)
 
+(eval-when (compile) (declaim (optimize (speed 3))))
 
 (net.aserve:def-clp-function time_universal-time
     (req ent args body)

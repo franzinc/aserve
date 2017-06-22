@@ -8,7 +8,7 @@
 
 (in-package :net.aserve)
 
-
+(eval-when (compile) (declaim (optimize (speed 3))))
 
 (defclass websession-master ()
   ;; describes how a set of sessions is managed

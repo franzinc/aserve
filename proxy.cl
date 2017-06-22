@@ -15,6 +15,8 @@
 
 (in-package :net.aserve)
 
+(eval-when (compile) (declaim (optimize (speed 3))))
+
 (check-smp-consistency)
 
 (defmacro with-mp-locked-connection-cache ((s) &rest body)

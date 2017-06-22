@@ -24,6 +24,8 @@
 
 (in-package :net.aserve)
 
+(eval-when (compile) (declaim (optimize (speed 3))))
+
 (defclass webaction-entity (computed-entity access-file-mixin)
   ((webaction ;; holds webaction object
     :initarg :webaction

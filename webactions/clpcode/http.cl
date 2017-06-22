@@ -8,6 +8,7 @@
 
 (in-package :net.aserve)
 
+(eval-when (compile) (declaim (optimize (speed 3))))
 
 (def-clp-function http_header-value (req ent args body)
   (declare (ignore ent body))

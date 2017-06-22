@@ -36,6 +36,8 @@ v1: add timeout to webaction-project."
 
 (in-package :net.aserve)
 
+(eval-when (compile) (declaim (optimize (speed 3))))
+
 (defpackage :net.aserve
   (:export #:clp-directory-entity-processor
 	   #:clp-entity

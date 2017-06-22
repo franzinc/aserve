@@ -20,6 +20,8 @@
 
 (in-package :net.aserve)
 
+(eval-when (compile) (declaim (optimize (speed 3))))
+
 (defvar *last-responses* nil)
 
 
