@@ -2768,12 +2768,13 @@ Returns a vector."
     (let (*wserver*)
       
       ; valid ssl startup
-      (handler-case 
-	  (net.aserve:start :ssl (merge-pathnames "server.pem" 
-						  *aserve-load-truename*)
-			    :server :new
-			    :port nil
-			    :test-ssl t)
+      (handler-case
+	  (setq *wserver*   ; fix for bug24838
+	    (net.aserve:start :ssl (merge-pathnames "server.pem" 
+						    *aserve-load-truename*)
+			      :server :new
+			      :port nil
+			      :test-ssl t))
 	(error (c)
 	  c
 	  (setq seen-error-1 t)))
@@ -2785,11 +2786,12 @@ Returns a vector."
       
       ;; bogus ssl cert but don't test
       (handler-case 
-	  (net.aserve:start :ssl (merge-pathnames "not-exist-server.pem" 
-						  *aserve-load-truename*)
-			    :port nil
-			    :server :new
-			    )
+	  (setq *wserver*
+	    (net.aserve:start :ssl (merge-pathnames "not-exist-server.pem" 
+						    *aserve-load-truename*)
+			      :port nil
+			      :server :new
+			      ))
 	(error (c)
 	  c
 	  (setq seen-error-2 t)))
@@ -2801,11 +2803,12 @@ Returns a vector."
       
       ;; bogus ssl cert and do test
       (handler-case 
-	  (net.aserve:start :ssl (merge-pathnames "not-exist-server.pem" 
-						  *aserve-load-truename*)
-			    :port nil
-			    :server :new
-			    :test-ssl t)
+	  (setq *wserver*
+	    (net.aserve:start :ssl (merge-pathnames "not-exist-server.pem" 
+						    *aserve-load-truename*)
+			      :port nil
+			      :server :new
+			      :test-ssl t))
 	(error (c)
 	  c
 	  (setq seen-error-3 t)))
