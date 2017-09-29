@@ -2627,14 +2627,17 @@
  			    (maybe-universal-time-to-date (request-reply-date req))
  			    *crlf*)
 
- 		(if* (member :keep-alive strategy :test #'eq)
- 		   then (format-dif :xmit-server-response-headers
- 				    hsock "Connection: Keep-Alive~aKeep-Alive: timeout=~d~a"
- 				    *crlf*
- 				    (wserver-header-read-timeout *wserver*)
- 				    *crlf*)
- 		   else (format-dif :xmit-server-response-headers
-                                    hsock "Connection: Close~a" *crlf*))
+		;; rfe15225: Add a strategy to suppress sending either of these headers.
+		;;  Some websocket clientsobject to these headers in the server response.
+		(or (member :no-keep-alive strategy)
+		    (if* (member :keep-alive strategy :test #'eq)
+		       then (format-dif :xmit-server-response-headers
+					hsock "Connection: Keep-Alive~aKeep-Alive: timeout=~d~a"
+					*crlf*
+					(wserver-header-read-timeout *wserver*)
+					*crlf*)
+		       else (format-dif :xmit-server-response-headers
+					hsock "Connection: Close~a" *crlf*)))
 
  		(if* (not (assoc :server extra-headers :test #'eq))
  		   then ; put out default server info

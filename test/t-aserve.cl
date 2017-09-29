@@ -1501,6 +1501,17 @@ Returns a vector."
 			       "redir-inf")
 			     (with-http-body (req ent)))))
     
+    ;; Test :no-keep-alive strategy added in rfe15225.
+    (publish :path "/defaultkeepalive"
+	     :function (lambda (req ent)
+			 (with-http-response (req ent)
+			   (with-http-body (req ent)))))
+    (publish :path "/nokeepalive"
+	     :function (lambda (req ent)
+			 (with-http-response (req ent)
+			   (push :no-keep-alive (request-reply-strategy req))
+			   (with-http-body (req ent)))))
+    
   
     ; first test target
     (multiple-value-bind (body code headers)
@@ -1580,7 +1591,48 @@ Returns a vector."
                        (declare (ignore body headers uri))
                        (test 200 code4)
                        (test t (and "not reuse socket"
-                                    (not (eq socket2 socket3)))))))))))
+                                    (not (eq socket2 socket3)))))))))
+    
+    (when (null (asc x-proxy))
+      ;; Do not run this test through a proxy.
+      ;; Test :no-keep-alive strategy added in rfe15225.
+      ;;  When :no-keep-alive strategy is present, avoid sending either of
+      ;;  the heders "Connection: close" or "Connection: Keep-Alive". 
+      (multiple-value-bind (body code3 headers)
+	  (x-do-http-request (format nil "~a/defaultkeepalive" prefix-local)
+			     :keep-alive nil)
+	(declare (ignore body))
+	(test 200 code3 :fail-info "defaultkeepalive keep-alive=nil")
+	(test "close" (cdr (assoc :connection headers)) :test #'string-equal
+	      :fail-info "defaultkeepalive keep-alive=nil"))
+      (multiple-value-bind (body code3 headers)
+	  (x-do-http-request (format nil "~a/defaultkeepalive" prefix-local)
+			     :keep-alive t)
+	(declare (ignore body))
+	(test 200 code3 :fail-info "defaultkeepalive keep-alive=t")
+	(test "keep-alive" (cdr (assoc :connection headers)) :test #'string-equal
+	      :fail-info "defaultkeepalive keep-alive=t"))
+    
+      (multiple-value-bind (body code3 headers)
+	  (x-do-http-request (format nil "~a/nokeepalive" prefix-local))
+	(declare (ignore body))
+	(test 200 code3 :fail-info "nokeepalive keep-alive missing")
+	(test nil (assoc :connection headers) :fail-info "nokeepalive keep-alive missing"))
+      (multiple-value-bind (body code3 headers)
+	  (x-do-http-request (format nil "~a/nokeepalive" prefix-local)
+			     :keep-alive nil)
+	(declare (ignore body))
+	(test 200 code3 :fail-info "nokeepalive keep-alive=nil")
+	(test nil (assoc :connection headers) :fail-info "nokeepalive keep-alive=nil"))
+      (multiple-value-bind (body code3 headers)
+	  (x-do-http-request (format nil "~a/nokeepalive" prefix-local)
+			     :keep-alive t)
+	(declare (ignore body))
+	(test 200 code3 :fail-info "nokeepalive keep-alive=t")
+	(test nil (assoc :connection headers) :fail-info "nokeepalive keep-alive=t"))
+      )
+    
+    ))
   
   
 
