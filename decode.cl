@@ -575,6 +575,11 @@
 ;;
 
 
+#+allegro
+(defun base64-decode (string)
+  (excl:base64-string-to-string string))
+
+#-allegro
 (defun base64-decode (string)
   ;;
   ;; given a base64 string, return it decoded.
@@ -616,6 +621,11 @@
     res))
 
 
+#+allegro
+(defun base64-encode (str)
+  (excl:string-to-base64-string str))
+
+#-allegro
 (defun base64-encode (str)
   ;;
   ;; take the given string and encode as a base64 string

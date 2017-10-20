@@ -5,8 +5,9 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 5
-  "v5: 1.3.53: Add :no-keep-alive strategy;
+(sys:defpatch "aserve" 6
+  "v6: 1.3.54: Use Allegro's built-in base64 routines when available;
+v5: 1.3.53: Add :no-keep-alive strategy;
 v4: 1.3.52: optimize compilation for speed;
 v3: 1.3.51 add get-request-body-incremental;
 v2: 1.3.50: define deflate-stream methods all the time;
@@ -15,8 +16,9 @@ v1: 1.3.49: speed up read-sock-line."
   :post-loadable t)
 
 #+(version= 10 0)
-(sys:defpatch "aserve" 16
-  "v16: 1.3.53: Add :no-keep-alive strategy;
+(sys:defpatch "aserve" 17
+  "v17: 1.3.54: Use Allegro's built-in base64 routines when available;
+v16: 1.3.53: Add :no-keep-alive strategy;
 v15: 1.3.52: optimize compilation for speed;
 v14: 1.3.51 add get-request-body-incremental;
 v13: 1.3.50: define deflate-stream methods all the time;
