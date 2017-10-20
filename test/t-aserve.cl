@@ -933,7 +933,26 @@ Returns a vector."
     (test 200
 	  (values2 (x-do-http-request (format nil "http://foo:bar@localhost:~a/secret" port))))
     
+    ; test that only first auth header is considered.
+    (let ((bad-auth '("bad" "password"))
+          (bad-auth-encoded (net.aserve::base64-encode "bad:password"))
+          (good-auth '("foo" . "bar"))
+          (good-auth-encoded (net.aserve::base64-encode "foo:bar")))
 
+      ;; good password first.
+      (test 200
+            (values2 (x-do-http-request (format nil "~a/secret" prefix-local)
+                                        :basic-authorization good-auth
+                                        :headers (list (cons "Authorization"
+                                                             (format nil "Basic ~a" bad-auth-encoded))))))
+
+      ;; good password second.
+      (test 401
+            (values2 (x-do-http-request (format nil "~a/secret" prefix-local)
+                                        :basic-authorization bad-auth
+                                        :headers (list (cons "Authorization"
+                                                             (format nil "Basic ~a" good-auth-encoded))))))
+      )
     
     ;; manual authorization testing, testing via ip address
     

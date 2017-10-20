@@ -3498,7 +3498,10 @@ in get-multipart-sequence"))
   ;;
   (let ((auth-value (header-slot-value req :authorization)))
     (if* auth-value
-       then (let ((words (split-into-words auth-value)))
+       then (let ((words (split-into-words
+                          ;; Only consider the first Auth header if there is
+                          ;; more than one.
+                          (first (delimited-string-to-list auth-value #\,)))))
 	      (if* (equalp (car words) "basic")
 		 then (setq auth-value 
 			(split-on-character (base64-decode (cadr words)) #\:))
