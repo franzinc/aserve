@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 54))
+(defparameter *aserve-version* '(1 3 55))
 
 (eval-when (eval load)
     (require :sock)
@@ -1155,35 +1155,69 @@ by keyword symbols and not by strings"
   number
   desc)
 
+;; 1xx
 (defparameter *response-continue* (make-resp 100 "Continue"))
+(defparameter *response-switching-protocols*
+    (make-resp 101 "Switching Protocols"))
+;; 2xx
 (defparameter *response-ok* (make-resp 200 "OK"))
 (defparameter *response-created* (make-resp 201 "Created"))
 (defparameter *response-accepted* (make-resp 202 "Accepted"))
 (defparameter *response-non-authoritative-information*
     (make-resp 203 "Non-Authoritative Information"))
 (defparameter *response-no-content* (make-resp 204 "No Content"))
-(defparameter *response-partial-content*
-    (make-resp 206 "Partial Content"))
-(defparameter *response-moved-permanently* (make-resp 301 "Moved Permanently"))
+;; 6.3.6.  205 Reset Content
+(defparameter *response-partial-content* (make-resp 206 "Partial Content"))
+;; 3xx
+(defparameter *response-moved-permanently*
+    (make-resp 301 "Moved Permanently"))
 (defparameter *response-found* (make-resp 302 "Found"))
 (defparameter *response-see-other* (make-resp 303 "See Other"))
 (defparameter *response-not-modified* (make-resp 304 "Not Modified"))
-(defparameter *response-temporary-redirect* 
+;; 305 is deprecated.
+;; 306 is reserved and unused.
+(defparameter *response-temporary-redirect*
     (make-resp 307 "Temporary Redirect"))
+;; 4xx
 (defparameter *response-bad-request* (make-resp 400 "Bad Request"))
 (defparameter *response-unauthorized* (make-resp 401 "Unauthorized"))
+;; 6.5.2.  402 Payment Required
+(defparameter *response-forbidden* (make-resp 403 "Forbidden"))
 (defparameter *response-not-found* (make-resp 404 "Not Found"))
-(defparameter *response-method-not-allowed* (make-resp 405 "Method Not Allowed"))
+(defparameter *response-method-not-allowed*
+    (make-resp 405 "Method Not Allowed"))
+(defparameter *response-not-acceptable* (make-resp 406 "Not acceptable"))
+;; there is no 407
 (defparameter *response-request-timeout* (make-resp 408 "Request Timeout"))
+(defparameter *response-conflict* (make-resp 409 "Conflict"))
+;; 6.5.9.  410 Gone
+;; 6.5.10.  411 Length Required
+(defparameter *response-precondition-failed*
+    (make-resp 412 "Precondition failed"))
+;; 6.5.11.  413 Payload Too Large
+(defparameter *response-uri-too-long* (make-resp 414 "URI Too Long"))
+(defparameter *response-unsupported-media-type*
+    (make-resp 415 "Unsupported media type"))
+;; 416 response text should be "Range not satisfiable" per rfc7233
 (defparameter *response-requested-range-not-satisfiable*
-    (make-resp 416 "Requested range not satisfiable"))
-(defparameter *response-expectation-failed* (make-resp 417 "Expectation Failed"))
+    (make-resp 416 "Range not satisfiable"))
+(defparameter *response-expectation-failed*
+    (make-resp 417 "Expectation Failed"))
+;; 418-425 unused
+(defparameter *response-upgrade-required*
+    (make-resp 426 "Upgrade Required"))
+;; 5xx
 (defparameter *response-internal-server-error*
     (make-resp 500 "Internal Server Error"))
 (defparameter *response-not-implemented* (make-resp 501 "Not Implemented"))
+;; 6.6.3.  502 Bad Gateway
+(defparameter *response-service-unavailable*
+    (make-resp 503 "Service unavailable"))
+;; 6.6.5.  504 Gateway Timeout
 
 (defparameter *responses*
     (list *response-continue*
+          *response-switching-protocols*
 	  *response-ok*
 	  *response-created*
 	  *response-accepted*
@@ -1197,13 +1231,21 @@ by keyword symbols and not by strings"
 	  *response-temporary-redirect*
 	  *response-bad-request*
 	  *response-unauthorized*
+          *response-forbidden*
 	  *response-not-found*
 	  *response-method-not-allowed*
+          *response-not-acceptable*
 	  *response-request-timeout*
+          *response-conflict*
+          *response-precondition-failed*
+          *response-uri-too-long*
+          *response-unsupported-media-type*
 	  *response-requested-range-not-satisfiable*
 	  *response-expectation-failed*
+          *response-upgrade-required*
 	  *response-internal-server-error*
 	  *response-not-implemented*
+          *response-service-unavailable*
 	  ))
 
 (defvar *crlf* (make-array 2 :element-type 'character :initial-contents

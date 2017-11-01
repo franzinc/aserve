@@ -5,8 +5,9 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 6
-  "v6: 1.3.54: Use Allegro's built-in base64 routines when available;
+(sys:defpatch "aserve" 7
+  "v7: 1.3.55: Add and export a more full set of http response codes;
+v6: 1.3.54: Use Allegro's built-in base64 routines when available;
 v5: 1.3.53: Add :no-keep-alive strategy;
 v4: 1.3.52: optimize compilation for speed;
 v3: 1.3.51 add get-request-body-incremental;
@@ -16,8 +17,9 @@ v1: 1.3.49: speed up read-sock-line."
   :post-loadable t)
 
 #+(version= 10 0)
-(sys:defpatch "aserve" 17
-  "v17: 1.3.54: Use Allegro's built-in base64 routines when available;
+(sys:defpatch "aserve" 18
+  "v18: 1.3.55: Add and export a more full set of http response codes;
+v17: 1.3.54: Use Allegro's built-in base64 routines when available;
 v16: 1.3.53: Add :no-keep-alive strategy;
 v15: 1.3.52: optimize compilation for speed;
 v14: 1.3.51 add get-request-body-incremental;
@@ -224,6 +226,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:*http-response-timeout*
    #:*mime-types*
    #:*response-continue*
+   #:*response-switching-protocols*
    #:*response-ok*
    #:*response-created*
    #:*response-accepted*
@@ -237,13 +240,21 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:*response-temporary-redirect*
    #:*response-bad-request*
    #:*response-unauthorized*
+   #:*response-forbidden*
    #:*response-not-found*
    #:*response-method-not-allowed*
+   #:*response-not-acceptable*
    #:*response-request-timeout*
+   #:*response-conflict*
+   #:*response-precondition-failed*
+   #:*response-uri-too-long*
+   #:*response-unsupported-media-type*
    #:*response-requested-range-not-satisfiable*
    #:*response-expectation-failed*
+   #:*response-upgrade-required*
    #:*response-internal-server-error*
    #:*response-not-implemented*
+   #:*response-service-unavailable*
    #:*wserver*))
 
 
