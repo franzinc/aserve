@@ -282,6 +282,7 @@
 		     (test-encoding)
 		     (test-forms port)
 		     (test-get-request-body-incr port)
+                     (test-request-character-encoding port)
 		     (test-client port)
 		     (test-cgi port)
 		     (test-http-copy-file port)
@@ -1489,8 +1490,38 @@ Returns a vector."
 		       :content *get-request-body-incr-value*
 		       :content-type "application/binary")
     ))
-    
 
+(defun test-request-character-encoding (port)
+  (let ((prefix-local (format nil "http://localhost:~a" port)))
+    (publish :path "/charset"
+	     :content-type "text/plain"
+	     :function #'(lambda (req ent)
+                           (let* ((check-ef (find-external-format (request-query-value "check" req)))
+                                  (req-ef (net.aserve::request-character-encoding req :void)))
+                             (test check-ef req-ef :fail-info (header-slot-value req :content-type))
+                             (with-http-response (req ent)
+                               (with-http-body (req ent)
+                                 (html "foo"))))))
+    (loop for (content-type check-charset) in
+          '(("text/plain"                     :void)
+            ("text/plain;charset=utf-8"       :utf-8)
+            ("text/plain; charset=utf-8"      :utf-8)
+            ("text/plain; charset=utf-8;"     :utf-8)
+            ("text/plain; charset=utf-8; "    :utf-8)
+            ("text/plain;charset=\"utf-8\""   :utf-8)
+            ("text/plain; charset=\"utf-8\""  :utf-8)
+            ("text/plain; charset=\"utf-8\";" :utf-8)
+            ("text/plain; charset = utf-8;" :utf-8)
+            ("text/plain; CHARSET = utf-8;" :utf-8)
+            ("text/plain; CHARSET=UTF-8;"   :utf-8)
+            ("text/plain; CHARSET = UTF-8;" :utf-8)
+            ("text/plain;CHARSET    =     UTF-8   ;" :utf-8)
+            ("text/plain; foo=bar;charset=\"utf-8\" ;x=y" :utf-8))
+        do (multiple-value-bind (body code headers)
+               (x-do-http-request (format nil "~a/charset?check=~A" prefix-local check-charset) 
+                                  :headers (list (cons :content-type content-type)))
+             (declare (ignore body headers))
+             (test 200 code)))))
   
 (defun test-client (port)
   (let ((prefix-local (format nil "http://localhost:~a" port)))

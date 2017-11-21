@@ -3712,9 +3712,15 @@ in get-multipart-sequence"))
 
 (defun request-character-encoding (req external-format)
   (let* ((type (header-slot-value req :content-type))
-         (charset (and type (nth-value 2 (match-re ";\\s+charset=([^;\\s]+)" type)))))
-    (or (when charset (find-external-format charset :errorp nil)) 
-	(when external-format (find-external-format external-format :errorp nil))
+         (charset (and type (nth-value 2 (match-re ";\\s*charset\\s*=\\s*([^;\\s]+)" type :case-fold t)))))
+    ;; Charset value might be quoted, according to MIME syntax.
+    ;; Space around the "=" is not allowed by rfc7231 section-3.1.1.1 but let's accept anyway.
+    (when (and charset
+               (> (length charset) 2)
+               (char= #\" (aref charset 0) (aref charset (1- (length charset)))))
+      (setf charset (subseq charset 1 (1- (length charset)))))
+    (or (when charset (find-external-format charset :errorp nil))
+        (when external-format (find-external-format external-format :errorp nil))
 	(find-external-format *default-aserve-external-format*))))
 
 (def-stream-class truncated-stream (terminal-simple-stream)
