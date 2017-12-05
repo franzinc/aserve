@@ -352,6 +352,11 @@
 		      util.test::*test-unexpected-failures*)))
     
 
+(defun log-wserver-name (&optional  (from "") (wserver *wserver*) &aux (*wserver* wserver))
+  (logmess (format nil "~A~Awserver name is now ~A at port ~A" 
+		   (or from "") (if from " " "") (wserver-name wserver)
+		   (socket::local-port (net.aserve::wserver-socket wserver))
+		   )))
 
 (defun start-aserve-running (&optional ssl (test-ssl t))
   ;; start aserve, return the port on which we've started aserve
@@ -359,11 +364,11 @@
 			:test-ssl test-ssl
 	
 			:listeners 20 ; must be at least 3 for keep-alive to be possible
-			))); let the system pick a port
+			)))		; let the system pick a port
+    (log-wserver-name "" wserver)
     (setq *wserver* wserver)
     (when *aserve-set-full-debug*
       (apply #'net.aserve::debug-on *aserve-set-full-debug*))
-    (logmess (format nil "wserver name is now ~A" (wserver-name *wserver*)))
     (unpublish :all t) ; flush anything published
     (setf (asc x-ssl) ssl)
     (socket::local-port (net.aserve::wserver-socket wserver))
@@ -384,7 +389,7 @@
   (let ((*wserver* (asc proxy-wserver)))
     (when *aserve-set-full-debug*
       (apply #'net.aserve::debug-on *aserve-set-full-debug*))
-    (logmess (format nil "proxy wserver name is ~A" (wserver-name *wserver*))))
+    (log-wserver-name "proxy"))
   
   (push (asc x-proxy) (asc save-x-proxy))
   (setf (asc x-proxy) (format nil "localhost:~d" 
@@ -1698,9 +1703,8 @@ Returns a vector."
 	 (pcache (net.aserve::wserver-pcache proxy-wserver))
 	 (*print-level* 4) ; in case we see some errors
 	 )
-    (logmess (format nil "wserver name is now ~A" (wserver-name *wserver*)))
-    (let ((*wserver* proxy-wserver))
-      (logmess (format nil "proxy wserver name is ~A" (wserver-name *wserver*))))
+    (log-wserver-name "test-proxy-cache main")
+    (log-wserver-name "test-proxy-cache proxy" proxy-wserver)
     
     (macrolet ((test-2 (res1 res2 form &key (test #'eql))
 		 `(multiple-value-bind (v1 v2) ,form
@@ -2444,8 +2448,7 @@ Returns a vector."
 		  "cz P"
 		  '(#\latin_small_letter_e_with_acute)
 		  "ter</Name>")))
-    (let ((*wserver* server))
-      (logmess (format nil "test-spr27296 wserver name is ~A" (wserver-name *wserver*))))
+    (log-wserver-name "test-spr27296" server)
     (publish :path "/spr27296"
 	     :content-type "text/xml"
 	     :server server
@@ -2470,10 +2473,7 @@ Returns a vector."
   ;; than byte count, which went wrong with multi-byte encodings.
   (let ((server (start :port nil :server :new
 		       :external-format (crlf-base-ef :utf8))))
-    (let ((*wserver* server))
-      (logmess
-       (format nil "test-client-unicode-content-length wserver name is ~A"
-	       (wserver-name *wserver*))))
+    (log-wserver-name "test-client-unicode-content-length" server)
     (publish-file :server server :path "/" :file (format nil "~a../test/testdir/unicode"
                                                          *aserve-examples-directory*))
     ;; Not timing out is the test.
@@ -2603,10 +2603,7 @@ Returns a vector."
     (unwind-protect
 	;; [bug23200] Avoid server leak in each test.
 	(let ()
-	  (let ((*wserver* server))
-	    (logmess
-	     (format nil "test-expect-header-responses wserver name is ~A"
-		     (wserver-name *wserver*))))
+	  (log-wserver-name "test-expect-header-responses" server)
 	  ;; verify that a 100 Continue is sent only if valid user:pass is provided
 	  (publish :path "/secret-auth"
 		   :content-type "text/html"
