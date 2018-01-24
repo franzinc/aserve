@@ -66,6 +66,11 @@ test: test.tmp
 	echo '(time (test-aserve-n :n 1 :exit t))' >> test.tmp
 	$(mlisp) -L test.tmp -kill
 
+test-no-hiper: test.tmp
+	echo '(setq excl::*hiper-socket-is-stream-socket* t)' >> test.tmp
+	echo '(time (test-aserve-n :n 1 :exit t))' >> test.tmp
+	$(mlisp) -L test.tmp -kill
+
 testsmp: test.tmp
 	echo '(time (test-aserve-n $(NSERVERS) :exit t))' >> test.tmp
 	$(mlisp) -L test.tmp -kill

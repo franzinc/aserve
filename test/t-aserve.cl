@@ -153,6 +153,13 @@
      ;; In case someone sets *do-aserve-test* to t.
      (setq n 0)))
   (setq *aserve-test-configs* (make-array (if (eql n 0) 1 n)))
+  
+  (format t "~&; *hiper-socket-is-stream-socket* = ~S~%" 
+	  (let (v) 
+	    (or (ignore-errors (setq v (eval 'excl::*hiper-socket-is-stream-socket*)) t)
+		(setq v :undefined))
+	    v))
+  
   (case n
     (0
      ;; In simple one-thread test, log server name only if requested
