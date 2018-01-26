@@ -346,6 +346,9 @@
 	(stop-proxy-running)
 	))
     
+    ;; independent test of a stream used in aserve
+    (test-force-output-prepend-stream)
+    
     (if* (and ssl (errorset (as-require :ssl)))
        then (test-aserve-extra-ssl))
     )
@@ -2922,7 +2925,36 @@ Returns a vector."
       (test t seen-error-3)
       (and *wserver* (shutdown)))))
 
+
+(defun test-force-output-prepend-stream ()
+  ;; the prepend-stream is defined in aserve
+  ;; we test here that force-output of such 
+  ;; a stream will force-output the underlying
+  ;; stream
+  (let* ((passive (socket:make-socket :connect :passive))
+         (sender (socket:make-socket :remote-host "127.0.0.1"
+                                     :remote-port
+                                     (socket:local-port passive)))
+         (receiver (socket:accept-connection passive))
+         (prepend (net.aserve::make-instance-prepend-stream+content+output-handle
+                   "" ; no content
+                   sender)))
+    (unwind-protect 
+        (progn
+          (write-byte 1 prepend)
+          (force-output prepend)
+    
+          (mp::with-timeout (10 (test nil "force-output of prepend-stream didn't work"))
       
+            ;; read-byte will return immediately if the force-output
+            ;; was successful
+            (test 1 (read-byte receiver))))
+      
+      (close passive)
+      (close sender)
+      (close receiver))))
+    
+        
       
 
 ;; (net.aserve::debug-on :xmit)

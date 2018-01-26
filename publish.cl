@@ -2986,10 +2986,15 @@
 	    (write-full-vector content output-handle))
     
     (if* (> end start) 
-       then (write-full-vector (or buffer (slot-value p 'excl::buffer))
+       then (prog1 (write-full-vector (or buffer (slot-value p 'excl::buffer))
 			       output-handle
 			       :start start
 			       :end end)
+              ;; this will cause a force-output of the prepend-stream
+              ;; to also force-output the underlying stream.
+              ;; We'll also force-output when the buffer fills up
+              ;; and that's not a bad thing to do and it is unavoidable.
+              (force-output output-handle))
        else start)))
 	    
 

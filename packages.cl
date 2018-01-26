@@ -5,8 +5,9 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 7
-  "v7: 1.3.55: Add and export a more full set of http response codes;
+(sys:defpatch "aserve" 8
+  "v8: 1.3.56: force-output of a prepend-stream supported
+v7: 1.3.55: Add and export a more full set of http response codes;
 v6: 1.3.54: Use Allegro's built-in base64 routines when available;
 v5: 1.3.53: Add :no-keep-alive strategy;
 v4: 1.3.52: optimize compilation for speed;
@@ -17,8 +18,9 @@ v1: 1.3.49: speed up read-sock-line."
   :post-loadable t)
 
 #+(version= 10 0)
-(sys:defpatch "aserve" 18
-  "v18: 1.3.55: Add and export a more full set of http response codes;
+(sys:defpatch "aserve" 19
+  "v19: 1.3.56: force-output of a prepend-stream supported
+v18: 1.3.55: Add and export a more full set of http response codes;
 v17: 1.3.54: Use Allegro's built-in base64 routines when available;
 v16: 1.3.53: Add :no-keep-alive strategy;
 v15: 1.3.52: optimize compilation for speed;
