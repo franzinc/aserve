@@ -62,28 +62,34 @@ else
 	echo '(load "test/t-aserve.cl")' >> test.tmp
 endif
 
+# Run tests with default setting of *hiper-socket-is-stream-socket* switch.
 test: test.tmp
-	echo '(time (test-aserve-n :n 1 :exit t))' >> test.tmp
+	echo '(time (test-aserve-n :n 1 :exit nil))' >> test.tmp
+	$(mlisp) -L test.tmp -kill
+
+test-do-hiper: test.tmp
+	echo '(setq excl::*hiper-socket-is-stream-socket* nil)' >> test.tmp
+	echo '(time (test-aserve-n :n 1 :exit nil))' >> test.tmp
 	$(mlisp) -L test.tmp -kill
 
 test-no-hiper: test.tmp
 	echo '(setq excl::*hiper-socket-is-stream-socket* t)' >> test.tmp
-	echo '(time (test-aserve-n :n 1 :exit t))' >> test.tmp
+	echo '(time (test-aserve-n :n 1 :exit nil))' >> test.tmp
 	$(mlisp) -L test.tmp -kill
 
 testsmp: test.tmp
-	echo '(time (test-aserve-n $(NSERVERS) :exit t))' >> test.tmp
+	echo '(time (test-aserve-n $(NSERVERS) :exit nil))' >> test.tmp
 	$(mlisp) -L test.tmp -kill
 
 stress: test.tmp
 	echo '(net.aserve::debug-on :notrap)' >> test.tmp
-	echo '(time (test-aserve-n $(NSERVERS) :exit t))' >> test.tmp
+	echo '(time (test-aserve-n $(NSERVERS) :exit nil))' >> test.tmp
 	../bin/repeat.sh 10 $(mlisp) -L test.tmp -kill
 
 stresswp: test.tmp
 	echo '(net.aserve::debug-on :notrap)' >> test.tmp
 	echo '(setq excl::*break-on-warnings* :pause)' >> test.tmp
-	echo '(time (test-aserve-n $(NSERVERS) :exit t))' >> test.tmp
+	echo '(time (test-aserve-n $(NSERVERS) :exit nil))' >> test.tmp
 	../bin/repeat.sh 10 $(mlisp) -L test.tmp -kill
 
 test-from-asdf: FORCE
