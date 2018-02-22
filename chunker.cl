@@ -169,24 +169,52 @@
 
 
 (defmethod set-trailers ((p chunking-stream) trailers)
-  ;; Set the values only for the trailers we've already declared
+  ;; Set the values only for the trailers already declared in the "Trailer"
+  ;; header by (with-http-response (.. :trailers ..) ..). Other trailers
+  ;; are not allowed to be set.
+  ;;
+  ;; Returns t if all trailers were declared and could be set, nil if some
+  ;; trailers were not declared earlier and were dropped.
   ;;
   (let ((saved-trailers (chunking-stream-trailers p)))
     (if* (consp trailers)
-       then (dolist (trailer trailers)
-	      (if* (and (consp trailer)
-			(or (stringp (car trailer))
-			    (symbolp (car trailer)))
-			(stringp (cdr trailer)))
-		 then (let ((ent (assoc (header-kwdize (car trailer)) saved-trailers
-					:test #'eq)))
-			(if* ent
-			   then (setf (cdr ent) (cdr trailer)))))))))
+       then (let ((all-success t))
+              (dolist (trailer trailers)
+                (let (success)
+                  (if* (and (consp trailer)
+                            (or (stringp (car trailer))
+                                (symbolp (car trailer)))
+                            (stringp (cdr trailer)))
+                     then (let ((predeclared-header
+                                 (assoc (header-kwdize (car trailer)) saved-trailers
+                                        :test #'eq)))
+                            (if* predeclared-header
+                               then (setf (cdr predeclared-header) (cdr trailer))
+                                    (setf success t))))
+                  (if* (not success)
+                     then (setf all-success nil))))
+              all-success))))
+
 (defmethod can-set-trailers-p ((p chunking-stream))
   t)
 
+(defmethod set-trailers ((bs broadcast-stream) trailers)
+  ;; Relevant when (member :xmit-server-response-body *debug-current*)
+  ;; as that combines the response stream and debug log stream in a B-S.
+  ;;
+  ;; Will try to set trailers on all the enclosed streams, returning
+  ;; true if one of the enclosed streams was a chunking-stream on which
+  ;; trailers could be set.
+  ;;
+  ;; Does not stop at first success, to be robust against a (user-provided)
+  ;; broadcast-stream that encloses multiple chunking response streams.
+  (find-if-not #'null (mapcar (lambda (s) (set-trailers s trailers))
+                              (broadcast-stream-streams bs))))
 
-
+(defmethod can-set-trailers-p ((bs broadcast-stream))
+  ;; Also relevant when (member :xmit-server-response-body *debug-current*).
+  ;; Returns true if trailers can be set on at least one of BS's streams.
+  (some #'can-set-trailers-p (broadcast-stream-streams bs)))
 
 
 (defmethod set-trailers ((req http-request) trailers)
@@ -203,7 +231,7 @@
 
 
 
-		      
+
 
 
 
@@ -414,11 +442,6 @@
 		 elseif value
 		   then (push (code-char ch) value)
 		   else (push (code-char ch) header)))))))
-			
-					
-				
-  
-
 
 (defmethod device-close ((p unchunking-stream) abort)
   (declare (ignore abort))
@@ -438,16 +461,3 @@
      ;; advance to eof
      (if* (null (read-byte p nil nil)) then (return)))
    p))
-
-
-
-
-		     
-	 
-	     
-		     
-		     
-		     
-		     
-  
-  

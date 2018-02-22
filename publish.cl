@@ -2328,9 +2328,9 @@
 
 
 (defun check-trailers-ok (req trailers)
-  ;; determine if trailers are allowed for this request
-  ;; and if so if the trailers arguement is correctly formed
-  ;;
+  ;; Determine if trailers are allowed for this request
+  ;; and if so if the trailers argument is correctly formed.
+  ;; Trailers are only sent to clients that specify the "TE: trailers" header.
   ;;
   (let ((str (header-slot-value req :te)))
     (if* (and str (search "trailers" str))

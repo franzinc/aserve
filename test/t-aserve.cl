@@ -297,6 +297,8 @@
 		     (test-expect-header-responses)
 		     (test-retry-on-timeout port)
                      (test-chunked-request port https)
+                     (test-chunked-request-set-trailers port https)
+                     (test-chunked-request-set-trailers-while-debugging port https)
 		     (test-server-request-body port :https https)
                      
 		     (if* (member :ics *features*)
@@ -2759,6 +2761,34 @@ Returns a vector."
       (test "TEST" body :test #'string=))
     (net.aserve.client:client-request-close req)))
 
+(defun test-chunked-request-set-trailers (port https &key verbose)
+  (if* (asc x-proxy)
+     then ;; Proxy uses HTTP/1.0 whereas trailers are HTTP/1.1
+          (when verbose (format t "~&Skipping test: test-chunked-request-set-trailers because: x-proxy~%"))
+     else (let ((test-body "AAAA")
+                (test-trailer-value "trailer test"))
+            (publish :path "/trailer-test" :content-type "text/plain"
+                     :function
+                     #'(lambda (req ent)
+                         (with-http-response (req ent :trailers '((:x-trailer-test . "initial")))
+                           (with-http-body (req ent)
+                             (set-trailers req `((:x-trailer-test . ,test-trailer-value)))
+                             (write-sequence test-body *html-stream*)))))
+            (multiple-value-bind (body code headers)
+                (x-do-http-request (format nil "http~@[s~*~]://localhost:~a/trailer-test" https port)
+                                   :content-type "text/plain"
+                                   :accept "text/plain"
+                                   :headers '((:te . "trailers"))
+                                   :timeout 10)
+              (test 200 code)
+              (test body test-body :test 'string=)
+              (test test-trailer-value (cdr (assoc :x-trailer-test headers)) :test 'equal)))))
+
+(defun test-chunked-request-set-trailers-while-debugging (port https)
+  ;; :xmit-server-response-body will wrap the chunking-stream in a broadcast-stream
+  ;; and set-trailers must work for that case too.
+  (let ((net.aserve::*debug-current* '(:xmit-server-response-body)))
+    (test-chunked-request-set-trailers port https)))
 
 (defun test-server-request-body (port &key https verbose)
   ;; Test with-body-input-stream.  rfe14295
