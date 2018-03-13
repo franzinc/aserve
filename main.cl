@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 57))
+(defparameter *aserve-version* '(1 3 58))
 
 (eval-when (eval load)
     (require :sock)
@@ -2147,103 +2147,111 @@ by keyword symbols and not by strings"
   ;; At this point decryption is taken care of by the sockets layer,
   ;; but dechunking, decompression and other content transforms must
   ;; be implemented here.
-  (let ((original-ef (stream-external-format (request-socket req))))
-    
-    ; must read using the octets external format because the 
-    ; content length is in terms of octets
-    (setf (stream-external-format (request-socket req))
-      (find-external-format :octets))
-    
+  (let ((original-ef (stream-external-format (request-socket req)))
+	length believe-it)
+            
     (unwind-protect
-	(if* (member (request-method req) '(:put :post))
-	   then (when (request-has-continue-expectation req)
-		  (send-100-continue req))
-		  
-		(multiple-value-bind (length believe-it)
-		    (header-slot-value-integer req :content-length)
-		  (if* believe-it
-		     then	; we know the length
-			  (prog1 (let ((ret (make-string length)))
-				   (read-sequence-with-timeout 
-				    ret length 
-				    (request-socket req)
-				    (wserver-read-request-body-timeout *wserver*)))
+	(let ()
+
+	  ;; must read using the octets external format because the 
+	  ;; content length is in terms of octets
+	  (setf (stream-external-format (request-socket req))
+	    (find-external-format :octets))
+    
+	  ;; Fetch the content-length value because a body can be present
+	  ;;  on any request. [rfe15456]
+	  (multiple-value-setq (length believe-it)
+	    (header-slot-value-integer req :content-length))
+    
+	  ;; Send  Continue status if requested, regardless of body indicators.
+	  (when (member (request-method req) '(:put :post))
+	    (when (request-has-continue-expectation req)
+	      (send-100-continue req)))
+
+	  (if* (and believe-it (> length 0))
+	     then ;; we know the length
+		  (prog1 (let ((ret (make-string length)))
+			   (read-sequence-with-timeout 
+			    ret length 
+			    (request-socket req)
+			    (wserver-read-request-body-timeout *wserver*)))
 	    
-			    ; netscape (at least) is buggy in that 
-			    ; it sends a crlf after
-			    ; the body.  We have to eat that crlf.
-			    ; We could check
-			    ; which browser is calling us but it's 
-				    ; not clear what
-			    ; is the set of buggy browsers 
-			    (let ((ch (read-char-no-hang
-				       (request-socket req)
-				       nil nil)))
-			      (if* (eq ch #\return)
-				 then ; now look for linefeed
-				      (setq ch (read-char-no-hang 
-						(request-socket req)
-						nil nil))
-				      (if* (eq ch #\linefeed)
-					 thenret 
-					 else (unread-char 
-					       ch (request-socket req)))
-			       elseif ch
-				 then (unread-char ch (request-socket
-						       req)))))
-		   elseif (equalp "chunked" (header-slot-value req
-							       :transfer-encoding))
-		     then ; chunked body
-			  
-			  (with-timeout-local
-			      ((wserver-read-request-body-timeout *wserver*) nil)
-			    (let ((ans (make-array 
-					2048 
-					:element-type 'character
-					:adjustable t
-					:fill-pointer 0))
-				  (sock (make-instance-unchunking-stream+input-handle (request-socket req)))
-				  (ch))
-                              (loop (if* (eq :eof 
-                                             (setq ch (read-char sock nil :eof)))
-                                       then 
-                                            ;; Chunked requests may contain trailing 'headers'
-                                            (close sock) ;; this *only* closes the unchunker
-                                            (let ((trailers 
-                                                   (net.aserve.client::convert-trailers 
-                                                    (unchunking-trailers sock))))
-                                              (if* trailers
-                                                 then (setf (request-headers req)
-                                                        (append (request-headers req) trailers))))
-                                            (return ans)
-                                       else (vector-push-extend
-                                             ch ans)))))
-		     else	; no content length given
-			  
-			  (if* (keep-alive-specified req)
-			     then ; must be no body
-				  ""
-			     else ; read until the end of file
-				  (with-timeout-local
-				      ((wserver-read-request-body-timeout *wserver*) 
-				       nil)
-				    (let ((ans (make-array 
-						2048 
-						:element-type 'character
-						:adjustable t
-						:fill-pointer 0))
-					  (sock (request-socket req))
-					  (ch))
-				      (loop (if* (eq :eof 
-						     (setq ch
-						       (read-char 
-							sock nil :eof)))
-					       then (return  ans)
-					       else (vector-push-extend
-						     ch ans))))))))
-	   else ""		; no body
-		)
-      ; uwp cleanup
+		    ;; netscape (at least) is buggy in that it sends a
+		    ;; crlf after the body.  We have to eat that crlf.
+		    ;; We could check which browser is calling us but
+		    ;; it's not clear what is the set of buggy
+		    ;; browsers
+		    (let ((ch (read-char-no-hang
+			       (request-socket req)
+			       nil nil)))
+		      (if* (eq ch #\return)
+			 then		; now look for linefeed
+			      (setq ch (read-char-no-hang 
+					(request-socket req)
+					nil nil))
+			      (if* (eq ch #\linefeed)
+				 thenret 
+				 else (unread-char 
+				       ch (request-socket req)))
+		       elseif ch
+			 then (unread-char ch (request-socket
+					       req)))))
+	   elseif (and believe-it (eql length 0))
+	     then ""
+	   elseif (equalp "chunked" (header-slot-value req
+						       :transfer-encoding))
+	     then ;; chunked body
+		  (with-timeout-local
+		      ((wserver-read-request-body-timeout *wserver*) nil)
+		    (let ((ans (make-array 
+				2048 
+				:element-type 'character
+				:adjustable t
+				:fill-pointer 0))
+			  (sock (make-instance-unchunking-stream+input-handle (request-socket req)))
+			  (ch))
+		      (loop (if* (eq :eof 
+				     (setq ch (read-char sock nil :eof)))
+			       then 
+				    ;; Chunked requests may contain trailing 'headers'
+				    (close sock) ;; this *only* closes the unchunker
+				    (let ((trailers 
+					   (net.aserve.client::convert-trailers 
+					    (unchunking-trailers sock))))
+				      (if* trailers
+					 then (setf (request-headers req)
+						(append (request-headers req) trailers))))
+				    (return ans)
+			       else (vector-push-extend
+				     ch ans)))))
+		  
+		  ;; no content length given
+	   elseif (keep-alive-specified req)
+	     then ;; must be no body
+		  ""
+	   elseif (member (request-method req) '(:put :post))					
+	     then ;; read until the end of file to collect an implied body
+		  (with-timeout-local
+		      ((wserver-read-request-body-timeout *wserver*) 
+		       nil)
+		    (let ((ans (make-array 
+				2048 
+				:element-type 'character
+				:adjustable t
+				:fill-pointer 0))
+			  (sock (request-socket req))
+			  (ch))
+		      (loop (if* (eq :eof 
+				     (setq ch
+				       (read-char 
+					sock nil :eof)))
+			       then (return  ans)
+			       else (vector-push-extend
+				     ch ans)))))
+	     else ;; Do nothing but remember that we already were here.
+		  "" 
+		  ))
+      ;; uwp cleanup
       (setf (stream-external-format (request-socket req)) original-ef)
       )))
 
@@ -2272,10 +2280,8 @@ by keyword symbols and not by strings"
 		   buffer))
     
 	      
-    (if* (or (request-request-body req)
-	     (not (member (request-method req) '(:put :post))))
-       then ; Either this is not a put or post 
-	    ; or the body has already been retrieved, can't do again
+    (if* (request-request-body req)
+       then ; The body has already been retrieved, can't do again
 	    ; so just indicate eof and leave.
 	    (funcall function buffer 0)
 	    (return-from get-request-body-incremental nil))
@@ -2313,13 +2319,10 @@ by keyword symbols and not by strings"
 		  (funcall function buffer 0)
 			  
 	    
-		  ; netscape (at least) is buggy in that 
-		  ; it sends a crlf after
-		  ; the body.  We have to eat that crlf.
-		  ; We could check
-		  ; which browser is calling us but it's 
-		  ; not clear what
-		  ; is the set of buggy browsers 
+		  ;; netscape (at least) is buggy in that it sends a
+		  ;; crlf after the body.  We have to eat that crlf.
+		  ;; We could check which browser is calling us but
+		  ;; it's not clear what is the set of buggy browsers
 		  (let ((ch (read-char-no-hang
 			     (request-socket req)
 			     nil nil)))
@@ -2337,8 +2340,7 @@ by keyword symbols and not by strings"
 					     req))))
 	   elseif (equalp "chunked" (header-slot-value req
 						       :transfer-encoding))
-	     then ; chunked body
-			  
+	     then ;; chunked body
 		  (with-timeout-local
 		      ((wserver-read-request-body-timeout *wserver*) nil)
 		    (let ((index 0)
@@ -2366,34 +2368,37 @@ by keyword symbols and not by strings"
 				    (if* (>= (incf index) buffsize)
 				       then (funcall function buffsize)
 					    (setq index 0))))))
-	     else	; no content length given
-			  
-		  (if* (keep-alive-specified req)
-		     then ; must be no body
-			  (funcall function nil 0)
-		     else ; read until the end of file
-			  (with-timeout-local
-			      ((wserver-read-request-body-timeout *wserver*) 
-			       nil)
-			    (let ((index 0)
-				  (sock (request-socket req))
-				  (ch))
-			      (loop (if* (eq :eof 
-					     (setq ch
-					       (read-char 
-						sock nil :eof)))
-				       then (if* (> index 0)
-					       then (funcall function buffer index))
-					    (funcall function buffer 0)
-					    (return nil)
-				       else (setf (ausb8 buffer index)
-					      (char-code ch))
-					    (if* (>= (incf index) buffsize)
-					       then (funcall function buffsize)
-						    (setq index 0)))))))))
+		  ;; no content length given
+	   elseif (keep-alive-specified req)
+	     then ;; must be no body
+		  (funcall function nil 0)
+		  
+	   elseif (member (request-method req) '(:put :post))
+	     then ;; read until the end of file to collect implied body
+		  (with-timeout-local
+		      ((wserver-read-request-body-timeout *wserver*) 
+		       nil)
+		    (let ((index 0)
+			  (sock (request-socket req))
+			  (ch))
+		      (loop (if* (eq :eof 
+				     (setq ch
+				       (read-char 
+					sock nil :eof)))
+			       then (if* (> index 0)
+				       then (funcall function buffer index))
+				    (funcall function buffer 0)
+				    (return nil)
+			       else (setf (ausb8 buffer index)
+				      (char-code ch))
+				    (if* (>= (incf index) buffsize)
+				       then (funcall function buffsize)
+					    (setq index 0))))))
+	     else (funcall function nil 0)))
     
       ; uwp cleanup
       (setf (stream-external-format (request-socket req)) original-ef))))
+
 
 ;; multipart code
 ;; used when enctype=multipart/form-data is used

@@ -517,8 +517,13 @@ cached connection = ~s~%" cond cached-connection))
     
 	    ;; now insert new headers
     
-	    ; content-length is inserted iff this is put or post method
-	    (if* (member method '(:put :post) :test #'eq)
+	    ;; content-length is inserted if this is put or post method
+	    ;;    and others if there is a body.
+	    (if* (or (member method '(:put :post) :test #'eq)
+		     ;; On PUT or POST we always send a content-length.
+		     ;; For other requests, send content-length if a body
+		     ;; was present.   [rfe15456]
+		     request-body)
 	       then (insert-header outbuf :content-length
 				   (format nil "~d"
 					   (if* request-body

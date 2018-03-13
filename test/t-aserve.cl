@@ -305,7 +305,9 @@
 			then (test-international port)
 			     (test-spr27296))
 		     (if* test-timeouts 
-			then (test-timeouts port))))
+			then (test-timeouts port))
+		     (test-body-in-get-request :port port :ssl https)  ;;; rfe15456
+		     ))
 	    
 	    
 		    
@@ -2983,6 +2985,76 @@ Returns a vector."
       (close passive)
       (close sender)
       (close receiver))))
+
+
+;; rfe15456
+(defun test-body-in-get-request (&key port ssl debug (n 3)
+				 &aux 
+				 (port-num (or port (start-aserve-running ssl)))
+				 (url (format nil "http~A://localhost:~A" 
+					      (if ssl "s" "") port-num))
+				 (test-body "the body")
+				 rbody rc hdrs auri sock sock2)
+			
+  (declare (ignore hdrs auri))
+  (publish-file :path "/junktest1" :file "test/testdir/aaa.foo")
+  (publish-file :path "/junktest2" :file "test/testdir/readme")
+  (publish :path "/junktest3"
+	   :function (lambda (req ent)
+		       (with-http-response (req ent)
+			 (with-http-body (req ent)
+			   (html (:princ (get-request-body req)))))))
+  
+  (asc-format "Begin test-body-in-get-request...")
+  (when debug (net.aserve::debug-on debug))
+  
+  ;; Verify that junk between requests causes a server error response.
+
+  (dotimes (i n (asc-format "   ~A test-body-in-get-request did not get second use of socket ..."
+			    (if (asc x-proxy) "Via proxy" "Direct")))
+    (multiple-value-setq (rbody rc hdrs auri sock)
+      (x-do-http-request (format nil "~A/junktest1?a~A" url i)
+			 :method :get :keep-alive t))
+    (when (and sock (eql rc 200) (eql 0 (search "this file" rbody)))
+      (write-sequence 
+       (concatenate 'vector (mapcar #'char-int (concatenate 'list "aaaaa")))
+       sock)
+      (multiple-value-setq (rbody rc  hdrs auri sock2)
+	(x-do-http-request (format nil "~A/junktest2?b" url)
+			   :method :get :connection sock :keep-alive t))
+      (when (eql rc 400)
+	(test 400 rc :fail-info "test-body-in-get-request 3")
+	(when sock2 (ignore-errors (close sock2)))
+	(return)))
+    (when sock (ignore-errors (close sock)))
+    (when sock2 (ignore-errors (close sock2)))
+    (sleep 2)
+    )
+  
+  ;; Verify that body of get request is not treated as junk.
+  (multiple-value-setq (rbody rc hdrs auri sock)
+    (x-do-http-request (format nil "~A/junktest1?k" url)
+		       :method :get :keep-alive t :content "body-of-request"))
+  (test 200 rc :fail-info "test-body-in-get-request 4")
+  (test 0 (search "this file" rbody) :fail-info "test-body-in-get-request 5")
+  (multiple-value-setq (rbody)
+    (x-do-http-request (format nil "~A/junktest2?m" url)
+		       :method :get :connection sock))
+  (test 200 rc :fail-info "test-body-in-get-request 6")
+  (test 0 (search "sorry," rbody) :fail-info "test-body-in-get-request 7")
+  
+  ;; Verify that body went through.
+  (multiple-value-setq (rbody rc hdrs auri sock)
+    (x-do-http-request (format nil "~A/junktest3" url)
+		       :method :get :content test-body))
+  (test 200 rc :fail-info "test-body-in-get-request 8")
+  (test test-body rbody :test #'equal :fail-info "test-body-in-get-request 9")
+  
+  (when debug (net.aserve::debug-off debug))
+  (asc-format "Done with test-body-in-get-request...")
+  
+  nil)
+
     
         
       
