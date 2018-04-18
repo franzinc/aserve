@@ -380,8 +380,7 @@
 						      (return-from do-http-request
 							(apply 'do-http-request uri args)))))
 	  
-	  (if* (equal "close" (cdr (assoc :connection 
-					  (client-request-headers creq))))
+	  (if* (equalp "close" (cdr (assoc :connection (client-request-headers creq))))
 	     then ; server forced the close
 		  ; so don't return the connection
 		  (setf (client-request-return-connection creq) nil))
