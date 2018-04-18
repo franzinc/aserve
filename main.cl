@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 58))
+(defparameter *aserve-version* '(1 3 59))
 
 (eval-when (eval load)
     (require :sock)
@@ -1462,7 +1462,7 @@ by keyword symbols and not by strings"
     (setf (wserver-terminal-io server) *terminal-io*)
     (setf (wserver-enable-chunking server) chunking)
     (setf (wserver-enable-keep-alive server) keep-alive)
-    (setf (wserver-ssl server) ssl)
+    (setf (wserver-ssl server) (or ssl (getf ssl-args :certificate)))
 
     #+unix
     (if* os-processes

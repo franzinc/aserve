@@ -300,6 +300,7 @@
                      (test-chunked-request-set-trailers port https)
                      (test-chunked-request-set-trailers-while-debugging port https)
 		     (test-server-request-body port :https https)
+                     (test-request-uri port https)
                      
 		     (if* (member :ics *features*)
 			then (test-international port)
@@ -2897,7 +2898,17 @@ Returns a vector."
       (test nil (null (search "after 1510" b)))
       )))
 
-
+(defun test-request-uri (port https)
+  (publish :path "/request-uri" :content-type "text/plain"
+           :function
+           #'(lambda (req ent)
+               (with-http-response (req ent)
+                 (with-http-body (req ent)
+                   (net.uri:render-uri (request-uri req) *html-stream*)))))
+  (let* ((uri (format nil 
+                      "http~@[s~*~]://localhost:~a/request-uri" https port))
+         (result (x-do-http-request uri)))
+    (test uri result :test 'string=)))
 
 (defun test-aserve-extra-ssl ()
   ;; tests run with no aserve server running
