@@ -5,32 +5,24 @@
 ;;
 ;; See the file LICENSE for the full license governing this code.
 
-#+(version= 10 1 beta)
+#+(version= 10 1)
 (sys:defpatch "webactions" 1
-  "v1: 1.16: fix misspelled initarg to websession-master."
+  "v1: 1.17: don't create session for non-existant urls."
   :type :system
   :post-loadable t)
 
 #+(version= 10 0)
-(sys:defpatch "webactions" 3
-  "v3: 1.16: fix misspelled initarg to websession-master;
+(sys:defpatch "webactions" 4
+  "v4: 1.17: don't create session for non-existant urls.
+v3: 1.16: fix misspelled initarg to websession-master;
 v2: 1.15: update parsed time after parsing is finished;
 v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
   :type :system
   :post-loadable t)
 
-#+(version= 9 0)
-(sys:defpatch "webactions" 2
-  "v2: 1.13: use http-only cookies feature of aserve;
-v1: add timeout to webaction-project."
-  :type :system
-  :post-loadable t)
 
-#+(version= 8 2)
-(sys:defpatch "webactions" 1
-  "v1: add timeout to webaction-project."
-  :type :system
-  :post-loadable t)
+
+
 
 (eval-when (compile load eval) (require :aserve))
 

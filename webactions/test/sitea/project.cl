@@ -1,6 +1,7 @@
 (in-package :net.aserve.testwa)
 
-(webaction-project "sitea"
+(defparameter *sitea-webaction-entity*
+    (webaction-project "sitea"
 		   :project-prefix "/sitea/"
 		   :destination (directory-namestring *load-pathname*)
 		   :map '(("pagea" "file1.clp")
@@ -36,7 +37,7 @@
 			  
 			  ; test nested clp elements
 			  ("file4"  "file4.clp")
-			  ))
+			  )))
 		   
 		   
 

@@ -231,6 +231,16 @@
       (test 200 retcode)
       
       
+      ;; test that sessions are not created for bogus urls references
+      ;;
+      (locally
+          (declare (special *sitea-webaction-entity*))
+        (let ((sm (net.aserve::webaction-websession-master 
+                   (net.aserve::webaction-webaction *sitea-webaction-entity*))))
+          (let ((before (hash-table-count (net.aserve::sm-websessions sm))))
+            (dotimes (i 10)
+              (x-do-http-request (format nil "~a/sitea/bogusurl" prefix-local)))
+            (test before (hash-table-count (net.aserve::sm-websessions sm)) ))))
       )))
 
 

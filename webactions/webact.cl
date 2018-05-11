@@ -84,7 +84,7 @@
     :initform nil :accessor webaction-use-http-only-cookies)
    ))
 
-(defparameter *webactions-version* "1.16")
+(defparameter *webactions-version* "1.17")
 	      
 (defvar *name-to-webaction* (make-hash-table :test #'equal))
 
@@ -258,9 +258,9 @@
 
 
 (defun webaction-entity (req ent
-			 ;; use-actions is used in an internal recursive call
-			 ;; when there are no action matches and we turn to
-			 ;; the webaction's default-actions.
+                         ;; use-actions is used in an internal recursive call
+                         ;; when there are no action matches and we turn to
+                         ;; the webaction's default-actions.
 			 &key (use-actions nil))
   ;; handle a request in the uri-space of this project
   
@@ -272,6 +272,7 @@
 	(websession (websession-from-req req))
 	(failed-following)
 	(final-flags)
+        (new-session) ; brand new created here
 	(sm))
     
     
@@ -293,8 +294,8 @@
 			 then (setf (websession-method websession) :cookie))
 	       elseif (> (length csessid) 10) 
 		 then ; no session found, but this session id looks good
-		      ; and was probably created by another web server.
-		      ; so create a session object
+                      ; and was probably created by another web server.
+                      ; so create a session object
 		      (setq websession (make-instance-websession+key+method csessid :cookie))
 		      (setf (gethash csessid (sm-websessions sm)) websession)))
       (if* websession 
@@ -329,9 +330,9 @@
 	      (or sm (setq sm (webaction-websession-master wa))))
 				 
        then ; we haven't got a session yet for this session.
-	    ; create one, and remeber it for this requst
+            ; create one, and remeber it for this requst
 	    (let ((key (next-websession-id sm)))
-		
+              (setq new-session t)
 	      (setf (websession-from-req req)
 		(setf (gethash key (sm-websessions sm))
 		  (setq websession (make-instance-websession+key+method key :try-cookie))))))
@@ -345,15 +346,15 @@
 	   (initial-following following))
       (if* following
 	 then ; this is a call on a webaction and no session id
-	      ; was found in the url
-	      ; try to locate the session via a cookie
+              ; was found in the url
+              ; try to locate the session via a cookie
 	      
 	      (let* ((actions (or use-actions
 				  (locate-actions req ent wa following)))
 		     (redirect))
 		
-		; there may be a list of flags at the end of
-		; the map entry
+                ; there may be a list of flags at the end of
+                ; the map entry
 		(setq final-flags (let ((last (last actions)))
 				    (if* (consp (car last))
 				       then (car last))))
@@ -362,15 +363,15 @@
 		(if* (and actions
 			  (not (listp (car actions))))
 		   then ; this isn't the case of an entry followed
-			; right by flags
+                        ; right by flags
 			(setq redirect (getf final-flags :redirect))
 			  
 			(loop
 			  (if* (stringp (car actions))
 			     then (if* redirect
 				     then  ; redir so client will send
-					  ; new request meaning we have to
-					  ; pass the cookie value in
+                                          ; new request meaning we have to
+                                          ; pass the cookie value in
 					  (modify-request-path 
 					   req 
 					   (webaction-project-prefix wa)
@@ -420,11 +421,11 @@
 						   initial-following))
 				  (return-from webaction-entity nil)))
 			
-			; out of the procesing loop.  the request
-			; has been modified and may now refer to
-			; an already published file, so start through
-			; the handle-request logic again to find
-			; an existing entity before creating one.
+                        ; out of the procesing loop.  the request
+                        ; has been modified and may now refer to
+                        ; an already published file, so start through
+                        ; the handle-request logic again to find
+                        ; an existing entity before creating one.
 			(return-from webaction-entity
 			  (if* redirect
 			     then (redirect-to req ent
@@ -439,12 +440,12 @@
       (let ((info)
 	    (forbidden))
       
-	; this is like what publish-directory does now
+        ; this is like what publish-directory does now
 	(if* (null realname)
 	   then ; contains ../ or ..\  
-		; ok, it could be valid, like foo../, but that's unlikely
-		; Also on Windows don't allow \ since that's a directory sep
-		; and user should be using / in http paths for that.
+                ; ok, it could be valid, like foo../, but that's unlikely
+                ; Also on Windows don't allow \ since that's a directory sep
+                ; and user should be using / in http paths for that.
 		(return-from webaction-entity
 		  (failed-request req)))
       
@@ -459,10 +460,10 @@
 	(let ((type (excl::filesys-type realname)))
 	  (if* (not (eq :file type))
 	     then ;; No regular map entry for webaction.  If it has a default
-		  ;; action, we try it here.
+                  ;; action, we try it here.
 		  (if* use-actions
 		     then ;; I don't think we can actually get here, but
-			  ;; just in case...
+                          ;; just in case...
 			  (if* failed-following
 			     then (logmess (format nil "~
 no map for webaction with default-actions ~s"
@@ -484,6 +485,15 @@ no map for webaction with default-actions ~s"
 					       (socket:remote-host
 						(request-socket req)))
 					      failed-following)))
+                                    (if* (and new-session sm)
+                                       then ;; a first time visitor who
+                                            ;; went to a missing page
+                                            ;; so eliminate the session
+                                            ;; created as it will never
+                                            ;; be used again
+                                            (remhash 
+                                             (websession-key websession) 
+                                             (sm-websessions sm)))
 				    (return-from webaction-entity
 				      (failed-request req))))))
 
@@ -494,8 +504,8 @@ no map for webaction with default-actions ~s"
 			  (or (getf final-flags :content-type)
 			      (webaction-clp-content-type wa))
 			  )))
-	    ; put the webaction in the entity so it can be used
-	    ; when the clp file (if this is clp entity) is used
+            ; put the webaction in the entity so it can be used
+            ; when the clp file (if this is clp entity) is used
 	    (setf (getf (entity-plist new-ent) 'webaction)
 	      (webaction-webaction ent))
 	    (authorize-and-process req new-ent)))))))
