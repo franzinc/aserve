@@ -7,13 +7,13 @@
 
 #+(version= 10 1)
 (sys:defpatch "webactions" 1
-  "v1: 1.17: don't create session for non-existant urls."
+  "v1: 1.17: don't create session for non-existant urls, get session from ent;"
   :type :system
   :post-loadable t)
 
 #+(version= 10 0)
 (sys:defpatch "webactions" 4
-  "v4: 1.17: don't create session for non-existant urls.
+  "v4: 1.17: don't create session for non-existant urls, get session from ent;
 v3: 1.16: fix misspelled initarg to websession-master;
 v2: 1.15: update parsed time after parsing is finished;
 v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."

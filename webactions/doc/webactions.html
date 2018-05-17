@@ -1081,10 +1081,10 @@ object.<br>
 <br>
 <span
  style="font-weight: bold; font-family: courier new,courier,monospace;"><br>
-(websession-from-req &nbsp;req)</span><br>
+(websession-from-req &nbsp;req &optional ent)</span><br>
 <br>
 Returns the websession object associated with this request (which is an
-http-request object). <br>
+http-request object).  If called from within an authorizer function the ent argument should be supplied as well since when the authorizer function runs webactions has not had a chance to store the session object into the req object.<br>
 <h2><br>
 </h2>
 <span

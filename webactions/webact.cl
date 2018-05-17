@@ -242,8 +242,29 @@
 ;; the current websession is placed in the req object by
 ;; the action code that first gets the request.
 
-(defun websession-from-req (req)
-  (getf (request-reply-plist req) 'websession))
+(defun websession-from-req (req &optional ent)
+  (or (getf (request-reply-plist req) 'websession)
+      
+      ;; if we're trying to get the websession from
+      ;; an authorizer function then we are called before
+      ;; process-entity which is what puts the session
+      ;; in the requst object, so we try to get it from
+      ;; the ent object.  This works if we're using cookies
+      ;; to save session identity.
+      (let (wa sm csessid)
+        (and ent
+             (setq wa (webaction-from-ent ent))
+             (setq sm (webaction-websession-master wa))
+             (setq csessid (session-id-from-session-master req sm))
+             (gethash csessid (sm-websessions sm))))))
+
+(defun session-id-from-session-master (req sm)
+  ;; given a session-master object see if there's a cookie in the 
+  ;; request that denotes a session id
+  (cdr (assoc (sm-cookie-name sm)
+              (get-cookie-values req)
+              :test #'equal)))
+
 
 (defsetf websession-from-req .inv-websession-from-req)
 
@@ -275,7 +296,6 @@
         (new-session) ; brand new created here
 	(sm))
     
-    
     ; look for session info based on cookie
     ; and remember it on the request
 
@@ -283,10 +303,7 @@
     (let (csessid)
       (if* (and (null websession)
 		(setq sm (webaction-websession-master wa))
-		(setq csessid
-		  (cdr (assoc (sm-cookie-name sm)
-			      (get-cookie-values req)
-			      :test #'equal))))
+		(setq csessid (session-id-from-session-master req sm)))
 	 then 
 	      (if* (setq websession
 		     (gethash csessid (sm-websessions sm)))
