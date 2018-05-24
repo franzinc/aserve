@@ -295,7 +295,9 @@
 			(external-format *default-aserve-external-format*)
 			ssl		; do an ssl connection
 			ssl-args	; plist of make-ssl-client-stream args
-			; overrides other ssl args when specified
+					; (overrides other ssl args when
+					; specified)
+			
 			skip-body ; fcn of request object
 			ssl-method
 			timeout
@@ -729,6 +731,21 @@
 		    (octets-to-string cont :external-format :octets)))
 	    (write-sequence cont sock))))
 
+(defun ssl-has-sni-p ()
+  ;; Return T if the :ssl module is loaded *and* has the SNI feature.
+  ;;
+  ;; We cannot do this at compile time because :ssl isn't loaded when
+  ;; aserve is compiled.  In fact, the test is written so that autoloading
+  ;; of :ssl is not triggered.
+  #-(version>= 10 1) nil
+  #+(version>= 10 1)
+  (let ((sym (find-symbol (symbol-name :*ssl-features*)
+			  (find-package :acl-socket))))
+    (when (and sym
+	       (boundp sym)
+	       (member :sni (symbol-value sym) :test #'eq))
+      t)))
+
 (defun make-http-client-request (uri &rest args
 				 &key 
 				 (method  :get)  ; :get, :post, ....
@@ -881,19 +898,23 @@
               (if* ssl
                  then #+(version>= 8 0)
 		      (let ((args (or ssl-args
-				      (append (list :certificate certificate
-						    :key key
-						    :certificate-password certificate-password
-						    :ca-file ca-file
-						    :ca-directory ca-directory
-						    ;; These args are not available in 8.1. [bug23328] 
-						    #+(version>= 8 2) :crl-file #+(version>= 8 2) crl-file
-						    #+(version>= 8 2) :crl-check #+(version>= 8 2) crl-check
-						    :verify verify
-						    :max-depth max-depth)
-					      (when ssl-method
-						;; [bug23838] Called fn expect :method as the keyword.
-						(list :method ssl-method))))))
+				      (append
+				       (list
+					:certificate certificate
+					:key key
+					:certificate-password certificate-password
+					:ca-file ca-file
+					:ca-directory ca-directory
+					;; These args are not available in 8.1. [bug23328] 
+					#+(version>= 8 2) :crl-file #+(version>= 8 2) crl-file
+					#+(version>= 8 2) :crl-check #+(version>= 8 2) crl-check
+					:verify verify
+					:max-depth max-depth)
+				       (when (ssl-has-sni-p)
+					 (list :server-name host))
+				       (when ssl-method
+					 ;; [bug23838] Called fn expect :method as the keyword.
+					 (list :method ssl-method))))))
 			(setq sock
 			  (apply 'socket::make-ssl-client-stream sock args)))
                       #-(version>= 8 0)

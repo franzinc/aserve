@@ -1544,6 +1544,13 @@ Returns a vector."
              (test 200 code)))))
   
 (defun test-client (port)
+  ;; If the :ssl module has the :sni feature, this should succeed.
+  ;; Otherwise it will signal an error.
+  (let ((url "https://allegrograph.com/"))
+    (if* (net.aserve.client::ssl-has-sni-p)
+       then (test t (stringp (values (net.aserve.client:do-http-request url))))
+       else (test-error (net.aserve.client:do-http-request url))))
+  
   (let ((prefix-local (format nil "http://localhost:~a" port)))
   
     ;; test redirection
@@ -3086,5 +3093,4 @@ Returns a vector."
    then (when (excl.osi:getenv "ASERVE_LOG_XMIT")
           (net.aserve::debug-on :xmit))
         (user::test-aserve-n :n user::*do-aserve-test*)
-   else (format t 
-		" (user::test-aserve-n :n 0) will run the aserve test~%"))
+   else (format t " (user::test-aserve-n :n 0) will run the aserve test~%"))
