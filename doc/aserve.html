@@ -3107,18 +3107,18 @@ new socket will be created.&nbsp; Thus it is not an error.<br>
       <td width="22%">ssl</td>
       <td width="16%">nil</td>
       <td width="62%">If true then the connection is made using the
-Secure Sockets Layer protocol.&nbsp;&nbsp;&nbsp; If the uri uses the <strong>https</strong>
-scheme then <strong>ssl</strong> is assumed to be true and the <strong>ssl
-
-
-
-
-
-
-
-
-
-      </strong>argument need not be specified.</td>
+	Secure Sockets Layer protocol. If the uri uses the
+	<strong>https</strong> scheme then <strong>ssl</strong>
+	is assumed to be true and the <strong>ssl</strong> argument
+	need not be specified.  NOTE: if the underlying Lisp implementation
+	supports it, Service Name Indication (SNI) will automatically be
+	be used.  <strong>do-http-request</strong> will use the
+	<strong>:server-name</strong> keyword to
+	<a href="https://franz.com/support/documentation/current/doc/operators/socket/make-ssl-client-stream.htm">acl-socket:make-ssl-client-stream</a>,
+	to indicate the hostname the client is attempting to connect to.
+	This information is passed to the server to allow it
+	to select the SSL certificate to present to the client.
+      </td>
     </tr>
     <tr>
       <td style="vertical-align: top;">ssl-method<br>
@@ -4265,7 +4265,7 @@ the protocols.<br>
 <p><a name="f-ensure-stream-lock"></a><strong><font face="Courier New">(ensure-stream-lock
 stream)</font></strong></p>
 <p>The function adds a <a
- href="https://franz.com/support/documentation/6.1/doc/multiprocessing.htm#process-locks-1">process
+ href="https://franz.com/support/documentation/current/doc/multiprocessing.htm#process-locks-1">process
 lock</a> to <strong>stream</strong>'s property list (under the
 indicator<strong> :lock</strong>)
 if no such lock is present.&nbsp;&nbsp; Then it returns the object <strong>stream</strong>.</p>
