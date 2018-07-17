@@ -5,8 +5,9 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 10
-  "v10: 1.3.60: use SNI if available in make-ssl-client-stream;
+(sys:defpatch "aserve" 11
+  "v11: 1.3.61: Make keep-alive timeout configurable at startup.
+v10: 1.3.60: use SNI if available in make-ssl-client-stream;
 v9: 1.3.57: fix setting response trailers when :xmit-server-response-body debug option enabled;
 v8: 1.3.56: force-output of a prepend-stream supported;
 v7: 1.3.55: Add and export a more full set of http response codes;

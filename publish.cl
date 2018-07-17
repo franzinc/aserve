@@ -2426,7 +2426,7 @@
 
   (let ((strategy nil)
 	(keep-alive-possible
-	 (and (wserver-enable-keep-alive *wserver*)
+	 (and (wserver-keep-alive-timeout *wserver*)
 	      (>= (wserver-free-workers *wserver*) 2)
               (keep-alive-specified req)))
 	(compression-possible
@@ -2505,7 +2505,7 @@
   ;; for files we can always use the socket stream and keep alive
   ;; since we konw the file length ahead of time
   (declare (ignore format))
-  (let ((keep-alive (and (wserver-enable-keep-alive *wserver*)
+  (let ((keep-alive (and (wserver-keep-alive-timeout *wserver*)
 			 (>= (wserver-free-workers *wserver*) 2)
 			 (keep-alive-specified req)))
 	(strategy))
@@ -2634,7 +2634,7 @@
 		       then (format-dif :xmit-server-response-headers
 					hsock "Connection: Keep-Alive~aKeep-Alive: timeout=~d~a"
 					*crlf*
-					(wserver-header-read-timeout *wserver*)
+					(wserver-keep-alive-timeout *wserver*)
 					*crlf*)
 		       else (format-dif :xmit-server-response-headers
 					hsock "Connection: Close~a" *crlf*)))

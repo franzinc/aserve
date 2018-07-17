@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 60))
+(defparameter *aserve-version* '(1 3 61))
 
 (eval-when (eval load)
     (require :sock)
@@ -451,10 +451,10 @@ died. Use nil to specify no timeout.")
     :initarg :socket
     :accessor wserver-socket)
      
-   (enable-keep-alive ;; do keep alive if it's possible
-    :initform t
+   (enable-keep-alive ;; Set to nil or the timeout used by keep-alive
+    :initform *http-header-read-timeout*
     :initarg :enable-keep-alive
-    :accessor wserver-enable-keep-alive)
+    :accessor wserver-keep-alive-timeout)
      
    (enable-chunking  ;; do chunking if it's possible
     :initform nil
@@ -1461,7 +1461,11 @@ by keyword symbols and not by strings"
     (setf (wserver-socket server) main-socket)
     (setf (wserver-terminal-io server) *terminal-io*)
     (setf (wserver-enable-chunking server) chunking)
-    (setf (wserver-enable-keep-alive server) keep-alive)
+    (setf (wserver-keep-alive-timeout server)
+      (typecase keep-alive
+        ((integer 1 *) keep-alive) ;; positive-int
+        (null nil)
+        (t (wserver-header-read-timeout server))))
     (setf (wserver-ssl server) (or ssl (getf ssl-args :certificate)))
 
     #+unix
@@ -1881,7 +1885,9 @@ by keyword symbols and not by strings"
   ;;
   
   (unwind-protect
-      (let (req error-obj error-response (chars-seen (list nil)))
+      (let ((header-read-timeout (wserver-header-read-timeout *wserver*))
+            req error-obj error-response (chars-seen (list nil)))
+            
 
 	;; run the accept hook on the socket if there is one
 	(let ((ahook (wserver-accept-hook *wserver*)))
@@ -1891,7 +1897,7 @@ by keyword symbols and not by strings"
 	(loop
 	  (multiple-value-setq (req error-obj error-response)
 	    (ignore-errors
-	     (mp:with-timeout ((wserver-header-read-timeout *wserver*)
+	     (mp:with-timeout (header-read-timeout
 			       (debug-format :info "total header read timeout")
 			       (values nil nil *response-request-timeout*))
 			     
@@ -1938,16 +1944,21 @@ by keyword symbols and not by strings"
 		  (setq *worker-request* nil)
 		  (free-req-header-block req)
 		  
-		  (let ((sock (request-socket req)))
-		    (if* (member :keep-alive
-				 (request-reply-strategy req)
-				 :test #'eq)
-		       then ; continue to use it
-			    (debug-format :info "request over, keep socket alive")
-			    (force-output-noblock sock)
-			    (setf (car chars-seen) nil)  ; for next use
-			    (excl::socket-bytes-written (request-socket req) 0)
-		       else (return))))))
+                  (let ((sock (request-socket req)))
+                    (if* (member :keep-alive
+                                 (request-reply-strategy req)
+                                 :test #'eq)
+                       then ;; continue to use it
+                            ;; For keep-alive sockets the header-read-timeout is now governed by
+                            ;; keep-alive timeout. Update the header-read-timeout so the timeout
+                            ;; timers are set properly for the next pass through the loop.
+                            (setf header-read-timeout (wserver-keep-alive-timeout *wserver*))
+                            (debug-format :info "request over, keep socket alive with timeout of ~d"
+                                          header-read-timeout)
+                            (force-output-noblock sock)
+                            (setf (car chars-seen) nil) ; for next use
+                            (excl::socket-bytes-written (request-socket req) 0)
+                       else (return))))))
     ;; do it in two stages since each one could error and both have
     ;; to be attempted
     (ignore-errors (force-output-noblock sock))
