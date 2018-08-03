@@ -747,6 +747,10 @@
 	       (member :sni (symbol-value sym) :test #'eq))
       t)))
 
+(defun make-auth-hash (user password)
+  (when user
+    (format nil "Basic ~a" (base64-encode (format nil "~a:~a" user password)))))
+
 (defun make-http-client-request (uri &rest args
 				 &key 
 				 (method  :get)  ; :get, :post, ....
@@ -1030,36 +1034,44 @@
           then (net.aserve::format-dif :xmit-client-request-headers
                                        sock "Content-Length: ~s~a" content-length crlf))
       
-              
        (if* cookies 
-          then (let ((str (compute-cookie-string uri
-                                                 cookies)))
-                 (if* str
-                    then (net.aserve::format-dif :xmit-client-request-headers
-                                                 sock "Cookie: ~a~a" str crlf))))
+           then (let ((str (compute-cookie-string uri
+                                                cookies)))
+                (if* str
+                   then (net.aserve::format-dif :xmit-client-request-headers
+                                                sock "Cookie: ~a~a" str crlf))))
 
-       ;; bug22805
-       (when (and (not basic-authorization) (net.uri:uri-userinfo uri))
-         (let ((userinfo (delimited-string-to-list (net.uri:uri-userinfo uri) #\:)))
-           (setf basic-authorization (cons (first userinfo) (or (second userinfo) "")))))
-	
-       (if* basic-authorization
-          then (net.aserve::format-dif :xmit-client-request-headers
-                                       sock "Authorization: Basic ~a~a"
-                                       (base64-encode
-                                        (format nil "~a:~a" 
-                                                (car basic-authorization)
-                                                (cdr basic-authorization)))
-                                       crlf))
+        ;; Authorization info can come from three different places: from uri, from basic-authorization or from headers.
+        ;; This code ensures that those three do not disagree with each other and result in equal final authorization hash.
+        ;; It also ensures that authorization information will be written to :xmit-client-request-headers only once.
+        (let* ((userinfo (when (net.uri:uri-userinfo uri) (delimited-string-to-list (net.uri:uri-userinfo uri) #\:)))
+               (uri-auth (make-auth-hash (first userinfo) (or (second userinfo) "")))
+               (basic-auth (make-auth-hash (car basic-authorization) (cdr basic-authorization)))
+               (header-auth (cdr (assoc "Authorization" headers :test #'equalp)))
+               (auth-candidates (remove-duplicates
+                                 (remove nil (list header-auth basic-auth uri-auth))
+                                 :test #'string=))
+               (common-auth (car auth-candidates)))
+    
+          (when (> (length auth-candidates) 1)
+            (error "Multiple conflicting authentication credentials supplied"))
+
+          ;; If everything is OK and there is no authorization info in supplied headers - write it.
+          ;; If authorization info is supplied in headers it will be written later when parsing headers.
+          (if* (and (not header-auth)
+                    common-auth)
+            then (net.aserve::format-dif :xmit-client-request-headers
+                                         sock "Authorization: ~a~a"
+                                         common-auth
+                                         crlf)))
         
-       (if* proxy-basic-authorization
-          then (net.aserve::format-dif :xmit-client-request-headers
-                                       sock "Proxy-Authorization: Basic ~a~a"
-                                       (base64-encode
-                                        (format nil "~a:~a" 
-                                                (car proxy-basic-authorization)
-                                                (cdr proxy-basic-authorization)))
-                                       crlf))
+        (if* proxy-basic-authorization
+           then (net.aserve::format-dif :xmit-client-request-headers
+                                        sock "Proxy-Authorization: ~a~a"
+                                        (make-auth-hash
+                                         (car proxy-basic-authorization)
+                                         (cdr proxy-basic-authorization))
+                                        crlf))
         
        (if* (and digest-authorization
                  (digest-response digest-authorization))
