@@ -82,9 +82,13 @@
    ;; use http-only cookies
    (use-http-only-cookies
     :initform nil :accessor webaction-use-http-only-cookies)
+   
+   ;; only track session with cookie, never put session in url
+   (session-cookie-only
+    :initform nil :accessor webaction-session-cookie-only)
    ))
 
-(defparameter *webactions-version* "1.17")
+(defparameter *webactions-version* "1.18")
 	      
 (defvar *name-to-webaction* (make-hash-table :test #'equal))
 
@@ -104,6 +108,7 @@
 				    access-file
 				    authorizer
 				    clp-content-type
+                                    session-cookie-only
 				    (external-format
 				     *default-aserve-external-format*)
 				    (default-actions nil)
@@ -145,6 +150,7 @@
     (setf (webaction-clp-content-type wa) clp-content-type)
     (setf (webaction-default-actions wa) default-actions)
     (setf (webaction-use-http-only-cookies wa) use-http-only-cookies)
+    (setf (webaction-session-cookie-only wa) session-cookie-only)
     
     (if* (and reap-interval (integerp reap-interval) (> reap-interval 0))
        then (setq *session-reap-interval* reap-interval))
@@ -307,7 +313,8 @@
 	 then 
 	      (if* (setq websession
 		     (gethash csessid (sm-websessions sm)))
-		 then (if* (eq :try-cookie (websession-method websession))
+		 then (if* (member (websession-method websession)
+                                   '(:try-cookie  :do-cookie))
 			 then (setf (websession-method websession) :cookie))
 	       elseif (> (length csessid) 10) 
 		 then ; no session found, but this session id looks good
@@ -352,7 +359,10 @@
               (setq new-session t)
 	      (setf (websession-from-req req)
 		(setf (gethash key (sm-websessions sm))
-		  (setq websession (make-instance-websession+key+method key :try-cookie))))))
+		  (setq websession (make-instance-websession+key+method 
+                                    key (if* (webaction-session-cookie-only wa)
+                                           then :do-cookie
+                                           else :try-cookie)))))))
 		
 	      
 
@@ -445,7 +455,9 @@
                         ; an existing entity before creating one.
 			(return-from webaction-entity
 			  (if* redirect
-			     then (redirect-to req ent
+			     then (insert-cookie req ent
+                                                 sm wa websession)
+                                  (redirect-to req ent
 					       (net.uri:uri-path
 						(request-uri req)))
 			     else (handle-request req)))
@@ -594,7 +606,11 @@ no map for webaction with default-actions ~s"
 		       then ; add new session
 			    (setf (websession-from-req req)
 			      (setf (gethash sessid (sm-websessions sm))
-				(make-instance-websession+key+method sessid :try-cookie)))
+				(make-instance-websession+key+method 
+                                 sessid 
+                                 (if* (webaction-session-cookie-only wa)
+                                           then :do-cookie
+                                           else :try-cookie))))
 			    
 			    ))
 	  

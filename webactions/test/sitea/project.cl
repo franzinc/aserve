@@ -4,6 +4,7 @@
     (webaction-project "sitea"
 		   :project-prefix "/sitea/"
 		   :destination (directory-namestring *load-pathname*)
+                   :session-cookie-only *sitea-session-cookie-only*
 		   :map '(("pagea" "file1.clp")
 			  ("action" 
 			   action-sitea-pushit
@@ -37,6 +38,9 @@
 			  
 			  ; test nested clp elements
 			  ("file4"  "file4.clp")
+                          
+                          ;; redirect test
+                          ("redirtest" "action" (:redirect t))
 			  )))
 		   
 		   

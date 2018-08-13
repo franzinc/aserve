@@ -25,7 +25,7 @@
 (in-package :net.aserve.testwa)
 
 (defvar *x-ssl*)
-
+(defvar *cj* nil)
 (defvar *test-dir* (directory-namestring *load-pathname*))
 
 (defun test-webactions ()
@@ -39,6 +39,9 @@
   (setq util.test::*test-errors* 0
         util.test::*test-successes* 0
 	util.test::*test-unexpected-failures* 0)
+  
+  (setq *cj* (make-instance 'cookie-jar))
+  
   (with-tests (:name "aserve")
     (let* ((*wserver* *wserver*)
 	   (port (start-aserve-running)))
@@ -63,9 +66,11 @@
 	  (format t "Unexpected failures: ~d~%" 
 		  util.test::*test-unexpected-failures*)))
 
+
+
 (defun x-do-http-request (uri &rest args)
   ;; add a proxy arg
-  (apply #'do-http-request uri :ssl *x-ssl* args))
+  (apply #'do-http-request uri :ssl *x-ssl* :cookies *cj* args))
 
 (defmacro values2 (form)
   ;; return the second value
@@ -95,6 +100,7 @@
 
 (defvar *sitea-vara* nil)
 
+(defparameter *sitea-session-cookie-only* nil)
 
 (defun sitea-tests (port)
   ; load in project
@@ -241,6 +247,51 @@
             (dotimes (i 10)
               (x-do-http-request (format nil "~a/sitea/bogusurl" prefix-local)))
             (test before (hash-table-count (net.aserve::sm-websessions sm)) ))))
+      
+      ;; test with :session-cookie-only arg at nil
+      ;; meaning that we'll include the session in the url
+      
+      ;; clear cookie jar
+      (setq *cj* (make-instance 'cookie-jar))
+      
+      (multiple-value-bind (body retcode headers)
+          (x-do-http-request (format nil "~a/sitea/redirtest" prefix-local)
+                             :redirect nil)
+        
+        (declare (ignore body retcode))
+        ;; there will be a set-cookie
+        (test t (not (null (assoc :set-cookie headers))))
+        
+        ;; and the url will have a session id in it
+        (test t (not (null (search "/~" (cdr (assoc :location headers))))))
+        
+        )
+      
+      
+      ;; now test with :session-cookie-only arg at t meaning
+      ;; no url rewriting to include the session id
+      
+      (setq *sitea-session-cookie-only* t)
+      ;; reload the project
+      (load (concatenate 'string *test-dir* "sitea/project.cl"))
+      
+      ;; clear cookie jar
+      (setq *cj* (make-instance 'cookie-jar))
+      
+      (multiple-value-bind (body retcode headers)
+          (x-do-http-request (format nil "~a/sitea/redirtest" prefix-local)
+                             :redirect nil)
+        (declare (ignore body retcode))
+        ;; there will be a set-cookie
+        (test t (not (null (assoc :set-cookie headers))))
+        
+        ;; and the url will not have a session id in it
+        (test nil (not (null (search "/~" (cdr (assoc :location headers))))))
+        
+        )
+      
+
+          
       )))
 
 
@@ -296,11 +347,13 @@
 
     (multiple-value-bind (data retcode)
 	(x-do-http-request (format nil "~a/siteb/sub/file1.clp" prefix-local))
+      (declare (ignore retcode))
       ;; Without bug fix, the rewritten line does not have "sub/".
       (test "/sub/file2.html\">file2.html</a>" data
 	    :test #'(lambda (x y) (search x y))))
     (multiple-value-bind (data retcode)
 	(x-do-http-request (format nil "~a/siteb/pageb" prefix-local))
+      (declare (ignore retcode))
       ;; Without bug fix, the rewritten line does not have "sub/".
       (test "/sub/file2.html\">file2.html</a>" data
 	    :test #'(lambda (x y) (search x y))))))

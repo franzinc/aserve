@@ -6,14 +6,16 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "webactions" 1
-  "v1: 1.17: don't create session for non-existant urls, get session from ent;"
+(sys:defpatch "webactions" 2
+  "v2: 1.18: can use cookies only for sessions; 
+v1: 1.17: don't create session for non-existant urls, get session from ent;"
   :type :system
   :post-loadable t)
 
 #+(version= 10 0)
-(sys:defpatch "webactions" 4
-  "v4: 1.17: don't create session for non-existant urls, get session from ent;
+(sys:defpatch "webactions" 5
+  "v5: 1.18: can use cookies only for sessions; 
+v4: 1.17: don't create session for non-existant urls, get session from ent;
 v3: 1.16: fix misspelled initarg to websession-master;
 v2: 1.15: update parsed time after parsing is finished;
 v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
@@ -195,17 +197,9 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
   
     (with-http-response (req ent 
 			     :content-type (content-type ent))
-      (if* (and websession
-		(eq :try-cookie (websession-method websession))
-		(or sm  ; sm already known, otherwise compute it
-		    (and (setq wa (getf (entity-plist ent) 'webaction))
-			 (setq sm (webaction-websession-master wa)))))
-	 then (set-cookie-header
-	       req 
-	       :name (sm-cookie-name sm)
-	       :value (websession-key websession)
-	       :path (webaction-project-prefix wa)
-	       :http-only (webaction-use-http-only-cookies wa)))
+      
+      (insert-cookie req ent sm wa websession)
+      
       (setf (reply-header-slot-value req :cache-control) "no-cache")
       (setf (reply-header-slot-value req :pragma) "no-cache")
       
@@ -216,6 +210,20 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 			   )
 	(emit-clp-entity req ent (clp-entity-objects ent))))
     t))
+
+(defun insert-cookie (req ent sm wa websession)
+  ;; set our cookie if needed
+  (if* (and websession
+            (member (websession-method websession) '(:try-cookie :do-cookie))
+            (or sm  ; sm already known, otherwise compute it
+                (and (setq wa (getf (entity-plist ent) 'webaction))
+                     (setq sm (webaction-websession-master wa)))))
+     then (set-cookie-header
+           req 
+           :name (sm-cookie-name sm)
+           :value (websession-key websession)
+           :path (webaction-project-prefix wa)
+           :http-only (webaction-use-http-only-cookies wa))))
 
 
 (defun parse-clp-file (ent)

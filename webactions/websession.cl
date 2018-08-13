@@ -59,10 +59,18 @@
    (lastref  :initform (excl::cl-internal-real-time)
 	     :accessor websession-lastref)
    
-   ; how we pass the session information
-   ; :try-cookie - send via cookie and url rewiting
-   ; :cookie - passwed as a cookie
-   ; :url  - pass in url	
+   ;; how we pass the session information
+   ;; :try-cookie - send via cookie and url rewiting
+   ;; :do-cookie - send via cookie, never do url
+   ;; :cookie - cookie received, so no need to send it any more
+   ;; :url  - send session id in url	
+   ;;
+   ;; normally the method changes from
+   ;;  :try-cookie -> :cookie
+   ;; or
+   ;;  :try-cookie -> :url
+   ;; but if :session-cookie-only is set then it's
+   ;;  :do-cookie -> :cookie  (stay at :do-cookie if cookie not returned)
    (method :initarg :method
 	   :initform nil
 	   :accessor websession-method)
