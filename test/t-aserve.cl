@@ -58,6 +58,13 @@
 	  (error "Could not find the aserve examples directory.")))
   )
 
+(defvar *aserve-test-dir* 
+    ;; the full path to aserve/test directory with no trailing slash
+    (namestring (pathname-as-file (path-namestring *load-pathname*)))
+  )
+
+
+
 (defparameter *aserve-set-full-debug*  nil) ; :all and :notrap are useful
 (when *aserve-set-full-debug*
   (apply #'net.aserve::debug-on *aserve-set-full-debug*))
@@ -2625,79 +2632,92 @@ Returns a vector."
 	 (base (format nil "http://localhost:~a" 
 		       (socket:local-port (net.aserve::wserver-socket *wserver*)))))
     (unwind-protect
-	;; [bug23200] Avoid server leak in each test.
+        ;; [bug23200] Avoid server leak in each test.
 	(let ()
 	  (log-wserver-name "test-expect-header-responses" server)
-	  ;; verify that a 100 Continue is sent only if valid user:pass is provided
+          ;; verify that a 100 Continue is sent only if valid user:pass is provided
 	  (publish :path "/secret-auth"
 		   :content-type "text/html"
 		   :authorizer (make-instance 'password-authorizer
-					      :allowed '(("foo2" . "bar2"))
-					      :realm  "SecretAuth")
+                                 :allowed '(("foo2" . "bar2"))
+                                 :realm  "SecretAuth")
 		   :function
 		   #'(lambda (req ent)
 		       (with-http-response (req ent)
-					   (with-http-body (req ent)
-							   (html (:head (:title "Secret page"))
-								 (:body "You made it to the secret page"))))))
-	  ;; verify 100 Continue is returned depending on request method.
+                         (with-http-body (req ent)
+                           (html (:head (:title "Secret page"))
+                                 (:body "You made it to the secret page"))))))
+          ;; verify 100 Continue is returned depending on request method.
 	  (publish :path "/noauth"
 		   :content-type "text/html"
 		   :function
 		   #'(lambda (req ent)
 		       (with-http-response (req ent)
-					   (with-http-body (req ent)
-							   (html (:head (:title "Secret page"))
-								 (:body "You made it to the secret page"))))))
+                         (with-http-body (req ent)
+                           (html (:head (:title "Secret page"))
+                                 (:body "You made it to the secret page"))))))
 
-	  ;; post methods manually send a 100-continue
-	  ;; put methods fetch from the body to trigger the auto 100-continue
-	  ;;     response if there's a 100-continue expect header.
+          ;; post methods manually send a 100-continue
+          ;; put methods fetch from the body to trigger the auto 100-continue
+          ;;     response if there's a 100-continue expect header.
 	  (publish :path "/no-auto"
 		   :content-type "text/html"
 		   :will-handle-expect-continue t
 		   :function
 		   #'(lambda (req ent)
 		       (with-http-response (req ent)
-					   (with-http-body (req ent)
-							   (case (request-method req)
-							     (:post (when (request-has-continue-expectation req)
-								      (send-100-continue req))
-								    (html "post success"))
-							     (:put ;; test that we will auto-send continue response.
-							      ;; force a read of the request body
-							      (request-query-value "body" req)
-							      (html "put success"))
-							     (t (html "non put/post success")))))))
-    
-	  (let ((tests '(("/does-not-exist" :post nil t 404)
-			 ("/secret-auth" :post nil t 401)
-			 ("/secret-auth" :post ("foo2" . "wrongpass") t 401)
-			 ("/secret-auth" :post ("foo2" . "bar2") t 100)
-			 ("/secret-auth" :get ("foo2" . "bar2") t 200)
-			 ("/noauth" :get nil t 200)
-			 ("/noauth" :put nil t 100)
-			 ("/no-auto" :get nil t 200)
-			 ("/no-auto" :put nil t 100)
-			 ("/no-auto" :put nil nil 200)
-			 ("/no-auto" :post nil t 100)
-			 ("/no-auto" :post nil nil 200)
+                         (with-http-body (req ent)
+                           (case (request-method req)
+                             (:post (when (request-has-continue-expectation req)
+                                      (send-100-continue req))
+                                    (html "post success"))
+                             (:put ;; test that we will auto-send continue response.
+                              ;; force a read of the request body
+                              (request-query-value "body" req)
+                              (html "put success"))
+                             (t (html "non put/post success")))))))
+
+          ;; The last two number are the no-proxy return code and
+          ;; the proxy return code.  They differ when the
+          ;; Expect: 100-continue
+          ;; header is sent because when sent to a proxy it has no 
+          ;; choice but to return  "100 continue".  If sent to the actual
+          ;; server it can test if the desired resource even exists and 
+          ;; then return the appropriate code and then send the "100 continue"
+          ;; only if it does.
+
+	  (let ((tests '(("/does-not-exist" :post nil t 404 100)
+			 ("/secret-auth" :post nil t 401 100)
+			 ("/secret-auth" :post ("foo2" . "wrongpass") t 401 100)
+			 ("/secret-auth" :post ("foo2" . "bar2") t 100 100)
+			 ("/secret-auth" :get ("foo2" . "bar2") t 200 200)
+			 ("/noauth" :get nil t 200 200)
+			 ("/noauth" :put nil t 100 100)
+			 ("/no-auto" :get nil t 200 200)
+			 ("/no-auto" :put nil t 100 100)
+			 ("/no-auto" :put nil nil 200 200)
+			 ("/no-auto" :post nil t 100 100)
+			 ("/no-auto" :post nil nil 200 200)
 			 )))
-	    (loop for (path method auth expect-hdr expected-code) in tests
-		  do (let* ((body-p (member method '(:put :post)))
-			    (body (when body-p (query-to-form-urlencoded '(("body" . "stuff")))))
-			    (creq (make-http-client-request
-				   (format nil "~a~a" base path)
-				   :method method
-				   :ssl (asc x-ssl)
-				   :basic-authorization auth
-				   :content (when body-p body)
-				   :content-type (when body-p "application/x-www-form-urlencoded")
-				   :headers (when expect-hdr '(("Expect" . "100-continue"))))))
-		       (unwind-protect 
-			   (progn (read-client-response-headers creq)
-				  (test expected-code (client-request-response-code creq)))
-			 (client-request-close creq))))))
+	    (loop for (path method auth expect-hdr expected-code
+                            expected-proxy) in tests
+                do (let* ((body-p (member method '(:put :post)))
+                          (body (when body-p (query-to-form-urlencoded '(("body" . "stuff")))))
+                          (creq (x-make-http-client-request
+                                 (format nil "~a~a" base path)
+                                 :method method
+                                 ;;:ssl (asc x-ssl)
+                                 :basic-authorization auth
+                                 :content (when body-p body)
+                                 :content-type (when body-p "application/x-www-form-urlencoded")
+                                 :headers (when expect-hdr '(("Expect" . "100-continue"))))))
+                     (unwind-protect 
+                         (progn (read-client-response-headers creq)
+                                (if*  (asc x-proxy)
+                                   then (test expected-proxy (client-request-response-code creq))
+                                   else (test expected-code (client-request-response-code creq)))
+                                )
+                       (client-request-close creq))))))
       (when server (shutdown :server server)))))
   
 
@@ -3017,8 +3037,10 @@ Returns a vector."
 				 rbody rc hdrs auri sock sock2)
 			
   (declare (ignore hdrs auri))
-  (publish-file :path "/junktest1" :file "test/testdir/aaa.foo")
-  (publish-file :path "/junktest2" :file "test/testdir/readme")
+  (publish-file :path "/junktest1" :file (format nil "~a/testdir/aaa.foo"
+                                                 *aserve-test-dir*))
+  (publish-file :path "/junktest2" :file (format nil "~a/testdir/readme"
+                                                 *aserve-test-dir*))
   (publish :path "/junktest3"
 	   :function (lambda (req ent)
 		       (with-http-response (req ent)

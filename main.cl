@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 63))
+(defparameter *aserve-version* '(1 3 64))
 
 (eval-when (eval load)
     (require :sock)
@@ -1195,7 +1195,7 @@ by keyword symbols and not by strings"
 (defparameter *response-method-not-allowed*
     (make-resp 405 "Method Not Allowed"))
 (defparameter *response-not-acceptable* (make-resp 406 "Not acceptable"))
-;; there is no 407
+(defparameter *response-proxy-unauthorized* (make-resp 407 "Proxy Authentication Required"))
 (defparameter *response-request-timeout* (make-resp 408 "Request Timeout"))
 (defparameter *response-conflict* (make-resp 409 "Conflict"))
 ;; 6.5.9.  410 Gone

@@ -295,8 +295,8 @@
 			(external-format *default-aserve-external-format*)
 			ssl		; do an ssl connection
 			ssl-args	; plist of make-ssl-client-stream args
-					; (overrides other ssl args when
-					; specified)
+                        ; (overrides other ssl args when
+                        ; specified)
 			
 			skip-body ; fcn of request object
 			ssl-method
@@ -313,7 +313,7 @@
 			connection ; existing socket to the server
 			read-body-hook
 			
-			;; internal
+                        ;; internal
 			recursing-call ; true if we are calling ourself
 			)
   
@@ -357,34 +357,35 @@
     (unwind-protect
 	(let (new-location) 
 
-          (net.aserve::maybe-accumulate-log (:xmit-client-response-headers "~s")
-					    (loop
-					      (if* (catch 'premature-eof
-						     (read-client-response-headers creq
-										   :throw-on-eof
-										   (and connection
-											'premature-eof))
-						     ;; if it's a continue, then deliver any content we're holding
-						     ;; onto and start the read again
-						     (if* (not (eql 100 (client-request-response-code creq)))
-							then (return)
-							else (let ((sock (client-request-socket creq)))
-							       (send-request-body sock (client-request-deferred-content creq))
-							       (force-output sock)))
+          (net.aserve::maybe-accumulate-log 
+           (:xmit-client-response-headers "~s")
+           (loop
+             (if* (catch 'premature-eof
+                    (read-client-response-headers creq
+                                                  :throw-on-eof
+                                                  (and connection
+                                                       'premature-eof))
+                    ;; if it's a continue, then deliver any content we're holding
+                    ;; onto and start the read again
+                    (if* (not (eql 100 (client-request-response-code creq)))
+                       then (return)
+                       else (let ((sock (client-request-socket creq)))
+                              (send-request-body sock (client-request-deferred-content creq))
+                              (force-output sock)))
 		   
-						     nil)
+                    nil)
 		    
-						 then ; got eof .. likely due to bogus
-						      ; saved connection... so try again with
-						      ; no saved connection
-						      (ignore-errors (close connection))
-						      (setf (getf args :connection) nil)
-						      (return-from do-http-request
-							(apply 'do-http-request uri args)))))
+                then ; got eof .. likely due to bogus
+                     ; saved connection... so try again with
+                     ; no saved connection
+                     (ignore-errors (close connection))
+                     (setf (getf args :connection) nil)
+                     (return-from do-http-request
+                       (apply 'do-http-request uri args)))))
 	  
 	  (if* (equalp "close" (cdr (assoc :connection (client-request-headers creq))))
 	     then ; server forced the close
-		  ; so don't return the connection
+                  ; so don't return the connection
 		  (setf (client-request-return-connection creq) nil))
 	  
 		  
@@ -419,7 +420,7 @@
 				   :recursing-call t
 				   args))))
 		  
-	  ;; auto-retry if request times out.
+          ;; auto-retry if request times out.
 	  (if* (and (eq (client-request-response-code creq)
 			#.(net.aserve::response-number *response-request-timeout*))
 		    (if (integerp retry-on-timeout)
@@ -437,7 +438,7 @@
 			   args)))
 
 	  (if* (or (and (null new-location) 
-			; not called when redirecting
+                        ; not called when redirecting
 			(if* (functionp skip-body)
 			   then (funcall skip-body creq)
 			   else skip-body))
@@ -785,9 +786,21 @@
 				     
 				 )
   
+  ;; 	        scheme  proxy  ssl    do
+  ;;            ------  -----  ---    --
+  ;;		http    nil    nil    http
+  ;;		http    nil    t      ssl
+  ;;		https   nil    any    ssl
+  ;;		http    nonnil any    http to proxy 
+  ;;		https   nonnil any    connect and https through tunnel
+  ;;
+  ;; (note if proxy given but host is on the no-proxy list then
+  ;;  proxy is set to nil for this call)
+  ;;
 
   (declare (ignorable timeout certificate key certificate-password ca-file 
-		      ca-directory crl-file crl-check verify max-depth ssl-method))
+		      ca-directory crl-file crl-check verify max-depth 
+                      ssl-method ssl-args))
   
   
   (if* (and connection (not use-socket))
@@ -800,8 +813,16 @@
 	    (error (c)
 	      (declare (ignore c))
 	      (ignore-errors (close connection))
-	      ; drop into code to do it normally
+              ; drop into code to do it normally
 	      )))
+  
+  (if* (and (not use-socket)
+            proxy)
+     then (multiple-value-setq (use-socket proxy)
+            (apply #'maybe-setup-proxy-tunnel uri args)))
+                                      
+            
+          
   (let (host sock port fresh-uri scheme-default-port)
     ;; start a request
     (with-stream-closed-on-failure (sock)
@@ -837,24 +858,12 @@
       
       (if* proxy
 	 then ; see if the no-proxy list disables
-	      ; the proxy for this call
+              ; the proxy for this call
 	      (if* (and no-proxy (atom no-proxy))
 		 then ; in case just a single string given
 		      (setq no-proxy (list no-proxy)))
 	      
-	      (dolist (nop no-proxy)
-		(if* (stringp nop)
-		   then (let ((pos (search nop host
-					   :from-end t
-					   :test #'char-equal)))
-			  (if* (and pos
-				    (eql pos
-					 (- (length host)
-					    (length nop))))
-			     then ; match at the end
-				  ; turn off proxy
-				  (setq proxy nil)
-				  (return))))))
+              (setq proxy (process-no-proxy host proxy no-proxy)))
 				  
 	      
       (if* proxy
@@ -896,32 +905,10 @@
                                                
                                       )))
               (if* ssl
-                 then #+(version>= 8 0)
-		      (let ((args (or ssl-args
-				      (append
-				       (list
-					:certificate certificate
-					:key key
-					:certificate-password certificate-password
-					:ca-file ca-file
-					:ca-directory ca-directory
-					;; These args are not available in 8.1. [bug23328] 
-					#+(version>= 8 2) :crl-file #+(version>= 8 2) crl-file
-					#+(version>= 8 2) :crl-check #+(version>= 8 2) crl-check
-					:verify verify
-					:max-depth max-depth)
-				       (when (ssl-has-sni-p)
-					 (list :server-name host))
-				       (when ssl-method
-					 ;; [bug23838] Called fn expect :method as the keyword.
-					 (list :method ssl-method))))))
-			(setq sock
-			  (apply 'socket::make-ssl-client-stream sock args)))
-                      #-(version>= 8 0)
-                      (setq sock
-                        (funcall 'socket::make-ssl-client-stream sock))))
-      
-                      
+                 then (setq sock
+                        (apply #'convert-to-ssl-stream sock :host host args))))
+                         
+                                
   
       (if* (not use-socket)
          then ; a fresh socket, so set params
@@ -954,14 +941,14 @@
                       (if* (not fresh-uri)
                          then (setq uri (net.uri:copy-uri uri)))
                       (setf (net.uri:uri-query uri)
-                            ;; rfe12963: append query to the query
-                            ;; part instead of clobbering it.
-                            (query-to-form-urlencoded
-                             (append (form-urlencoded-to-query
-                                      (net.uri:uri-query uri)
-                                      :external-format external-format)
-                                     query)
-                             :external-format external-format))))
+                        ;; rfe12963: append query to the query
+                        ;; part instead of clobbering it.
+                        (query-to-form-urlencoded
+                         (append (form-urlencoded-to-query
+                                  (net.uri:uri-query uri)
+                                  :external-format external-format)
+                                 query)
+                         :external-format external-format))))
 
       (let ((command (format nil "~a ~a ~a"
                              (string-upcase (string method))
@@ -980,144 +967,145 @@
   
       ; always send a Host header, required for http/1.1 and a good idea
       ; for http/1.0
-      (net.aserve::maybe-accumulate-log (:xmit-client-request-headers "~s")
-        (if*  (not (eql scheme-default-port  port))
-           then (net.aserve::format-dif :xmit-client-request-headers
-                                        sock "Host: ~a:~a~a" host port crlf)
-           else (net.aserve::format-dif :xmit-client-request-headers
-                                        sock "Host: ~a~a" host crlf))
+      (net.aserve::maybe-accumulate-log 
+       (:xmit-client-request-headers "~s")
+       (if*  (not (eql scheme-default-port  port))
+          then (net.aserve::format-dif :xmit-client-request-headers
+                                       sock "Host: ~a:~a~a" host port crlf)
+          else (net.aserve::format-dif :xmit-client-request-headers
+                                       sock "Host: ~a~a" host crlf))
         
         
-        ; now the headers
-        (if* (and keep-alive (eq protocol :http/1.0))
-           then ; for http/1.1 keep alive is the default so no need 
-              ; to express it
-              (net.aserve::format-dif :xmit-client-request-headers
-                                      sock "Connection: Keep-Alive~a" crlf)
-         elseif (and (not keep-alive) (eq protocol :http/1.1))
-           then ; request it close for us
-              (net.aserve::format-dif :xmit-client-request-headers
-                                      sock "Connection: close~a" crlf))
+       ; now the headers
+       (if* (and keep-alive (eq protocol :http/1.0))
+          then ; for http/1.1 keep alive is the default so no need 
+               ; to express it
+               (net.aserve::format-dif :xmit-client-request-headers
+                                       sock "Connection: Keep-Alive~a" crlf)
+        elseif (and (not keep-alive) (eq protocol :http/1.1))
+          then ; request it close for us
+               (net.aserve::format-dif :xmit-client-request-headers
+                                       sock "Connection: close~a" crlf))
   
         
-        (if* accept
-           then (net.aserve::format-dif :xmit-client-request-headers
-                                      sock "Accept: ~a~a" accept crlf))
+       (if* accept
+          then (net.aserve::format-dif :xmit-client-request-headers
+                                       sock "Accept: ~a~a" accept crlf))
   
   
-        (if* compress
-           then (net.aserve::format-dif :xmit-client-request-headers
-                                      sock "Accept-Encoding: gzip~a"  crlf))
+       (if* compress
+          then (net.aserve::format-dif :xmit-client-request-headers
+                                       sock "Accept-Encoding: gzip~a"  crlf))
           
-        ; some webservers (including AServe) have trouble with put/post
-        ; requests without a body
-        (if* (and (not content) (member method '(:put :post)))
-           then (setf content ""))
-        ; content can be a nil, a single vector or a list of vectors.
-        ; canonicalize..
-        (if* (and content (atom content)) then (setq content (list content)))
+       ; some webservers (including AServe) have trouble with put/post
+       ; requests without a body
+       (if* (and (not content) (member method '(:put :post)))
+          then (setf content ""))
+       ; content can be a nil, a single vector or a list of vectors.
+       ; canonicalize..
+       (if* (and content (atom content)) then (setq content (list content)))
         
-        (if* content
-           then (let ((computed-length 0))
-                (dolist (content-piece content)
-                  (typecase content-piece
-                    ((array character (*))
-                     (if* (null content-length)
-                        then (incf computed-length 
-                                   (native-string-sizeof 
-                                    content-piece
-                                    :external-format external-format))))
+       (if* content
+          then (let ((computed-length 0))
+                 (dolist (content-piece content)
+                   (typecase content-piece
+                     ((array character (*))
+                      (if* (null content-length)
+                         then (incf computed-length 
+                                    (native-string-sizeof 
+                                     content-piece
+                                     :external-format external-format))))
                    
-                    ((array (unsigned-byte 8) (*)) 
-                     (if* (null content-length)
-                        then (incf computed-length (length content-piece))))
-                    (t (error "Illegal content array: ~s" content-piece))))
+                     ((array (unsigned-byte 8) (*)) 
+                      (if* (null content-length)
+                         then (incf computed-length (length content-piece))))
+                     (t (error "Illegal content array: ~s" content-piece))))
                 
-                (if* (null content-length)
-                   then (setq content-length computed-length))))
+                 (if* (null content-length)
+                    then (setq content-length computed-length))))
         
               
         
-        (if* content-length
-           then (net.aserve::format-dif :xmit-client-request-headers
-                                      sock "Content-Length: ~s~a" content-length crlf))
+       (if* content-length
+          then (net.aserve::format-dif :xmit-client-request-headers
+                                       sock "Content-Length: ~s~a" content-length crlf))
       
               
-        (if* cookies 
-           then (let ((str (compute-cookie-string uri
-                                                cookies)))
-                (if* str
-                   then (net.aserve::format-dif :xmit-client-request-headers
-                                                sock "Cookie: ~a~a" str crlf))))
+       (if* cookies 
+          then (let ((str (compute-cookie-string uri
+                                                 cookies)))
+                 (if* str
+                    then (net.aserve::format-dif :xmit-client-request-headers
+                                                 sock "Cookie: ~a~a" str crlf))))
 
-	;; bug22805
-	(when (and (not basic-authorization) (net.uri:uri-userinfo uri))
-	  (let ((userinfo (delimited-string-to-list (net.uri:uri-userinfo uri) #\:)))
-	    (setf basic-authorization (cons (first userinfo) (or (second userinfo) "")))))
+       ;; bug22805
+       (when (and (not basic-authorization) (net.uri:uri-userinfo uri))
+         (let ((userinfo (delimited-string-to-list (net.uri:uri-userinfo uri) #\:)))
+           (setf basic-authorization (cons (first userinfo) (or (second userinfo) "")))))
 	
-        (if* basic-authorization
-           then (net.aserve::format-dif :xmit-client-request-headers
-                                        sock "Authorization: Basic ~a~a"
-					(base64-encode
-					 (format nil "~a:~a" 
-						 (car basic-authorization)
-						 (cdr basic-authorization)))
-					crlf))
+       (if* basic-authorization
+          then (net.aserve::format-dif :xmit-client-request-headers
+                                       sock "Authorization: Basic ~a~a"
+                                       (base64-encode
+                                        (format nil "~a:~a" 
+                                                (car basic-authorization)
+                                                (cdr basic-authorization)))
+                                       crlf))
         
-        (if* proxy-basic-authorization
-           then (net.aserve::format-dif :xmit-client-request-headers
-                                        sock "Proxy-Authorization: Basic ~a~a"
-                                      (base64-encode
-                                       (format nil "~a:~a" 
-                                               (car proxy-basic-authorization)
-                                               (cdr proxy-basic-authorization)))
-                                      crlf))
+       (if* proxy-basic-authorization
+          then (net.aserve::format-dif :xmit-client-request-headers
+                                       sock "Proxy-Authorization: Basic ~a~a"
+                                       (base64-encode
+                                        (format nil "~a:~a" 
+                                                (car proxy-basic-authorization)
+                                                (cdr proxy-basic-authorization)))
+                                       crlf))
         
-        (if* (and digest-authorization
-                (digest-response digest-authorization))
-           then ; put out digest info
-              (net.aserve::format-dif 
-               :xmit-client-request-headers sock
-               "Authorization: Digest username=~s, realm=~s, nonce=~s, uri=~s, qop=~a, nc=~a, cnonce=~s, response=~s~@[, opaque=~s~]~a"
-               (digest-username digest-authorization)
-               (digest-realm digest-authorization)
-               (digest-nonce digest-authorization)
-               (digest-uri digest-authorization)
-               (digest-qop digest-authorization)
-               (digest-nonce-count digest-authorization)
-               (digest-cnonce digest-authorization)
-               (digest-response digest-authorization)
-               (digest-opaque digest-authorization)
-               crlf))
+       (if* (and digest-authorization
+                 (digest-response digest-authorization))
+          then ; put out digest info
+               (net.aserve::format-dif 
+                :xmit-client-request-headers sock
+                "Authorization: Digest username=~s, realm=~s, nonce=~s, uri=~s, qop=~a, nc=~a, cnonce=~s, response=~s~@[, opaque=~s~]~a"
+                (digest-username digest-authorization)
+                (digest-realm digest-authorization)
+                (digest-nonce digest-authorization)
+                (digest-uri digest-authorization)
+                (digest-qop digest-authorization)
+                (digest-nonce-count digest-authorization)
+                (digest-cnonce digest-authorization)
+                (digest-response digest-authorization)
+                (digest-opaque digest-authorization)
+                crlf))
                
                                       
                                       
   
-        (if* user-agent
-           then (if* (stringp user-agent)
-                 thenret
-               elseif (eq :aserve user-agent)
-                 then (setq user-agent net.aserve::*aserve-version-string*)
-               elseif (eq :netscape user-agent)
-                 then (setq user-agent "Mozilla/4.7 [en] (WinNT; U)")
-               elseif (eq :ie user-agent)
-                 then (setq user-agent "Mozilla/4.0 (compatible; MSIE 5.01; Windows NT 5.0)")
-                 else (error "Illegal user-agent value: ~s" user-agent))
-              (net.aserve::format-dif :xmit-client-request-headers
-                                      sock "User-Agent: ~a~a" user-agent crlf))
+       (if* user-agent
+          then (if* (stringp user-agent)
+                  thenret
+                elseif (eq :aserve user-agent)
+                  then (setq user-agent net.aserve::*aserve-version-string*)
+                elseif (eq :netscape user-agent)
+                  then (setq user-agent "Mozilla/4.7 [en] (WinNT; U)")
+                elseif (eq :ie user-agent)
+                  then (setq user-agent "Mozilla/4.0 (compatible; MSIE 5.01; Windows NT 5.0)")
+                  else (error "Illegal user-agent value: ~s" user-agent))
+               (net.aserve::format-dif :xmit-client-request-headers
+                                       sock "User-Agent: ~a~a" user-agent crlf))
   
-        (if* content-type
-           then (net.aserve::format-dif :xmit-client-request-headers
-                                        sock "Content-Type: ~a~a"
-                                      content-type
-                                      crlf))
+       (if* content-type
+          then (net.aserve::format-dif :xmit-client-request-headers
+                                       sock "Content-Type: ~a~a"
+                                       content-type
+                                       crlf))
         
-        (if* headers
-           then (dolist (header headers)
-                (net.aserve::format-dif :xmit-client-request-headers
+       (if* headers
+          then (dolist (header headers)
+                 (net.aserve::format-dif :xmit-client-request-headers
                                          sock "~a: ~a~a" 
-                                        (car header) (cdr header) crlf)))
-        (if* use-socket then (force-output sock)))
+                                         (car header) (cdr header) crlf)))
+       (if* use-socket then (force-output sock)))
       
   
       (write-string crlf sock)  ; final crlf
@@ -1149,6 +1137,166 @@
 	  :return-connection (if* keep-alive then :maybe)
 	  :deferred-content deferred-content)))))
 
+(defun maybe-setup-proxy-tunnel (url &rest args
+                                 &key proxy-basic-authorization
+                                      proxy
+                                      no-proxy
+                                 &allow-other-keys
+                                 )
+  ;; Determine if we are going to proxy an ssl connection 
+  ;; and if so setup a tunnel through the proxy (if this is
+  ;; supported by the proxy). 
+  ;;
+  ;; return two values:
+  ;;   socket 
+  ;;   proxy
+  ;;
+  ;; If we successfully setup a tunnel then the socket is
+  ;;  a connection to the proxy that will be tunneled to
+  ;;  target http server's ssl port. We'll setup ssl on the
+  ;;  socket before returning it.
+  ;; The proxy returned will be nil indicating that proxying
+  ;;  isn't necessary as we're talking to the target http server itself
+  ;;  through the tunnel.
+  ;;
+  ;; If the argument indicate that a tunnel isn't needed then
+  ;   we return nil for the socket as the value of proxy
+  ;;  as the proxy so its value won't change
+  ;;  
+  
+  (declare (ignorable certificate key certificate-password
+                      ca-file ca-directory crl-file crl-check
+                      verify max-depth ssl-method))
+  
+  (let* ((uri (net.uri:parse-uri url))
+         (host (net.uri:uri-host uri))
+         (port (or (net.uri:uri-port uri) 443))
+         (ssl  (eq (net.uri:uri-scheme uri) :https))
+         (creq))
+    
+    
+    (setq proxy (process-no-proxy host proxy no-proxy))
+    
+    (if* (or (not proxy)
+             (not ssl))
+       then ;; ssl tunnel not required
+            (return-from maybe-setup-proxy-tunnel (values nil proxy)))
+  
+    (multiple-value-bind (phost pport)
+        (net.aserve::get-host-port proxy)
+      (let ((sock (with-socket-connect-timeout (:timeout nil
+                                                         :host phost 
+                                                         :port pport)
+                    (socket:make-socket :remote-host phost
+                                        :remote-port pport
+                                        :format :bivalent
+                                        :type net.aserve::*socket-stream-type*
+                                        :nodelay t
+                                        ))))
+        (let ((cmd (format nil "CONNECT ~a:~d HTTP/1.1"
+                           host
+                           port)))
+          (net.aserve::format-dif :xmit-client-request-command
+                                  sock "~a~a"
+                                  cmd
+                                  crlf)
+          
+          (net.aserve::maybe-accumulate-log 
+           (:xmit-client-request-headers "~s")
+           (net.aserve::format-dif :xmit-client-request-headers
+                                   sock "Host: ~a:~d~a"
+                                   host port crlf)
+           (net.aserve::format-dif :xmit-client-request-headers
+                                   sock "Proxy-Connection: Keep-Alive~a" crlf)
+           (if* proxy-basic-authorization
+              then (net.aserve::format-dif :xmit-client-request-headers
+                                           sock "Proxy-Authorization: Basic ~a~a"
+                                           (base64-encode
+                                            (format nil "~a:~a" 
+                                                    (car proxy-basic-authorization)
+                                                    (cdr proxy-basic-authorization)))
+                                           crlf))
+           (net.aserve::format-dif :xmit-client-request-headers sock "~a" crlf))
+          (force-output sock)
+        
+          (setq creq (make-instance 'client-request
+                       :uri uri
+                       :socket sock
+                       :method :connect
+                       :return-connection t))
+
+          (read-client-response-headers creq)
+          (if* (eq (client-request-response-code creq) 
+                   #.(net.aserve::response-number *response-ok*))
+             then ;; will return a second value of nil
+                  ;; thus setting proxy var to nil since we've
+                  ;; got a direct connection
+                  (apply #'convert-to-ssl-stream 
+                         sock :host host args)
+           elseif (eq (client-request-response-code creq) 
+                      #.(net.aserve::response-number 
+                         *response-proxy-unauthorized*))
+             then (error "Proxy at ~a:~a responded with: access is unauthorized"
+                         phost pport)
+             else (error "Proxy at ~a:~a responded to ~s with error code ~s"
+                         phost pport
+                         cmd
+                         (client-request-response-code creq))))))))
+
+(defun process-no-proxy (host proxy no-proxy)
+  ;; return the value of proxy after checking
+  ;; the no-proxy list
+  (if* proxy
+     then (dolist (nop no-proxy)
+            (if* (stringp nop)
+               then (let ((pos (search nop host
+                                       :from-end t
+                                       :test #'char-equal)))
+                      (if* (and pos
+                                (eql pos
+                                     (- (length host)
+                                        (length nop))))
+                         then ; match at the end
+                              ; turn off proxy
+                              (setq proxy nil)
+                              (return)))))
+          proxy))
+  
+
+(defun convert-to-ssl-stream (sock &key certificate
+                                        key certificate-password
+                                        ca-file ca-directory
+                                        crl-file crl-check
+                                        verify max-depth 
+                                        host ssl-method
+                                        ssl-args
+                                        &allow-other-keys)
+  (let ((args (or ssl-args
+                  (append
+                   (list
+                    :certificate certificate
+                    :key key
+                    :certificate-password certificate-password
+                    :ca-file ca-file
+                    :ca-directory ca-directory
+                    ;; These args are not available in 8.1. [bug23328] 
+                    #+(version>= 8 2) :crl-file #+(version>= 8 2) crl-file
+                    #+(version>= 8 2) :crl-check #+(version>= 8 2) crl-check
+                    :verify verify
+                    :max-depth max-depth)
+                   (when (ssl-has-sni-p)
+                     (list :server-name host))
+                   (when ssl-method
+                     ;; [bug23838] Called fn expect :method as the keyword.
+                     (list :method ssl-method))))))
+    
+    (apply 'socket::make-ssl-client-stream sock args)))
+    
+      
+  
+  
+  
+        
 
 (defun uri-path-etc (uri)
   ;; return the string form of the uri path, query and fragment
