@@ -294,6 +294,7 @@
 		     (test-publish-prefix port)
 		     (test-authorization port)
 		     (test-encoding)
+                     (test-truncated-stream)
 		     (test-forms port)
 		     (test-get-request-body-incr port)
                      (test-request-character-encoding port)
@@ -3097,6 +3098,19 @@ Returns a vector."
   
   nil)
 
+(defun test-truncated-stream ()
+  (let ((temp-file-name (sys:make-temp-file-name "temp")))
+    (unwind-protect
+         (progn
+           (with-open-file (f temp-file-name
+                              :direction :output
+                              :if-exists :supersede)
+             (write-sequence (make-string 2000 :initial-element #\a) f))
+           (with-open-file (f temp-file-name)
+             (let ((truncated-stream (net.aserve::make-instance-truncated-stream+byte-length+input-handle 50 f))
+                   (buffer (make-array 256 :element-type '(unsigned-byte 8))))
+               (test 4 (device-read truncated-stream buffer 0 4 nil)))))
+      (delete-file temp-file-name))))
     
 (defun test-spr44282 ()
   (test '(("bar" . " ") ("foo" . " ")) 
