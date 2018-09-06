@@ -301,6 +301,7 @@
                      (test-chunked-request-set-trailers-while-debugging port https)
 		     (test-server-request-body port :https https)
                      (test-request-uri port https)
+                     (test-spr44282)
                      
 		     (if* (member :ics *features*)
 			then (test-international port)
@@ -3074,7 +3075,14 @@ Returns a vector."
   nil)
 
     
-        
+(defun test-spr44282 ()
+  (test '(("bar" . " ") ("foo" . " ")) 
+        (net.aserve::form-urlencoded-to-query "bar=+&foo=+")
+        :test #'equal)
+  (test '(("b ar" . " +") ("foo" . " +")) 
+        (net.aserve::form-urlencoded-to-query "b+ar=+%2b&foo=+%2b")
+        :test #'equal))
+         
       
 
 ;; (net.aserve::debug-on :xmit)

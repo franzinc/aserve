@@ -340,11 +340,11 @@
 	 (name)
 	 (max-minus-1 (1- max))
 	 (seenpct)
-	 ;; The following is a flag which determines whether we should do
-	 ;; external-format processing on the source string.
-	 ;; Note that we are assuming the source string not to be in Unicode,
-	 ;; but to contain one latin1 octet per element.  This is the way
-	 ;; a uri gets returned by parse-uri.
+         ;; The following is a flag which determines whether we should do
+         ;; external-format processing on the source string.
+         ;; Note that we are assuming the source string not to be in Unicode,
+         ;; but to contain one latin1 octet per element.  This is the way
+         ;; a uri gets returned by parse-uri.
 	 (seen-non-ascii nil)
 	 (ch))
 	((>= i max))
@@ -355,14 +355,16 @@
 		 (eq ch #\&))
 	   then (setq obj (buffer-substr str start i))
 		(setq start (1+ i))
-	 elseif (eql i max-minus-1)
-	   then (setq obj (buffer-substr str start (1+ i)))
-	 elseif (and (not seenpct) (or (eq ch #\%)
-				       (eq ch #\+)))
-	   then (setq seenpct t)
-	 elseif (and (not seen-non-ascii)
-		     (>= (char-code ch) #.(expt 2 7)))
-	   then (setq seen-non-ascii t))
+           else
+                (if* (eql i max-minus-1)
+                   then (setq obj (buffer-substr str start (1+ i))))
+                
+                (if* (and (not seenpct) (or (eq ch #\%)
+                                            (eq ch #\+)))
+                   then (setq seenpct t)
+                 elseif (and (not seen-non-ascii)
+                             (>= (char-code ch) #.(expt 2 7)))
+                   then (setq seen-non-ascii t)))
       
 	(if* obj
 	   then (if* (or seenpct seen-non-ascii)
