@@ -5,8 +5,9 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 12
-  "v12: 1.3.62: fix x-www-form-encoded decoding
+(sys:defpatch "aserve" 13
+  "v13: 1.3.63: do request timing in microseconds
+v12: 1.3.62: fix x-www-form-encoded decoding
 v11: 1.3.61: Make keep-alive timeout configurable at startup.
 v10: 1.3.60: use SNI if available in make-ssl-client-stream;
 v9: 1.3.57: fix setting response trailers when :xmit-server-response-body debug option enabled;
@@ -22,8 +23,9 @@ v1: 1.3.49: speed up read-sock-line."
   :post-loadable t)
 
 #+(version= 10 0)
-(sys:defpatch "aserve" 21
-  "v21: 1.3.62: fix x-www-form-encoded decoding
+(sys:defpatch "aserve" 22
+  " v22: 1.3.63: do request timing in microseconds
+v21: 1.3.62: fix x-www-form-encoded decoding
 v20: 1.3.57: fix setting response trailers when :xmit-server-response-body debug option enabled;
 v19: 1.3.56: force-output of a prepend-stream supported;
 v18: 1.3.55: Add and export a more full set of http response codes;
@@ -186,10 +188,13 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:request-variable-value
    #:request-wserver
    
+   #:request-request-microtime
+   
    #:request-reply-code
    #:request-reply-date
    #:request-reply-content-length
    #:request-reply-content-type
+   #:request-reply-microtime
    #:request-reply-plist
    #:request-reply-protocol-string
    #:request-reply-strategy

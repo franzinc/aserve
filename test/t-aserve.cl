@@ -1550,7 +1550,8 @@ Returns a vector."
   (let ((url "https://allegrograph.com/"))
     (if* (net.aserve.client::ssl-has-sni-p)
        then (test t (stringp (values (net.aserve.client:do-http-request url))))
-       else (test-error (net.aserve.client:do-http-request url))))
+       else (test-error (net.aserve.client:do-http-request url)
+                        :condition-type 'excl::ssl-error)))
   
   (let ((prefix-local (format nil "http://localhost:~a" port)))
   
