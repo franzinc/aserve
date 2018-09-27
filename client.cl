@@ -67,6 +67,16 @@
     :initarg :cookies
     :initform nil)
    
+   (cookie-string ;; if there are cookies then this is what's put in the header
+    :reader client-request-cookie-string
+    :initarg :cookie-string
+    :initform nil)
+   
+   (accept  ;; the client's Accept header value
+    :reader client-request-accept
+    :initarg :accept
+    :initform nil)
+   
    (return-connection
     ;; set to
     ;;  :maybe - would like to return but only if no errors
@@ -88,6 +98,12 @@
     :initarg :deferred-content
     :initform nil
     :accessor client-request-deferred-content)
+   
+   (cacheable
+    ;; true if the response is cacheable assuming the 
+    ;; response permits it
+    :initarg :cacheable
+    :accessor client-request-cacheable)
    ))
 
 
@@ -312,6 +328,7 @@
 			max-depth
 			connection ; existing socket to the server
 			read-body-hook
+                        cache  ;; client-cache object
 			
                         ;; internal
 			recursing-call ; true if we are calling ourself
@@ -352,8 +369,23 @@
 	       :verify verify
 	       :max-depth max-depth
 	       :connection connection
+               :cache cache
 	       )))
 
+    (if* (consp creq)
+       then ;; cache validation has computed the answer already
+            (return-from do-http-request (values-list creq)))
+    
+    (if* (typep creq 'cache-entry)
+       then ;; make-http-client-request returned a cache entry 
+            ;; which has all the needed values
+            (return-from do-http-request 
+              (values (centry-body creq)
+                      (centry-code creq)
+                      (centry-headers creq)
+                      uri
+                      )))
+    
     (unwind-protect
 	(let (new-location) 
 
@@ -485,7 +517,12 @@
 			       then (setf (client-request-return-connection creq)
 				      :yes)
 			       else (client-request-close creq))
-				    
+
+                            (if* (client-request-cacheable creq)
+                               then (insert-into-cache cache
+                                                       creq
+                                                       body))
+                                    
 			    (values 
 			     body
 			     (client-request-response-code creq)
@@ -787,6 +824,7 @@
 				 max-depth
 				 connection
 				 use-socket
+                                 cache  ;; client-cache object
 				     
 				 )
   
@@ -827,7 +865,7 @@
                                       
             
           
-  (let (host sock port fresh-uri scheme-default-port)
+  (let (host sock port fresh-uri scheme-default-port cookie-string cacheable)
     ;; start a request
     (with-stream-closed-on-failure (sock)
       ;; CONNECT method requests do not require a uri
@@ -895,7 +933,30 @@
          then ; persistent connection
               (setq sock use-socket)
          else 
-             
+              ;; check to see if it's in the cache first
+              (let ((centry 
+                     (and 
+                      ;; preconditions
+                      cache
+                      (or (eq method :get)
+                          (eq method :head))
+                      (not (or query
+                               basic-authorization
+                               digest-authorization
+                               headers))
+                      
+                      ;; if we get this far the response is cacheable
+                      (setq cacheable t)
+                      
+                      ;; then it's ok to look in the check the cache
+                      (lookup-in-client-cache cache
+                                              uri
+                                              cookies
+                                              accept
+                                              method))))
+                (if* centry
+                   then (return-from make-http-client-request centry)))
+                                                     
               (setq sock
                 (with-socket-connect-timeout (:timeout timeout
                                                        :host host
@@ -1035,43 +1096,43 @@
                                        sock "Content-Length: ~s~a" content-length crlf))
       
        (if* cookies 
-           then (let ((str (compute-cookie-string uri
-                                                cookies)))
-                (if* str
-                   then (net.aserve::format-dif :xmit-client-request-headers
-                                                sock "Cookie: ~a~a" str crlf))))
+          then (setq cookie-string (compute-cookie-string uri cookies))
+               (if* cookie-string
+                  then (net.aserve::format-dif 
+                        :xmit-client-request-headers
+                        sock "Cookie: ~a~a" cookie-string crlf)))
 
-        ;; Authorization info can come from three different places: from uri, from basic-authorization or from headers.
-        ;; This code ensures that those three do not disagree with each other and result in equal final authorization hash.
-        ;; It also ensures that authorization information will be written to :xmit-client-request-headers only once.
-        (let* ((userinfo (when (net.uri:uri-userinfo uri) (delimited-string-to-list (net.uri:uri-userinfo uri) #\:)))
-               (uri-auth (make-auth-hash (first userinfo) (or (second userinfo) "")))
-               (basic-auth (make-auth-hash (car basic-authorization) (cdr basic-authorization)))
-               (header-auth (cdr (assoc "Authorization" headers :test #'equalp)))
-               (auth-candidates (remove-duplicates
-                                 (remove nil (list header-auth basic-auth uri-auth))
-                                 :test #'string=))
-               (common-auth (car auth-candidates)))
+       ;; Authorization info can come from three different places: from uri, from basic-authorization or from headers.
+       ;; This code ensures that those three do not disagree with each other and result in equal final authorization hash.
+       ;; It also ensures that authorization information will be written to :xmit-client-request-headers only once.
+       (let* ((userinfo (when (net.uri:uri-userinfo uri) (delimited-string-to-list (net.uri:uri-userinfo uri) #\:)))
+              (uri-auth (make-auth-hash (first userinfo) (or (second userinfo) "")))
+              (basic-auth (make-auth-hash (car basic-authorization) (cdr basic-authorization)))
+              (header-auth (cdr (assoc "Authorization" headers :test #'equalp)))
+              (auth-candidates (remove-duplicates
+                                (remove nil (list header-auth basic-auth uri-auth))
+                                :test #'string=))
+              (common-auth (car auth-candidates)))
     
-          (when (> (length auth-candidates) 1)
-            (error "Multiple conflicting authentication credentials supplied"))
+         (when (> (length auth-candidates) 1)
+           (error "Multiple conflicting authentication credentials supplied"))
 
-          ;; If everything is OK and there is no authorization info in supplied headers - write it.
-          ;; If authorization info is supplied in headers it will be written later when parsing headers.
-          (if* (and (not header-auth)
-                    common-auth)
+         ;; If everything is OK and there is no authorization info in supplied headers - write it.
+         ;; If authorization info is supplied in headers it will be written later when parsing headers.
+         (if* (and (not header-auth)
+                   common-auth)
             then (net.aserve::format-dif :xmit-client-request-headers
                                          sock "Authorization: ~a~a"
                                          common-auth
                                          crlf)))
         
-        (if* proxy-basic-authorization
-           then (net.aserve::format-dif :xmit-client-request-headers
-                                        sock "Proxy-Authorization: ~a~a"
-                                        (make-auth-hash
-                                         (car proxy-basic-authorization)
-                                         (cdr proxy-basic-authorization))
-                                        crlf))
+       (if* proxy-basic-authorization
+          then (net.aserve::format-dif :xmit-client-request-headers
+                                       sock "Proxy-Authorization: ~a~a"
+                                       (make-auth-hash
+                                        (car proxy-basic-authorization)
+                                        (cdr proxy-basic-authorization))
+                                       crlf))
         
        (if* (and digest-authorization
                  (digest-response digest-authorization))
@@ -1145,9 +1206,13 @@
 	  :uri uri
 	  :socket sock
 	  :cookies cookies
+          :cookie-string cookie-string
+          :accept accept
 	  :method method
 	  :return-connection (if* keep-alive then :maybe)
-	  :deferred-content deferred-content)))))
+	  :deferred-content deferred-content
+          :cacheable cacheable
+          )))))
 
 (defun maybe-setup-proxy-tunnel (url &rest args
                                  &key proxy-basic-authorization
@@ -1593,7 +1658,13 @@
        then (net.aserve::parse-header-value val)
        else val)))
 
-    
+(defun header-value (headers key)
+  ;; return the value for the given header from a list of header values.
+  ;; A header is named by a keyword symbol
+  ;;
+  (cdr (assoc key headers :test #'eq)))
+  
+
 (defmacro ignore-connection-reset-and-abort (&body body)
   (let ((tag (gensym)))
     `(catch ',tag

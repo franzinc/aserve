@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 66))
+(defparameter *aserve-version* '(1 3 67))
 
 (eval-when (eval load)
     (require :sock)
@@ -1177,6 +1177,8 @@ by keyword symbols and not by strings"
 ;; 6.3.6.  205 Reset Content
 (defparameter *response-partial-content* (make-resp 206 "Partial Content"))
 ;; 3xx
+(defparameter *response-multiple-choices* 
+    (make-resp 300 "Multiple Choice"))
 (defparameter *response-moved-permanently*
     (make-resp 301 "Moved Permanently"))
 (defparameter *response-found* (make-resp 302 "Found"))
@@ -1198,7 +1200,7 @@ by keyword symbols and not by strings"
 (defparameter *response-proxy-unauthorized* (make-resp 407 "Proxy Authentication Required"))
 (defparameter *response-request-timeout* (make-resp 408 "Request Timeout"))
 (defparameter *response-conflict* (make-resp 409 "Conflict"))
-;; 6.5.9.  410 Gone
+(defparameter *response-gone* (make-resp 410 "Gone"))
 ;; 6.5.10.  411 Length Required
 (defparameter *response-precondition-failed*
     (make-resp 412 "Precondition failed"))

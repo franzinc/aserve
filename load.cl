@@ -25,6 +25,7 @@
       "publish"
       "authorize"
       "log" 
+      "cache"
       "client"
       "proxy"
       "cgi"

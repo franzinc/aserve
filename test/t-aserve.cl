@@ -363,6 +363,9 @@
     ;; independent test of a stream used in aserve
     (test-force-output-prepend-stream)
     
+    ;; test the caching object
+    (test-caching)
+    
     (if* (and ssl (errorset (as-require :ssl)))
        then 
 	    (test-aserve-extra-ssl)
@@ -1570,7 +1573,8 @@ Returns a vector."
     (if* (net.aserve.client::ssl-has-sni-p)
        then (test t (stringp (values (net.aserve.client:do-http-request url))))
        else (test-error (net.aserve.client:do-http-request url)
-                        :condition-type 'excl::ssl-error)))
+                        :condition-type 'error
+                        :include-subtypes t)))
   
   (let ((prefix-local (format nil "http://localhost:~a" port)))
   
@@ -3166,7 +3170,537 @@ Returns a vector."
   (test '(("b ar" . " +") ("foo" . " +")) 
         (net.aserve::form-urlencoded-to-query "b+ar=+%2b&foo=+%2b")
         :test #'equal))
-         
+
+
+
+;;;; caching test
+
+(defmacro with-new-cache ((var &key (max-cache-size 1000000)) &body body)
+  `(let ((,var (make-instance 'net.aserve.client:client-cache
+                 :max-cache-size ,max-cache-size)))
+     ,@body))
+
+(defun test-caching ()
+  (let ((port (start-aserve-running)))
+    (unwind-protect
+        (progn
+          ;; test something that has no cache-control specifier
+          ;; but is cached anyway
+          (with-new-cache (cache)
+            ;; all counters are zero
+            
+            (dopublish "/simple" :last-modified (get-universal-time)) 
+            (dohttp "/simple" :cache cache :port port :expect 200 :name "aaa") 
+            
+            (check-cache cache "aa"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+                         
+            
+            ;; call again this time will validate cache result
+            (dohttp "/simple" :cache cache :port port :expect 200 :name "bbb")
+            (check-cache cache "bb"
+                         :lookups 2
+                         :alive   0
+                         :revalidate 1
+                         :validated 1))
+          
+          ;; test cache-control: max-age=N
+          ;;
+          (with-new-cache (cache)
+            
+            ;; set the max age so the page will be valid for 10 seconds
+            (dopublish "/maxage" :last-modified (get-universal-time)
+                       :headers '(("cache-control" . "private, max-age=10")))
+            (dohttp "/maxage" :cache cache :port port :expect 200 :name "ccc")
+            (check-cache cache "cc"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            ;; call again within 10 seconds so it will be valid in the cache
+            (dohttp "/maxage" :cache cache :port port :expect 200 :name "ddd")
+            (check-cache cache "dd"
+                         :lookups 2
+                         :alive   1
+                         :revalidate 0
+                         :validated 0)
+            
+            ;; now wait 11 seconds to ensure that it has expired in
+            ;; the cache
+            (sleep 11)
+            (dohttp "/maxage" :cache cache :port port :expect 200 :name "eee")
+            (check-cache cache "ee"
+                         :lookups 3
+                         :alive   1
+                         :revalidate 1
+                         :validated 1)
+            
+          
+            )
+          
+          ;; test using an expires header
+          (with-new-cache (cache)
+            
+            ;; set the max age so the page will be valid for 10 seconds
+            (dopublish "/expire" :last-modified (get-universal-time)
+                       :headers `(("expires" . 
+                                             ,(net.aserve::universal-time-to-date 
+                                               (+ (get-universal-time) 10)))))
+            (dohttp "/expire" :cache cache :port port :expect 200 :name "fff")
+            (check-cache cache "cc"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            ;; call again within 10 seconds so it will be valid in the cache
+            (dohttp "/expire" :cache cache :port port :expect 200 :name "ggg")
+            (check-cache cache "dd"
+                         :lookups 2
+                         :alive   1
+                         :revalidate 0
+                         :validated 0)
+            
+            ;; now wait 11 seconds to ensure that it has expired in
+            ;; the cache
+            (sleep 11)
+            (dohttp "/expire" :cache cache :port port :expect 200 :name "hhh")
+            (check-cache cache "ee"
+                         :lookups 3
+                         :alive   1
+                         :revalidate 1
+                         :validated 1)
+            
+          
+            )
+          
+          
+          ;; we set max-age to 10 and expires to 30 seconds in the future
+          ;; we check that max-age takes precedence in ths case
+          (with-new-cache (cache)
+            
+            ;; set the max age so the page will be valid for 10 seconds
+            (dopublish "/expmax" :last-modified (get-universal-time)
+                       :headers `(("cache-control" . "private, max-age=10")
+                                  ("expires" . 
+                                             ,(net.aserve::universal-time-to-date 
+                                               (+ (get-universal-time) 30)))))
+            (dohttp "/expmax" :cache cache :port port :expect 200 :name "ppp")
+            (check-cache cache "ff"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            ;; call again within 10 seconds so it will be valid in the cache
+            (dohttp "/expmax" :cache cache :port port :expect 200 :name "qqq")
+            (check-cache cache "gg"
+                         :lookups 2
+                         :alive   1
+                         :revalidate 0
+                         :validated 0)
+            
+            ;; now wait 11 seconds to ensure that it has expired in
+            ;; the cache
+            (sleep 11)
+            (dohttp "/expmax" :cache cache :port port :expect 200 :name "rrr")
+            (check-cache cache "hh"
+                         :lookups 3
+                         :alive   1
+                         :revalidate 1
+                         :validated 1)
+            
+          
+            )
+
+          
+          ;; test that using a different accept header will not return a cached
+          ;; entry with a different accept header
+          (with-new-cache (cache)
+            
+            ;; set the max age so the page will be valid for 10 seconds
+            (dopublish "/maxage" :last-modified (get-universal-time)
+                       :headers '(("cache-control" . "private, max-age=10")))
+            (dohttp "/maxage" :cache cache :port port :expect 200 :name "ccc2"
+                    :accept "one/two")
+            (check-cache cache "cc2"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            ;; call again within 10 seconds so it will be valid in the cache
+            (dohttp "/maxage" :cache cache :port port :expect 200 :name "ddd2"
+                    :accept "one/two")
+            (check-cache cache "dd2"
+                         :lookups 2
+                         :alive   1
+                         :revalidate 0
+                         :validated 0)
+            
+            ;; call with a different accept header
+            (dohttp "/maxage" :cache cache :port port :expect 200 :name "ddd2"
+                    :accept "three/four")
+            (check-cache cache "dd3"
+                         :lookups 3
+                         :alive   1
+                         :revalidate 0
+                         :validated 0)
+            
+            
+            ;; now wait 11 seconds to ensure that it has expired in
+            ;; the cache
+            (sleep 11)
+            (dohttp "/maxage" :cache cache :port port :expect 200 :name "eee"
+                    :accept "one/two")
+            (check-cache cache "ee2"
+                         :lookups 4
+                         :alive   1
+                         :revalidate 1
+                         :validated 1)
+            
+            )
+          ;; cache-control: no-store
+          ;;  does not let the response be stored in the cache
+            
+          (with-new-cache (cache)
+            
+            ;; set the max age so the page will be valid for 10 seconds
+            (dopublish "/nostore" :last-modified (get-universal-time)
+                       :headers `(("cache-control" . "no-store")
+                                  ("expires" . 
+                                             ,(net.aserve::universal-time-to-date 
+                                               (+ (get-universal-time) 10)))))
+            (dohttp "/nostore" :cache cache :port port :expect 200 :name "abbb")
+            (check-cache cache "ii"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            ;; call again quickly and note that the response wasn't cached
+            (dohttp "/nostore" :cache cache :port port :expect 200 :name "bbbb")
+            (check-cache cache "jj"
+                         :lookups 2
+                         :alive 0  
+                         :revalidate 0
+                         :validated 0)
+            
+            ;; now wait 11 seconds to ensure and try the call again.
+            ;; verify not cached
+            (sleep 11)
+            (dohttp "/nostore" :cache cache :port port :expect 200 :name "cbbb")
+            (check-cache cache "kk"
+                         :lookups 3
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            
+          
+            )
+          
+          
+          ;; cache-control: no-cache allows you to cache
+          ;; an item but you must validate on each access
+          (with-new-cache (cache)
+            
+            ;; set the max age so the page will be valid for 10 seconds
+            (dopublish "/nocache" :last-modified (get-universal-time)
+                       :headers `(("expires" . 
+                                             ,(net.aserve::universal-time-to-date 
+                                               (+ (get-universal-time) 10)))
+                                  ("cache-control" . "no-cache")))
+            (dohttp "/nocache" :cache cache :port port :expect 200 :name "aa1")
+            (check-cache cache "a1"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            ;; call again within 10 seconds so it will be valid in the cache
+            ;; but we must revalidate anyway becuase of 'no-cache'
+            (dohttp "/nocache" :cache cache :port port :expect 200 :name "aa2")
+            (check-cache cache "a2"
+                         :lookups 2
+                         :alive   0
+                         :revalidate 1
+                         :validated 1)
+            
+            ;; now wait 11 seconds to ensure that it has expired in
+            ;; the cache
+            (sleep 11)
+            (dohttp "/nocache" :cache cache :port port :expect 200 :name "aa3")
+            (check-cache cache "a3"
+                         :lookups 3
+                         :alive   0
+                         :revalidate 2
+                         :validated 2)
+            
+          
+            )
+
+          ;; test no-cache=headerfield  which allows certain
+          ;; headers to not be stored in the cache.
+          ;;
+          (with-new-cache (cache)
+            
+            ;; set the max age so the page will be valid for 10 seconds
+            (dopublish "/nohead" :last-modified (get-universal-time)
+                       :headers `(("cache-control" . "private, max-age=10, no-cache=fancy, no-cache=schmansy")
+                                  ("fancy" . "foo")
+                                  ("schmansy" . "bar")
+                                  ("flippy"  . "flop")))
+            
+            
+            ;; when we do the http request it won't be in the
+            ;; the cache so we will return all headers, when
+            ;; we call it later and get the value from the
+            ;; cache the fancy and schmansy headers will not be
+            ;; present because we said they should not be cached.
+            (multiple-value-bind (body code headers) 
+                (dohttp "/nohead" :cache cache :port port 
+                        :expect 200 
+                        :name "ppp")
+              (declare (ignore body code))
+              (check-cache cache "ff"
+                           :lookups 1
+                           :alive   0
+                           :revalidate 0
+                           :validated 0)
+              (test '(:fancy . "foo") (assoc :fancy headers)
+                    :test #'equal
+                    :fail-info "111")
+              (test '(:schmansy . "bar") (assoc :schmansy headers)
+                    :test #'equal
+                    :fail-info "111")
+              (test '(:flippy  . "flop") (assoc :flippy headers)
+                    :test #'equal
+                    :fail-info "111"))
+            
+            ;; call again within 10 seconds so it will be valid in the cache
+            (multiple-value-bind (body code headers)
+                (dohttp "/nohead" :cache cache :port port :expect 200 :name "qqq")
+              (declare (ignore body code))
+              (check-cache cache "gg"
+                           :lookups 2
+                           :alive   1
+                           :revalidate 0
+                           :validated 0)
+           
+              (test 'nil (assoc :fancy headers)
+                    :test #'equal
+                    :fail-info "222")
+              (test 'nil (assoc :schmansy headers)
+                    :test #'equal
+                    :fail-info "222")
+              (test '(:flippy  . "flop") 
+                    (assoc :flippy headers)
+                    :test #'equal
+                    :fail-info "222"))
+            
+            
+            ;; now wait 11 seconds to ensure that it has expired in
+            ;; the cache.  it will be validated and a new body
+            ;; not returned so the old header with removed header
+            ;; lines will still be in effect
+            (sleep 11)
+            (multiple-value-bind (body code headers)
+                (dohttp "/nohead" :cache cache :port port :expect 200 :name "rrr")
+              (declare (ignore body code))
+              (check-cache cache "hh"
+                           :lookups 3
+                           :alive   1
+                           :revalidate 1
+                           :validated 1)
+          
+              (test 'nil (assoc :fancy headers)
+                    :test #'equal
+                    :fail-info "333")
+              (test 'nil 
+                    (assoc :schmansy headers)
+                    :test #'equal
+                    :fail-info "333")
+              (test '(:flippy  . "flop") 
+                    (assoc :flippy headers :test #'equal)
+                    :test #'equal
+                    :fail-info "333")))
+
+                    
+            
+      
+          ;; test cache flushing
+          
+          ;; first test that the cache size accounting is correct
+          (with-new-cache (cache)
+                  
+            (dopublish-prefix "/bigret" 
+                              :headers '(("cache-control" . "private, max-age=10")))
+            ;; cache 5 objects of size 10000, 10001 .. 10004
+                  
+            (dotimes (i 5)
+              (dohttp (format nil "/bigret~d" (+ i 10000))
+                      :cache cache
+                      :port port
+                      :expect 200
+                      :name "www"))
+            (test (+ 10000 10001 10002 10003 10004)
+                  (net.aserve.client::client-cache-cache-size cache)))
+          
+          ;; test that the cache flushing works
+          (with-new-cache (cache :max-cache-size 500000)
+            (dotimes (i 5)
+              (dohttp (format nil "/bigret~d" (+ i 100000))
+                      :cache cache
+                      :port port
+                      :expect 200
+                      :name "xxx")
+              ;; sleep one second to cause the last-used time in the cache
+              ;; to vary by one second for each new item cached
+              (sleep 1)
+              )
+            
+            ;; will fit in cache size (500000) plus slop (100000)
+            (test (+ 100000 100001 100002 100003 100004)
+                  (net.aserve.client::client-cache-cache-size cache))
+              
+            ;; one more and that's too much, will have to flush a few.
+            (dohttp (format nil "/bigret~d" 200000)
+                    :cache cache
+                    :port port
+                    :expect 200
+                    :name "zzz")
+            
+            ;; cache grew to 
+            ;; (+ 100000 100001 100002 100003 100004 200000) == 700010
+            ;; causing us to ask for it to be reduced below
+            ;;  (- 500000 (max-cache-size) 100000 (slop)) = 400000
+            ;; we cached items starting at 100000 so the will be
+            ;; removed that order.
+            ;;  we need to drop (- 700010 400000) = 300010 bytes
+            ;; so we'll need to remove
+            ;;   (+ 100000 100001 100002 100003)  == 400006 bytes
+            ;; leaving (- 700010 400006) == 300004 bytes in the cache
+            (test 300004 (net.aserve.client::client-cache-cache-size cache))
+            nil
+            )
+
+          
+          ;; test the flush-client-cache function
+          (with-new-cache (cache)
+            (dopublish "/checkflush" :last-modified (get-universal-time)
+                       :headers `(("cache-control" . "max-age=10")))
+            (dopublish "/checkflush2" :last-modified (get-universal-time)
+                       :headers `(("cache-control" . "max-age=10")))
+            ;; baseline
+            (test 0 (net.aserve.client::client-cache-cache-size cache) 
+                  :fail-info "dd1")
+             
+            (dohttp "/checkflush" :cache cache :port port :expect 200 
+                    :name "cc1")
+       
+            ;; one thing cached of 20 bytes
+             
+            (test 20  (net.aserve.client:client-cache-cache-size cache) 
+                  :fail-info "dd2")
+             
+            ;; it won't expire for 10 seconds so this will not remove it
+            (net.aserve.client:flush-client-cache cache :expired t)
+             
+            (test 20  (net.aserve.client:client-cache-cache-size cache)
+                  :fail-info "dd3")
+             
+            ;; let it expire
+            (sleep 11)
+             
+            ;; cache a new url
+            (dohttp "/checkflush2" :cache cache :port port :expect 200 
+                    :name "cc1")
+             
+
+            ;; now we have two things cached == 40 bytes
+            (test 40  (net.aserve.client:client-cache-cache-size cache) 
+                  :fail-info "dd4")
+             
+            ;; get rid of expired ones
+            (net.aserve.client:flush-client-cache cache :expired t)
+             
+            ;; and we're done to one
+            (test 20  (net.aserve.client:client-cache-cache-size cache)
+                  :fail-info "dd5")
+             
+            ;; get rid of everyone
+            (net.aserve.client:flush-client-cache cache :all t)
+             
+            ;; and we're down to zero
+            (test 0  (net.aserve.client:client-cache-cache-size cache) 
+                  :fail-info "dd6"))
+             
+      
+          
+          )
+      
+      ;; cleanup
+      (stop-aserve-running))))
+
+(defun check-cache (cache name &key lookups alive revalidate validated)
+  (test lookups    (net.aserve.client:client-cache-lookups cache) :fail-info name)
+  (test alive      (net.aserve.client:client-cache-alive cache) :fail-info name)
+  (test revalidate (net.aserve.client:client-cache-revalidate cache) :fail-info name)
+  (test validated  (net.aserve.client:client-cache-validated cache) :fail-info name))
+
+(defun dopublish (path &key last-modified headers)
+  (let ((ent (publish  
+              :path path
+              :function #'(lambda (req ent)
+                            (with-http-response (req ent)
+                              (with-http-body (req ent 
+                                                   :headers headers)
+                                  (dotimes (i 20)
+                                    (write-char #\f net.aserve::*html-stream*))
+                                  (force-output net.aserve::*html-stream*)))))))
+                                         
+    (if* last-modified
+       then (setf (net.aserve::last-modified ent) last-modified))
+    
+    ))
+
+(defun dopublish-prefix (path &key headers)
+  (publish-prefix  
+   :prefix path
+   :function 
+   #'(lambda (req ent)
+       (let ((path (net.uri:uri-path (request-uri req))))
+         (multiple-value-bind (ok whole size)
+             (match-re "([0-9]+)$" path) 
+           (declare (ignore whole))
+           (if* ok
+              then (setq size (parse-integer size))
+              else (setq size 10))
+                                    
+           (with-http-response (req ent)
+             (with-http-body (req ent 
+                                  :headers headers)
+                                                                     
+               (dotimes (i size)
+                 (write-char #\f net.aserve::*html-stream*))
+                            
+               (force-output net.aserve::*html-stream*))))))))
+    
+  
+
+(defun dohttp (path &key (port 0) cache expect (name "not-given") (accept "*/*"))
+  (multiple-value-bind (body code headers)
+      (net.aserve.client:do-http-request (format nil "http://127.0.0.1:~d~a"
+                                                 port
+                                                 path)
+        :cache cache
+        :accept accept)
+    (test expect code :fail-info name)
+    
+    (values body code headers)))
+
+  
+
+
+  
       
 
 ;; (net.aserve::debug-on :xmit)
