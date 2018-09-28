@@ -5,8 +5,9 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 14
-  "v14: 1.3.64: proxing https through a tunnel
+(sys:defpatch "aserve" 15
+  "v15: 1.3.65: device-read fix for truncated-stream; remove dup auth header;
+v14: 1.3.64: proxing https through a tunnel
 v13: 1.3.63: do request timing in microseconds
 v12: 1.3.62: fix x-www-form-encoded decoding
 v11: 1.3.61: Make keep-alive timeout configurable at startup.
