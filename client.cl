@@ -1785,12 +1785,20 @@
   ;;  
   ;;
   ((items :initform nil
-	  :accessor cookie-jar-items)))
+	  :accessor cookie-jar-items)
+   (lock  :initform (mp:make-process-lock)
+          :reader cookie-jar-lock)
+   ))
 
 (defmethod print-object ((jar cookie-jar) stream)
   (print-unreadable-object (jar stream :type t :identity t)
     (format stream "~d cookies" (length (cookie-jar-items jar)))))
 
+(defmacro with-cookie-jar-lock ((cookie-jar) &body body)
+  `(mp:with-process-lock ((cookie-jar-lock ,cookie-jar))
+     ,@body))
+  
+  
 ;* for a given hostname, there will be only one cookie with
 ; a given (path,name) pair
 ;
@@ -1843,7 +1851,7 @@
     
     (if* domain
        then ; one is given, test to see if it's a substring
-	    ; of the host we used
+            ; of the host we used
 	    (if* (null (net.aserve::match-tail-p domain 
 						 (net.uri:uri-host uri)))
 	       then (return-from save-cookie nil))
@@ -1859,43 +1867,44 @@
 		 :http-only (net.aserve::assoc-paramval "httponly" others)
 		 )))
       ; now put in the cookie jar
-      (let ((domain-vals (assoc domain (cookie-jar-items jar) :test #'equal)))
-	(if* (null domain-vals)
-	   then ; this it the first time for this host
-		(push (list domain item) (cookie-jar-items jar))
-	   else ; this isn't the first
-		; check for matching path and name
-		(do* ((xx (cdr domain-vals) (cdr xx))
-		     (thisitem (car xx) (car xx)))
-		    ((null xx)
-		     )
-		  (if* (and (equal (cookie-item-path thisitem)
-				   path)
-			    (equal (cookie-item-name thisitem)
-				   (car namevalue)))
-		     then ; replace this one
-			  (setf (car xx) item)
-			  (return-from save-cookie nil)))
+      (with-cookie-jar-lock (jar)
+        (let ((domain-vals (assoc domain (cookie-jar-items jar) :test #'equal)))
+          (if* (null domain-vals)
+             then ; this it the first time for this host
+                  (push (list domain item) (cookie-jar-items jar))
+             else ; this isn't the first
+                  ; check for matching path and name
+                  (do* ((xx (cdr domain-vals) (cdr xx))
+                        (thisitem (car xx) (car xx)))
+                      ((null xx)
+                       )
+                    (if* (and (equal (cookie-item-path thisitem)
+                                     path)
+                              (equal (cookie-item-name thisitem)
+                                     (car namevalue)))
+                       then ; replace this one
+                            (setf (car xx) item)
+                            (return-from save-cookie nil)))
 		
-		; no match, must insert based on the path length
-		(do* ((prev nil xx)
-		      (xx (cdr domain-vals) (cdr xx))
-		      (thisitem (car xx) (car xx))
-		      (length (length path)))
-		    ((null xx)
-		     ; put at end
-		     (if* (null prev) then (setq prev domain-vals))
-		     (setf (cdr prev) (cons item nil)))
-		  (if* (>= (length (cookie-item-path thisitem)) length)
-		     then ; can insert here
-			  (if* prev
-			     then (setf (cdr prev)
-				    (cons item xx))
+                  ; no match, must insert based on the path length
+                  (do* ((prev nil xx)
+                        (xx (cdr domain-vals) (cdr xx))
+                        (thisitem (car xx) (car xx))
+                        (length (length path)))
+                      ((null xx)
+                       ; put at end
+                       (if* (null prev) then (setq prev domain-vals))
+                       (setf (cdr prev) (cons item nil)))
+                    (if* (>= (length (cookie-item-path thisitem)) length)
+                       then ; can insert here
+                            (if* prev
+                               then (setf (cdr prev)
+                                      (cons item xx))
 				  
-			     else ; at the beginning
-				  (setf (cdr domain-vals)
-				    (cons item (cdr domain-vals))))
-			  (return-from save-cookie nil))))))))
+                               else ; at the beginning
+                                    (setf (cdr domain-vals)
+                                      (cons item (cdr domain-vals))))
+                            (return-from save-cookie nil)))))))))
 		  
       
 
@@ -1911,15 +1920,16 @@
 	res
 	rres)
     
-    (dolist (hostval (cookie-jar-items jar))
-      (if* (net.aserve::match-tail-p (car hostval)
-				     host)
-	 then ; ok for this host
-	      (dolist (item (cdr hostval))
-		(if* (net.aserve::match-head-p (cookie-item-path item)
-					       path)
-		   then ; this one matches
-			(push item res)))))
+    (with-cookie-jar-lock (jar)
+      (dolist (hostval (cookie-jar-items jar))
+        (if* (net.aserve::match-tail-p (car hostval)
+                                       host)
+           then ; ok for this host
+                (dolist (item (cdr hostval))
+                  (if* (net.aserve::match-head-p (cookie-item-path item)
+                                                 path)
+                     then ; this one matches
+                          (push item res))))))
     
     (if* res
        then ; have some cookies to return
