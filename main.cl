@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 65))
+(defparameter *aserve-version* '(1 3 66))
 
 (eval-when (eval load)
     (require :sock)
@@ -1474,7 +1474,7 @@ by keyword symbols and not by strings"
         ((integer 1 *) keep-alive) ;; positive-int
         (null nil)
         (t (wserver-header-read-timeout server))))
-    (setf (wserver-ssl server) (or ssl (getf ssl-args :certificate)))
+    (setf (wserver-ssl server) (or ssl (getf ssl-args :certificate) (getf ssl-args :context)))
 
     #+unix
     (if* os-processes

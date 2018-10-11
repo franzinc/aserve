@@ -364,7 +364,10 @@
     (test-force-output-prepend-stream)
     
     (if* (and ssl (errorset (as-require :ssl)))
-       then (test-aserve-extra-ssl))
+       then 
+	    (test-aserve-extra-ssl)
+	    (test-aserve-ssl-redirect) 
+	    )
     )
   (if* (or (> util.test::*test-errors* 0)
 	   (> util.test::*test-successes* 0)
@@ -3005,6 +3008,42 @@ Returns a vector."
       
       (test t seen-error-3)
       (and *wserver* (shutdown)))))
+
+(defun test-aserve-ssl-redirect (&aux server1 server2 port1 port2 context test-dir text)
+  (unwind-protect
+      (let ()
+	(setq context (socket:make-ssl-server-context 
+		       :certificate (merge-pathnames "server.pem" *aserve-load-truename*)))
+	(setq server1 (start :port nil :server :new :ssl-args (list :context context)))
+	(setq port1 (socket::local-port (net.aserve::wserver-socket server1)))
+	(setq server2 (start :port nil :server :new :ssl-args (list :context context)))
+	(setq port2 (socket::local-port (net.aserve::wserver-socket server2)))
+	(test nil (eql port1 port2) :fail-info (format nil "test-aserve-ssl-redirect ports ~A ~A" port1 port2))
+	
+	(multiple-value-bind (ok whole dir)
+	    (match-regexp "\\(.*[/\\]\\).*" (namestring *aserve-load-truename*))
+	  (declare (ignore whole))
+	  (if* (not ok) 
+	     then (error "can't find the server.pem directory"))
+      
+	  (setq test-dir dir))
+	(publish-directory :server server1 :prefix "/"
+			   :destination (concatenate 'string test-dir "testdir3/"))
+	(test-no-error (setq text (do-http-request (format nil "https://localhost:~A/" port1))))
+	(test 12 (search "topfile</body>" text))
+	(shutdown :server server1)
+	(setq server1 nil)
+	(sleep 1)
+
+	(publish-directory :server server2 :prefix "/"
+			   :destination (concatenate 'string test-dir "testdir3/"))
+	(test-no-error (setq text (do-http-request (format nil "https://localhost:~A/" port2))))
+	(test 12 (search "topfile</body>" text))
+
+	)
+    (when server1 (shutdown :server server1))
+    (when server2 (shutdown :server server2))
+    ))
 
 
 (defun test-force-output-prepend-stream ()
