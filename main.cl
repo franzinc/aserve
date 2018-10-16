@@ -1103,7 +1103,8 @@ by keyword symbols and not by strings"
     :initform 0
     :accessor request-request-date)
    
-   (request-microtime      ; microsecond time when request came in
+   #-zacl
+   (request-microtime	       ; microsecond time when request came in
     :initform 0
     :accessor request-request-microtime)
    
@@ -1111,7 +1112,8 @@ by keyword symbols and not by strings"
     :initform (get-universal-time)	  ; when we're responding
     :accessor request-reply-date)
    
-   (reply-microtime	 ; microsecond time when reply done
+   #-zacl
+   (reply-microtime		    ; microsecond time when reply done
     :initform 0
     :accessor request-reply-microtime)
    
@@ -1941,11 +1943,11 @@ by keyword symbols and not by strings"
 		  (setq *worker-request* req) 
 		  
 		  (setf (request-request-date req) (get-universal-time))
-                  (setf (request-request-microtime req) (get-micro-real-time))
+                  #-zacl (setf (request-request-microtime req) (get-micro-real-time))
 
 		  (handle-request req)
 		  (setf (request-reply-date req) (get-universal-time))
-                  (setf (request-reply-microtime req) (get-micro-real-time))
+                  #-zacl (setf (request-reply-microtime req) (get-micro-real-time))
 		  
 		  (force-output-noblock (request-socket req))
 
@@ -3535,10 +3537,11 @@ in get-multipart-sequence"))
 		       then (values (car parts) port))))))
 
 ;------
+#-zacl
 (defun get-micro-real-time ()
   (multiple-value-bind (secs usecs) (excl::acl-internal-real-time)
     (+ (* 1000000 (- secs excl::base-for-internal-real-time))
-	 usecs)))
+       usecs)))
       
 ;-------
 

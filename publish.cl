@@ -823,9 +823,9 @@
     (if* preload
        then ; keep the content in core for fast display
 	    (with-open-file (p file
-			     #-(and allegro (version>= 6))
+			     #-(and (not zacl) allegro (version>= 6))
 			     :element-type
-			     #-(and allegro (version>= 6))
+			     #-(and (not zacl) allegro (version>= 6))
 			     '(unsigned-byte 8))
 	      (let ((size (excl::filesys-size (stream-input-fn p)))
 		    (lastmod (excl::filesys-write-date (stream-input-fn p)))
@@ -1567,9 +1567,9 @@
     (if* (null (errorset 
 		(setq p (open filename
 			      :direction :input
-			      #-(and allegro (version>= 6))
+			      #-(and (not zacl) allegro (version>= 6))
 			      :element-type
-			      #-(and allegro (version>= 6))
+			      #-(and (not zacl) allegro (version>= 6))
 			      '(unsigned-byte 8)))))
        then ; file not readable
 		      

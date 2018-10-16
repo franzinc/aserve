@@ -172,7 +172,7 @@
     
       (let ((header-byte-array (make-array total-length
 					   :element-type '(unsigned-byte 8)))
-	    (header-lookup-array (make-array (1+ max-length))))
+	    (header-lookup-array (make-array (1+ max-length) :initial-element nil)))
       
 	(let ((hba -1)
 	      (header-number -1)

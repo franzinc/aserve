@@ -8,8 +8,6 @@
   (defclass asdf::cl-file (asdf:cl-source-file) ())
   (defmethod asdf:source-file-type ((c asdf::cl-file) (s asdf:module)) "cl"))
 
-(asdf:disable-output-translations)
-
 (asdf:defsystem :aserve
   :components
   ;; this list is in cl/src/sys/make.cl as well... keep in sync

@@ -155,15 +155,19 @@
   nil
   )
 
+#+zlib-deflate
 (defmethod set-trailers ((p deflate-stream) trailers)
   (set-trailers (deflate-target-stream p) trailers))
 
+#+zlib-deflate
 (defmethod can-set-trailers-p ((p deflate-stream))
   (can-set-trailers-p (deflate-target-stream p)))
 
+#+zlib-deflate
 (defmethod excl::socket-bytes-written ((stream deflate-stream) &optional set)
   (excl::socket-bytes-written (deflate-target-stream stream) set))
 
+#+zlib-deflate
 (defmethod excl::socket-bytes-read ((stream deflate-stream) &optional set)
   (excl::socket-bytes-read (deflate-target-stream stream) set))
 
