@@ -4,7 +4,7 @@
 ;;
 ;; See the file LICENSE for the full license governing this code.
 
-#+(version= 10 1)
+#+(and (not zacl) (version= 10 1))
 (sys:defpatch "aserve" 15
   "v15: 1.3.65: device-read fix for truncated-stream; remove dup auth header;
 v14: 1.3.64: proxing https through a tunnel
@@ -24,7 +24,7 @@ v1: 1.3.49: speed up read-sock-line."
   :type :system
   :post-loadable t)
 
-#+(version= 10 0)
+#+(and (not zacl) (version= 10 0))
 (sys:defpatch "aserve" 23
   "v23: 1.3.64: proxing https through a tunnel 
 v22: 1.3.63: do request timing in microseconds
@@ -52,7 +52,7 @@ v1: 1.3.36: cosmetic: bump version #; code same as 10.0 initial release."
   :type :system
   :post-loadable t)
 
-#+(version= 9 0)
+#+(and (not zacl) (version= 9 0))
 (sys:defpatch "aserve" 23
   "v23: 1.3.62: proxing https through a tunnel
 v22: 1.3.52: optimize compilation for speed;
@@ -312,7 +312,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
 
 ;; These functions must be undefined in case new aserve is loaded on
 ;;   top of older aserve in 8.1. [bug23328] 
-#+(version= 8 1)
+#+(and (not zacl) (version= 8 1))
 (eval-when (compile load eval)
   (fmakunbound 'net.aserve::logmess)
   (fmakunbound 'net.aserve::logmess-stream)

@@ -738,8 +738,8 @@
   ;; We cannot do this at compile time because :ssl isn't loaded when
   ;; aserve is compiled.  In fact, the test is written so that autoloading
   ;; of :ssl is not triggered.
-  #-(version>= 10 1) nil
-  #+(version>= 10 1)
+  #-(and (not zacl) (version>= 10 1)) nil
+  #+(and (not zacl) (version>= 10 1))
   (let ((sym (find-symbol (symbol-name :*ssl-features*)
 			  (find-package :acl-socket))))
     (when (and sym

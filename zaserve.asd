@@ -8,12 +8,31 @@
   (defclass asdf::cl-file (asdf:cl-source-file) ())
   (defmethod asdf:source-file-type ((c asdf::cl-file) (s asdf:module)) "cl"))
 
-#-(or allegro ccl sbcl) (error "This version of aserve is not yet supported on ~a~%" (lisp-implementation-type))
+(defun check-platform-compatibilty ()
+  (unless (or (member :ccl *features*)
+	      (member :sbcl *features*))
+    (error "
 
-(asdf:defsystem :aserve
-  :depends-on (#+(or ccl sbcl) :zacl)
+SORRY:
+=====
+
+This version of AllegroServe, which uses the `zacl' compatibility
+layer (instead of this old acl-compat), is not currently supported on
+~a. Please consider contributing, or requesting, a port of zacl for ~a.
+
+
+"
+	   (lisp-implementation-type) (lisp-implementation-type))))
+
+#-allegro
+(asdf:defsystem :zaserve
+  :depends-on (:zacl)
+  :version "1.3.65"
+  :name "AllegroServe"
+  :author "John K. Foderaro"
+  :licence "LLGPL"
   :components
-  ;; this list is in cl/src/sys/make.cl as well... keep in sync
+  ;; this list is in load.cl as well... keep in sync
   ((:module "htmlgen" :components ((:cl-file "htmlgen")
                                    (:static-file "ChangeLog")))
    (:cl-file "packages")
@@ -30,13 +49,16 @@
    (:cl-file "proxy")
    (:cl-file "cgi")
    (:cl-file "chunker")
-   (:cl-file "playback")
+   #+include-playback (:cl-file "playback")
 
    (:static-file "README.md")
    (:static-file "ChangeLog")
    (:static-file "license-lgpl.txt")
    (:static-file "LICENSE")
    (:static-file "load"))
+  :perform (asdf:load-op :before (op paserve)
+			 (check-platform-compatibilty))
   :serial t)
 
  
+
