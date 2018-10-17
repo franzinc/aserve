@@ -8,7 +8,10 @@
   (defclass asdf::cl-file (asdf:cl-source-file) ())
   (defmethod asdf:source-file-type ((c asdf::cl-file) (s asdf:module)) "cl"))
 
+#-(or allegro ccl sbcl) (error "This version of aserve is not yet supported on ~a~%" (lisp-implementation-type))
+
 (asdf:defsystem :aserve
+  :depends-on (#+(or ccl sbcl) :zacl)
   :components
   ;; this list is in cl/src/sys/make.cl as well... keep in sync
   ((:module "htmlgen" :components ((:cl-file "htmlgen")
