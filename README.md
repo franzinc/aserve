@@ -104,7 +104,7 @@ value of excl:\*current-case-mode\*
 
 ### Loading from source on Allegro CL
 
-    load in the file load.cl 
+load in the file load.cl 
 
     user(1):  :ld <path-to-aserve>/load.cl
 
@@ -113,7 +113,7 @@ the examples file too.
 
 ### Loading into a non-Allegro CL
 
-   CL-USER> (ql:quickload :zaserve)
+    CL-USER> (ql:quickload :zaserve)
 
 This will not load the example files. 
 
