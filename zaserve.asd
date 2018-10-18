@@ -62,10 +62,10 @@ layer (instead of this old acl-compat), is not currently supported on
 
 
 #+allegro
-(defsystem zaserve
+(asdf:defsystem :zaserve
     :name "AllegroServe (portable)"
     :author "John K. Foderaro"
     :version "1.3.65"
     :licence "LLGPL"
     :default-component-class cl-source-file.cl
-    :components ((:file "require-original-aserve")))
+    :components ((:cl-file "require-original-aserve")))
