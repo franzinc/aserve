@@ -74,10 +74,44 @@ network programming in Allegro Common Lisp.  AllegroServe was written
 according to a certain coding standard to demonstrate how Lisp programs 
 are more readable if certain macros and special forms are avoided.
 
+
+A Note on Portability
+---------------------
+
+See the Installation section below for information on running
+AllegroServe on CL implementations other than Allegro CL. 
+
+Although AllegroServe was originally written with portability (to
+other CL implementations) as "neither a goal nor a non-goal"
+(according to John Foderaro), it is a testament to the cleanliness of
+the AllegroServe codebase, as well as the flexibility of Common Lisp,
+and the power of the CL ANSI standard, that some ports of AllegroServe
+have in fact been accomplished over the years.
+
+The most recent one attempts to keep the official AllegroServe code
+unmodified, and uses a compatibility layer called
+["ZACL"](https://gitlab.common-lisp.net/zbeane/zacl), available in
+Quicklisp as `:zacl`.
+
+With this said, please do keep in mind that Allegro CL is
+AllegroServe's native platform, and as such it will always work and
+perform best on Allegro CL. So if you have mission-critical or
+performance-critical applications, it will be to your advantage to
+invest in Allegro CL for developing and running your applications.
+
+And probably most important of all for your mission-critical
+applications, running AllegroServe natively on a supported
+installation of Allegro CL comes backed with the dedicated,
+unparalleled support of the world-class Franz Inc. staff of engineers.
+
+
 Platforms
 ---------
 
 AllegroServe works on all versions of Allegro Common Lisp since 6.0.
+
+It can also run to some extent on other CL implementations (see "A
+Note on Portability" above and "Installation" below).
 
 Dependencies
 ------------
