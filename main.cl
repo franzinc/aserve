@@ -1688,32 +1688,33 @@ by keyword symbols and not by strings"
 	     ;; 8.1.
 	     #+(version>= 8 1)
 	     ((member :zoom-on-error *debug-current* :test #'eq)
-	      (tagbody out
-		(handler-bind
-		    ((error
-		      (lambda (cond)
-			(if* (connection-reset-error cond)
-			   then (go out) ;; don't print these errors,
-			   else (logmess 
-				 (format nil "~agot error ~a~%" 
-					 (if* *worker-request*
-					    then (format 
-						  nil 
-						  "while processing command ~s~%"
-						  (request-raw-request 
-						   *worker-request*))
-					    else "")
-					 cond))
-				(top-level.debug:zoom
-				 (or (vhost-error-stream
-				      (wserver-default-vhost
-				       *wserver*))
-				     *initial-terminal-io*))
-				(if* (not (member :notrap *debug-current*))
+	      (tagbody
+		 (handler-bind
+		     ((error
+		       (lambda (cond)
+			 (if* (connection-reset-error cond)
+			      then (go out) ;; don't print these errors,
+			      else (logmess 
+				    (format nil "~agot error ~a~%" 
+					    (if* *worker-request*
+						 then (format 
+						       nil 
+						       "while processing command ~s~%"
+						       (request-raw-request 
+							*worker-request*))
+						 else "")
+					    cond))
+			      (top-level.debug:zoom
+			       (or (vhost-error-stream
+				    (wserver-default-vhost
+				     *wserver*))
+				   *initial-terminal-io*))
+			      (if* (not (member :notrap *debug-current*))
 				   then ; after the zoom ignore the error
-					(go out))
-				))))
-		  (process-connection sock))))
+				   (go out))
+			      ))))
+		   (process-connection sock))
+	       out))
 	     ((not (member :notrap *debug-current* :test #'eq))
 	      (handler-case (process-connection sock)
 		(error (cond)

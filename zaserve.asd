@@ -56,7 +56,7 @@ layer (instead of this old acl-compat), is not currently supported on
    (:static-file "license-lgpl.txt")
    (:static-file "LICENSE")
    (:static-file "load"))
-  :perform (asdf:load-op :before (op paserve)
+  :perform (asdf:load-op :before (op :zaserve)
 			 (check-platform-compatibilty))
   :serial t)
 
