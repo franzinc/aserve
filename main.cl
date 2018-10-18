@@ -1111,7 +1111,7 @@ by keyword symbols and not by strings"
     :initform (get-universal-time)	  ; when we're responding
     :accessor request-reply-date)
    
-   (reply-microtime	  ; microsecond time when reply done
+   (reply-microtime	 ; microsecond time when reply done
     :initform 0
     :accessor request-reply-microtime)
    
