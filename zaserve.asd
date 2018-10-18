@@ -8,6 +8,15 @@
   (defclass asdf::cl-file (asdf:cl-source-file) ())
   (defmethod asdf:source-file-type ((c asdf::cl-file) (s asdf:module)) "cl"))
 
+#+allegro
+(asdf:defsystem :zaserve
+    :name "AllegroServe (portable)"
+    :author "John K. Foderaro"
+    :version "1.3.65"
+    :licence "LLGPL"
+    :default-component-class cl-source-file.cl
+    :components ((:cl-file "require-original-aserve")))
+
 (defun check-platform-compatibilty ()
   (unless (or (member :ccl *features*)
 	      (member :sbcl *features*))
@@ -56,16 +65,9 @@ layer (instead of this old acl-compat), is not currently supported on
    (:static-file "license-lgpl.txt")
    (:static-file "LICENSE")
    (:static-file "load"))
-  :perform (asdf:load-op :before (op :zaserve)
+  :perform (asdf:load-op :before (op zaserve)
 			 (check-platform-compatibilty))
   :serial t)
 
 
-#+allegro
-(asdf:defsystem :zaserve
-    :name "AllegroServe (portable)"
-    :author "John K. Foderaro"
-    :version "1.3.65"
-    :licence "LLGPL"
-    :default-component-class cl-source-file.cl
-    :components ((:cl-file "require-original-aserve")))
+
