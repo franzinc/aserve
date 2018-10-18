@@ -16,14 +16,14 @@
 
 (in-package :net.aserve)
 
-(eval-when (compile) (declaim (optimize (speed 3))))
+(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
 
 #+ignore
 (check-smp-consistency)
 
 (defparameter *aserve-version* '(1 3 65))
 
-(eval-when (eval load)
+(eval-when (:execute :load-toplevel)
     (require :sock)
     (require :process)
     #+(version>= 6) (require :acldns) ; not strictly required but this is preferred
@@ -850,7 +850,7 @@ Problems with protocol may occur." (ef-name ef)))))
        
 
 
-(eval-when (compile load eval)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   ;; these are the common headers and are stored in slots in 
   ;; the objects
   ;; the list consists of  ("name" . name)

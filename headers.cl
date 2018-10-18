@@ -15,7 +15,7 @@
 
 (in-package :net.aserve)
 
-(eval-when (compile) (declaim (optimize (speed 3))))
+(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
 
 (defvar *header-byte-array*
     ;; unsigned-byte 8 vector contains the characters referenced by
@@ -61,19 +61,19 @@
     )
     
 
-(defconstant *header-block-size* 8192) ; bytes in a header block
-(defconstant *header-block-used-size-index*
+(defconstant +header-block-size+ 8192) ; bytes in a header block
+(defconstant +header-block-used-size-index+
     ;; where the size of lower part of the buffer is kept
-    (- *header-block-size* 2))
-(defconstant *header-block-data-start-index*
+    (- +header-block-size+ 2))
+(defconstant +header-block-data-start-index+
     ;; where the start of the lowest data block is stored
-    (- *header-block-size* 4))
+    (- +header-block-size+ 4))
 
 (defmacro header-block-header-index (index)
   ;; where in the buffer the 2byte entry for header 'index' is located
-  `(- *header-block-size* 6  (ash ,index 1)))
+  `(- +header-block-size+ 6  (ash ,index 1)))
 
-(eval-when (compile eval)
+(eval-when (:compile-toplevel :execute)
   ;; the headers from the http spec
   ;; Following the header name we specify how to 
   ;; 1.  transfer client  request headers and 
@@ -90,7 +90,7 @@
   ;;     nil - no match needed
   ;;
   ;;***** note well: adding something to this table must be accompanied
-  ;;      by modifying *headers-count* above and then removing all caches
+  ;;      by modifying +headers-count+ above and then removing all caches
   ;;      if we're using a proxy cache.
   (defparameter *http-headers* 
       '(("Accept" :p :nf :mp) 
@@ -150,16 +150,16 @@
 ;; we take advantage of this being a constant in the code below and 
 ;; in the proxy caches.  If this number should change all proxy caches
 ;; should be removed.
-(defconstant *headers-count* #.(length *http-headers*))
+(defconstant +headers-count+ #.(length *http-headers*))
 
 (defmacro header-block-data-start ()
   ;; return index right above the first data index object stored
-  `(- *header-block-size* 4 (* *headers-count* 2)))
+  `(- +header-block-size+ 4 (* +headers-count+ 2)))
 
 
 
 
-(eval-when (compile eval)
+(eval-when (:compile-toplevel :execute)
   (defmacro build-header-lookup-table ()
     (let ((max-length 0)
 	  (total-length 0))
@@ -230,8 +230,8 @@
 		    ;; number of distinct headers
 		    ,(1+ header-number))
 		  
-		  (if* (not (eql *header-count* *headers-count*))
-		     then (error "setq *headers-count* to ~d in headers.cl" 
+		  (if* (not (eql *header-count* +headers-count+))
+		     then (error "setq +headers-count+ to ~d in headers.cl" 
 				 *header-count*))
 		  
 			    
@@ -255,7 +255,7 @@
 		 (if* size
 		    then (error "size can't be specifed for header blocks"))
 		 
-		 (make-array *header-block-size*
+		 (make-array +header-block-size+
 			     :element-type '(unsigned-byte 8)))))
 
 (defparameter *header-block-plus-sresource*
@@ -267,7 +267,7 @@
 		 (if* size
 		    then (error "size can't be specifed for header blocks"))
 		 
-		 (make-array (+ *header-block-size* 100)
+		 (make-array (+ +header-block-size+ 100)
 			     :element-type '(unsigned-byte 8)))))
 
 (defparameter *header-index-sresource*
@@ -545,8 +545,8 @@
 		  (setf (aref buff (1+ table-index)) 0)))
 	(decf table-index 2))
 	
-      (setf (unsigned-16-value buff *header-block-used-size-index*) end)
-      (setf (unsigned-16-value buff *header-block-data-start-index* )
+      (setf (unsigned-16-value buff +header-block-used-size-index+) end)
+      (setf (unsigned-16-value buff +header-block-data-start-index+ )
 	data-index)
 	      
     
@@ -730,7 +730,7 @@
   ;; the header block buff has been parsed.
   ;; we just extract all headers in conses
   (let (res)
-    (dotimes (i *headers-count*)
+    (dotimes (i +headers-count+)
       (let ((val (header-buffer-header-value buff i)))
 	(if* val
 	   then (push (cons (aref *header-keyword-array* i) val) res))))
@@ -748,10 +748,10 @@
       (decf index 2)))
   
   ; no headers yet
-  (setf (unsigned-16-value buf *header-block-used-size-index*) 0)
+  (setf (unsigned-16-value buf +header-block-used-size-index+) 0)
   
   ; start of where to put data
-  (setf (unsigned-16-value buf *header-block-data-start-index*)
+  (setf (unsigned-16-value buf +header-block-data-start-index+)
     (header-block-data-start))
   
   buf)
@@ -829,8 +829,8 @@
 	      (setf (unsigned-16-value tobuf header-index) 0))
       (decf header-index 2))
 
-    (setf (unsigned-16-value tobuf *header-block-used-size-index*) toi)
-    (setf (unsigned-16-value tobuf *header-block-data-start-index* )
+    (setf (unsigned-16-value tobuf +header-block-used-size-index+) toi)
+    (setf (unsigned-16-value tobuf +header-block-data-start-index+ )
       data-index)
     
     toi))
@@ -846,7 +846,7 @@
 	    (if* (null val)
 	       then (error "no such header as ~s" header))
 	    (setq header val)))
-  (let ((end (unsigned-16-value buff *header-block-used-size-index*))
+  (let ((end (unsigned-16-value buff +header-block-used-size-index+))
 	(starth)
 	(endh))
     (let ((name (svref *header-name-array* header)))
@@ -870,7 +870,7 @@
     ; now insert the information about this header in the data list
     (let ((this-data-index (unsigned-16-value buff (header-block-header-index
 						    header)))
-	  (data-start (unsigned-16-value buff *header-block-data-start-index*)))
+	  (data-start (unsigned-16-value buff +header-block-data-start-index+)))
       (let ((count 0))
 	(if* (not (zerop this-data-index))
 	   then ; must copy this one down and add to it
@@ -879,7 +879,7 @@
 	(decf data-start (+ 1 (* count 4)))
 	(setf (unsigned-16-value buff (header-block-header-index header))
 	  data-start)
-	(setf (unsigned-16-value buff *header-block-data-start-index*)
+	(setf (unsigned-16-value buff +header-block-data-start-index+)
 	  data-start)
 	(setf (aref buff data-start) count)
 	; copy in old stuff
@@ -895,7 +895,7 @@
 	(setf (unsigned-16-value buff (+ 2 data-start)) endh)))
     
     ; new end of headers
-    (setf (unsigned-16-value buff *header-block-used-size-index*) end)))
+    (setf (unsigned-16-value buff +header-block-used-size-index+) end)))
     
 
 
@@ -904,7 +904,7 @@
   ;;
   (setq name (string name))
   
-  (let ((end (unsigned-16-value buff *header-block-used-size-index*)))
+  (let ((end (unsigned-16-value buff +header-block-used-size-index+)))
     (if* (> (+ end (length name) (length value) 4) 
 	    (header-block-data-start))
        then ; no room
@@ -930,7 +930,7 @@
     (setf (aref buff end) #.(char-code #\linefeed))
     (incf end)
     
-    (setf (unsigned-16-value buff *header-block-used-size-index*) end)))
+    (setf (unsigned-16-value buff +header-block-used-size-index+) end)))
 		
 	       
     
@@ -1022,7 +1022,7 @@
   ;; find the end of the data and add a crlf and then return the
   ;; index right after the linefeed
   (declare (ignore xx))
-  (let ((size (unsigned-16-value buff *header-block-used-size-index*)))
+  (let ((size (unsigned-16-value buff +header-block-used-size-index+)))
     (if* (not (<= 0 size (header-block-data-start)))
        then (error "buffer likely isn't a parsed header block"))
     

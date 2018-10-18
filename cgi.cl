@@ -16,7 +16,7 @@
 
 (in-package :net.aserve)
 
-(eval-when (compile) (declaim (optimize (speed 3))))
+(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
 
 (defun run-cgi-program (req ent program
 			&key
@@ -174,7 +174,6 @@
 			   :wait nil
 			   :environment envs
 			   :show-window :hide)
-      (declare (ignore ignore-this))
 	    
       (unwind-protect
 	  ; first send the body to the script

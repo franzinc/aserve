@@ -3,7 +3,7 @@
 
 (in-package :net.aserve)
 
-(eval-when (compile) (declaim (optimize (speed 3))))
+(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
 
 #+(version= 8 2)
 (eval-when (:compile-toplevel :load-toplevel :execute)

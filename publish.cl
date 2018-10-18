@@ -14,7 +14,7 @@
 
 (in-package :net.aserve)
 
-(eval-when (compile) (declaim (optimize (speed 3))))
+(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
 
 (defclass entity ()
   ;; an object to be published
@@ -1540,7 +1540,7 @@
 
 ; this is stack allocated so don't make it too big
 (defparameter *send-buffer-lock* (mp:make-process-lock))
-(defconstant  *send-buffer-size* #.(* 16 1024))
+(defconstant  +send-buffer-size+ #.(* 16 1024))
 
 (defvar *send-buffers* nil)
 
@@ -1549,7 +1549,7 @@
     (let ((buff (pop *send-buffers*)))
       (if* buff
 	 thenret
-	 else (make-array *send-buffer-size* :element-type '(unsigned-byte 8))))))
+	 else (make-array +send-buffer-size+ :element-type '(unsigned-byte 8))))))
 
 (defun free-send-buffer (buffer)
   (mp:with-process-lock (*send-buffer-lock*)

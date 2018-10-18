@@ -20,7 +20,7 @@
 
 (in-package :net.aserve.client)
 
-(eval-when (compile) (declaim (optimize (speed 3))))
+(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
 
 (net.aserve::check-smp-consistency)
 
@@ -1175,10 +1175,6 @@
   ;   we return nil for the socket as the value of proxy
   ;;  as the proxy so its value won't change
   ;;  
-  
-  (declare (ignorable certificate key certificate-password
-                      ca-file ca-directory crl-file crl-check
-                      verify max-depth ssl-method))
   
   (let* ((uri (net.uri:parse-uri url))
          (host (net.uri:uri-host uri))

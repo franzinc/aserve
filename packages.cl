@@ -93,9 +93,9 @@ v1: 1.3.16: fix freeing freed buffer."
 ;
 (in-package :user)
 
-(eval-when (compile) (declaim (optimize (speed 3))))
+(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
 
-(eval-when (compile load eval)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (require :osi)
   (require :autozoom)
   (require :uri)
@@ -103,7 +103,7 @@ v1: 1.3.16: fix freeing freed buffer."
   (require :streamc)
   (require :inflate))
 
-(eval-when (compile load eval)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar sys::*user-warned-about-deflate* nil)
   (handler-case (require :deflate)
     (error (c)
@@ -313,7 +313,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
 ;; These functions must be undefined in case new aserve is loaded on
 ;;   top of older aserve in 8.1. [bug23328] 
 #+(and (not zacl) (version= 8 1))
-(eval-when (compile load eval)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (fmakunbound 'net.aserve::logmess)
   (fmakunbound 'net.aserve::logmess-stream)
   (fmakunbound 'net.aserve.client::read-client-response-headers)

@@ -82,8 +82,8 @@ AllegroServe works on all versions of Allegro Common Lisp since 6.0.
 Dependencies
 ------------
 
-There are no dependences for AllegroServe.  In order to run the
-allegroserve test suite you'll need to have the tester module
+There are no dependences for AllegroServe on Allegro CL.  In order to
+run the allegroserve test suite you'll need to have the tester module
 (available at <https://github.com/franzinc>) loaded.
 
 Installation
@@ -96,12 +96,30 @@ This should work in a lisp running in a :case-insensitive-upper or
 testing in a :case-sensitive-lower lisp.  The current case mode is the
 value of excl:\*current-case-mode\* 
 
-### load in the file load.cl 
+
+### Loading precompiled, installed version into Allegro CL
+
+    user(1): (require :aserve)
+
+
+### Loading from source on Allegro CL
+
+    load in the file load.cl 
 
     user(1):  :ld <path-to-aserve>/load.cl
 
 it will compile and and load all of AllegroServe, and it will load in
 the examples file too.
+
+### Loading into a non-Allegro CL
+
+   CL-USER> (ql:quickload :zaserve)
+
+This will not load the example files. 
+
+Note: For information on compatibility with non-Allegro CLs, please
+      refer [here](https://gitlab.common-lisp.net/zbeane/zacl).
+
 
 ### start the server
 
