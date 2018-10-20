@@ -93,7 +93,7 @@ v1: 1.3.16: fix freeing freed buffer."
 ;
 (in-package :user)
 
-(eval-when (compile) (declaim (optimize (speed 3))))
+(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
 
 (eval-when (compile load eval)
   (require :osi)
@@ -103,7 +103,7 @@ v1: 1.3.16: fix freeing freed buffer."
   (require :streamc)
   (require :inflate))
 
-(eval-when (compile load eval)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar sys::*user-warned-about-deflate* nil)
   (handler-case (require :deflate)
     (error (c)

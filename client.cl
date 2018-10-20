@@ -20,7 +20,7 @@
 
 (in-package :net.aserve.client)
 
-(eval-when (compile) (declaim (optimize (speed 3))))
+(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
 
 (net.aserve::check-smp-consistency)
 
@@ -802,10 +802,6 @@
   ;;  proxy is set to nil for this call)
   ;;
 
-  (declare (ignorable timeout certificate key certificate-password ca-file 
-		      ca-directory crl-file crl-check verify max-depth 
-                      ssl-method ssl-args))
-  
   
   (if* (and connection (not use-socket))
      then ; try using it

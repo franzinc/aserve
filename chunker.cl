@@ -13,7 +13,7 @@
 
 (in-package :net.aserve)
 
-(eval-when (compile) (declaim (optimize (speed 3))))
+(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
 
 ; stream that reads the input and chunks the data to the output
 

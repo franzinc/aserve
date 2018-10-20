@@ -15,7 +15,7 @@
 
 (in-package :net.aserve)
 
-(eval-when (compile) (declaim (optimize (speed 3))))
+(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
 
 (defvar *header-byte-array*
     ;; unsigned-byte 8 vector contains the characters referenced by
@@ -73,7 +73,7 @@
   ;; where in the buffer the 2byte entry for header 'index' is located
   `(- *header-block-size* 6  (ash ,index 1)))
 
-(eval-when (compile eval)
+(eval-when (:compile-toplevel :execute)
   ;; the headers from the http spec
   ;; Following the header name we specify how to 
   ;; 1.  transfer client  request headers and 
@@ -159,7 +159,7 @@
 
 
 
-(eval-when (compile eval)
+(eval-when (:compile-toplevel :execute)
   (defmacro build-header-lookup-table ()
     (let ((max-length 0)
 	  (total-length 0))
@@ -172,7 +172,7 @@
     
       (let ((header-byte-array (make-array total-length
 					   :element-type '(unsigned-byte 8)))
-	    (header-lookup-array (make-array (1+ max-length))))
+	    (header-lookup-array (make-array (1+ max-length) :initial-element nil)))
       
 	(let ((hba -1)
 	      (header-number -1)

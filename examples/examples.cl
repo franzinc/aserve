@@ -75,7 +75,7 @@
 			 (:b "bar2") ")"
 			 :br
 			 ((:a :href "local-secret") "Test source based authorization") " This will only work if you can use "
-			 "http:://localhost ... to reach this page" :
+			 "http://localhost ... to reach this page" :
 			 :br
 			 ((:a :href "local-secret-auth") 
 			  "Like the preceding but uses authorizer objects")
