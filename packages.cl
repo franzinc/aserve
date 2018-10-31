@@ -57,8 +57,9 @@ v1: 1.3.36: cosmetic: bump version #; code same as 10.0 initial release."
   :post-loadable t)
 
 #+(version= 9 0)
-(sys:defpatch "aserve" 24
-  "v24: 1.3.66: improve redirection when SSL is being used;
+(sys:defpatch "aserve" 25
+  "v25: 1.3.67: caching for do-http-request
+v24: 1.3.66: improve redirection when SSL is being used;
 v23: 1.3.62: proxing https through a tunnel
 v22: 1.3.52: optimize compilation for speed;
 v21: 1.3.50: define deflate-stream methods all the time;
