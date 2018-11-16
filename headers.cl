@@ -250,6 +250,8 @@
     ;; 8192 element usb8 arrays
     ;; used to hold header contents with index at the end
     (create-sresource
+     :one-size t
+     :name "header-block"
      :create #'(lambda (sresource &optional size)
 		 (declare (ignore sresource))
 		 (if* size
@@ -262,6 +264,8 @@
     ;; (+ 8192 100) element usb8 arrays
     ;; used to hold things slight larger than a header block will hold
     (create-sresource
+     :one-size t
+     :name "header-block-plus"
      :create #'(lambda (sresource &optional size)
 		 (declare (ignore sresource))
 		 (if* size
@@ -273,6 +277,8 @@
 (defparameter *header-index-sresource*
     ;; used in parsing to hold location of header info in header-block
     (create-sresource
+     :one-size t
+     :name "header-index"
      :create #'(lambda (sresource &optional size)
 		 (declare (ignore sresource))
 		 (if* size

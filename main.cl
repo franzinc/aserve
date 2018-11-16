@@ -3384,65 +3384,88 @@ in get-multipart-sequence"))
 
 
 ;; ----- simple resource
+;; Motivation for using private resource functions is discussed in rfe15865.
 
 (defstruct sresource
-  data	 ; list of buffers
+  name   
+  data	 ; list of buffers or (nil . buffers)
   create ; create new object for the buffer
   init	 ; optional - used to init buffers taken off the free list
-  (lock  (mp:make-process-lock))
+  lock   ; When set to process-lock, size can be specified in get call.
   )
 
-(defun create-sresource (&key create init)
-  (make-sresource :create create :init init))
+(defun create-sresource (&key create init 
+			      (name (gensym (string :asres)))
+			      (one-size (error "ONE_SIZE argument is required."))
+			 &aux
+			 (new (make-sresource :name name :create create :init init)))
+  (if one-size
+      ;; For fixed size resource, make the data slot a list
+      ;;  that can be modified with atomic push and pop.
+      (setf (sresource-data new) (list nil))
+    ;; If size can vary, we have to use a lock;
+    ;;  data can be a simple list.
+    (setf (sresource-lock new) (mp:make-process-lock :name name)))
+  new)
 
-(defun get-sresource (sresource &optional size)
+(defun get-sresource (sresource &optional size 
+		      &aux to-return 
+			   (lock (sresource-lock sresource)))
   ;; get a new resource. If size is given then ask for at least that
   ;; size
-  (let (to-return)
-    ;; force new ones to be allocated
-    (mp:with-process-lock ((sresource-lock sresource))
-      (let ((buffers (sresource-data sresource)))
-	(if* size
-	   then ; must get one of at least a certain size
-		(dolist (buf buffers)
-		  (if* (>= (length buf) size)
-		     then (setf (sresource-data sresource)
-			    (delete buf buffers :test #'eq))
-			  (setq to-return buf)
-			  (return)))
+  (when (and size (null lock))
+    (error "Size cannot be specified for sresource ~A" (sresource-name sresource)))
+  
+  
+  ;; force new ones to be allocated
+  (if lock
+      (mp:with-process-lock (lock)
+	(let ((buffers (sresource-data sresource)))
+	  (if* size
+	     then ;; must get one of at least a certain size
+		  (dolist (buf buffers)
+		    (if* (>= (length buf) size)
+		       then (setf (sresource-data sresource)
+			      (delete buf buffers :test #'eq))
+			    (setq to-return buf)
+			    (return)))
 	    
-		; none big enough
+		  ;; none big enough
 	      
-	   else ; just get any buffer
-		(if* buffers
-		   then (setf (sresource-data sresource) (cdr buffers))
-			(setq to-return (car buffers)))
+	     else ;; just get any buffer
+		  (if* buffers
+		     then (setf (sresource-data sresource) (cdr buffers))
+			  (setq to-return (car buffers)))
 		
-		)))
+		  )))
+    (setq to-return (pop-atomic (cdr (sresource-data sresource)))))
   
-    (if* to-return
-       then ; found one to return, must init
+  (if* to-return
+     then ;; found one to return, must init
 	    
-	    (let ((init (sresource-init sresource)))
-	      (if* init
-		 then (funcall init sresource to-return)))
-	    to-return
-       else ; none big enough, so get a new buffer.
-	    (funcall (sresource-create sresource)
-		     sresource
-		     size))))
+	  (let ((init (sresource-init sresource)))
+	    (if* init
+	       then (funcall init sresource to-return)))
+	  to-return
+     else ;; none big enough, so get a new buffer.
+	  (funcall (sresource-create sresource)
+		   sresource
+		   size)))
   
-(defun free-sresource (sresource buffer)
+(defun free-sresource (sresource buffer &aux (lock (sresource-lock sresource)))
   ;; return a resource to the pool
   ;; we silently ignore nil being passed in as a buffer
-  (if* buffer 
-     then (mp:with-process-lock ((sresource-lock sresource))
-	    ;; if debugging
-	    (if* (member buffer (sresource-data sresource) :test #'eq)
-	       then (error "freeing freed buffer"))
-	    ;;
+  (when buffer 
+    (if lock
+	(mp:with-process-lock (lock)
+	  ;; if debugging
+	  (if* (member buffer (sresource-data sresource) :test #'eq)
+	     then (error "freeing freed buffer from ~A" (sresource-name sresource)))
+	  ;;
 	    
-	    (push buffer (sresource-data sresource)))))
+	  (push buffer (sresource-data sresource)))
+      (push-atomic buffer (cdr (sresource-data sresource)))))
+  nil)
 
 
 
@@ -3451,10 +3474,12 @@ in get-multipart-sequence"))
 
 (defparameter *request-buffer-sresource* 
     (create-sresource 
+     :one-size nil
+     :name "request-buffer"
      :create #'(lambda (sresource &optional size)
-			  (declare (ignore sresource))
-			  (make-array (or size 2048)
-				      :element-type 'character))))
+		 (declare (ignore sresource))
+		 (make-array (or size 2048)
+			     :element-type 'character))))
 
 (defun get-request-buffer (&optional size)
   (get-sresource *request-buffer-sresource* size))
