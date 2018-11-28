@@ -1497,29 +1497,29 @@ Returns a vector."
 		    req #'(lambda (buffer size)
 			    (if* got-zero
 			       then ; never should get
-				    ; callback after zero
+                                    ; callback after zero
 				    (setq after-zero t))
 			    (if* (eql size 0)
 			       then (setq got-zero t)
 			       else (push (subseq buffer 0 size) bufs))))
 
-		   ; test that the callback function got a zero size
+                   ; test that the callback function got a zero size
 		   (test t got-zero)
 		 
-		   ; test that the zero was the last value sent the
-		   ; callback function
+                   ; test that the zero was the last value sent the
+                   ; callback function
 		   (test nil after-zero)
 		 
-		   ; test that the callback function received
-		   ; the correct value
+                   ; test that the callback function received
+                   ; the correct value
 		   (let ((res (apply #'concatenate
 				     'vector
 				     (nreverse bufs))))
 		     (test t
-		      (equalp res *get-request-body-incr-value*))))
+                           (equalp res *get-request-body-incr-value*))))
 				  
 
-		 ; response doesn't matter, we'e done the testing already
+                 ; response doesn't matter, we'e done the testing already
    
 		 (with-http-response (req ent)
 		   (with-http-body (req ent)
@@ -1532,7 +1532,27 @@ Returns a vector."
 		       :method :put
 		       :content *get-request-body-incr-value*
 		       :content-type "application/binary")
-    ))
+    )
+  
+  (let ((tfile (format nil "~a/test-computed-content" *aserve-test-dir*)))
+    (with-open-file  (p tfile :direction :output
+                      :if-exists :supersede
+                      :if-does-not-exist :create)
+      (write-sequence *get-request-body-incr-value* p))
+    (let ((prefix-local (format nil "http://localhost:~a" port)))
+      ;; we append ?use=computed here just to make it clear in the log
+      ;; file that we're using  computed-content in this request should
+      ;; we see a failure.
+      ;; The query here will have no effect at the http server.
+      (x-do-http-request (format nil "~a/get-request-body-incr-test?use=computed" 
+                                 prefix-local)
+                         :method :put
+                         :content (make-instance 'file-computed-content
+                                    :filename tfile)
+                         :content-type "application/binary")
+      (delete-file tfile)))
+    
+  )
 
 (defun test-request-character-encoding (port)
   (let ((prefix-local (format nil "http://localhost:~a" port)))

@@ -144,6 +144,43 @@
    ))
 
 
+;; This class is meant to be subclassed.
+;; Instances of this class can be passed as the content argument
+;; to do-http-request in order to dynamically produced the content
+;; to be sent with the http request to the web server.
+(defclass computed-content ()
+  nil)
+
+(defgeneric get-content-length ((cc computed-content))
+  (:documentation "returns the number of bytes in the content"))
+
+(defgeneric write-content ((cc computed-content) stream)
+  (:documentation "writes the content to the given stream"))
+
+
+;; This subclass of computed-content will send the contents
+;; of a file to the web server.
+(defclass file-computed-content (computed-content)
+  ((filename :initarg :filename :reader fcc-filename)))
+
+(defmethod get-content-length ((fcc file-computed-content))
+  (with-open-file (p (fcc-filename fcc) :direction :input)
+    (file-length p)))
+
+(defmethod write-content ((fcc file-computed-content) stream)
+  (let ((buffer (make-array 4096 :element-type '(unsigned-byte 8))))
+    (with-open-file (p (fcc-filename fcc)
+                     :direction :input)
+      (loop
+        (let ((size (read-sequence buffer p)))
+          (if* (eql 0 size)
+             then (return)
+             else (write-sequence buffer stream :end size)))))))
+      
+    
+
+
+
 (defvar crlf (make-array 2 :element-type 'character
 			 :initial-contents '(#\return #\linefeed)))
 
@@ -757,17 +794,22 @@
 
 (defun send-request-body (sock content)
   (if* content
-     then ; content can be a vector or a list of vectors
+     then ;; content can be a vector or a list of vectors
+          ;; or a computed-content object
 	  (dolist (cont content)
-	    (net.aserve::debug-format
-	     :info "client sending content of ~d characters/bytes"
-	     (length cont))
-	    (net.aserve::debug-format
-	     :xmit-client-request-body
-	     "~s" (if (stringp cont)
-		      cont
-		    (octets-to-string cont :external-format :octets)))
-	    (write-sequence cont sock))))
+            (typecase cont
+              (computed-content
+               (write-content cont sock))
+              (t 
+               (net.aserve::debug-format
+                :info "client sending content of ~d characters/bytes"
+                (length cont))
+               (net.aserve::debug-format
+                :xmit-client-request-body
+                "~s" (if (stringp cont)
+                         cont
+                       (octets-to-string cont :external-format :octets)))
+               (write-sequence cont sock))))))
 
 (defun ssl-has-sni-p ()
   ;; Return T if the :ssl module is loaded *and* has the SNI feature.
@@ -1084,6 +1126,15 @@
                      ((array (unsigned-byte 8) (*)) 
                       (if* (null content-length)
                          then (incf computed-length (length content-piece))))
+                     (computed-content
+                      (let ((this-length (get-content-length content-piece)))
+                        (if* (integerp this-length)
+                           then (incf computed-length this-length)
+                           else ;; we can't compute the length so
+                                ;; don't specify any content-length 
+                                ;; unless given explicitly by caller
+                                (setq computed-length nil)
+                                (return))))
                      (t (error "Illegal content array: ~s" content-piece))))
                 
                  (if* (null content-length)

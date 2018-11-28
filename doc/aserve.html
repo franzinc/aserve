@@ -36,7 +36,7 @@
   </tbody>
 </table>
 <h1 align="center">AllegroServe - A Web Application Server<br>
-<small><small><small>version <font face="Courier New">1.3.20</font></small></small></small></h1>
+<small><small><small>version <font face="Courier New">1.3.68</font></small></small></small></h1>
 <p align="left"><strong><small>copyright (c) Franz Inc.</small></strong></p>
 
 <p>
@@ -131,6 +131,8 @@ Files</a><font face="Courier New"><br>
 &nbsp; <a href="#f-process-entity">process-entity</a></font><br>
 <a href="#client-request">Client Functions</a><br>
 <font face="Courier New">&nbsp; <a href="#f-do-http-request">do-http-request</a><br>
+&nbsp; <a href="#c-computed-content">computed-content</a><br>
+&nbsp; <a href="#c-file-computed-content">file-computed-content</a><br>
 &nbsp; <a href="#c-client-request">client-request</a><br>
 &nbsp; <a href="#c-cookie-jar">cookie-jar</a><br>
 &nbsp; <a href="#f-make-http-client-request">make-http-client-request</a><br>
@@ -2935,8 +2937,7 @@ audio/*"&nbsp; The default is to accept anything which is expressed
       <td width="62%">If the method is <strong>:put</strong> or<strong>
 :post</strong> then the request should include something to be sent to
 the web server.&nbsp;&nbsp; The value of this argument is either a
-string or a vector of type (unsigned-byte 8) which will be sent to the
-web server.&nbsp;&nbsp; It may also be a list of strings or vectors.
+string, a vector of type (unsigned-byte 8) or an instance of a subclass of <b>computed-content</b>. &nbsp;&nbsp; It may also be a list of strings or vectors or instances of a subclass of <b>computed-content</b>.
 See the <strong>query</strong> argument for a more convenient way to <strong>:post</strong>
 data to a form.</td>
     </tr>
@@ -3230,6 +3231,27 @@ arguments like<br>
 <pre>(do-http-request "http://www.secret.com/whatever.html"<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :digest-authorization (make-instance 'digest-authorization :username "joe" :password "secret"))<br></pre>
 <p><br>
 </p>
+<h2><a name="c-computed-content"></a>computed-content</h2>
+<strong>computed-content</strong> is an class that is used to allow one to send data to a webserver when doing a PUT or POST operation without having to collect that data first in an object in Lisp memory.
+<b>computed-content</b> should be subclassed and these two methods written over it:
+<pre><strong><font face="Courier New">(get-content-length (cc my-computed-content-subclass))</font></strong></pre>
+returns the number of bytes in the content.
+<br>
+<br>
+<pre><strong><font face="Courier New">(write-content (cc my-computed-content-subclass) stream)</font></strong></pre>
+writes the bytes of the computed content to the stream.
+<br>
+<h2><a name="c-file-computed-content"></a>file-computed-content</h2>
+We have a subclass of <b>computed-content</b> called
+<b>file-computed-content</b>.   Instances of <b>file-computed-content</b>
+will send the contents of a file without first reading all of the file into
+memory at once.
+In order to create an instance of <b>file-computed-content</b> you do:
+
+<pre><font face="Courier New">(make-instance 'net.aserve.client:file-computed-content :filename "/a/b/myfile.txt")</font></pre>
+
+
+
 <p>&nbsp;</p>
 <p>Before we describe the lower level client request functions we will
 describe two
