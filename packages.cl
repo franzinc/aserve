@@ -5,8 +5,9 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 17
-  "v17: 1.3.68: computed-content for do-http-request
+(sys:defpatch "aserve" 18
+   "v18: 1.3.69: automatic caching in the client
+v17: 1.3.68: computed-content for do-http-request
 v16: 1.3.67: improve redirection for SSL, caching for do-http-request;
 v15: 1.3.65: device-read fix for truncated-stream; remove dup auth header;
 v14: 1.3.64: proxing https through a tunnel
@@ -27,8 +28,9 @@ v1: 1.3.49: speed up read-sock-line."
   :post-loadable t)
 
 #+(version= 10 0)
-(sys:defpatch "aserve" 25
-  "v25: 1.3.68: computed-content for do-http-request
+(sys:defpatch "aserve" 26
+  "v26: 1.3.69: automatic caching in the client
+v25: 1.3.68: computed-content for do-http-request
 v24: 1.3.67: improve redirection for SSL, caching for do-http-request;
 v23: 1.3.64: proxing https through a tunnel 
 v22: 1.3.63: do request timing in microseconds

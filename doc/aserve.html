@@ -133,6 +133,7 @@ Files</a><font face="Courier New"><br>
 <font face="Courier New">&nbsp; <a href="#f-do-http-request">do-http-request</a><br>
 &nbsp; <a href="#c-computed-content">computed-content</a><br>
 &nbsp; <a href="#c-file-computed-content">file-computed-content</a><br>
+&nbsp; <a href="#c-client-cache">client-cache</a><br>
 &nbsp; <a href="#c-client-request">client-request</a><br>
 &nbsp; <a href="#c-cookie-jar">cookie-jar</a><br>
 &nbsp; <a href="#f-make-http-client-request">make-http-client-request</a><br>
@@ -3203,6 +3204,11 @@ These values are used in a fully patched ACL 8.0 (or newer).&nbsp; In
 older versions of ACL they are ignored.<br>
       </td>
     </tr>
+    <tr>
+      <td style="vertical-align: top;">cache</td>
+      <td style="vertical-align: top;">nil</td>
+      <td style="vertical-align: top;">A instance of class <b>net.aserve.client:client-cache</b> if you wish to consult and update this cache with this request.  See the documentation on <b>client-cache</b> below.</td>
+    </tr>
   </tbody>
 </table>
 <p>&nbsp;</p>
@@ -3255,7 +3261,95 @@ In order to create an instance of <b>file-computed-content</b> you do:
 <p>&nbsp;</p>
 <p>Before we describe the lower level client request functions we will
 describe two
-classes of objects used in that interface.</p>
+  classes of objects used in that interface.</p>
+
+<h2><a name="c-client-cache"></a>client-cache</h2>
+   The <b>do-http-request</b> function will cache responses if a
+    <b>client-cache</b> object is passed as the value of the <b>:cache</b> argument.
+<p>    
+    Only <b>:get</b> and <b>:head</b> requests meeting certain criteria are cacheable:
+    The request cannot have a query, basic or digest authentication, or new headers
+    passed in.
+<p>    
+    You can specify the maximum size of the data in the cache by
+    passing the <b>:max-cache-size</b> argument to make-instance of client-cache
+    e.g.
+      <pre>(make-instance 'client-cache :max-cache-size 1000000)</pre>
+<p>    
+    When the number of bytes stored in the cache exceeds the <b>max-cache-size</b>
+    plus <b>*cache-size-slop*</b> (default 100000) entries in the cache are removed
+    so that the size is less than the maximum size minus
+    <b>*cache-size-slop*</b>.
+    The least recently used cache entries are removed first.
+
+<p>
+  The caching code will strictly follow the HTTP caching specification
+  but you may wish to do more caching than would be permitted by
+  the specification.   You may know for a fact that a certain url's
+  response can be cached for a certain period of time despite the
+  returned headers from that cache not indicating that fact.
+  There are two additional initargs to make-instance of client-cache
+  you can specify
+  <br>
+  <b>:auto-cache-codes</b>
+  <br>
+  <b>:auto-cache-seconds</b>
+<p>
+  If an HTTP response is returned with no caching headers and if
+  the response code is one of the <b>auto-cache-codes</b> list then
+  the response will be cached with an expiration date <b>auto-cache-seconds</b>
+  in the future.
+<p>
+  <i>Both <b>auto-cache-codes</b> and <b>auto-cache-seconds</b> must be given
+    or auto caching will not occur.</i>
+  
+<p>
+    Accessors for the <b>client-cache</b> object (in the net.aserve.client package):
+<br>    
+    <b>client-cache-max-cache-entry-size</b> -  if a response to be cached exceeds this
+      number of bytes the response will not be cached (default 1,000,000 bytes).
+<br>    
+    <b>client-cache-max-cache-size</b>  - when the cache size exceeds this value
+      plus *cache-size-slop* the cache is automatically reduced in size.
+<br>    
+    <b>client-cache-lookups</b> - the number of times the cache was checked to see
+      if it contained the uri passed to do-http-request.
+<br>    
+    <b>client-cache-alive</b> - the number of times the cache contains the desired
+      response and the cache entry hadn't expired.
+      In this case the response is returned from the cache.
+<br>    
+    <b>client-cache-revalidate</b> - the number of times the cache contains the desired
+      uri but the cache entry had expired so the cache entry
+      must be revalidated.
+<br>    
+    <b>client-cache-validated</b> - the number of times the cache contains the desired
+      uri but the cache entry had expired so it was revalidated and found
+      to be still valid.
+    <br>
+<p>
+    Associated function:
+<br>    
+    <pre><font face="Courier New"><b>(net.aserve.client:flush-client-cache cache &key expired all)</b></font></pre>
+     Specify which entries in the cache should be removed immediately.
+    Passing :all a true value will remove all entries.
+    Passing :expired a true value will remove entries whose expiration
+    date is in the past.  Note that just because a cache entry has
+    expired it doesn't mean it's worthless.   When an expired entry
+    is encountered AllegroServe will do a revalidation request which
+    may return an indication that the entry is still valid thus saving
+    the cost of returning the body of the request again.   Also the
+    cache entry will get a new expiration date.
+<p>    
+    Associated variable:
+<br>    
+    <b>net.aserve.client:*cache-size-slop*</b>  - specifies how many more bytes
+    beyond the <b>(client-cache-max-cache-size cache)</b> value are permitted before
+    the cache size is reduced to <b>*cache-size-slop*</b> less than
+    the <b>(client-cache-max-cache-size cache)</b> value.
+    
+
+
 <h2><a name="c-client-request"></a>client-request</h2>
 <p>A <strong>client-request</strong> object includes the information
 about the request and

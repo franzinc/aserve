@@ -540,6 +540,10 @@
 		    
 		    
 		    
+                    (if* (client-request-cacheable creq)
+                       then (insert-into-cache cache
+                                               creq
+                                               body))
 		    (if* new-location
 		       then			; must do a redirect to get to the real site
 			    (client-request-close creq)
@@ -555,11 +559,6 @@
 				      :yes)
 			       else (client-request-close creq))
 
-                            (if* (client-request-cacheable creq)
-                               then (insert-into-cache cache
-                                                       creq
-                                                       body))
-                                    
 			    (values 
 			     body
 			     (client-request-response-code creq)

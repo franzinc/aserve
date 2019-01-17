@@ -15,6 +15,7 @@
 
 (in-package :net.aserve.client)
 
+
 (defclass cache-entry ()
   (;; url in string form
    (uri :initarg :url :reader centry-uri)
@@ -85,6 +86,14 @@
                    :accessor client-cache-max-cache-size)
    
    
+   (auto-cache-codes :initform nil
+                     :initarg :auto-cache-codes
+                     :accessor client-cache-auto-cache-codes)
+   
+   (auto-cache-seconds :initform nil
+                       :initarg :auto-cache-seconds
+                       :accessor client-cache-auto-cache-seconds)
+  
    ;; statistics
    ;; number of body bytes cached
    (cache-size   :initform 0
@@ -188,6 +197,7 @@
     '(#.(net.aserve::response-number *response-ok*)
       #.(net.aserve::response-number *response-non-authoritative-information*)
       #.(net.aserve::response-number *response-multiple-choices*)
+      #.(net.aserve::response-number *response-found*) ;; aka moved-temporarily
       #.(net.aserve::response-number *response-moved-permanently*)
       #.(net.aserve::response-number *response-gone*)))
 
@@ -203,7 +213,7 @@
      then ;; update expiration date
           (with-client-cache-lock (cache)
             (incf (client-cache-validated cache)))
-          (update-expiration-time centry headers)
+          (update-expiration-time cache centry headers)
           centry
    elseif (member code *cacheable-codes*)
      then (update-in-place-centry cache centry body code headers)
@@ -212,7 +222,7 @@
           (eliminate-cache-entry cache centry)
           nil))
 
-(defun update-expiration-time (centry headers)
+(defun update-expiration-time (cache centry headers)
   ;; compute new expiration date
   (let* ((date (header-value headers :date))
          (cache-control (get-cache-control-values headers))
@@ -229,6 +239,10 @@
           
     (setf (centry-last-modified centry) (or last-modified date))
     (setf (centry-date centry) date)
+    (if* (and (null max-age)
+              (null expires)
+              (member (centry-code centry) (client-cache-auto-cache-codes cache)))
+       then (setq max-age (client-cache-auto-cache-seconds cache)))
     (if* max-age
        then (setf (centry-expires centry)
               (+ (get-universal-time) max-age))
@@ -272,7 +286,7 @@
     (setf (centry-code centry) code)
     (setf (centry-headers centry) headers)
     (setf (centry-must-validate centry) must-validate)
-    (update-expiration-time centry headers)
+    (update-expiration-time cache centry headers)
     (ensure-cache-size-ok cache :preserve (list centry))
     ))
 

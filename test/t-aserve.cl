@@ -287,7 +287,7 @@
 		     (test-publish-file port nil) ; no compression
 		     #+unix
 		     (test-publish-file port t) ; with compression
-		     
+	     
 		     (test-publish-directory port)
 		     (test-publish-computed port)
 		     (test-publish-multi port)
@@ -3195,9 +3195,13 @@ Returns a vector."
 
 ;;;; caching test
 
-(defmacro with-new-cache ((var &key (max-cache-size 1000000)) &body body)
+(defmacro with-new-cache ((var &key (max-cache-size 1000000)
+                                     auto-cache-codes 
+                                     auto-cache-seconds) &body body)
   `(let ((,var (make-instance 'net.aserve.client:client-cache
-                 :max-cache-size ,max-cache-size)))
+                 :max-cache-size ,max-cache-size
+                 :auto-cache-codes ,auto-cache-codes
+                 :auto-cache-seconds ,auto-cache-seconds)))
      ,@body))
 
 (defun test-caching ()
@@ -3544,6 +3548,32 @@ Returns a vector."
                     :fail-info "333")))
 
                     
+
+          ;; test auto caching
+          (with-new-cache (cache :auto-cache-codes '(200) :auto-cache-seconds 10)
+            (dopublish "/autocache" :last-modified (- (get-universal-time) 60))
+            (dohttp "/autocache" :cache cache :port port :expect 200)
+            (check-cache cache "vv1"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            ;; still in cache
+            (dohttp "/autocache" :cache cache :port port :expect 200)
+            (check-cache cache "vv2"
+                         :lookups 2
+                         :alive   1
+                         :revalidate 0
+                         :validated 0)
+            ;; will expire
+            (sleep 11)
+            (dohttp "/autocache" :cache cache :port port :expect 200)
+            (check-cache cache "vv3"
+                         :lookups 3
+                         :alive   1
+                         :revalidate 1
+                         :validated 1))
+            
             
       
           ;; test cache flushing
