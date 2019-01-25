@@ -283,11 +283,9 @@
 			       (do-tests-inner))
 			   (setf (asc x-compress) prev)))))
 		   (do-tests-inner ()
-				   
 		     (test-publish-file port nil) ; no compression
 		     #+unix
 		     (test-publish-file port t) ; with compression
-	     
 		     (test-publish-directory port)
 		     (test-publish-computed port)
 		     (test-publish-multi port)
@@ -316,7 +314,7 @@
 			     (test-spr27296))
 		     (if* test-timeouts 
 			then (test-timeouts port))
-		     (test-body-in-get-request :port port :ssl https)  ;;; rfe15456
+                     (test-body-in-get-request :port port :ssl https)  ;;; rfe15456
 		     ))
 	    
 	    
@@ -3683,9 +3681,47 @@ Returns a vector."
             (test 0  (net.aserve.client:client-cache-cache-size cache) 
                   :fail-info "dd6"))
              
-      
+
+          ;; test caching of redirect responses without a cache-control
+          ;; header.
+          ;; We demonstrate using auto-caching how we can cause 
+          ;; a redirect to be cached
+          ;; for a certain period of time even if the returned
+          ;; header doesn't specify a caching time.  This mirrors
+          ;; a real world example we need to support.
           
-          )
+          (with-new-cache (cache :auto-cache-codes 
+                                 '(#.(net.aserve::response-number *response-moved-permanently*))
+                                 
+                                 :auto-cache-seconds 10)
+            (dopublish "/redirit" :response *response-moved-permanently*
+                       :headers '(("location" . "/redirit-target")))
+            (dopublish "/redirit-target" :response *response-ok*
+                       :headers '(("cache-control" "public, max-age=10")))
+            
+            (dohttp "/redirit" :cache cache :port port :expect 200
+                    :name "cp1")
+            
+            ;; we did two lookups (/redirit and /redirit-target) and
+            ;; none were in the cache so zero alive
+            (check-cache cache "cp2"
+                         :lookups 2
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            
+            (dohttp "/redirit" :cache cache :port port :expect 200
+                    :name "cp3")
+            
+            ;; we did two more lookups (/redirit and /redirit-target)
+            ;; and both were alive in the cache so no network
+            ;; activity occurred.
+            (check-cache cache "cp4"
+                         :lookups 4
+                         :alive   2
+                         :revalidate 0
+                         :validated 0)
+            ))
       
       ;; cleanup
       (stop-aserve-running))))
@@ -3696,11 +3732,11 @@ Returns a vector."
   (test revalidate (net.aserve.client:client-cache-revalidate cache) :fail-info name)
   (test validated  (net.aserve.client:client-cache-validated cache) :fail-info name))
 
-(defun dopublish (path &key last-modified headers)
+(defun dopublish (path &key last-modified headers (response *response-ok*))
   (let ((ent (publish  
               :path path
               :function #'(lambda (req ent)
-                            (with-http-response (req ent)
+                            (with-http-response (req ent :response response)
                               (with-http-body (req ent 
                                                    :headers headers)
                                   (dotimes (i 20)

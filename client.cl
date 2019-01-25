@@ -322,6 +322,12 @@
 ;; bug22596
 (defparameter *default-retry-on-timeout* nil)
 
+(defparameter *redirect-codes*
+    '(#.(net.aserve::response-number *response-found*)
+      #.(net.aserve::response-number *response-moved-permanently*)
+      #.(net.aserve::response-number *response-temporary-redirect*)
+      #.(net.aserve::response-number *response-see-other*)))
+
 (defun do-http-request (uri 
 			&rest args
 			&key 
@@ -417,11 +423,26 @@
        then ;; make-http-client-request returned a cache entry 
             ;; which has all the needed values
             (return-from do-http-request 
-              (values (centry-body creq)
-                      (centry-code creq)
-                      (centry-headers creq)
-                      uri
-                      )))
+              (if* (and (member (centry-code creq) *redirect-codes*)
+                        redirect
+                        (if* (integerp redirect)
+                           then (> redirect 0)
+                           else t))
+                 then (let ((new-location (cdr (assoc :location (centry-headers creq)))))
+                        (apply #'do-http-request 
+                               (net.uri:merge-uris new-location uri)
+                               :redirect
+                               (if* (integerp redirect)
+                                  then (1- redirect)
+                                  else redirect)
+                               args))
+                 else
+                    
+                      (values (centry-body creq)
+                              (centry-code creq)
+                              (centry-headers creq)
+                              uri
+                              ))))
     
     (unwind-protect
 	(let (new-location) 
@@ -458,85 +479,81 @@
 		  (setf (client-request-return-connection creq) nil))
 	  
 		  
-	  (if* (and (member (client-request-response-code creq)
-			    '(#.(net.aserve::response-number *response-found*)
-			      #.(net.aserve::response-number *response-moved-permanently*)
-			      #.(net.aserve::response-number *response-temporary-redirect*)
-			      #.(net.aserve::response-number *response-see-other*))
-			    :test #'eq)
-		    redirect
-		    (member method redirect-methods :test #'eq)
-		    (if* (integerp redirect)
-		       then (> redirect 0)
-		       else t))		; unrestricted depth
-	     then
-		  (setq new-location
-		    (cdr (assoc :location (client-request-headers creq)
-				:test #'eq))))
+	  (if* (and (member (client-request-response-code creq) *redirect-codes*
+                            :test #'eq)
+                    redirect
+                    (member method redirect-methods :test #'eq)
+                    (if* (integerp redirect)
+                       then (> redirect 0)
+                       else t))		; unrestricted depth
+             then
+                  (setq new-location
+                    (cdr (assoc :location (client-request-headers creq)
+                                :test #'eq))))
 	
-	  (if* (and digest-authorization
-		    (equal (client-request-response-code creq)
-			   #.(net.aserve::response-number 
-			      *response-unauthorized*))
-		    (not recursing-call))
-	     then ; compute digest info and retry
-		  (if* (compute-digest-authorization 
-			creq digest-authorization)
-		     then (client-request-close creq)
-			  (return-from do-http-request
-			    (apply #'do-http-request
-				   uri
-				   :recursing-call t
-				   args))))
+          (if* (and digest-authorization
+                    (equal (client-request-response-code creq)
+                           #.(net.aserve::response-number 
+                              *response-unauthorized*))
+                    (not recursing-call))
+             then ; compute digest info and retry
+                  (if* (compute-digest-authorization 
+                        creq digest-authorization)
+                     then (client-request-close creq)
+                          (return-from do-http-request
+                            (apply #'do-http-request
+                                   uri
+                                   :recursing-call t
+                                   args))))
 		  
           ;; auto-retry if request times out.
-	  (if* (and (eq (client-request-response-code creq)
-			#.(net.aserve::response-number *response-request-timeout*))
-		    (if (integerp retry-on-timeout)
-			(> retry-on-timeout 0)
-		      retry-on-timeout))
-	     then (net.aserve::debug-format :info "Received 408 response. Retrying request because retry-on-timeout is ~a.." retry-on-timeout)
-		  (return-from do-http-request
-		    (apply #'do-http-request
-			   uri
-			   :retry-on-timeout
-			   (if* (integerp retry-on-timeout)
-			      then (1- retry-on-timeout)
-			      else retry-on-timeout)
-			   :recursing-call t
-			   args)))
+          (if* (and (eq (client-request-response-code creq)
+                        #.(net.aserve::response-number *response-request-timeout*))
+                    (if (integerp retry-on-timeout)
+                        (> retry-on-timeout 0)
+                      retry-on-timeout))
+             then (net.aserve::debug-format :info "Received 408 response. Retrying request because retry-on-timeout is ~a.." retry-on-timeout)
+                  (return-from do-http-request
+                    (apply #'do-http-request
+                           uri
+                           :retry-on-timeout
+                           (if* (integerp retry-on-timeout)
+                              then (1- retry-on-timeout)
+                              else retry-on-timeout)
+                           :recursing-call t
+                           args)))
 
-	  (if* (or (and (null new-location) 
+          (if* (or (and (null new-location) 
                         ; not called when redirecting
-			(if* (functionp skip-body)
-			   then (funcall skip-body creq)
-			   else skip-body))
-		   (member (client-request-response-code creq)
-			   ' (#.(net.aserve::response-number 
-				 *response-no-content*)
-				#.(net.aserve::response-number 
-				   *response-not-modified*)
-				))
-		   (and (eq method :connect)
-			(eq (client-request-response-code creq)
-			    #.(net.aserve::response-number *response-ok*))))
-	     then
-		  (return-from do-http-request
-		    (values 
-		     nil		; no body
-		     (client-request-response-code creq)
-		     (client-request-headers  creq)
-		     (client-request-uri creq)
-		     (and (client-request-return-connection creq)
-			  (setf (client-request-return-connection creq)
-			    :yes)
-			  (client-request-socket creq))
-		     )))
+                        (if* (functionp skip-body)
+                           then (funcall skip-body creq)
+                           else skip-body))
+                   (member (client-request-response-code creq)
+                           ' (#.(net.aserve::response-number 
+                                 *response-no-content*)
+                                #.(net.aserve::response-number 
+                                   *response-not-modified*)
+                                ))
+                   (and (eq method :connect)
+                        (eq (client-request-response-code creq)
+                            #.(net.aserve::response-number *response-ok*))))
+             then
+                  (return-from do-http-request
+                    (values 
+                     nil		; no body
+                     (client-request-response-code creq)
+                     (client-request-headers  creq)
+                     (client-request-uri creq)
+                     (and (client-request-return-connection creq)
+                          (setf (client-request-return-connection creq)
+                            :yes)
+                          (client-request-socket creq))
+                     )))
 	  
-	  (if* read-body-hook
-	     then (funcall read-body-hook creq :format format)
-	     else (let ((body (read-response-body creq :format format)))
-		    (net.aserve::debug-format :xmit-client-response-body "~s" body)
+          (if* read-body-hook
+             then (funcall read-body-hook creq :format format)
+             else (let ((body (read-response-body creq :format format)))
+                    (net.aserve::debug-format :xmit-client-response-body "~s" body)
 		    
 		    
 		    
@@ -544,28 +561,28 @@
                        then (insert-into-cache cache
                                                creq
                                                body))
-		    (if* new-location
-		       then			; must do a redirect to get to the real site
-			    (client-request-close creq)
-			    (apply #'do-http-request
-				   (net.uri:merge-uris new-location uri)
-				   :redirect
-				   (if* (integerp redirect)
-				      then (1- redirect)
-				      else redirect)
-				   args)
-		       else (if* (client-request-return-connection creq)
-			       then (setf (client-request-return-connection creq)
-				      :yes)
-			       else (client-request-close creq))
+                    (if* new-location
+                       then			; must do a redirect to get to the real site
+                            (client-request-close creq)
+                            (apply #'do-http-request
+                                   (net.uri:merge-uris new-location uri)
+                                   :redirect
+                                   (if* (integerp redirect)
+                                      then (1- redirect)
+                                      else redirect)
+                                   args)
+                       else (if* (client-request-return-connection creq)
+                               then (setf (client-request-return-connection creq)
+                                      :yes)
+                               else (client-request-close creq))
 
-			    (values 
-			     body
-			     (client-request-response-code creq)
-			     (client-request-headers  creq)
-			     (client-request-uri creq)
-			     (client-request-socket creq)
-			     )))))
+                            (values 
+                             body
+                             (client-request-response-code creq)
+                             (client-request-headers  creq)
+                             (client-request-uri creq)
+                             (client-request-socket creq)
+                             )))))
       
       ;; protected form:
       (and (not read-body-hook) (client-request-close creq)))))
