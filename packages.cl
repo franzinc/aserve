@@ -29,9 +29,8 @@ v1: 1.3.49: speed up read-sock-line."
   :post-loadable t)
 
 #+(version= 10 0)
-(sys:defpatch "aserve" 27
-  "v27: 1.3.70: caching of redirects
-v26: 1.3.69: automatic caching in the client
+(sys:defpatch "aserve" 26
+  "v26: 1.3.70: caching of redirects
 v25: 1.3.68: computed-content for do-http-request
 v24: 1.3.67: improve redirection for SSL, caching for do-http-request;
 v23: 1.3.64: proxing https through a tunnel 
