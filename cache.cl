@@ -186,6 +186,7 @@
         (multiple-value-bind (body code headers)
             (do-http-request uri
               :method method
+              :accept (or (centry-accept centry) "*/*")
               :headers new-headers)
           (setq centry 
             (update-cache-entry-from-response cache centry body code headers))))

@@ -3733,6 +3733,70 @@ Returns a vector."
                          :alive   2
                          :revalidate 0
                          :validated 0)
+            )
+          
+          ;; test that the accept header is sent with the revalidation
+          (with-new-cache (cache :auto-cache-seconds 10
+                                 :auto-cache-codes '(200))
+            (publish :path "/auto-accept-test"
+                     :function #'(lambda (req ent)
+                                   (let ((retval (header-slot-value req :accept)))
+                                     (with-http-response (req ent)
+                                       (with-http-body (req ent)
+                                         (format (request-reply-stream req) "~a" retval)
+                                         (force-output (request-reply-stream req))
+                                         )))))
+            
+            (test "foo/bar" (values (dohttp "/auto-accept-test" :port port
+                                            :cache cache :accept "foo/bar"
+                                            :expect 200
+                                            :name "aa1"))
+                  :test #'equal)
+            (check-cache cache "aa2"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            
+            (test "foo/bar" (values (dohttp "/auto-accept-test" :port port
+                                            :cache cache :accept "foo/bar"
+                                            :expect 200
+                                            :name "aa2"))
+                  :test #'equal)
+            
+            (check-cache cache "aa3"
+                         :lookups 2
+                         :alive   1
+                         :revalidate 0
+                         :validated 0)
+            (sleep 11)
+            
+            ;; force revalidation
+            (test "foo/bar" (values (dohttp "/auto-accept-test" :port port
+                                            :cache cache :accept "foo/bar"
+                                            :expect 200
+                                            :name "aa4"))
+                  :test #'equal)
+            
+            (check-cache cache "aa5"
+                         :lookups 3
+                         :alive   1
+                         :revalidate 1
+                         :validated 0)
+            
+            ;; should be cached again
+            (test "foo/bar" (values (dohttp "/auto-accept-test" :port port
+                                            :cache cache :accept "foo/bar"
+                                            :expect 200
+                                            :name "aa6"))
+                  :test #'equal)
+            
+            (check-cache cache "aa7"
+                         :lookups 4
+                         :alive   2
+                         :revalidate 1
+                         :validated 0)
+            
             ))
       
       ;; cleanup
