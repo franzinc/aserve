@@ -913,10 +913,10 @@ Returns a vector."
 
 
 (defun test-authorization (port)
-  (let ((prefix-local (format nil "http://localhost:~a" port))
-	(prefix-dns   (format nil "http://~a:~a" 
-			      (long-site-name) port)))
-    
+  (let ((prefix-local  (format nil "http://localhost:~a" port))
+        (prefix-dns    (format nil "http://~a:~a" (long-site-name) port))
+        (long-password "abcdefghijklmnopqrstuvwxyz1234567890"))
+
     ;; manual authorization testing
     ;; basic authorization
     ;;
@@ -925,7 +925,9 @@ Returns a vector."
 	     :function
 	     #'(lambda (req ent)
 		 (multiple-value-bind (name password) (get-basic-authorization req)
-		   (if* (and (equal name "foo") (equal password "bar"))
+                   (if* (and (equal name "foo")
+                             (or (equal password "bar")
+                                 (equal password long-password)))
 		      then (with-http-response (req ent)
 			     (with-http-body (req ent)
 			       (html (:head (:title "Secret page"))
@@ -952,6 +954,11 @@ Returns a vector."
     (test 200
 	  (values2 (x-do-http-request (format nil "~a/secret" prefix-local)
 				      :basic-authorization '("foo" . "bar"))))
+
+    ; long password
+    (test 200
+          (values2 (x-do-http-request (format nil "~a/secret" prefix-local)
+                                      :basic-authorization `("foo" . ,long-password))))
     
     ; bad password
     (test 401
@@ -961,6 +968,11 @@ Returns a vector."
     ; auth via userinfo
     (test 200
 	  (values2 (x-do-http-request (format nil "http://foo:bar@localhost:~a/secret" port))))
+
+    ; long password auth via userinfo
+    (test 200
+	  (values2 (x-do-http-request (format nil "http://foo:~a@localhost:~a/secret" long-password port))))
+
 
     ; test conflicting auth headers.
     (let ((bad-auth '("bad" "password"))

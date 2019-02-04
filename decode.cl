@@ -625,7 +625,7 @@
 
 #+allegro
 (defun base64-encode (str)
-  (excl:string-to-base64-string str))
+  (excl:string-to-base64-string str :wrap-at-column nil))
 
 #-allegro
 (defun base64-encode (str)
