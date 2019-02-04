@@ -846,7 +846,7 @@
 			    
 			    :contents  guts
 			    :last-modified lastmod
-			    :last-modified-string (universal-time-to-date lastmod)
+			    :last-modified-string (when lastmod (universal-time-to-date lastmod))
 			    
 			    :cache-p cache-p
 			    :authorizer authorizer
@@ -1585,7 +1585,7 @@
 			
 	    (setf (last-modified ent) lastmod
 		  (last-modified-string ent)
-		  (universal-time-to-date lastmod))
+		  (when lastmod (universal-time-to-date lastmod)))
 		      
 	    (if* (and cache-ok (cache-p ent))
 	       then ; we should read and cache the contents
