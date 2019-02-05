@@ -359,11 +359,20 @@ will be logged with one log entry per line in some cases.")
 (defun check-for-open-socket-before-gc (socket)
   (if* (open-stream-p socket)
      then (logmess 
-	   (let ((*print-readably* nil))
+	   (let ((*print-readably* nil)
+                 (socket:*print-hostname-in-stream* nil)
+                 )
 	     ;; explicitly binding *print-readably* nil in order to avoid
 	     ;; a printer crash if the finalization is run in a thread
 	     ;; with, say, with-standard-io-syntax that binds *print-readably*
-	     ;; true.
+             ;; true.
+             ;;
+             ;; bug25695
+             ;; Bind *print-hostname-in-stream* to nil so that we don't
+             ;; invoke acldns which may have been interrupted by this gc
+             ;; while it held a lock that we'll need to acquire to
+             ;; complete the hostname lookup (thus resulting in a deadlock)
+             ;; (see ensure-nameserver-queue-process-started).
 	     (format nil 
 		     "socket ~s is open yet is about to be gc'ed. It will be closed" 
 		     socket)))
