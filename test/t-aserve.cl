@@ -21,6 +21,16 @@
 ;;        n>0  --- run n servers in n new threads
 ;;        n=1 is like n=nil or 0 but leaves the initial listener 
 ;;            free for console interactions
+;;
+;; WHEN WRITING A NEW TEST:
+;;  - Do not use global variables specific to a test. When stress-aserve
+;;    is running, several instances of the same test will be running in
+;;    the same Lisp address space.  Each instance has its own test config
+;;    accessed with the asc macro;  it can be used to hold or point to 
+;;    private tes data.
+;;  - Do not use constant file names for the same reason as above.
+;;    Use the value of (asc index) to generate a name based on the
+;;    test instance.
 
 
 (eval-when (compile load eval)
@@ -1544,7 +1554,7 @@ Returns a vector."
 		       :content-type "application/binary")
     )
   
-  (let ((tfile (format nil "~a/test-computed-content" *aserve-test-dir*)))
+  (let ((tfile (format nil "~a/test~A-computed-content" *aserve-test-dir* (asc index))))
     (with-open-file  (p tfile :direction :output
                       :if-exists :supersede
                       :if-does-not-exist :create)
