@@ -88,7 +88,7 @@
     :initform nil :accessor webaction-session-cookie-only)
    ))
 
-(defparameter *webactions-version* "1.18")
+(defparameter *webactions-version* "1.19")
 	      
 (defvar *name-to-webaction* (make-hash-table :test #'equal))
 
