@@ -7,9 +7,8 @@
 ;;
 
 ;; Description:
-;;  This file is a copy of aserve/test/t-aserve.cl 
-;;  modified to run the same tests in several servers
-;;  simultaneously.
+;;  
+;; This test suite for aserve can be run in several different test modes.
 ;;
 ;; THIS FILE MUST BE COMPILED WITH THE CURRENT DIRECTORY 
 ;;  set to the aserve source directory,
@@ -27,11 +26,24 @@
 ;;    is running, several instances of the same test will be running in
 ;;    the same Lisp address space.  Each instance has its own test config
 ;;    accessed with the asc macro;  it can be used to hold or point to 
-;;    private tes data.
+;;    private test data.
 ;;  - Do not use constant file names for the same reason as above.
 ;;    Use the value of (asc index) to generate a name based on the
 ;;    test instance.
-
+;;
+;; SPECIAL TEST MODE OPTION FOR STRESS TESTS:
+;; (pause-test-on-break onoff)  When called with non-nil, run the tests with
+;;    :notrap and if any thread calls break, signal all other threads to stop 
+;;    as soon as possible.   See stopper functions for details of when and how.
+;;  Also enabled by setting ASERVE_PAUSE_ON_BREAK.
+;;   This option is most useful when running the tests from an interactive
+;;   top-level.
+;; Running with this option enabled in -batch mode will only yield a 
+;;   backtrace of the failing thread, and the run will be cancelled with 
+;;   Lisp exit.  
+;; In addition, this option should be disabled before running webactions 
+;;   tests because these depend on :notrap being nil for non-stop operation.
+;;   This is done automatically in a normal test run
 
 (eval-when (compile load eval)
   (require :tester)
@@ -94,6 +106,15 @@
 ; if true run timeout test
 (defvar *test-timeouts* nil)
 
+(defvar-nonbindable *asc-stop-mode*
+    ;; Global stop mode ->  (indicator stop-flag stop-gate)
+    ;; stop-flag -> nil  
+    ;;           -> :kill     Throw to asc-stopper-catch or kill the current process.
+    ;;           -> :pause    Sleep forever or wait for gate to open.
+    ;; indicator starts as nil; is set to t when error break is entered.
+    nil)
+
+(defvar *aserve-test-config* nil)
 
 (defclass aserve-test-config ()
   ;; Keep a separate test config for each server.
@@ -119,9 +140,9 @@
 		       ;; stack of old values
 		       :initform nil)
    (wserver :accessor asc-wserver :initform nil)
-   (done    :accessor asc-done    :initform nil)
+   (done    :accessor asc-done    :initform nil) 
    ))
-(defvar *aserve-test-config* (make-instance 'aserve-test-config))
+
 (defmacro asc (slot &aux (accessor
 			  (read-from-string
 			   (format nil "~A::asc-~A "
@@ -129,6 +150,73 @@
 				    (find-package :net.aserve.test))
 				   slot))))
   `(,accessor *aserve-test-config*))
+
+(defun set-stop-mode (value &optional gated)
+  ;; Set the stop flag.
+  (ecase value 
+    ((:pause :kill)  
+     (setq *asc-stop-mode* (list nil value (when gated (mp:make-gate nil)))))
+    ((nil)
+     (when (and (consp *asc-stop-mode*) (third *asc-stop-mode*))
+       (mp:open-gate (third *asc-stop-mode*)))
+     (setq *asc-stop-mode* nil))))
+
+(defun set-stop-indicator (&rest args)
+  (declare (ignore args))
+  (when (consp *asc-stop-mode*) (setf (car *asc-stop-mode*) t)))
+
+(def-fwrapper wrapper-with-check-stopper (&rest args)
+  (declare (ignorable args))
+  ;; Generic fwrapper that can be wrapped around any function where a stopper
+  ;;  check could be useful.
+  (net.aserve.test::asc-check-stopper)
+  (multiple-value-prog1 (call-next-fwrapper)
+    (net.aserve.test::asc-check-stopper)))
+
+(defun pause-test-on-break (onoff &optional gated)
+  (ecase onoff
+    ((:pause :kill)
+     (format t "~&; ASERVE TEST - Enabling pause-test-on-break ~S ~S" onoff gated)
+     (set-stop-mode onoff gated)
+     (net.aserve::debug-on :notrap)
+     (fwrap 'util.test::test-check :aserve-stopper 'wrapper-with-check-stopper)
+     (setq excl::*internal-invoke-debugger-hook* 'set-stop-indicator))
+    ((nil)
+     (format t "~&; ASERVE TEST - Disabling pause-test-on-break.")
+     (set-stop-mode nil)
+     (net.aserve::debug-off :notrap)
+     (funwrap 'util.test::test-check :aserve-stopper)
+     (setq excl::*internal-invoke-debugger-hook* nil))))
+
+(defvar *asc-stopper-catch* nil)
+
+(defun asc-check-stopper (&optional from-where &aux stopper stop-flag stop-gate)
+  ;; Check the stopper and pause, throw, kill or wait as required.
+  (when (consp (setq stopper *asc-stop-mode*))
+    (when (first stopper)
+      (setq stop-flag (second stopper))
+      (setq stop-gate (third stopper))
+      (case stop-flag
+	(:kill (if *asc-stopper-catch* 
+		   (throw 'asc-stopper-catch from-where)
+		 (mp:process-kill mp:*current-process*)))
+	(otherwise (if stop-gate
+		       (mp:process-wait "stopper" #'mp:gate-open-p stop-gate) 
+		     (sleep most-positive-fixnum))))
+      )))
+
+(defmacro with-stopper-catch (name &body body)
+  `(let ((*asc-stopper-catch* ,name))
+     (catch 'asc-stopper-catch ,@body)))
+  
+
+(defmacro with-stopper-checks (options &body body)
+  ;; Insert stopper checks beween forms in body.
+  ;; Options may be needed in the future for more detailed checks.
+  (declare (ignore options))
+  `(multiple-value-prog1 
+       (progn ,@(mapcan (lambda (form) `((asc-check-stopper) ,form)) body))
+       (asc-check-stopper)))
 
 
 
@@ -163,92 +251,105 @@
 				 (name "ast") (log-name nil l-n-p)
 				 (wait t) ; wait for tests to finish
 				 (exit nil) ; ignored if wait=nil
+				 (pause-on-break (when (excl.osi:getenv "ASERVE_PAUSE_ON_BREAK") :pause))
 			    &aux wname)
-  (typecase n
-    ((integer 0) nil)
-    (null (return-from user::test-aserve-n nil))
-    (otherwise 
-     ;; In case someone sets *do-aserve-test* to t.
-     (setq n 0)))
-  (setq *aserve-test-configs* (make-array (if (eql n 0) 1 n)))
+  (unwind-protect
+      (let ()
+	(when pause-on-break 
+	  (pause-test-on-break pause-on-break))	
+	(typecase n
+	  ((integer 0) nil)
+	  (null (return-from user::test-aserve-n nil))
+	  (otherwise 
+	   ;; In case someone sets *do-aserve-test* to t.
+	   (setq n 0)))
+	(setq *aserve-test-configs* (make-array (if (eql n 0) 1 n)))
   
-  (format t "~&; *hiper-socket-is-stream-socket* = ~S~%" 
-	  (let (v) 
-	    (or (ignore-errors (setq v (eval 'excl::*hiper-socket-is-stream-socket*)) t)
-		(setq v :undefined))
-	    v))
+	(format t "~&; *hiper-socket-is-stream-socket* = ~S~%" 
+		(let (v) 
+		  (or (ignore-errors (setq v (eval 'excl::*hiper-socket-is-stream-socket*)) t)
+		      (setq v :undefined))
+		  v))
   
-  (case n
-    (0
-     ;; In simple one-thread test, log server name only if requested
-     ;; explicitly.
-     (if l-n-p
-	 (setq *log-wserver-name* log-name)
-       (setq *log-wserver-name* nil))
-     (test-aserve test-timeouts :direct direct :proxy proxy :proxyproxy proxyproxy 
-		  :ssl ssl :proxy-auth proxy-auth))
-    (otherwise
-     (let ((procs '()))
-       (when (cond (l-n-p (setq *log-wserver-name* log-name))
-		   ((eql n 1) (setq *log-wserver-name* nil))
-		   (t  (setq *log-wserver-name* user::*default-log-wserver-name*)))
-	 (when (boundp 'util.test::*test-report-thread*)
-	   (set 'util.test::*test-report-thread* t)))	 
-       (dotimes (i n)
-	 (push
-	  (mp:process-run-function
-	      (setq wname (format nil "~A~A" i name))
-	    (lambda (i name)
-	      (let* (os
-		     clean 
-		     (*standard-output*
-		      (if logs
-			  (setq os
-			    (open (format nil "~A~A.log" logs i) :direction :output
-				  :if-exists :supersede))
-			*standard-output*))
-		     (*aserve-test-config* 
-		      (setf (aref *aserve-test-configs* i)
-			(make-instance 'aserve-test-config
-			  :name name :index i
-			  :test-timeouts test-timeouts)))
-		     (*wserver* (apply #'make-instance 'wserver 
-				       (when user::*default-log-wserver-name* (list :name name)))))
-		(unwind-protect
-		    (let ()
-		      (asc-format "~&~%============ STARTING SERVER ~A ~A ~%~%" i name)
-		      (setf (asc wserver) *wserver*)
-		      (test-aserve test-timeouts
-				   :direct direct :proxy proxy :proxyproxy proxyproxy :ssl ssl
-				   :proxy-auth proxy-auth
-				   )
-		      (setq clean t))
-		  (asc-format "~&~%============ ENDING SERVER ~A ~A ~A ~%~%" i name 
-			      (if clean "normally" "ABRUPTLY"))
-		  (when os (close os))
-		  (setf (asc done) (if clean :clean :abrupt))
-		  (dotimes (j (length *aserve-test-configs*)
-			     (format *initial-terminal-io* "~&~%~%ALL SERVERS ENDED~%~%"))
-		    (or (asc-done (aref *aserve-test-configs* j)) (return)))
-		  )))
-	    i wname)
-	  procs)
-	 ;; should be able to handle a delay = 0
-	 (sleep delay))
+	(case n
+	  (0
+	   ;; In simple one-thread test, log server name only if requested
+	   ;; explicitly.
+	   (if l-n-p
+	       (setq *log-wserver-name* log-name)
+	     (setq *log-wserver-name* nil))
+	   (with-stopper-catch
+	       :single-test-instance
+	     (test-aserve test-timeouts :direct direct :proxy proxy :proxyproxy proxyproxy 
+			  :ssl ssl :proxy-auth proxy-auth)))
+	  (otherwise
+	   (let ((procs '()))
+	     (when (cond (l-n-p (setq *log-wserver-name* log-name))
+			 ((eql n 1) (setq *log-wserver-name* nil))
+			 (t  (setq *log-wserver-name* user::*default-log-wserver-name*)))
+	       (when (boundp 'util.test::*test-report-thread*)
+		 (set 'util.test::*test-report-thread* t)))	 
+	     (dotimes (i n)
+	       (push
+		(mp:process-run-function
+		    (setq wname (format nil "~A~A" i name))
+		  (lambda (i name)
+		    (let* (os
+			   clean 
+			   (*standard-output*
+			    (if logs
+				(setq os
+				  (open (format nil "~A~A.log" logs i) :direction :output
+					:if-exists :supersede))
+			      *standard-output*))
+			   (*aserve-test-config* 
+			    (setf (aref *aserve-test-configs* i)
+			      (make-instance 'aserve-test-config
+				:name name :index i
+				:test-timeouts test-timeouts)))
+			   (*wserver* (apply #'make-instance 'wserver 
+					     (when user::*default-log-wserver-name* (list :name name)))))
+		      (unwind-protect
+			  (let ()
+			    (asc-format "~&~%============ STARTING SERVER ~A ~A ~%~%" i name)
+			    (setf (asc wserver) *wserver*)
+			    (with-stopper-catch
+				wname
+			      (test-aserve test-timeouts
+					   :direct direct :proxy proxy :proxyproxy proxyproxy :ssl ssl
+					   :proxy-auth proxy-auth
+					   )
+			      (setq clean t)))
+			(asc-format "~&~%============ ENDING SERVER ~A ~A ~A ~%~%" i name 
+				    (if clean "normally" "ABRUPTLY"))
+			(when os (close os))
+			(setf (asc done) (if clean :clean :abrupt))
+			(dotimes (j (length *aserve-test-configs*)
+				   (format *initial-terminal-io* "~&~%~%ALL SERVERS ENDED~%~%"))
+			  (or (asc-done (aref *aserve-test-configs* j)) (return)))
+			)))
+		  i wname)
+		procs)
+	       ;; should be able to handle a delay = 0
+	       (sleep delay))
 
-       (when wait
-	 (dolist (p procs)
-	   (mp:process-wait
-	    (format nil "waiting for ~a"
-		    (mp:process-name p))
-	    (lambda (p) (eq :terminated (mp::process-state p)))
-	    p))))))
-  (when wait
-    (let ((code (+ util.test::*test-unexpected-failures*
-		   util.test::*test-errors*)))
-      (if* exit
-	 then (exit code :quiet t)
-	 else code))))
+	     (when wait
+	       (dolist (p procs)
+		 (mp:process-wait
+		  (format nil "waiting for ~a"
+			  (mp:process-name p))
+		  (lambda (p) (eq :terminated (mp::process-state p)))
+		  p))))))
+	(when wait
+	  (let ((code (+ util.test::*test-unexpected-failures*
+			 util.test::*test-errors*)))
+	    (if* exit
+	       then (exit code :quiet t)
+	       else code))))
+    (cond ((null pause-on-break))
+	  (wait (pause-test-on-break nil))
+	  (t 	(format t "~&; test-aserve-n: pause-test-on-break is left enabled.~%")))))
+
 
 (defvar *asc-lock* (mp:make-process-lock :name "asc"))
 (defun asc-format (fmt &rest args)
@@ -294,43 +395,46 @@
 			       (do-tests-inner))
 			   (setf (asc x-compress) prev)))))
 		   (do-tests-inner ()
-		     (test-publish-file port nil) ; no compression
-		     #+unix
-		     (test-publish-file port t) ; with compression
-		     (test-publish-directory port)
-		     (test-publish-computed port)
-		     (test-publish-multi port)
-		     (test-publish-prefix port)
-		     (test-put-patch port)
-		     (test-authorization port)
-		     (test-encoding)
-                     (test-truncated-stream)
-		     (test-forms port)
-		     (test-get-request-body-incr port)
-                     (test-request-character-encoding port)
-		     (test-client port)
-		     (test-cgi port)
-		     (test-http-copy-file port)
-		     (test-client-unicode-content-length)
-		     (test-expect-header-responses)
-		     (test-retry-on-timeout port)
-                     (test-chunked-request port https)
-                     (test-chunked-request-set-trailers port https)
-                     (test-chunked-request-set-trailers-while-debugging port https)
-		     (test-server-request-body port :https https)
-                     (test-request-uri port https)
-                     (test-spr44282)
+		     (with-stopper-checks
+			 nil
+		       (test-publish-file port nil) ; no compression
+		       #+unix
+		       (test-publish-file port t) ; with compression
+		       (test-publish-directory port)
+		       (test-publish-computed port)
+		       (test-publish-multi port)
+		       (test-publish-prefix port)
+		       (test-put-patch port)
+		       (test-authorization port)
+		       (test-encoding)
+		       (test-truncated-stream)
+		       (test-forms port)
+		       (test-get-request-body-incr port)
+		       (test-request-character-encoding port)
+		       (test-client port)
+		       (test-cgi port)
+		       (test-http-copy-file port)
+		       (test-client-unicode-content-length)
+		       (test-expect-header-responses)
+		       (test-retry-on-timeout port)
+		       (test-chunked-request port https)
+		       (test-chunked-request-set-trailers port https)
+		       (test-chunked-request-set-trailers-while-debugging port https)
+		       (test-server-request-body port :https https)
+		       (test-request-uri port https)
+		       (test-spr44282)
                      
-		     (if* (member :ics *features*)
-			then (test-international port)
-			     (test-spr27296))
-		     (if* test-timeouts 
-			then (test-timeouts port))
-                     (test-body-in-get-request :port port :ssl https)  ;;; rfe15456
-		     ))
+		       (if* (member :ics *features*)
+			  then (test-international port)
+			       (test-spr27296))
+		       (if* test-timeouts 
+			  then (test-timeouts port))
+		       (test-body-in-get-request :port port :ssl https)	 ;;; rfe15456
+		       )))
 	    
 	    
-		    
+	    (with-stopper-checks
+		nil
 	    (if*  direct
 	       then (asc-format "~%~%===== test direct ~%~%")
 		    (do-tests))
@@ -363,7 +467,7 @@
                             (setq https t)
 			    (do-tests)
 		       else (asc-format "~%>> it isn't so ssl tests skipped~%~%")))
-	    ) ;;; end body of unwind-protect 
+	    )) ;;; end body of unwind-protect 
 	; cleanup forms:
 	(stop-aserve-running)
 	(stop-proxy-running)
@@ -3067,7 +3171,8 @@ Returns a vector."
       (sleep 1)
       (setq b (chunked-sender (format nil "http~A://localhost:~A/stream3" https port)))
       (test nil (null (search "after 1510" b)))
-      )))
+      
+      (format t "~&Done with test with-body-input-stream~%"))))
 
 (defun test-request-uri (port https)
   (publish :path "/request-uri" :content-type "text/plain"
