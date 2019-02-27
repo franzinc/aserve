@@ -2837,7 +2837,8 @@ redirect
 redirect-methods
 basic-authorization<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-digest-authorization<br>
+digest-authorization
+no-proxy<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 headers
 proxy
@@ -3057,6 +3058,18 @@ Proxying web servers are often used when clients are behind firewalls
 that prevent direct access to the internet. &nbsp; Another use is to
 centralize the page cache for a group of clients.</td>
     </tr>
+    <tr>
+      <td width="22%">no-proxy</td>
+      <td width="16%">nil</td>
+      <td width="62%">A list of strings naming the host names that will be
+        directly accessed rather than going through a proxy.
+        An entry in this list of "foo.com" will match any host name with
+        "foo.com" as a suffix, such as "www.foo.com".  If the value
+        of no-proxy is a string then it is treated as if it were a list of
+        that single string.
+</td>
+    </tr>
+
     <tr>
       <td style="vertical-align: top;">proxy-basic-authorization<br>
       </td>
