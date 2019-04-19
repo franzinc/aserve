@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 72))
+(defparameter *aserve-version* '(1 3 73))
 
 (eval-when (eval load)
     (require :sock)
@@ -417,6 +417,9 @@ will be logged with one log entry per line in some cases.")
 blocked before we give up and assume the client on the other side has
 died. Use nil to specify no timeout.")
 
+(defvar *http-free-worker-timeout* 3
+  "Number of seconds to wait for a free worker thread.")
+
 ; usually set to the default server object created when aserve is loaded.
 ; users may wish to set or bind this variable to a different server
 ; object so it is the default for publish calls.
@@ -560,6 +563,12 @@ died. Use nil to specify no timeout.")
     :initarg :header-read-timeout
     :initform *http-header-read-timeout*
     :accessor wserver-header-read-timeout)
+
+   (free-worker-timeout
+    ;; time to wait for a free worker thread
+    :initform *http-free-worker-timeout*
+    :initarg :free-worker-timeout
+    :accessor wserver-free-worker-timeout)
    
    ;;
    ;; -- internal slots --
@@ -1784,8 +1793,7 @@ by keyword symbols and not by strings"
   (let* ((error-count 0)
 	 (server *wserver*)
 	 (main-socket (wserver-socket server))
-	 (ipaddrs (wserver-ipaddrs server))
-	 (busy-sleeps 0))
+	 (ipaddrs (wserver-ipaddrs server)))
     (unwind-protect
 
 	(loop
@@ -1824,32 +1832,18 @@ by keyword symbols and not by strings"
 		(setq error-count 0) ; reset count
 	
 		; find a worker thread
-		; keep track of the number of times around the loop looking
-		; for one so we can handle cases where the workers are all busy
-		(let ((looped 0))
-		  (loop
-                    (multiple-value-bind (worker found-worker-p) (dequeue (wserver-free-worker-threads server) :wait 1)
-                      (if* found-worker-p
-                         then (incf-free-workers server -1)
-                              (mp:process-add-run-reason worker sock)
-                              (return)
-                       elseif (below-max-n-workers-p server)
-                         then (case looped
-                                (0 nil)
-                                ((1 2 3) (logmess "all threads busy, pause")
-                                 (if* (>= (incf busy-sleeps) 4)
-                                    then ; we've waited too many times
-                                         (setq busy-sleeps 0)
-                                         (logmess "too many sleeps, will create a new thread")
-                                         (make-worker-thread)))
-                                (4
-                                 (logmess "forced to create new thread")
-                                 (make-worker-thread))
-                                (5
-                                 (logmess "can't even create new thread, quitting")
-                                 (return-from http-accept-thread nil)))
-                         else (logmess "all threads busy, pause"))
-                      (incf looped)))))
+                (loop
+                  (multiple-value-bind (worker found-worker-p)
+                      (dequeue (wserver-free-worker-threads server)
+                               :wait (wserver-free-worker-timeout server))
+                    (if* found-worker-p
+                       then (incf-free-workers server -1)
+                            (mp:process-add-run-reason worker sock)
+                            (return)
+                     elseif (below-max-n-workers-p server)
+                       then (logmess "creating new thread")
+                            (make-worker-thread)
+                       else (logmess "all threads busy, pause")))))
 	  
 	    (error (cond)
 	      (logmess (format nil "accept: error ~s on accept ~a" 

@@ -120,6 +120,7 @@ Files</a><font face="Courier New"><br>
  href="#v-aserve-version">*aserve-version*</a><br>
 &nbsp; <a href="#v-default-aserve-external-format">*default-aserve-external-format*</a><br>
 &nbsp; <a href="#v-http-response-timeout">*http-response-timeout*</a><br>
+&nbsp; <a href="#v-http-free-worker-timeout">*http-free-worker-timeout*</a><br>
 &nbsp; <a href="#v-mime-types">*mime-types*</a></font><br>
 <a href="#iseve-request-proc">AllegroServe Request Processing Protocol<br>
 </a><font face="Courier New">&nbsp; <a href="#f-handle-request">handle-request</a><br>
@@ -2613,6 +2614,11 @@ with-http-response.&nbsp;&nbsp; [in future
 versions of AllegroServe we'll treat this value like
 *default-aserve-external-format* and
 bind it in each worker thread]</p>
+<p><a name="v-http-free-worker-timeout"></a><strong><font face="Courier
+New">*http-free-worker-timeout*</font></strong> - the number of seconds that
+AllegroServe will wait for a worker thread to become available (see
+<a href="iseve-request-proc">AllegroServe request processing protocol</a> for
+more details).</p>
 <p><a name="v-mime-types"></a><strong><font face="Courier New">*mime-types*</font></strong>
 - a hash table where the keys are the file types (e.g. "jpg") and the
 values are
@@ -2638,18 +2644,16 @@ listening, AllegroServe
 passes that connected socket to a free worker thread which then wakes
 up and calls the
 internal function <strong>net.aserve::process-connection</strong>.&nbsp;&nbsp;
-If
-there
-are
-no
-free
-worker
-threads
-then
-AllegroServe
-waits
-for one to be
-available.</p>
+If there are no free worker threads then AllegroServe waits for one to be
+available. The wait time can be configured either globally
+via the <strong>*http-free-worker-timeout*</strong> variable which defaults to 3
+seconds, or on a per-server basis via the setting</p>
+<p><a name="f-wserver-free-worker-timeout"></a><strong><font face="Courier
+New">(wserver-free-worker-timeout wserver)</font></strong></p>
+<p>which is an accessor to the <strong>wserver</strong> slot that can be set
+with <strong>:free-worker-timeout</strong> initialization argument and is by
+default initialized with the value
+of <strong>*http-free-worker-timeout*</strong>.</p>
 <p>In each worker thread the variable <strong>*wserver*</strong> is
 bound to the <strong>wserver</strong>
 object that holds all the information about the webserver on which the

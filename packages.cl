@@ -5,8 +5,9 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 20
-  "v20: 1.3.71: cache reuses previous accept header
+(sys:defpatch "aserve" 21
+  "v21: 1.3.73: allow free worker wait timeout configuration;
+v20: 1.3.71: cache reuses previous accept header
 v19: 1.3.70: caching of redirects
 v18: 1.3.69: automatic caching in the client
 v17: 1.3.68: computed-content for do-http-request
@@ -241,6 +242,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:wserver-log-function
    #:wserver-log-stream
    #:wserver-response-timeout
+   #:wserver-free-worker-timeout
    #:wserver-socket
    #:wserver-vhosts
    #:log-for-wserver
@@ -250,6 +252,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:*http-header-read-timeout*
    #:*http-io-timeout*
    #:*http-response-timeout*
+   #:*http-free-worker-timeout*
    #:*mime-types*
    #:*response-continue*
    #:*response-switching-protocols*
