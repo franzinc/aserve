@@ -3215,6 +3215,10 @@ Returns a vector."
 
 ;;;; caching test
 
+(defparameter *test-auto-cache-seconds* 10)
+;; Delay long enough past lifetime to detect cache entry expiration reliably.
+(defparameter *test-auto-cache-delay* 3)
+
 (defmacro with-new-cache ((var &key (max-cache-size 1000000)
                                      auto-cache-codes 
                                      auto-cache-seconds) &body body)
@@ -3224,7 +3228,8 @@ Returns a vector."
                  :auto-cache-seconds ,auto-cache-seconds)))
      ,@body))
 
-(defun test-caching ()
+(defun test-caching (&key (cache-seconds *test-auto-cache-seconds*)
+			  (cache-delay (+ cache-seconds *test-auto-cache-delay*)))
   (let ((port (start-aserve-running)))
     (unwind-protect
         (progn
@@ -3255,16 +3260,16 @@ Returns a vector."
           ;;
           (with-new-cache (cache)
             
-            ;; set the max age so the page will be valid for 10 seconds
+            ;; set the max age so the page will be valid for cache-seconds seconds
             (dopublish "/maxage" :last-modified (get-universal-time)
-                       :headers '(("cache-control" . "private, max-age=10")))
+                       :headers `(("cache-control" . ,(format nil "private, max-age=~A" cache-seconds))))
             (dohttp "/maxage" :cache cache :port port :expect 200 :name "ccc")
             (check-cache cache "cc"
                          :lookups 1
                          :alive   0
                          :revalidate 0
                          :validated 0)
-            ;; call again within 10 seconds so it will be valid in the cache
+            ;; call again within cache-seconds seconds so it will be valid in the cache
             (dohttp "/maxage" :cache cache :port port :expect 200 :name "ddd")
             (check-cache cache "dd"
                          :lookups 2
@@ -3272,9 +3277,9 @@ Returns a vector."
                          :revalidate 0
                          :validated 0)
             
-            ;; now wait 11 seconds to ensure that it has expired in
+            ;; now wait cache-delay seconds to ensure that it has expired in
             ;; the cache
-            (sleep 11)
+            (sleep cache-delay)
             (dohttp "/maxage" :cache cache :port port :expect 200 :name "eee")
             (check-cache cache "ee"
                          :lookups 3
@@ -3288,18 +3293,18 @@ Returns a vector."
           ;; test using an expires header
           (with-new-cache (cache)
             
-            ;; set the max age so the page will be valid for 10 seconds
+            ;; set the max age so the page will be valid for cache-seconds seconds
             (dopublish "/expire" :last-modified (get-universal-time)
                        :headers `(("expires" . 
                                              ,(net.aserve::universal-time-to-date 
-                                               (+ (get-universal-time) 10)))))
+                                               (+ (get-universal-time) cache-seconds)))))
             (dohttp "/expire" :cache cache :port port :expect 200 :name "fff")
             (check-cache cache "cc"
                          :lookups 1
                          :alive   0
                          :revalidate 0
                          :validated 0)
-            ;; call again within 10 seconds so it will be valid in the cache
+            ;; call again within cache-seconds seconds so it will be valid in the cache
             (dohttp "/expire" :cache cache :port port :expect 200 :name "ggg")
             (check-cache cache "dd"
                          :lookups 2
@@ -3307,9 +3312,9 @@ Returns a vector."
                          :revalidate 0
                          :validated 0)
             
-            ;; now wait 11 seconds to ensure that it has expired in
+            ;; now wait cache-delay seconds to ensure that it has expired in
             ;; the cache
-            (sleep 11)
+            (sleep cache-delay)
             (dohttp "/expire" :cache cache :port port :expect 200 :name "hhh")
             (check-cache cache "ee"
                          :lookups 3
@@ -3321,13 +3326,13 @@ Returns a vector."
             )
           
           
-          ;; we set max-age to 10 and expires to 30 seconds in the future
+          ;; we set max-age to cache-seconds and expires to 30 seconds in the future
           ;; we check that max-age takes precedence in ths case
           (with-new-cache (cache)
             
-            ;; set the max age so the page will be valid for 10 seconds
+            ;; set the max age so the page will be valid for cache-seconds seconds
             (dopublish "/expmax" :last-modified (get-universal-time)
-                       :headers `(("cache-control" . "private, max-age=10")
+                       :headers `(("cache-control" . ,(format nil "private, max-age=~A" cache-seconds))
                                   ("expires" . 
                                              ,(net.aserve::universal-time-to-date 
                                                (+ (get-universal-time) 30)))))
@@ -3337,7 +3342,7 @@ Returns a vector."
                          :alive   0
                          :revalidate 0
                          :validated 0)
-            ;; call again within 10 seconds so it will be valid in the cache
+            ;; call again within cache-seconds seconds so it will be valid in the cache
             (dohttp "/expmax" :cache cache :port port :expect 200 :name "qqq")
             (check-cache cache "gg"
                          :lookups 2
@@ -3345,9 +3350,9 @@ Returns a vector."
                          :revalidate 0
                          :validated 0)
             
-            ;; now wait 11 seconds to ensure that it has expired in
+            ;; now wait cache-delay seconds to ensure that it has expired in
             ;; the cache
-            (sleep 11)
+            (sleep cache-delay)
             (dohttp "/expmax" :cache cache :port port :expect 200 :name "rrr")
             (check-cache cache "hh"
                          :lookups 3
@@ -3363,9 +3368,9 @@ Returns a vector."
           ;; entry with a different accept header
           (with-new-cache (cache)
             
-            ;; set the max age so the page will be valid for 10 seconds
+            ;; set the max age so the page will be valid for cache-seconds seconds
             (dopublish "/maxage" :last-modified (get-universal-time)
-                       :headers '(("cache-control" . "private, max-age=10")))
+                       :headers `(("cache-control" . ,(format nil "private, max-age=~A" cache-seconds))))
             (dohttp "/maxage" :cache cache :port port :expect 200 :name "ccc2"
                     :accept "one/two")
             (check-cache cache "cc2"
@@ -3373,7 +3378,7 @@ Returns a vector."
                          :alive   0
                          :revalidate 0
                          :validated 0)
-            ;; call again within 10 seconds so it will be valid in the cache
+            ;; call again within cache-seconds seconds so it will be valid in the cache
             (dohttp "/maxage" :cache cache :port port :expect 200 :name "ddd2"
                     :accept "one/two")
             (check-cache cache "dd2"
@@ -3392,9 +3397,9 @@ Returns a vector."
                          :validated 0)
             
             
-            ;; now wait 11 seconds to ensure that it has expired in
+            ;; now wait cache-delay seconds to ensure that it has expired in
             ;; the cache
-            (sleep 11)
+            (sleep cache-delay)
             (dohttp "/maxage" :cache cache :port port :expect 200 :name "eee"
                     :accept "one/two")
             (check-cache cache "ee2"
@@ -3409,12 +3414,12 @@ Returns a vector."
             
           (with-new-cache (cache)
             
-            ;; set the max age so the page will be valid for 10 seconds
+            ;; set the max age so the page will be valid for cache-seconds seconds
             (dopublish "/nostore" :last-modified (get-universal-time)
                        :headers `(("cache-control" . "no-store")
                                   ("expires" . 
                                              ,(net.aserve::universal-time-to-date 
-                                               (+ (get-universal-time) 10)))))
+                                               (+ (get-universal-time) cache-seconds)))))
             (dohttp "/nostore" :cache cache :port port :expect 200 :name "abbb")
             (check-cache cache "ii"
                          :lookups 1
@@ -3429,9 +3434,9 @@ Returns a vector."
                          :revalidate 0
                          :validated 0)
             
-            ;; now wait 11 seconds to ensure and try the call again.
+            ;; now wait cache-delay seconds to ensure and try the call again.
             ;; verify not cached
-            (sleep 11)
+            (sleep cache-delay)
             (dohttp "/nostore" :cache cache :port port :expect 200 :name "cbbb")
             (check-cache cache "kk"
                          :lookups 3
@@ -3447,11 +3452,11 @@ Returns a vector."
           ;; an item but you must validate on each access
           (with-new-cache (cache)
             
-            ;; set the max age so the page will be valid for 10 seconds
+            ;; set the max age so the page will be valid for cache-seconds seconds
             (dopublish "/nocache" :last-modified (get-universal-time)
                        :headers `(("expires" . 
                                              ,(net.aserve::universal-time-to-date 
-                                               (+ (get-universal-time) 10)))
+                                               (+ (get-universal-time) cache-seconds)))
                                   ("cache-control" . "no-cache")))
             (dohttp "/nocache" :cache cache :port port :expect 200 :name "aa1")
             (check-cache cache "a1"
@@ -3459,7 +3464,7 @@ Returns a vector."
                          :alive   0
                          :revalidate 0
                          :validated 0)
-            ;; call again within 10 seconds so it will be valid in the cache
+            ;; call again within cache-seconds seconds so it will be valid in the cache
             ;; but we must revalidate anyway becuase of 'no-cache'
             (dohttp "/nocache" :cache cache :port port :expect 200 :name "aa2")
             (check-cache cache "a2"
@@ -3468,9 +3473,9 @@ Returns a vector."
                          :revalidate 1
                          :validated 1)
             
-            ;; now wait 11 seconds to ensure that it has expired in
+            ;; now wait cache-delay seconds to ensure that it has expired in
             ;; the cache
-            (sleep 11)
+            (sleep cache-delay)
             (dohttp "/nocache" :cache cache :port port :expect 200 :name "aa3")
             (check-cache cache "a3"
                          :lookups 3
@@ -3486,9 +3491,11 @@ Returns a vector."
           ;;
           (with-new-cache (cache)
             
-            ;; set the max age so the page will be valid for 10 seconds
+            ;; set the max age so the page will be valid for cache-seconds seconds
             (dopublish "/nohead" :last-modified (get-universal-time)
-                       :headers `(("cache-control" . "private, max-age=10, no-cache=fancy, no-cache=schmansy")
+                       :headers `(("cache-control"
+				   . ,(format nil "private, max-age=~A, no-cache=fancy, no-cache=schmansy" 
+					      cache-seconds))
                                   ("fancy" . "foo")
                                   ("schmansy" . "bar")
                                   ("flippy"  . "flop")))
@@ -3519,7 +3526,7 @@ Returns a vector."
                     :test #'equal
                     :fail-info "111"))
             
-            ;; call again within 10 seconds so it will be valid in the cache
+            ;; call again within cache-seconds seconds so it will be valid in the cache
             (multiple-value-bind (body code headers)
                 (dohttp "/nohead" :cache cache :port port :expect 200 :name "qqq")
               (declare (ignore body code))
@@ -3541,11 +3548,11 @@ Returns a vector."
                     :fail-info "222"))
             
             
-            ;; now wait 11 seconds to ensure that it has expired in
+            ;; now wait cache-delay seconds to ensure that it has expired in
             ;; the cache.  it will be validated and a new body
             ;; not returned so the old header with removed header
             ;; lines will still be in effect
-            (sleep 11)
+            (sleep cache-delay)
             (multiple-value-bind (body code headers)
                 (dohttp "/nohead" :cache cache :port port :expect 200 :name "rrr")
               (declare (ignore body code))
@@ -3570,7 +3577,7 @@ Returns a vector."
                     
 
           ;; test auto caching
-          (with-new-cache (cache :auto-cache-codes '(200) :auto-cache-seconds 10)
+          (with-new-cache (cache :auto-cache-codes '(200) :auto-cache-seconds cache-seconds)
             (dopublish "/autocache" :last-modified (- (get-universal-time) 60))
             (dohttp "/autocache" :cache cache :port port :expect 200)
             (check-cache cache "vv1"
@@ -3586,7 +3593,7 @@ Returns a vector."
                          :revalidate 0
                          :validated 0)
             ;; will expire
-            (sleep 11)
+            (sleep cache-delay)
             (dohttp "/autocache" :cache cache :port port :expect 200)
             (check-cache cache "vv3"
                          :lookups 3
@@ -3602,7 +3609,7 @@ Returns a vector."
           (with-new-cache (cache)
                   
             (dopublish-prefix "/bigret" 
-                              :headers '(("cache-control" . "private, max-age=10")))
+                              :headers `(("cache-control" . ,(format nil "private, max-age=~A" cache-seconds))))
             ;; cache 5 objects of size 10000, 10001 .. 10004
                   
             (dotimes (i 5)
@@ -3656,9 +3663,9 @@ Returns a vector."
           ;; test the flush-client-cache function
           (with-new-cache (cache)
             (dopublish "/checkflush" :last-modified (get-universal-time)
-                       :headers `(("cache-control" . "max-age=10")))
+                       :headers `(("cache-control" . ,(format nil "max-age=~A" cache-seconds))))
             (dopublish "/checkflush2" :last-modified (get-universal-time)
-                       :headers `(("cache-control" . "max-age=10")))
+                       :headers `(("cache-control" . ,(format nil "max-age=~A" cache-seconds))))
             ;; baseline
             (test 0 (net.aserve.client::client-cache-cache-size cache) 
                   :fail-info "dd1")
@@ -3671,14 +3678,14 @@ Returns a vector."
             (test 20  (net.aserve.client:client-cache-cache-size cache) 
                   :fail-info "dd2")
              
-            ;; it won't expire for 10 seconds so this will not remove it
+            ;; it won't expire for cache-seconds seconds so this will not remove it
             (net.aserve.client:flush-client-cache cache :expired t)
              
             (test 20  (net.aserve.client:client-cache-cache-size cache)
                   :fail-info "dd3")
              
             ;; let it expire
-            (sleep 11)
+            (sleep cache-delay)
              
             ;; cache a new url
             (dohttp "/checkflush2" :cache cache :port port :expect 200 
@@ -3715,11 +3722,11 @@ Returns a vector."
           (with-new-cache (cache :auto-cache-codes 
                                  '(#.(net.aserve::response-number *response-moved-permanently*))
                                  
-                                 :auto-cache-seconds 10)
+                                 :auto-cache-seconds cache-seconds)
             (dopublish "/redirit" :response *response-moved-permanently*
                        :headers '(("location" . "/redirit-target")))
             (dopublish "/redirit-target" :response *response-ok*
-                       :headers '(("cache-control" "public, max-age=10")))
+                       :headers `(("cache-control" . ,(format nil "public, max-age=~A" cache-seconds))))
             
             (dohttp "/redirit" :cache cache :port port :expect 200
                     :name "cp1")
@@ -3746,7 +3753,7 @@ Returns a vector."
             )
           
           ;; test that the accept header is sent with the revalidation
-          (with-new-cache (cache :auto-cache-seconds 10
+          (with-new-cache (cache :auto-cache-seconds cache-seconds
                                  :auto-cache-codes '(200))
             (publish :path "/auto-accept-test"
                      :function #'(lambda (req ent)
@@ -3779,7 +3786,7 @@ Returns a vector."
                          :alive   1
                          :revalidate 0
                          :validated 0)
-            (sleep 11)
+            (sleep cache-delay)
             
             ;; force revalidation
             (test "foo/bar" (values (dohttp "/auto-accept-test" :port port
