@@ -1,6 +1,9 @@
 # On Windows, this makefile requires the use of GNU make from Redhat
 # (http://sources.redhat.com/cygwin/).
 
+# Export everything
+export
+
 SHELL = sh
 
 ## First, so it can set variables and even change the default rule

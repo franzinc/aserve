@@ -49,6 +49,21 @@
     (defun net.aserve::wserver-name (x) (declare (ignore x)) "")
     (setq user::*default-log-wserver-name* nil)
     )
+  (set 'excl::*aclssl-verbose* t)
+  (let ((ssl (sys:getenv "ACL_OPENSSL_VERSION")))
+    (cond 
+     ((or (null ssl) (equal ssl ""))
+      (format t "~&; ACLSSL: ACL_OPENSSL_VERSION unset.~%"))
+     (*aclssl-version*
+      (format t "~&; ACLSSL: *aclssl-version* is set to ~S~%" *aclssl-version*))
+     ((equal ssl "10") 
+      (format t "~&; ACLSSL: Setting *aclssl-version* to (1 0)~%")
+      (setq *aclssl-version* (list 1 0)))
+     ((equal ssl "11")
+      (format t "~&; ACLSSL: Setting *aclssl-version* to (1 1)~%")
+      (setq *aclssl-version* (list 1 1)))
+     (t (format t "~&; ACLSSL: Ignoring odd setting of ACL_OPENSSL_VERSION ~S~%" ssl))
+     ))
   )
 
 
@@ -1223,11 +1238,11 @@ Returns a vector."
 
 (defun as-require (&rest args)
   (mp:with-process-lock
-   ;; 2010-12 mm: Use a process-lock to avoid conditionalizing on smp...
-   ;; We need a lock to avoid race on require.
-   ;; If and when require code is fixed, this lock could be removed.
-   (*as-test-lock*)
-   (apply #'require args)))
+      ;; 2010-12 mm: Use a process-lock to avoid conditionalizing on smp...
+      ;; We need a lock to avoid race on require.
+      ;; If and when require code is fixed, this lock could be removed.
+      (*as-test-lock*)
+    (apply #'require args)))
 
 (defun test-encoding ()
   ;; test the encoding and decoding
