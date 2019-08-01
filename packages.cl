@@ -338,8 +338,10 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    ;; computed content exports:
    #:computed-content
    #:get-content-length
+   #:get-content-headers
    #:write-content
    #:file-computed-content
+   #:stream-computed-content
    ))
 
 ;; These functions must be undefined in case new aserve is loaded on

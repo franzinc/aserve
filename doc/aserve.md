@@ -89,6 +89,7 @@ version of this document can be found [here][latest].
   * [**`do-http-request`**](#f-do-http-request)
   * [**`computed-content`**](#c-computed-content)
   * [**`file-computed-content`**](#c-file-computed-content)
+  * [**`stream-computed-content`**](#c-stream-computed-content)
   * [**`client-cache`**](#c-client-cache)
   * [**`client-request`**](#c-client-request)
   * [**`cookie-jar`**](#c-cookie-jar)
@@ -2087,7 +2088,7 @@ or `"http"`. The keyword arguments to **`do-http-request`** are
 | **`method`**                                                                                                               | **`:get`**                         | The type of request to make. Other possible values are **`:put`**, **`:post`** and **`:head`**. **`:head`** is useful if you just want to see if the link works without downloading the data.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | **`protocol`**                                                                                                             | **`:http/1.1`**                    | The other possible value is **`:http/1.0`**. Modern web servers will return the response body in chunks if told to use the **`:http/1.1`** protocol. Buggy web servers may do chunking incorrectly (even Apache has bugs in this regard but we've worked around them). If you have trouble talking to a web server you should try specifying the **`:http/1.0`** protocol to see if that works.                                                                                                                                                                                                                                                                                                                               |
 | **`accept`**                                                                                                               | `"*/*"`                            | A string listing of MIME types that are acceptable as a response to this request. The type listed can be simple such as `"text/html"` or more complex like `"text/html, audio/*"`.  The default is to accept anything which is expressed `"*/*"`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| **`content`**                                                                                                              | **`nil`**                          | If the method is **`:put`** or **`:post`** then the request should include something to be sent to the web server. The value of this argument is either a string, a vector of type **`(unsigned-byte 8)`** or an instance of a subclass of **`computed-content`**.  It may also be a list of strings or vectors or instances of a subclass of **`computed-content`**. See the **`query`** argument for a more convenient way to **`:post`** data to a form.                                                                                                                                                                                                                                                                   |
+| **`content`**                                                                                                              | **`nil`**                          | If the method is **`:put`** or **`:post`** then the request should include something to be sent to the web server. The value of this argument is either a string, a vector of type **`(unsigned-byte 8)`**, a pathname, a stream or an instance of a subclass of **`computed-content`**.  It may also be a list containing strings, vectors, pathnames, streams or instances of a subclass of **`computed-content`**. See the **`query`** argument for a more convenient way to **`:post`** data to a form.                                                                                                                                                                                                                   |
 | **`content-type`**                                                                                                         | **`nil`**                          | A string which is to be the value of the Content-Type header field, describing the format of the value of the **`content`** argument.  This is only needed for **`:put`** and **`:post`** requests.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | **`query`**                                                                                                                | **`nil`**                          | This is a query alist of the form suitable for **`query-to-form-urlencoded`**. If the method is a **`:get`** then the value of  this argument is **`urlencoded`** and made the query string of the uri being accessed. If the method is **`:post`** then the query string is **`urlencoded`** and made the **`content`** of the request. Also the **`content-type`** is set to **`application/x-www-form-urlencoded.`**                                                                                                                                                                                                                                                                                                       |
 | **`format`**                                                                                                               | **`:text`**                        | The body of the response is returned as a string if the value is **`:text`** or as an array of type (unsigned-byte 8) if the value is **`:binary`**.  When the body is a string the external-format argument is important.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -2180,6 +2181,15 @@ returns the number of bytes in the content.
 
 writes the bytes of the computed content to the stream.
 
+```lisp
+(get-content-headers (cc my-computed-content-subclass) &key protocol headers)
+```
+
+is an optional method (default implementation returns `nil`, effectively doing
+nothing) that allows the programmer to specify additional headers for a given
+content type as well as check for protocol/header conflicts and signal an error
+if that is the case.
+
 -----
 
 ## <span id="c-file-computed-content"></span>
@@ -2193,6 +2203,29 @@ instance of **`file-computed-content`** you do:
 ```lisp
 (make-instance 'net.aserve.client:file-computed-content :filename "/a/b/myfile.txt")
 ```
+
+If the **`:content`** argument to **`do-http-request`** or
+**`make-http-client-request`** is a `pathname`, it is implicitly converted into
+an instance of **`file-computed-content`**.
+
+-----
+
+## <span id="c-stream-computed-content"></span>
+#### **`net.aserve.client:stream-computed-content`** \[class\]
+
+Another handy subclass of **`computed-content`** is **`stream-computed-content`**.
+Instances of **`stream-computed-content`** will send the data read from inner stream,
+using the chunking mechanism. Required `"Transfer-Encoding"` header is automatically
+set via specialized **`get-content-headers`** method. In order to create an instance
+of **`stream-computed-content`** you do:
+
+```lisp
+(make-instance 'net.aserve.client:stream-computed-content :stream input-stream)
+```
+
+If the **`:content`** argument to **`do-http-request`** or
+**`make-http-client-request`** is a `stream`, it is implicitly converted into an
+instance of **`stream-computed-content`**.
 
 Before we describe the lower level client request functions we will describe two
 classes of objects used in that interface.

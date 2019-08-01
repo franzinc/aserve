@@ -154,6 +154,17 @@
 (defgeneric get-content-length ((cc computed-content))
   (:documentation "returns the number of bytes in the content"))
 
+(defgeneric get-content-headers ((cc computed-content) &key protocol headers)
+  (:documentation "takes protocol and headers specified by the caller
+of do-http-request and returns additional content-specific headers to
+be included; can signal errors, but cannot modify the existing
+headers")
+  ;; Protocol and headers are passed as keyword arguments to prohibit
+  ;; multiple dispatch which may easily get out of hand when default
+  ;; methods are available.
+  (:method ((cc computed-content) &key protocol headers)
+    (declare (ignore protocol headers))))
+
 (defgeneric write-content ((cc computed-content) stream)
   (:documentation "writes the content to the given stream"))
 
@@ -176,8 +187,44 @@
           (if* (eql 0 size)
              then (return)
              else (write-sequence buffer stream :end size)))))))
-      
-    
+
+
+;; This subclass of computed-content will send the data from the
+;; specified stream, using the chunking mechanism.
+(defclass stream-computed-content (computed-content)
+  ((stream :initarg :stream
+           :reader stream-computed-content-stream)))
+
+(defmethod get-content-length ((scc stream-computed-content))
+  nil)
+
+(defmethod get-content-headers ((scc stream-computed-content) &key protocol headers)
+  (let ((transfer-encoding (cdr (assoc "Transfer-Encoding" headers :test #'equalp))))
+    (if* (not (eq protocol :http/1.1))
+       then (error "STREAM-COMPUTED-CONTENT uses chunking mechanism ~
+                    which is only supported by HTTP/1.1.")
+     elseif (null transfer-encoding)
+       then '(("Transfer-Encoding" . "chunked"))
+     elseif (string= transfer-encoding "chunked")
+       then nil ;; correct Transfer-Encoding header is already there
+       else (error "Conflicting value of Transfer-Encoding header (~s): ~
+                    STREAM-COMPUTED-CONTENT uses AllegroServe's plain chunking ~
+                    mechanism so only \"chunked\" value is allowed."
+                   transfer-encoding))))
+
+(defmethod write-content ((scc stream-computed-content) stream)
+  ;; Copy data from in-stream to out-stream.
+  (let* ((out-stream (net.aserve::make-instance-chunking-stream+output-handle stream))
+         (in-stream (stream-computed-content-stream scc))
+         (buffer (make-array 4096 :element-type (stream-element-type in-stream)))
+         (num-elements nil))
+    (loop
+       (setf num-elements (read-sequence buffer in-stream))
+       (when (zerop num-elements)
+         (return))
+       (write-sequence buffer out-stream :end num-elements))
+    (force-output out-stream)
+    (close out-stream)))
 
 
 
@@ -1124,9 +1171,18 @@
        ; requests without a body
        (if* (and (not content) (member method '(:put :post)))
           then (setf content ""))
-       ; content can be a nil, a single vector or a list of vectors.
-       ; canonicalize..
-       (if* (and content (atom content)) then (setq content (list content)))
+
+       ;; Content can be NIL, a single object or a list. Some objects
+       ;; need to be converted to computed-content objects before processing.
+       (labels ((canonicalize (content-piece)
+                  (typecase content-piece
+                    (pathname
+                     (make-instance 'file-computed-content :filename content-piece))
+                    (stream
+                     (make-instance 'stream-computed-content :stream content-piece))
+                    (otherwise
+                     content-piece))))
+         (setq content (mapcar #'canonicalize (if (listp content) content (list content)))))
         
        (if* content
           then (let ((computed-length 0))
@@ -1143,9 +1199,13 @@
                       (if* (null content-length)
                          then (incf computed-length (length content-piece))))
                      (computed-content
-                      (let ((this-length (get-content-length content-piece)))
-                        (if* (integerp this-length)
-                           then (incf computed-length this-length)
+                      (let ((content-piece-length (get-content-length content-piece))
+                            (content-piece-headers
+                             (get-content-headers
+                              content-piece :protocol protocol :headers (copy-tree headers))))
+                        (setq headers (append headers content-piece-headers))
+                        (if* (integerp content-piece-length)
+                           then (incf computed-length content-piece-length)
                            else ;; we can't compute the length so
                                 ;; don't specify any content-length 
                                 ;; unless given explicitly by caller

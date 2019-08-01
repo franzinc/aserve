@@ -1513,7 +1513,6 @@ Returns a vector."
 		       got-zero
 		       after-zero)
 				    
-				    
 		   (get-request-body-incremental
 		    req #'(lambda (buffer size)
 			    (if* got-zero
@@ -1555,57 +1554,87 @@ Returns a vector."
 		       :content-type "application/binary")
     )
 
-  (let* ((prefix-local (format nil "http://localhost:~a" port))
-         (creq (x-make-http-client-request
-                (format nil "~a/get-request-body-incr-test?use=chunked"
-                        prefix-local)
-                :method :put
-                :content-type "application/binary"
-                ;; Extremely hacky: content length must not be nil to bypass any
-                ;; attempts to compute it inside make-http-client-request, so we
-                ;; rely on the fact that the Content-Length header parsing will
-                ;; return NIL in case of failure, and the chunked body branch
-                ;; will be executed.
-                :content-length ""
-                :headers '(("Transfer-Encoding" . "chunked"))))
-         (crlf (vector (char-int #\return) (char-int #\newline))))
-    ;; Manually construct a chunked sequence (with one chunk) by wrapping it
-    ;;     <hex-length>\r\n<chunk>\r\n0\r\n\r\n
-    ;; and write it to the socket.
-    (write-sequence
-     (concatenate
-      'vector
-      (map 'vector #'char-code (format nil "~x" (length *get-request-body-incr-value*)))
-      crlf
-      *get-request-body-incr-value*
-      crlf
-      (vector (char-code #\0))
-      crlf
-      crlf)
-     (client-request-socket creq))
-    (force-output (client-request-socket creq))
-    ;; Read the headers for error propagation.
-    (read-client-response-headers creq :throw-on-eof 'premature-eof)
-    (client-request-close creq))
-  
   (let ((tfile (format nil "~a/test~A-computed-content" *aserve-test-dir* (asc index))))
     (with-open-file  (p tfile :direction :output
                       :if-exists :supersede
                       :if-does-not-exist :create)
       (write-sequence *get-request-body-incr-value* p))
     (let ((prefix-local (format nil "http://localhost:~a" port)))
-      ;; we append ?use=computed here just to make it clear in the log
-      ;; file that we're using  computed-content in this request should
-      ;; we see a failure.
+      ;; We append ?use=<tag> here just to make it clear in the log
+      ;; file which request failed, should we see a failure.
       ;; The query here will have no effect at the http server.
-      (x-do-http-request (format nil "~a/get-request-body-incr-test?use=computed" 
+      (x-do-http-request (format nil "~a/get-request-body-incr-test?use=file-computed-content"
                                  prefix-local)
                          :method :put
                          :content (make-instance 'file-computed-content
                                     :filename tfile)
                          :content-type "application/binary")
+      ;; Test pathname is automatically wrapped in file-computed-content.
+      (x-do-http-request (format nil "~a/get-request-body-incr-test?use=pathname"
+                                 prefix-local)
+                         :method :put
+                         :content (pathname tfile)
+                         :content-type "application/binary")
+      ;; Test chunked body request by using the stream-computed-content.
+      (with-open-file (stream tfile :direction :input :element-type '(unsigned-byte 8))
+        (x-do-http-request (format nil "~a/get-request-body-incr-test?use=stream-computed-content"
+                                   prefix-local)
+                           :method :put
+                           :content (make-instance 'stream-computed-content :stream stream)
+                           :content-type "application/binary"))
+      ;; Test stream is automatically wrapped in stream-computed-content.
+      (with-open-file (stream tfile :direction :input :element-type '(unsigned-byte 8))
+        (x-do-http-request (format nil "~a/get-request-body-incr-test?use=stream"
+                                   prefix-local)
+                           :method :put
+                           :content stream
+                           :content-type "application/binary"))
+      ;; Test connection is kept alive.
+      (if* (and (not (asc x-proxy))
+                (not (asc x-ssl)))
+         then (multiple-value-bind (body code headers uri socket1)
+                  (with-open-file (stream tfile :direction :input :element-type '(unsigned-byte 8))
+                    (x-do-http-request (format nil "~a/get-request-body-incr-test?use=socket1"
+                                               prefix-local)
+                                       :method :put
+                                       :content stream
+                                       :content-type "application/binary"
+                                       :keep-alive t))
+                (declare (ignore body code headers uri))
+                (test t (not (null socket1)) :fail-info "socket is nil")
+                (multiple-value-bind (body code headers uri socket2)
+                    (with-open-file (stream tfile :direction :input :element-type '(unsigned-byte 8))
+                      (x-do-http-request (format nil "~a/get-request-body-incr-test?use=socket2"
+                                                 prefix-local)
+                                         :method :put
+                                         :content stream
+                                         :content-type "application/binary"
+                                         :keep-alive t
+                                         :connection socket1))
+                  (declare (ignore body code headers uri))
+                  (test socket1 socket2 :fail-info "socket is not reused"))))
+      ;; Multiple values in 'Transfer-Encoding' header are legal
+      ;; accoding to the MDN resource:
+      ;;    https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding,
+      ;; but aserve does not handle this, so error is expected.
+      (with-open-file (stream tfile :direction :input :element-type '(unsigned-byte 8))
+        (test-error
+         (x-do-http-request (format nil "~a/get-request-body-incr-test?use=stream-error"
+                                    prefix-local)
+                            :method :put
+                            :content stream
+                            :content-type "application/binary"
+                            :headers '(("Transfer-Encoding" . "gzip, chunked")))))
+      ;; Test that error is thrown when attempting to use chunking with HTTP/1.0.
+      (with-open-file (stream tfile :direction :input :element-type '(unsigned-byte 8))
+        (test-error
+         (x-do-http-request (format nil "~a/get-request-body-incr-test?use=stream-error"
+                                    prefix-local)
+                            :protocol :http/1.0
+                            :method :put
+                            :content stream
+                            :content-type "application/binary")))
       (delete-file tfile)))
-    
   )
 
 (defun test-request-character-encoding (port)
