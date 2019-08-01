@@ -1554,6 +1554,39 @@ Returns a vector."
 		       :content *get-request-body-incr-value*
 		       :content-type "application/binary")
     )
+
+  (let* ((prefix-local (format nil "http://localhost:~a" port))
+         (creq (x-make-http-client-request
+                (format nil "~a/get-request-body-incr-test?use=chunked"
+                        prefix-local)
+                :method :put
+                :content-type "application/binary"
+                ;; Extremely hacky: content length must not be nil to bypass any
+                ;; attempts to compute it inside make-http-client-request, so we
+                ;; rely on the fact that the Content-Length header parsing will
+                ;; return NIL in case of failure, and the chunked body branch
+                ;; will be executed.
+                :content-length ""
+                :headers '(("Transfer-Encoding" . "chunked"))))
+         (crlf (vector (char-int #\return) (char-int #\newline))))
+    ;; Manually construct a chunked sequence (with one chunk) by wrapping it
+    ;;     <hex-length>\r\n<chunk>\r\n0\r\n\r\n
+    ;; and write it to the socket.
+    (write-sequence
+     (concatenate
+      'vector
+      (map 'vector #'char-code (format nil "~x" (length *get-request-body-incr-value*)))
+      crlf
+      *get-request-body-incr-value*
+      crlf
+      (vector (char-code #\0))
+      crlf
+      crlf)
+     (client-request-socket creq))
+    (force-output (client-request-socket creq))
+    ;; Read the headers for error propagation.
+    (read-client-response-headers creq :throw-on-eof 'premature-eof)
+    (client-request-close creq))
   
   (let ((tfile (format nil "~a/test~A-computed-content" *aserve-test-dir* (asc index))))
     (with-open-file  (p tfile :direction :output

@@ -2392,7 +2392,7 @@ by keyword symbols and not by strings"
 			       else (setf (ausb8 buffer index)
 				      (char-code ch))
 				    (if* (>= (incf index) buffsize)
-				       then (funcall function buffsize)
+				       then (funcall function buffer buffsize)
 					    (setq index 0))))))
 		  ;; no content length given
 	   elseif (keep-alive-specified req)
