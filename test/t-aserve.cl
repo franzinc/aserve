@@ -50,20 +50,6 @@
     (setq user::*default-log-wserver-name* nil)
     )
   (set 'excl::*aclssl-verbose* t)
-  (let ((ssl (sys:getenv "ACL_OPENSSL_VERSION")))
-    (cond 
-     ((or (null ssl) (equal ssl ""))
-      (format t "~&; ACLSSL: ACL_OPENSSL_VERSION unset.~%"))
-     (*aclssl-version*
-      (format t "~&; ACLSSL: *aclssl-version* is set to ~S~%" *aclssl-version*))
-     ((equal ssl "10") 
-      (format t "~&; ACLSSL: Setting *aclssl-version* to (1 0)~%")
-      (setq *aclssl-version* (list 1 0)))
-     ((equal ssl "11")
-      (format t "~&; ACLSSL: Setting *aclssl-version* to (1 1)~%")
-      (setq *aclssl-version* (list 1 1)))
-     (t (format t "~&; ACLSSL: Ignoring odd setting of ACL_OPENSSL_VERSION ~S~%" ssl))
-     ))
   )
 
 
