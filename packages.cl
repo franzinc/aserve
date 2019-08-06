@@ -5,8 +5,9 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 21
-  "v21: 1.3.73: allow free worker wait timeout configuration;
+(sys:defpatch "aserve" 22
+  "v22: 1.3.74: handle input from stream for MAKE-HTTP-CLIENT-REQUEST;
+v21: 1.3.73: allow free worker wait timeout configuration;
 v20: 1.3.71: cache reuses previous accept header
 v19: 1.3.70: caching of redirects
 v18: 1.3.69: automatic caching in the client
