@@ -15,111 +15,111 @@ version of this document can be found [here][latest].
 * [Introduction](#introduction)
 * [Running AllegroServe](#running-AllegroServe)
 * [Starting the Server](#starting-the-server)
-  * [**`start`**](#f-start)
+  * [**`start`**](aserve.md#f-start)
 * [Shutting Down the Server](#shutting-down-the-server)
-  * [**`shutdown`**](#f-shutdown)
+  * [**`shutdown`**](aserve.md#f-shutdown)
 * [Publishing Information](#publishing-information)
-  * [**`publish-file`**](#f-publish-file)
+  * [**`publish-file`**](aserve.md#f-publish-file)
     * [Entity hook function](#entity-hook-function)
-  * [**`publish-directory`**](#f-publish-directory)
+  * [**`publish-directory`**](aserve.md#f-publish-directory)
     * [Directory Access Files](#directory-access-files)
-  * [**`publish`**](#f-publish)
-  * [**`publish-prefix`**](#f-publish-prefix)
-  * [**`publish-multi`**](#f-publish-multi)
+  * [**`publish`**](aserve.md#f-publish)
+  * [**`publish-prefix`**](aserve.md#f-publish-prefix)
+  * [**`publish-multi`**](aserve.md#f-publish-multi)
 * [Generating a Computed Response](#generating-a-computed-response)
-  * [**`with-http-response`**](#f-with-http-response)
-  * [**`with-http-body`**](#f-with-http-body)
-  * [**`get-request-body`**](#f-get-request-body)
-  * [**`get-request-body-incremental`**](#f-get-request-body-incremental)
-  * [**`header-slot-value`**](#f-header-slot-value)
-  * [**`reply-header-slot-value`**](#f-reply-header-slot-value)
-  * [**`request-query`**](#f-request-query)
-  * [**`set-trailers`**](#f-set-trailers)
-  * [**`can-set-trailers-p`**](#f-can-set-trailers-p)
-  * [**`request-query-value`**](#f-request-query-value)
+  * [**`with-http-response`**](aserve.md#f-with-http-response)
+  * [**`with-http-body`**](aserve.md#f-with-http-body)
+  * [**`get-request-body`**](aserve.md#f-get-request-body)
+  * [**`get-request-body-incremental`**](aserve.md#f-get-request-body-incremental)
+  * [**`header-slot-value`**](aserve.md#f-header-slot-value)
+  * [**`reply-header-slot-value`**](aserve.md#f-reply-header-slot-value)
+  * [**`request-query`**](aserve.md#f-request-query)
+  * [**`set-trailers`**](aserve.md#f-set-trailers)
+  * [**`can-set-trailers-p`**](aserve.md#f-can-set-trailers-p)
+  * [**`request-query-value`**](aserve.md#f-request-query-value)
 * [Request Variables](#request-variables)
-  * [**`request-variable-value`**](#f-request-variable-value)
+  * [**`request-variable-value`**](aserve.md#f-request-variable-value)
 * [Request Object Readers and Accessors](#request-object-readers)
-  * [**`request-method`**](#f-request-method)
-  * [**`request-uri`**](#f-request-uri)
-  * [**`request-protocol`**](#f-request-protocol)
-  * [**`request-socket`**](#f-request-socket)
-  * [**`request-wserver`**](#f-request-wserver)
-  * [**`request-raw-request`**](#f-request-raw-request)
-  * [**`request-reply-code`**](#f-request-reply-code)
-  * [**`request-reply-date`**](#f-request-reply-date)
-  * [**`request-reply-headers`**](#f-request-reply-headers)
-  * [**`request-reply-content-length`**](#f-request-reply-content-length)
-  * [**`request-reply-plist`**](#f-request-reply-plist)
-  * [**`request-reply-strategy`**](#f-request-reply-strategy)
-  * [**`request-reply-stream`**](#f-request-reply-stream)
+  * [**`request-method`**](aserve.md#f-request-method)
+  * [**`request-uri`**](aserve.md#f-request-uri)
+  * [**`request-protocol`**](aserve.md#f-request-protocol)
+  * [**`request-socket`**](aserve.md#f-request-socket)
+  * [**`request-wserver`**](aserve.md#f-request-wserver)
+  * [**`request-raw-request`**](aserve.md#f-request-raw-request)
+  * [**`request-reply-code`**](aserve.md#f-request-reply-code)
+  * [**`request-reply-date`**](aserve.md#f-request-reply-date)
+  * [**`request-reply-headers`**](aserve.md#f-request-reply-headers)
+  * [**`request-reply-content-length`**](aserve.md#f-request-reply-content-length)
+  * [**`request-reply-plist`**](aserve.md#f-request-reply-plist)
+  * [**`request-reply-strategy`**](aserve.md#f-request-reply-strategy)
+  * [**`request-reply-stream`**](aserve.md#f-request-reply-stream)
 * [CGI Program Execution](#cgi-program)
-  * [**`run-cgi-program`**](#f-run-cgi-program)
+  * [**`run-cgi-program`**](aserve.md#f-run-cgi-program)
 * [Form Processing](#form-processing)
-  * [**`get-multipart-header`**](#f-get-multipart-header)
-  * [**`parse-multipart-header`**](#f-parse-multipart-header)
-  * [**`get-multipart-sequence`**](#f-get-multipart-sequence)
-  * [**`get-all-multipart-data`**](#f-get-all-multipart-data)
-  * [**`form-urlencoded-to-query`**](#f-form-urlencoded-)
-  * [**`query-to-form-urlencoded`**](#f-query-to)
+  * [**`get-multipart-header`**](aserve.md#f-get-multipart-header)
+  * [**`parse-multipart-header`**](aserve.md#f-parse-multipart-header)
+  * [**`get-multipart-sequence`**](aserve.md#f-get-multipart-sequence)
+  * [**`get-all-multipart-data`**](aserve.md#f-get-all-multipart-data)
+  * [**`form-urlencoded-to-query`**](aserve.md#f-form-urlencoded-)
+  * [**`query-to-form-urlencoded`**](aserve.md#f-query-to)
 * [Authorization](#authorization)
-  * [**`get-basic-authorization`**](#f-get-basic-authorization)
-  * [**`set-basic-authorization`**](#f-set-basic-authorization)
-  * [**`password-authorizer`**](#c-password-authorizer)
-  * [**`location-authorizer`**](#c-location-authorizer)
-  * [**`function-authorizer`**](#c-function-authorizer)
+  * [**`get-basic-authorization`**](aserve.md#f-get-basic-authorization)
+  * [**`set-basic-authorization`**](aserve.md#f-set-basic-authorization)
+  * [**`password-authorizer`**](aserve.md#c-password-authorizer)
+  * [**`location-authorizer`**](aserve.md#c-location-authorizer)
+  * [**`function-authorizer`**](aserve.md#c-function-authorizer)
 * [Cookies](#cookies)
-  * [**`set-cookie-header`**](#f-set-cookie-header)
-  * [**`get-cookie-values`**](#f-get-cookie-values)
-* [Variables](#varaibles)
-  * [**`*aserve-version*`**](#v-aserve-version)
-  * [**`*default-aserve-external-format*`**](#v-default-aserve-external-format)
-  * [**`*http-response-timeout*`**](#v-http-response-timeout)
-  * [**`*http-free-worker-timeout*`**](#v-http-free-worker-timeout)
-  * [**`*mime-types*`**](#v-mime-types)
+  * [**`set-cookie-header`**](aserve.md#f-set-cookie-header)
+  * [**`get-cookie-values`**](aserve.md#f-get-cookie-values)
+* [Variables](#variables)
+  * [**`*aserve-version*`**](aserve.md#v-aserve-version)
+  * [**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format)
+  * [**`*http-response-timeout*`**](aserve.md#v-http-response-timeout)
+  * [**`*http-free-worker-timeout*`**](aserve.md#v-http-free-worker-timeout)
+  * [**`*mime-types*`**](aserve.md#v-mime-types)
 * [AllegroServe Request Processing Protocol](#iseve-request-proc)
-  * [**`handle-request`**](#f-handle-request)
-  * [**`standard-locator`**](#f-standard-locator)
-  * [**`unpublish-locator`**](#f-unpublish-locator)
-  * [**`authorize`**](#f-authorize)
-  * [**`failed-request`**](#f-failed-request)
-  * [**`denied-request`**](#f-denied-request)
-  * [**`process-entity`**](#f-process-entity)
+  * [**`handle-request`**](aserve.md#f-handle-request)
+  * [**`standard-locator`**](aserve.md#f-standard-locator)
+  * [**`unpublish-locator`**](aserve.md#f-unpublish-locator)
+  * [**`authorize`**](aserve.md#f-authorize)
+  * [**`failed-request`**](aserve.md#f-failed-request)
+  * [**`denied-request`**](aserve.md#f-denied-request)
+  * [**`process-entity`**](aserve.md#f-process-entity)
 * [Client Functions](#client-request)
-  * [**`do-http-request`**](#f-do-http-request)
-  * [**`computed-content`**](#c-computed-content)
-  * [**`file-computed-content`**](#c-file-computed-content)
-  * [**`stream-computed-content`**](#c-stream-computed-content)
-  * [**`client-cache`**](#c-client-cache)
-  * [**`client-request`**](#c-client-request)
-  * [**`cookie-jar`**](#c-cookie-jar)
-  * [**`make-http-client-request`**](#f-make-http-client-request)
-  * [**`read-client-response-headers`**](#f-read-client-response)
-  * [**`client-request-read-sequence`**](#f-client-request-read-sequence)
-  * [**`read-response-body`**](#f-read-response-body)
-  * [**`client-request-close`**](#f-client-request-read-close)
-  * [**`compute-digest-authorization`**](#f-compute-digest-authorization)
-  * [**`uriencode-string`**](#f-uriencode-string)
+  * [**`do-http-request`**](aserve.md#f-do-http-request)
+  * [**`computed-content`**](aserve.md#c-computed-content)
+  * [**`file-computed-content`**](aserve.md#c-file-computed-content)
+  * [**`stream-computed-content`**](aserve.md#c-stream-computed-content)
+  * [**`client-cache`**](aserve.md#c-client-cache)
+  * [**`client-request`**](aserve.md#c-client-request)
+  * [**`cookie-jar`**](aserve.md#c-cookie-jar)
+  * [**`make-http-client-request`**](aserve.md#f-make-http-client-request)
+  * [**`read-client-response-headers`**](aserve.md#f-read-client-response)
+  * [**`client-request-read-sequence`**](aserve.md#f-client-request-read-sequence)
+  * [**`read-response-body`**](aserve.md#f-read-response-body)
+  * [**`client-request-close`**](aserve.md#f-client-request-read-close)
+  * [**`compute-digest-authorization`**](aserve.md#f-compute-digest-authorization)
+  * [**`uriencode-string`**](aserve.md#f-uriencode-string)
 * [Proxy](#proxy)
-  * [**`proxy-control`**](#c-proxy-control)
-  * [**`authorize-proxy-request`**](#f-authorize-proxy-request)
+  * [**`proxy-control`**](aserve.md#c-proxy-control)
+  * [**`authorize-proxy-request`**](aserve.md#f-authorize-proxy-request)
 * [Cache](#cache)
 * [Request Filters](#filters)
 * [Virtual Hosts](#virtual_hosts)
 * [Timeouts](#timeouts)
-  * [**`wserver-io-timeout`**](#f-wserver-io-timeout)
-  * [**`wserver-response-timeout`**](#f-wserver-response-timeout)
+  * [**`wserver-io-timeout`**](aserve.md#f-wserver-io-timeout)
+  * [**`wserver-response-timeout`**](aserve.md#f-wserver-response-timeout)
 * [Compression](#compression)
 * [SSL/TLS](#ssltls)
 * [Miscellaneous](#miscellaneous)
-  * [**`ensure-stream-lock`**](#f-ensure-stream-lock)
-  * [**`map-entities`**](#f-map-entities)
-  * [**`log-for-wserver`**](#f-log-for-wserver)
+  * [**`ensure-stream-lock`**](aserve.md#f-ensure-stream-lock)
+  * [**`map-entities`**](aserve.md#f-map-entities)
+  * [**`log-for-wserver`**](aserve.md#f-log-for-wserver)
 * [Running AllegroServe as a Service on Windows NT](#asaservice)
 * [Using International Characters in AllegroServe](#international-chars-aserve)
 * [Debugging](#debugging)
-  * [**`net.aserve::debug-on`**](#f-debug-on)
-  * [**`net.aserve::debug-off`**](#f-debug-off)
+  * [**`net.aserve::debug-on`**](aserve.md#f-debug-on)
+  * [**`net.aserve::debug-off`**](aserve.md#f-debug-off)
 
 
 ## <span id="introduction"></span>Introduction
@@ -185,12 +185,12 @@ The function **`net.aserve:start`** is used to start the server running.
             ca-directory verify max-depth)
 ```
 
-If no arguments are given then **`start`** starts a multi-threaded web server on
+If no arguments are given then [**`start`**](aserve.md#f-start) starts a multi-threaded web server on
 port 80, which is the standard web server port. If you are running this on Unix
 then you can only allocate port 80 if you are logged in as root or have made
 Lisp a set-user-id root program.
 
-There are quite a few keyword arguments to **`start`**, but in practice you only
+There are quite a few keyword arguments to [**`start`**](aserve.md#f-start), but in practice you only
 need be concerned with **`:port`** and **`:listeners`**. The arguments have the
 following meanings:
 
@@ -204,11 +204,11 @@ following meanings:
   - **`listeners`** - the number of threads to process http requests. If a value
     isn't given for the **`:listeners`** argument then 5 is assumed. If the value
     is **`nil`** or `0` then the server runs in *simple server mode* in which the
-    **`start`** function doesn't return - instead it processes the requests
+    [**`start`**](aserve.md#f-start) function doesn't return - instead it processes the requests
     itself, one at a time. If a positive number is given as the value of
     **`:listeners`** then the server runs in *threaded server mode*. In this mode
     separate lisp threads are started to handle requests from clients and after
-    which the **`start`** function returns. The number of request handling threads
+    which the [**`start`**](aserve.md#f-start) function returns. The number of request handling threads
     is initially equal to the value of the **`:listeners`** keyword argument. Note
     that under high load more threads may be created to keep the server
     operating smoothly. See also **`:max-listeners`**.
@@ -256,8 +256,8 @@ following meanings:
     file created by **`net.aserve:shutdown`** when given the **`save-cache`**
     argument. The state of the cache is restored as of when it was saved. This
     will only succeed if the external cache files that were in use when the
-    **`shutdown`** was done are in exactly the same state they were when the
-    **`shutdown`** was done. When the **`restore-cache`** argument is given, the
+    [**`shutdown`**](aserve.md#f-shutdown) was done are in exactly the same state they were when the
+    [**`shutdown`**](aserve.md#f-shutdown) was done. When the **`restore-cache`** argument is given, the
     value of the **`cache`** argument is ignored.
   - **`accept-hook`** - this should be a function of one argument, the socket which
     was created when a http request was accepted by AllegroServe. The function
@@ -282,7 +282,7 @@ following meanings:
     the moment. The AllegroServes in different processes do **not** share a
     common Lisp heap..
   - **`external-format`** - If given it should name the value to which
-    **`*default-aserve-external-format*`** should be bound to when requests are
+    [**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format) should be bound to when requests are
     processed. The default value is **`:latin1-base`**.
   - **`compress`** - if true then the server will send the body gzip compressed if
     the client can accept it and the entity being returned is enabled for
@@ -354,7 +354,7 @@ handling the request in any way it sees fit.
 
 The following functions create entities and specify which requests they will
 handle. An entity is distinguished by the **`path`** and **`host`** values passed
-to the particular **`publish`** function. When a **`publish`** is done for a
+to the particular [**`publish`**](aserve.md#f-publish) function. When a [**`publish`**](aserve.md#f-publish) is done for a
 **`path`** and **`host`** for which there is already an entity assigned, the old
 entity is replaced by the new entity.
 
@@ -385,7 +385,7 @@ arguments are optional. The arguments have these meanings:
   - **`content-type`** - A string describing the content of the file. This is
     often referred to as the MIME type of the file. An example is "text/html" to
     describe an html file. If a content-type value is not provided, then
-    AllegroServe checks the pathname-type in the **`*mime-types*`** hash table to
+    AllegroServe checks the pathname-type in the [**`*mime-types*`**](aserve.md#v-mime-types) hash table to
     see if there is a content-type associated with this pathname-type. If it
     fails to find a content-type then it uses the type
     "application/octet-stream".
@@ -417,7 +417,7 @@ arguments are optional. The arguments have these meanings:
     there will be no time limit on the transfer. If I/O timeouts are not
     supported then the default value of this argument is **`nil`** meaning ignore
     this value and use the timeout value held in the server object and retrieved
-    with **`wserver-response-timeout`**.
+    with [**`wserver-response-timeout`**](aserve.md#f-wserver-response-timeout).
   - **`plist`** - initial property list for this entity.
   - **`hook`** - a function of three arguments: **`req`**, **`ent`** and **`extra`**. See
     [entity hook function](#entity-hook-function).
@@ -447,8 +447,8 @@ AllegroServe supplies many subclasses of entity which automatically generate a
 responses to requests. There are times when user code needs to run during the
 generation of a response by one of the built-in entity classes. For example you
 may wish to add or modify the headers that will be sent back with the
-**`publish-file`**'s response. The entity hook function is called just before the
-**`with-http-body`** in the response function. At this point all the response
+[**`publish-file`**](aserve.md#f-publish-file)'s response. The entity hook function is called just before the
+[**`with-http-body`**](aserve.md#f-with-http-body) in the response function. At this point all the response
 headers have been specified but the hook function is free to change them or add
 new headers.
 
@@ -475,26 +475,26 @@ being called in a special context:
                         hook headers compress hidden-index-redirect)
 ```
 
-**`publish-directory`** is used to publish a complete directory tree of files. This
+[**`publish-directory`**](aserve.md#f-publish-directory) is used to publish a complete directory tree of files. This
 is similar to how web servers such as Apache publish files. AllegroServe
 publishes the files in the directory tree in a *lazy* manner. As files in the
 tree are referenced by client requests entities are created and published.
 
-**`publish-directory`** creates a mapping from all urls whose name begins with
+[**`publish-directory`**](aserve.md#f-publish-directory) creates a mapping from all urls whose name begins with
 **`prefix`** to files stored in the directories specified by the
 **`destination`**. **`destination`** may either be a single directory or a list of
 directories to search. The **`host`**, **`port`**, **`remove`**, **`authorizer`**, **`plist`**,
 **`hook`**, **`headers`** and **`server`** arguments are as described above for
-**`publish-file`**. The **`timeout`** argument defaults as described in
-**`publish-file`**. The **`hook`** argument specifies what hook function should be put
-in the entities that **`publish-directory`** creates. The **`access-file`** argument
+[**`publish-file`**](aserve.md#f-publish-file). The **`timeout`** argument defaults as described in
+[**`publish-file`**](aserve.md#f-publish-file). The **`hook`** argument specifies what hook function should be put
+in the entities that [**`publish-directory`**](aserve.md#f-publish-directory) creates. The **`access-file`** argument
 names the [access file](#directory-access-files) name which will be used in this
 directory tree. When a request comes in for which there isn't an entity that
 matches it exactly, AllegroServe checks to see if a prefix of the request has
 been registered. If so, and if the resulting entity is a **`directory-entity`** as
 created by this function, then it strips the prefix off the given request and
 appends the remaining part of the request to the destination string. It then
-publishes that (normally using **`publish-file`** and computing the content-type
+publishes that (normally using [**`publish-file`**](aserve.md#f-publish-file) and computing the content-type
 from the file type). Next that **`file-entity`** is made to handle the request in
 the normal manner.
 
@@ -533,7 +533,7 @@ to the client.
 
 The **`publisher`** argument can be used to specify exactly what happens when a
 request comes that's handled by the **`directory-entity`** and a file is located
-on the disk that matches the incoming **`url`**. Nomally a **`publish-file`** is
+on the disk that matches the incoming **`url`**. Nomally a [**`publish-file`**](aserve.md#f-publish-file) is
 done to add that file. You may want to publish some other kind of entity to
 represent that file. The **`publisher`** argument, if non-nil, must be a function
 of four arguments: **`req ent filename`** **`info`**. The filename is a string
@@ -542,7 +542,7 @@ naming the file that's been matched with the request. **`info`** is the list of
 function must return an entity to be processed to send back a response. The
 **`publisher`** function may wish to publish that entity but it need not do so.
 
-> *Note*: **`publish-directory`** is a more general function than its name
+> *Note*: [**`publish-directory`**](aserve.md#f-publish-directory) is a more general function than its name
 > implies. It looks at each url path for a match for **`prefix`** and if such a
 > match is found the **`prefix`** is removed and replaced with **`destination`**. Thus
 > if prefix is `"/foo"` and destination is `"/bar"` then a url path of
@@ -554,8 +554,8 @@ function must return an entity to be processed to send back a response. The
 > prefix of `"/foo/"` would have a destination of `"/bar/"`.
 
 The **`compress`** argument specifies the value to pass for the **`:compress`** argument
-to **`publish-file`** when an entity is located i the directories and a
-**`publish-file`** is done automatically.
+to [**`publish-file`**](aserve.md#f-publish-file) when an entity is located i the directories and a
+[**`publish-file`**](aserve.md#f-publish-file) is done automatically.
 
 ### <span id="directory-access-files"></span>Directory Access Files
 
@@ -571,12 +571,12 @@ publishing with `.htaccess` files (except that in AllegroServe once a file is
 published the access files have no effect on it).
 
 The name of an access file in AllegroServe is controlled by the **`:access-file`**
-argument to **`publish-directory`**. We'll assume the name chosen is **`access.cl`** in
-this document. If no **`:access-file`** argument is given to **`publish-directory`**
+argument to [**`publish-directory`**](aserve.md#f-publish-directory). We'll assume the name chosen is **`access.cl`** in
+this document. If no **`:access-file`** argument is given to [**`publish-directory`**](aserve.md#f-publish-directory)
 then no access file checking is done. When a file is about to be published all
 access files from the **`destination`** directory all the way down to the directory
 containing the file to be published are read and used. For example if the
-**`destination`** in a **`publish-directory`** was given as `"/home/joe/html/"` and an
+**`destination`** in a [**`publish-directory`**](aserve.md#f-publish-directory) was given as `"/home/joe/html/"` and an
 http request comes in which references the file
 `"/home/joe/html/pics/archive/foo.jpg"` then AllegroServe will check for access
 files at *all* of these locations and in this order:
@@ -627,7 +627,7 @@ levels.
 
 | Name            | Arguments                                        | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 |-----------------|--------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **`:ip`**       | **`:patterns`**<br>**`:inherit`**                | specifies a [`location-authorizer`](#c-location-authorizer) restriction on which machines can see published files. The value of the **`:patterns`** argument has the same form as the **`:patterns`** slot of a **`location-authorizer`**.                                                                                                                                                                                                |
+| **`:ip`**       | **`:patterns`**<br>**`:inherit`**                | specifies a [`location-authorizer`](#c-location-authorizer) restriction on which machines can see published files. The value of the **`:patterns`** argument has the same form as the **`:patterns`** slot of a [**`location-authorizer`**](aserve.md#c-location-authorizer).                                                                                                                                                                                                |
 | **`:password`** | **`:realm`**<br>**`:allowed`**<br>**`:inherit`** | specifies a [`password-authorizer`](#c-password-authorizer) restriction on access to published files. See the password-authorizer documentation for a description of the **`:realm`** and **`:allowed`** arguments.                                                                                                                                                                                                                       |
 | **`:files`**    | **`:allow`**<br>**`:deny`**<br>**`:inherit`**    | specifies which files are visible to be published. To be visible a file must be allowed and not denied. What is tested is the filename only (that is the part after the last directory separator in the files's complete name). See below for the rules on how allow and denied is used.                                                                                                                                                  |
 | **`:mime`**     | **`:types`**<br>**`:inherit`**                   | specifies which mime types are to be associated with which file types. This list takes precedence over the built-in list inside AllegroServe. **`:types`** is a list of mime specifiers. A mime specifier is a list beginning with a string giving the mime type followed by the files types that should map to that mime type. A file type in a list (e.g. **`("ReadMe")`**) refers to the whole file name rather than the type component. |
@@ -639,7 +639,7 @@ The **`:files`** and **`:subdirectories`** information are used to determine if 
 or subdirectory of a given name is accessible. AllegroServe will collect all the
 access file information for the directory containing the file or subdirectory
 and for all directories above it up to the directory given as the **`destination`**
-argument to **`publish-directory`**. Information from superdirectories will only be
+argument to [**`publish-directory`**](aserve.md#f-publish-directory). Information from superdirectories will only be
 used if **`:inherit t`** is given for that information.
 
 The rule is it that a given name is accessible if it is allowed and not denied.
@@ -721,7 +721,7 @@ the request wasn't found.
                      server authorizer timeout plist hook headers)
 ```
 
-This is like **`publish`** except that it declares **`function`** to be the handler for
+This is like [**`publish`**](aserve.md#f-publish) except that it declares **`function`** to be the handler for
 all urls that begin with the string **`prefix`**. Note however that prefix handlers
 have lower priority than exact handlers. Thus if you declare a prefix handler
 for `"/foo"` and also a specific handler for `"/foo/bar.html"` then the specific
@@ -729,7 +729,7 @@ handler will be chosen if `"/foo/bar.html"` is found in an http request.
 Typically a prefix handler is used to make available a whole directory of files
 since their complete names begin with a common prefix (namely the directory in
 which the files are located). If you want to publish a whole directory then you
-probably want to use **`publish-directory`** since it has a number of features to
+probably want to use [**`publish-directory`**](aserve.md#f-publish-directory) since it has a number of features to
 support file publishing. The value of the **`hook`** argument is stored in the
 entity created however the hook function will only be run if the **`function`**
 supplied makes use of it.
@@ -745,13 +745,13 @@ supplied makes use of it.
 ```
 
 Some web pages are created from information from various sources.
-**`publish-multi`** allows you to specify a sequence of places that supply data for
-the combined web page. The data for each page is cached by **`publish-multi`** so
+[**`publish-multi`**](aserve.md#f-publish-multi) allows you to specify a sequence of places that supply data for
+the combined web page. The data for each page is cached by [**`publish-multi`**](aserve.md#f-publish-multi) so
 that minimal computation is required each time the page is requested.
 
 The **`host`**, **`port`**, **`content-type`**, **`class`**, **`remove`**, **`server`**, **`authorizer`**,
 **`hook`**, **`headers`** and **`timeout`** arguments are the same as those of the other
-publish functions. The **`items`** argument is unique to **`publish-multi`** and is a
+publish functions. The **`items`** argument is unique to [**`publish-multi`**](aserve.md#f-publish-multi) and is a
 list of zero or more of the following objects:
 
   - **`string`** or **`pathname`** - this is a reference to a file on the server. This
@@ -817,8 +817,8 @@ This example works regardless of whether the request comes in from an old
 HTTP/0.9 browser or a modern HTTP/1.1 browser. It may or may not send the
 response back with chunked transfer encoding and it may or may not keep the
 connection alive after sending back the response. The user code doesn't have to
-deal with those possibilities, it just uses **`with-http-response`** and
-**`with-http-body`** and the rest is automatic. The **`html`** macro is part of the
+deal with those possibilities, it just uses [**`with-http-response`**](aserve.md#f-with-http-response) and
+[**`with-http-body`**](aserve.md#f-with-http-body) and the rest is automatic. The [**`html`**](htmlgen.md#f-html) macro is part of the
 htmlgen package that accompanies AllegroServe. In the case above we are being
 lazy and not putting out the html directives that should be found on every page
 of html since most browsers are accommodating. Here's the function that
@@ -855,7 +855,7 @@ function designated to compute the response for the request. **`timeout`** sets 
 time limit for the computation of the response. If **`timeout`** is nil then the
 entity **`ent`** is checked for a timeout value. If that value is also nil then the
 timeout value is retrieved from the current **`wserver`** object using
-**`wserver-response-timeout`**. If **`check-modified`** is true (the default) then the
+[**`wserver-response-timeout`**](aserve.md#f-wserver-response-timeout). If **`check-modified`** is true (the default) then the
 **`last-modified`** time stored in the entity object will be compared against the
 **`if-modified-since`** time of the request and if that indicates that the client
 already has the latest copy of this entity then a **`not-modified`** response will
@@ -865,7 +865,7 @@ response we wish to return. The default value is the value of **``*response-ok*`
 (which has a code of **`200`** and a string descriptor `"OK"`). **`content-type`** is a
 string describing the MIME type of the body (if any) sent after the headers. It
 has a form like `"text/html"`. If **`content-type`** isn't given here then the
-content-type value in the entity (which is set in the call to **`publish`**) will be
+content-type value in the entity (which is set in the call to [**`publish`**](aserve.md#f-publish)) will be
 used.
 
 The **`format`** argument specifies whether the code that writes the body of the
@@ -873,15 +873,15 @@ response will want to write **`:text`** (e.g. **`write-char`**) or **`:binary`**
 (e.g. **`write-byte`**) when it writes the data of the body of the response. Based
 on the value of the **`format`** argument, AllegroServe will create the correct kind
 of response stream. If **`format`** is not specified here it will default to the
-value specified when **`publish`** was called to create the entity. If not **`:format`**
-argument was passed to **`publish`** then **`:binary`** format is assumed. If **`:binary`**
+value specified when [**`publish`**](aserve.md#f-publish) was called to create the entity. If not **`:format`**
+argument was passed to [**`publish`**](aserve.md#f-publish) then **`:binary`** format is assumed. If **`:binary`**
 is specified then you can write both text and binary to the stream since
 Allegro's binary streams also support text calls as well. If you specify **`:text`**
 then you may end up with a stream that supports only text operations.
 
 The **`trailers`** specifies which header lines will be found in the trailer
 instead. It also allows one to specify a value for the trailer (which may be
-changed using the **`set-trailers`** function). All trailers you intend to send must
+changed using the [**`set-trailers`**](aserve.md#f-set-trailers) function). All trailers you intend to send must
 be declared here. **`trailers`** is list of strings, symbols or a cons of a string
 or symbol and a string. For example: **`(:foo "bar" (:baz . "123123") ("bof"
 . "456"))`**. Trailers, like headers, are denoted by keyword symbols, with names
@@ -891,12 +891,12 @@ symbol is done by AllegroServe in the appropriate manner
 
 An http response consists of a line describing the response code, followed by
 headers (unless it's the HTTP/0.9 protocol in which case there are no headers),
-and then followed by the body (if any) of the response. **`with-http-response`**
+and then followed by the body (if any) of the response. [**`with-http-response`**](aserve.md#f-with-http-response)
 doesn't normally send anything to the client. It only does so when it determines
 that the **`if-modified-since`** predicate doesn't hold and that it must send back a
-**`not-modified`** response. Thus is not enough to just call **`with-http-response`** in
-your response function. You must always call **`with-http-body`** inside the call to
-**`with-http-response`**.
+**`not-modified`** response. Thus is not enough to just call [**`with-http-response`**](aserve.md#f-with-http-response) in
+your response function. You must always call [**`with-http-body`**](aserve.md#f-with-http-body) inside the call to
+[**`with-http-response`**](aserve.md#f-with-http-response).
 
 -----
 
@@ -912,13 +912,13 @@ This macro causes the whole http response to be sent out. The macro itself will
 send out everything except the body of the response. That is the responsibility
 of the code supplied as the **`body`** form of the macro. In cases where there is
 no body to the response being sent it is still necessary to call
-**`with-http-body`** so that the other parts of the response are sent out, e.g. at
+[**`with-http-body`**](aserve.md#f-with-http-body) so that the other parts of the response are sent out, e.g. at
 a minimum you should put **`(with-http-body (req ent))`** in the body of a
 with-http-response.
 
 *The **`body`** forms may not be executed!* If the request is an http **`head`**
 request then the browser wants only the headers returned. The
-**`with-http-body`** macro will not evaulate the **`body`** forms. You must be
+[**`with-http-body`**](aserve.md#f-with-http-body) macro will not evaulate the **`body`** forms. You must be
 aware of this and should never put code in the **`body`** form that absolutely
 must be executed when a request is given.
 
@@ -930,13 +930,13 @@ Within the **`body`** forms the code calls **`(request-reply-stream req)`** to o
 stream to which it can write to supply the body of the response. The
 external-format of this stream is set to the value of the **`external-format`**
 argument (which defaults to the value of
-**`*default-aserve-external-format*`**). The variable **`*html-stream*`** is bound to
+[**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format)). The variable **`*html-stream*`** is bound to
 the value of **`(request-reply-stream req)`** before the **`body`** is evaluated. This
-makes it easy to use the **`html`** macro to generate html as part of the response.
+makes it easy to use the [**`html`**](htmlgen.md#f-html) macro to generate html as part of the response.
 
-*Note: there used to be a **`:format`** argument to **`with-http-body`**. That
-argument was never used by **`with-http-body`**. The **`:format`** argument has been
-moved to **`with-http-response`** so that it can now have an effect on the stream
+*Note: there used to be a **`:format`** argument to [**`with-http-body`**](aserve.md#f-with-http-body). That
+argument was never used by [**`with-http-body`**](aserve.md#f-with-http-body). The **`:format`** argument has been
+moved to [**`with-http-response`**](aserve.md#f-with-http-response) so that it can now have an effect on the stream
 created.*
 
 -----
@@ -981,7 +981,7 @@ The caller can pass in a simple-array of **`(unsigned-byte 8)`** as the value of
 **`:buffer`** argument. If no buffer is supplied by the caller one will be
 allocated by the function.
 
-This function or **`get-request-body`** can be called but not both.
+This function or [**`get-request-body`**](aserve.md#f-get-request-body) can be called but not both.
 
 This function treats the body of the request as a sequence of bytes. If you wish
 to convert it to a string you'll need to collect the whole body and call
@@ -998,7 +998,7 @@ to convert it to a string you'll need to collect the whole body and call
 
 Return the value given in the request for the given header-name (a keyword
 symbol). If the header wasn't present in this request then nil will be
-returned. **`header-slot-value`** is a macro that will expand into a fast
+returned. [**`header-slot-value`**](aserve.md#f-header-slot-value) is a macro that will expand into a fast
 accessor if the **`header-name`** is a constant naming a known header slot. In
 older versions of aserve the **`header-name`** was a string.
 
@@ -1034,7 +1034,7 @@ The query string is in one or both of two places:
     of the uri or a sharp sign (**`\#`**), whichever comes first.
   - it is in the body of a POST request from a web client.
 
-**`request-query`** will by default look in both locations for the query string and
+[**`request-query`**](aserve.md#f-request-query) will by default look in both locations for the query string and
 concatenate the results of decoding both query strings. If you would like it to
 not check one or both of the locations you can use the **`:uri`** and **`:post`**
 keyword arguments. If **`uri`** is true (and true is the default value) then the
@@ -1043,7 +1043,7 @@ value) and if the request is a POST then the body of the post form will be
 decoded for query values.
 
 The **`external-format`** is used in the conversion of bytes in the form to
-characters. It defaults to the value of **`*default-aserve-external-format*`**.
+characters. It defaults to the value of [**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format).
 
 A query is normally a set of names and values. `http://foo.com/bar?a=3\&b=4`
 yields a query alist **`(("a" . "3") ("b" . "4"))`**. If a name doesn't have an
@@ -1060,7 +1060,7 @@ associated value then the value in the alist is the empty string.
 (request-query-value key request &key uri post external-format test)
 ```
 
-This combines a call to **`request-query`** to retrieve the alist of query keys and
+This combines a call to [**`request-query`**](aserve.md#f-request-query) to retrieve the alist of query keys and
 values, with a call to **`assoc`** to search for the specific key, and finally with
 a call to **`cdr`** to return just the value from the assoc list entry. The **`test`**
 argument is the function to be used to test the given key against the keys in
@@ -1090,8 +1090,8 @@ can only specify values for trailers that you've already declared with the
 trailers argument to with-http-response. Trailers can only be sent if the
 response uses chunked transfer encoding but that is the standard encoding for
 HTTP/1.1 so this is rarely going to be an issue. You can use the
-**`can-set-trailers-p`** function to check if it's possible to set the trailers for
-this request. If **`set-trailers`** cannot set the trailers it does nothing.
+[**`can-set-trailers-p`**](aserve.md#f-can-set-trailers-p) function to check if it's possible to set the trailers for
+this request. If [**`set-trailers`**](aserve.md#f-set-trailers) cannot set the trailers it does nothing.
 
 -----
 
@@ -1102,7 +1102,7 @@ this request. If **`set-trailers`** cannot set the trailers it does nothing.
 (can-set-trailers-p req-or-stream)
 ```
 
-Return true if the **`set-trailers`** function can be used to set the trailers for
+Return true if the [**`set-trailers`**](aserve.md#f-set-trailers) function can be used to set the trailers for
 this response. Trailers can only be set for chunking streams, or gzip streams
 which send their data to chunking streams. It's very likely that trailers can be
 set. This function allows you to test be sure.
@@ -1172,7 +1172,7 @@ reader - a string holding the exact request made by the client.
 <span id="f-request-reply-code"></span> **`(request-reply-code request)`** -
 accessor - the value describes the response code and string we will return for
 this request. See the value of the argument **`response`** in
-**`with-http-response`** for more information.
+[**`with-http-response`**](aserve.md#f-with-http-response) for more information.
 
 <span id="f-request-reply-date"></span> **`(request-reply-date request)`** -
 accessor - the date the response will be made (in Lisp's universal time
@@ -1183,8 +1183,8 @@ accessor - an alist of some of the headers to send out with the reply (other
 headers values are stored in specific slots of the request object). Each entry
 in the alist is a cons where the **`car`** is a keyword symbol holding the header
 name and the **`cdr`** is the value (it is printed using the `~a` format
-directive). Typically **`request-reply-headers`** isn't used, instead the headers
-to be sent are passed as the **`:header`** argument to **`with-http-body`**, or **`(setf
+directive). Typically [**`request-reply-headers`**](aserve.md#f-request-reply-headers) isn't used, instead the headers
+to be sent are passed as the **`:header`** argument to [**`with-http-body`**](aserve.md#f-with-http-body), or **`(setf
 reply-header-slot-value)`** is called.
 
 <span id="f-request-reply-content-length"></span> **`(request-reply-content-length
@@ -1204,7 +1204,7 @@ given about the possible strategies at a future time.
 <span id="f-request-reply-stream"></span> **`(request-reply-stream request)`** -
 accessor - This is the stream to be used in user code to send back the body of
 the response. This stream must be used instead of the value of
-**`request-socket`**.
+[**`request-socket`**](aserve.md#f-request-socket).
 
 -----
 
@@ -1220,7 +1220,7 @@ sent to standard input of the program.
 CGI is a clumsy and slow protocol for extending the behavior of a web server and
 is falling out of favor. However there are legacy CGI applications you may need
 to call from AllegroServe. You invoke an external program using the CGI
-protocol with the **`run-cgi-program`** function.
+protocol with the [**`run-cgi-program`**](aserve.md#f-run-cgi-program) function.
 
 -----
 
@@ -1330,7 +1330,7 @@ form
     not be desirable.
   - `<form method="post">` - The data is sent in the body of the request. The
     AllegroServe url handler should call **`(request-query req)`** to retrieve and
-    decode the data posted. In this case **`request-query`** calls
+    decode the data posted. In this case [**`request-query`**](aserve.md#f-request-query) calls
     **`(get-request-body req)`** to retrieve the body from the web browser and then
     **`(form-urlencoded-to-query body)`** to turn it into an alist that associates
     form field names with values.
@@ -1352,14 +1352,14 @@ in the form:
 
   1. Call **`(get-multipart-header req)`** to return the MIME headers of the next
      field. If this returns nil then there are no more fields to
-     retrieve. You'll likely want to call **`parse-multipart-header`** on the result
-     of **`get-multipart-header`** in order to extract the important information
+     retrieve. You'll likely want to call [**`parse-multipart-header`**](aserve.md#f-parse-multipart-header) on the result
+     of [**`get-multipart-header`**](aserve.md#f-get-multipart-header) in order to extract the important information
      from the header.
   2. Create a buffer and call **`(get-multipart-sequence req buffer)`** repeatedly
      to return the next chunk of data. When there is no more data to read for
-     this field, **`get-multipart-sequence`** will return nil. If you're willing to
+     this field, [**`get-multipart-sequence`**](aserve.md#f-get-multipart-sequence) will return nil. If you're willing to
      store the whole multipart data item in a lisp object in memory you can call
-     **`get-all-multipart-data`** instead to return the entire item in one Lisp
+     [**`get-all-multipart-data`**](aserve.md#f-get-all-multipart-data) instead to return the entire item in one Lisp
      object.
   3. Go back to step 1.
 
@@ -1380,18 +1380,18 @@ Details on the functions are given next.
 ```
 
 This returns nil or the MIME headers for the next form field in alist form. If
-nil is returned then there is no more form data. See **`parse-multipart-header`**
+nil is returned then there is no more form data. See [**`parse-multipart-header`**](aserve.md#f-parse-multipart-header)
 for a simple way to extract information from the header.
 
 For an input field such as `<input type="text" name="textthing">` the value
-returned by **`get-multipart-header`** would be
+returned by [**`get-multipart-header`**](aserve.md#f-get-multipart-header) would be
 
 ```lisp
 ((:content-disposition (:param "form-data" ("name" . "textthing"))))
 ```
 
 For an input field such as `<input type="file" name="thefile">` the value
-returned by **`get-multipart-header`** would be something like
+returned by [**`get-multipart-header`**](aserve.md#f-get-multipart-header) would be something like
 
 ```lisp
 ((:content-disposition
@@ -1423,24 +1423,24 @@ The first value returned is
       value is returned when the value of **`header`** is **`nil`**.
   - **`:data`** - the next multipart item is a simple form value. The second value
     returned is a string naming the value. You can retrieve the value itself
-    using repeated calls to **`get-multipart-sequence`** or one call to
-    **`get-all-multipart-data`**.
+    using repeated calls to [**`get-multipart-sequence`**](aserve.md#f-get-multipart-sequence) or one call to
+    [**`get-all-multipart-data`**](aserve.md#f-get-all-multipart-data).
   - **`:file`** - the next multipart item is a file the user is uploading to the
     server. The second value returned in the name of the form item for which
     this file was given. The third value is the name of the file as specified by
     the user to his browser. The fourth value returned is the MIME Content-Type
     that the browser is guessing applies to this contents of the file. The
     contents of the file can be retrieved using repeated calls to
-    **`get-multipart-sequence`** or one call to **`get-all-multipart-data`**.
+    [**`get-multipart-sequence`**](aserve.md#f-get-multipart-sequence) or one call to [**`get-all-multipart-data`**](aserve.md#f-get-all-multipart-data).
   - **`:nofile`** - If a form contains a place for a filename but no filename was
     entered before the form was submitted then this type of header is sent. The
     values returned are the same as those for **`:file`** except that the third
     value (the filename) will always be the empty string. Just like in the
-    **`:file`** case you retrived the contents with **`get-multipart-sequence`** or
+    **`:file`** case you retrived the contents with [**`get-multipart-sequence`**](aserve.md#f-get-multipart-sequence) or
     **`get-multipart-data`**.
-  - **`nil`** - This header has a form not recognized by **`parse-multipart-header`**.
+  - **`nil`** - This header has a form not recognized by [**`parse-multipart-header`**](aserve.md#f-parse-multipart-header).
     If you encounter this please let us know about it since we would like to
-    enhance **`parse-multipart-header`** to understand this type of header. If you
+    enhance [**`parse-multipart-header`**](aserve.md#f-parse-multipart-header) to understand this type of header. If you
     encounter this type of header you still have to read the contents of the
     data item that follows the header in order to read the next header. A call
     to **`(get-all-multipart-data req :limit 1000)`** will read and throw away the
@@ -1456,7 +1456,7 @@ The first value returned is
 ```
 
 This retrieves the next chunk of data for the current form field and stores it
-in **`buffer`**. If **`start`** is given then it specifies the index in the buffer at
+in **`buffer`**. If [**`start`**](aserve.md#f-start) is given then it specifies the index in the buffer at
 which to begin storing the data. If **`end`** is given then it specifies the index
 just after the last index in which to store data.
 
@@ -1470,11 +1470,11 @@ the program should use a 4096 byte **`(unsigned-byte 8)`** array.
 If the buffer is a character array then the data is converted from
 get-multipart-sequence's **`(unsigned-byte 8)`** array to characters using the given
 **`external-format`** (which defaults to the value of
-**`*default-aserve-external-format*`**).
+[**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format)).
 
-**`get-multipart-sequence`** may return before filling up the whole
+[**`get-multipart-sequence`**](aserve.md#f-get-multipart-sequence) may return before filling up the whole
 buffer, so the program should be sure to make use of the index returned
-by **`get-multipart-sequence`**.
+by [**`get-multipart-sequence`**](aserve.md#f-get-multipart-sequence).
 
 -----
 
@@ -1494,18 +1494,18 @@ the data. You usually won't need to specify a value for this but but if you
 know the values retrieved are either very small or very large it may make the
 operation run faster to specify an appropriate **`size`**. **`external-format`** is
 used when **`type`** is **`:text`** to convert the octet stream into characters. It
-defaults to the value of **`*default-aserve-external-format*`**. **`limit`** can be
+defaults to the value of [**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format). **`limit`** can be
 given an integer value that specifies the maximum size of data you're willing to
 retrieve. By default there is no limit. This can be dangerous as a user may try
 to upload a huge data file which will take up so much Lisp heap space that it
 takes down the server. If a **`limit`** is given and that limit is reached,
-**`get-all-multipart-data`** will continue to read the data from the client until it
+[**`get-all-multipart-data`**](aserve.md#f-get-all-multipart-data) will continue to read the data from the client until it
 reaches the end of the data, however it will *not* save it and will return the
 symbol **`:limit`** to indicate that the data being sent to the sever exceeded the
 limit. It will return a second value which is the size of the data the client
 tried to upload to the server. If your application intends to handle very large
 amounts of data being uploaded to the server you would be better off using
-**`get-multipart-sequence`** since with that you can write the data buffer by buffer
+[**`get-multipart-sequence`**](aserve.md#f-get-multipart-sequence) since with that you can write the data buffer by buffer
 to the disk instead of storing it in the Lisp heap.
 
 ------
@@ -1528,7 +1528,7 @@ functions to convert between the encoding and the query list:
 ```
 
 Decodes the string and returns the query list. The default value for
-**`external-format`** is the value of **`*default-aserve-external-format*`**.
+**`external-format`** is the value of [**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format).
 
 -----
 
@@ -1540,7 +1540,7 @@ Decodes the string and returns the query list. The default value for
 ```
 
 Encodes the query and returns a string. The default value for **`external-format`**
-is the value of **`*default-aserve-external-format*`**.
+is the value of [**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format).
 
 
 
@@ -1591,7 +1591,7 @@ entity.
 ### Functions
 
 These two functions invoke and process the *Basic* Authorization Method defined
-by the http specification. The **`password-authorizer`** class described below make
+by the http specification. The [**`password-authorizer`**](aserve.md#c-password-authorizer) class described below make
 use of these functions.
 
 -----
@@ -1618,8 +1618,8 @@ is returned.
 ```
 
 This adds a header line that requests Basic authorization in the given realm (a
-string). This should be called between **`with-http-response`** and
-**`with-http-body`** and only for response of type 401
+string). This should be called between [**`with-http-response`**](aserve.md#f-with-http-response) and
+[**`with-http-body`**](aserve.md#f-with-http-body) and only for response of type 401
 (i.e. **`*response-unauthorized*`**). The realm is an identifier, unique on this
 site, for the set of pages for which access should be authorized by a certain
 name and password.
@@ -1660,10 +1660,10 @@ The protocol followed during authorization is this:
     entity's authorizer slot is retrieved from the entity object.
  2. If the list of pending authorizer objects is **`nil`** then it is considered
     authorized.
- 3. Otherwise the **`authorize`** generic function is called on the first
-    **`authorizer`** object, passing **`authorize`** the **`authorizer`** object, the
+ 3. Otherwise the [**`authorize`**](aserve.md#f-authorize) generic function is called on the first
+    **`authorizer`** object, passing [**`authorize`**](aserve.md#f-authorize) the **`authorizer`** object, the
     http-request object and the entity object
- 4. The return value from **`authorize`** can be
+ 4. The return value from [**`authorize`**](aserve.md#f-authorize) can be
     - **`t`** - meaning this request is authorized to access this entity. In this
       case the first authorizer object is popped from the list of pending
       authorizer objects and we go back to step 2. 
@@ -1675,7 +1675,7 @@ The protocol followed during authorization is this:
       the 401 return code so this will not cause a password box to be displayed
       by the browser. 
     - **`:done`** - the request is denied, and a response has already been sent to
-      the requestor by the **`authorize`** function so no further response should be
+      the requestor by the [**`authorize`**](aserve.md#f-authorize) function so no further response should be
       made.
 
 -----
@@ -1724,7 +1724,7 @@ patterns and for each pattern a command of **`:accept`** (permit the access) or
 request is accepted or denied. If the pattern list is empty or if no pattern
 matches, then the request is accepted.
 
-The single slot of an object of class **`location-authorizer`** is
+The single slot of an object of class [**`location-authorizer`**](aserve.md#c-location-authorizer) is
 
 | Slot Name      | initarg         | Description                                                                                |
 |----------------|-----------------|--------------------------------------------------------------------------------------------|
@@ -1752,7 +1752,7 @@ A pattern can be
     **`ipaddress`** is a host name and that host name cannot be translated to an IP
     address, then it is assumed to match, and thus the request will be denied.
 
-The example of using a **`location-authorizer`** only permits connections coming in
+The example of using a [**`location-authorizer`**](aserve.md#c-location-authorizer) only permits connections coming in
 via the loopback network (which occurs if you specify
 `http://localhost/whatever`) or if they come from one particular machine
 (tiger.franz.com). Note that we end the pattern list with **`:deny`** so that
@@ -1783,7 +1783,7 @@ anything not matching the preceding patterns will be denied.
 This authorizer contains a function provided by the user which is used to test
 if the request is authorized. The function take three arguments, the
 http-request object, the entity and the authorizer object. It must return one
-of the four values that the **`authorize`** function returns, namely **`t`**, **`nil`**,
+of the four values that the [**`authorize`**](aserve.md#f-authorize) function returns, namely **`t`**, **`nil`**,
 **`:deny`** or **`:done`**.
 
 A function-authorizer is created as follows
@@ -1829,7 +1829,7 @@ Each cookie has these components:
                                 encode-value external-format)
 ```
 
-This function must be called before **`with-http-body`**. It can be called more
+This function must be called before [**`with-http-body`**](aserve.md#f-with-http-body). It can be called more
 than once. Each call will cause one Set-Cookie directive to be sent to the web
 browser. The **`name`** and **`value`** arguments should be given (and they should be
 strings). They will be automatically encoded using the same encoding used in
@@ -1837,7 +1837,7 @@ urls (we call it *uriencoding*). The purpose of this encoding is to convert
 characters that are either unprintable or those that have a special meaning into
 a printable string. The web browser doesn't care about the **`name`** and **`value`**,
 it just stores them and sends them back to the web server. If you use the
-**`get-cookie-values`** function to retrieve the cookie **`name`** and **`value`** pairs,
+[**`get-cookie-values`**](aserve.md#f-get-cookie-values) function to retrieve the cookie **`name`** and **`value`** pairs,
 then it will automatically decode the uriencoding.
 
 You can disable the encoding of the value by specifying a **`nil`** value to
@@ -1857,7 +1857,7 @@ false. Any non-nil value is interpreted as true. The default value is false.
 **`http-only`** should be true or false. Any non-nil value is interpreted as
 true. The default value is false. The **`external-format`** is used to convert
 bytes to characters. It defaults to the value of
-**`*default-aserve-external-format*`**.
+[**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format).
 
 -----
 
@@ -1871,44 +1871,46 @@ bytes to characters. It defaults to the value of
 Return the cookie **`name`** and **`value`** pairs from the header of the request. Each
 **`name`** **`value`** pair will be in a cons whose **`car`** is the **`name`** and whose **`cdr`**
 is the **`value`**. The names and values will be decoded (in other words the
-decoding done by **`set-cookie-header`** will be undone). The **`external-format`** is
+decoding done by [**`set-cookie-header`**](aserve.md#f-set-cookie-header) will be undone). The **`external-format`** is
 used to convert bytes to characters. It defaults to the value of
-**`*default-aserve-external-format*`**.
+[**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format).
 
 -----
 
-## <span id="varaibles"></span>Variables
+## <span id="variables"></span>Variables
 
 These special variables contain information about AllegroServe or help control
 AllegroServe:
 
-<span id="v-aserve-version"></span> **`*aserve-version*`** - a list of three values:
-**`(major-version minor-version sub-minor-version)`** which is usually printed with
-periods separating the values (i.e. X.Y.Z).
+<span id="v-aserve-version"></span> **`net.aserve:*aserve-version*`** - a list
+of three values: **`(major-version minor-version sub-minor-version)`** which is
+usually printed with periods separating the values (i.e. X.Y.Z).
 
 <span id="v-default-aserve-external-format"></span>
-**`*default-aserve-external-format*`** - a symbol or external format object which is
-the default value for those AllegroServe functions that take an external-format
-argument. http requests are normally run in separate lisp threads and those
-threads bind **`*default-aserve-external-format*`** to the value of the
-external-format argument to the start function. Thus changing the value of
-**`*default-aserve-external-format*`** in one thread will not affect its value in
-other threads. You should decide the default external format before you start
-AllegroServe running.
+**`net.aserve:*default-aserve-external-format*`** - a symbol or external format
+object which is the default value for those AllegroServe functions that take an
+external-format argument. http requests are normally run in separate lisp
+threads and those threads bind [**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format) to the
+value of the external-format argument to the start function. Thus changing the
+value of [**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format) in one thread will not affect
+its value in other threads. You should decide the default external format before
+you start AllegroServe running.
 
-<span id="v-http-response-timeout"></span> **`*http-response-timeout*`** - the
-default value for the timeout argument to with-http-response. \[in future
-versions of AllegroServe we'll treat this value like
-**`*default-aserve-external-format*`** and bind it in each worker thread\]
+<span id="v-http-response-timeout"></span>
+**`net.aserve:*http-response-timeout*`** - the default value for the timeout
+argument to with-http-response. \[in future versions of AllegroServe we'll treat
+this value like [**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format) and bind it in each
+worker thread\]
 
-<span id="v-http-free-worker-timeout"></span> **`*http-free-worker-timeout*`** -
-the number of seconds that AllegroServe will wait for a worker thread to become
-available (see [AllegroServe request processing protocol](#iseve-request-proc)
-for more details).
+<span id="v-http-free-worker-timeout"></span>
+**`net.aserve:*http-free-worker-timeout*`** - the number of seconds that
+AllegroServe will wait for a worker thread to become available (see
+[AllegroServe request processing protocol](#iseve-request-proc) for more
+details).
 
-<span id="v-mime-types"></span> **`*mime-types*`** - a hash table where the keys are
-the file types (e.g. `"jpg"`) and the values are the MIME types
-(e.g. `"image/jpeg"`).
+<span id="v-mime-types"></span>
+**`net.aserve:*mime-types*`** - a hash table where the keys are the file types
+(e.g. `"jpg"`) and the values are the MIME types (e.g. `"image/jpeg"`).
 
 -----
 
@@ -1927,7 +1929,7 @@ AllegroServe passes that connected socket to a free worker thread which then
 wakes up and calls the internal function **`net.aserve::process-connection`**. If
 there are no free worker threads then AllegroServe waits for one to be
 available. The wait time can be configured either globally
-via the **`*http-free-worker-timeout*`** variable which defaults to 3
+via the [**`*http-free-worker-timeout*`**](aserve.md#v-http-free-worker-timeout) variable which defaults to 3
 seconds, or on a per-server basis via the setting
 
 <span id="f-wserver-free-worker-timeout"></span>
@@ -1935,7 +1937,7 @@ seconds, or on a per-server basis via the setting
 
 which is an accessor to the **`wserver`** slot that can be set with
 **`:free-worker-timeout`** initialization argument and is by default initialized
-with the value of **`*http-free-worker-timeout*`**.
+with the value of [**`*http-free-worker-timeout*`**](aserve.md#v-http-free-worker-timeout).
 
 In each worker thread the variable **`*wserver*`** is bound to the **`wserver`** object
 that holds all the information about the webserver on which the connection was
@@ -1944,7 +1946,7 @@ webserver). **`process-connection`** reads the request from the socket (but does
 read past the header lines). If the request can't be read within
 **`*read-request-timeout*`** seconds (currently 20) then the request is rejected.
 The request is stored in an object of class **`http-request`**. Next
-**`process-connection`** calls **`handle-request`** to do all the work of the request
+**`process-connection`** calls [**`handle-request`**](aserve.md#f-handle-request) to do all the work of the request
 and then **`log-request`** to log the action of the request. Finally if the
 response to the request indicated that the connection was to be kept open rather
 than being closed after the response, then **`process-connection`** loops back to
@@ -1955,18 +1957,18 @@ the top to read the next request.
 
 This generic function must locate the entity to handle this request and then
 cause it to respond to the request. If there is no matching entity then
-**`handle-request`** must send a response back to the client
-itself. **`handle-request`** uses locators to find the entity (more on this below),
+[**`handle-request`**](aserve.md#f-handle-request) must send a response back to the client
+itself. [**`handle-request`**](aserve.md#f-handle-request) uses locators to find the entity (more on this below),
 and then if an entity is found and that entity has an authorizer, it calls
-**`authorize`** to see if this request is allowed to access the selected entity. If
-the entity passes the authorization then **`process-entity`** is called to cause the
-entity to respond to the request. **`process-entity`** returns true if it processed
+[**`authorize`**](aserve.md#f-authorize) to see if this request is allowed to access the selected entity. If
+the entity passes the authorization then [**`process-entity`**](aserve.md#f-process-entity) is called to cause the
+entity to respond to the request. [**`process-entity`**](aserve.md#f-process-entity) returns true if it processed
 the entity, and nil if did not in which case the search continues for an
-entity. If there is no entity to respond then **`failed-request`** is called to send
+entity. If there is no entity to respond then [**`failed-request`**](aserve.md#f-failed-request) is called to send
 back a failure message.
 
 A **`locator`** is an object used to map requests into entities. The value of
-**`(wserver-locators *wserver*)`** is a list of locator objects. **`handle-request`**
+**`(wserver-locators *wserver*)`** is a list of locator objects. [**`handle-request`**](aserve.md#f-handle-request)
 calls
 
 <span id="f-standard-locator"></span>
@@ -1974,11 +1976,11 @@ calls
 
 on each successive locator in that list until one returns an entity object.
 AllegroServe has two built-in locator classes, **`locator-exact`** and
-**`locator-prefix`**, that are subclasses of **`locator`**. When you call **`publish`** or
-**`publish-file`** you are adding the entity to locator of class **`locator-exact`**
-found in the **`wserver-locators`** list. When you call **`publish-directory`** you are
+**`locator-prefix`**, that are subclasses of **`locator`**. When you call [**`publish`**](aserve.md#f-publish) or
+[**`publish-file`**](aserve.md#f-publish-file) you are adding the entity to locator of class **`locator-exact`**
+found in the **`wserver-locators`** list. When you call [**`publish-directory`**](aserve.md#f-publish-directory) you are
 adding to the locator of class **`locator-prefix`**. Users are free to define new
-locator classes. Locators should define the **`standard-locator`** method as well
+locator classes. Locators should define the [**`standard-locator`**](aserve.md#f-standard-locator) method as well
 as
 
 <span id="f-unpublish-locator"></span>
@@ -1986,7 +1988,7 @@ as
 
 which if called should remove all published entities from the locator.
 
-Let's return to **`handle-request`**. It has called **`standard-locator`** and found an
+Let's return to [**`handle-request`**](aserve.md#f-handle-request). It has called [**`standard-locator`**](aserve.md#f-standard-locator) and found an
 entity. Next it checks to see if the entity has an authorizer value and if so
 calls
 
@@ -1995,17 +1997,17 @@ calls
 
 whose return value will be one of
 
-  - **`t`** - The request is authorized, call **`process-entity`** to make the entity
+  - **`t`** - The request is authorized, call [**`process-entity`**](aserve.md#f-process-entity) to make the entity
     respond.
-  - **`nil`** - The request is not authorized, call **`failed-request`** to send back a
+  - **`nil`** - The request is not authorized, call [**`failed-request`**](aserve.md#f-failed-request) to send back a
     response.
   - **`:deny`** - The request is denied and we want the user to know that it was
-    denied rather than sending a generic failed message, call **`denied-request`**
+    denied rather than sending a generic failed message, call [**`denied-request`**](aserve.md#f-denied-request)
     to send back a response.
-  - **`:done`** - The **`authorize`** function has sent back a response, there is
-    nothing more for **`handle-request`** to do for this request.
+  - **`:done`** - The [**`authorize`**](aserve.md#f-authorize) function has sent back a response, there is
+    nothing more for [**`handle-request`**](aserve.md#f-handle-request) to do for this request.
 
-If there is no authorizer for this entity then we just call **`process-entity`**.
+If there is no authorizer for this entity then we just call [**`process-entity`**](aserve.md#f-process-entity).
 If there is no entity, then we call
 
 <span id="f-failed-request"></span>
@@ -2036,12 +2038,12 @@ AllegroServe.
 The client-side functions described in this section are exported from the
 **`net.aserve.client`** package.
 
-The function **`do-http-request`** sends a request and retrieves the whole response.
+The function [**`do-http-request`**](aserve.md#f-do-http-request) sends a request and retrieves the whole response.
 This is the most convenient function to use to retrieve a web page.
 
 If you need more control over the process you can use the functions:
-**`make-http-client-request`**, **`read-client-response-headers`** and
-**`client-request-read-sequence`**.
+[**`make-http-client-request`**](aserve.md#f-make-http-client-request), [**`read-client-response-headers`**](aserve.md#f-read-client-response) and
+[**`client-request-read-sequence`**](aserve.md#f-client-request-read-sequence).
 
 -----
 
@@ -2077,41 +2079,41 @@ Sends a request to **`uri`** and returns four values:
   5. If a true value for the **`:keep-alive`** argument was given then this will be
      socket connection to the server if the server chose to accept the
      keep-alive request. This socket can be used as the value of the
-     **`:connection`** argument in a subsequent call to **`do-http-request`** to the
+     **`:connection`** argument in a subsequent call to [**`do-http-request`**](aserve.md#f-do-http-request) to the
      same server.
 
 The **`uri`** can be a uri object or a string. The scheme of the **`uri`** must be **`nil`**
-or `"http"`. The keyword arguments to **`do-http-request`** are
+or `"http"`. The keyword arguments to [**`do-http-request`**](aserve.md#f-do-http-request) are
 
-| Name                                                                                                                       | Default                            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-|----------------------------------------------------------------------------------------------------------------------------|------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **`method`**                                                                                                               | **`:get`**                         | The type of request to make. Other possible values are **`:put`**, **`:post`** and **`:head`**. **`:head`** is useful if you just want to see if the link works without downloading the data.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| **`protocol`**                                                                                                             | **`:http/1.1`**                    | The other possible value is **`:http/1.0`**. Modern web servers will return the response body in chunks if told to use the **`:http/1.1`** protocol. Buggy web servers may do chunking incorrectly (even Apache has bugs in this regard but we've worked around them). If you have trouble talking to a web server you should try specifying the **`:http/1.0`** protocol to see if that works.                                                                                                                                                                                                                                                                                                                               |
-| **`accept`**                                                                                                               | `"*/*"`                            | A string listing of MIME types that are acceptable as a response to this request. The type listed can be simple such as `"text/html"` or more complex like `"text/html, audio/*"`.  The default is to accept anything which is expressed `"*/*"`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| **`content`**                                                                                                              | **`nil`**                          | If the method is **`:put`** or **`:post`** then the request should include something to be sent to the web server. The value of this argument is either a string, a vector of type **`(unsigned-byte 8)`**, a pathname, a stream or an instance of a subclass of **`computed-content`**.  It may also be a list containing strings, vectors, pathnames, streams or instances of a subclass of **`computed-content`**. See the **`query`** argument for a more convenient way to **`:post`** data to a form.                                                                                                                                                                                                                   |
-| **`content-type`**                                                                                                         | **`nil`**                          | A string which is to be the value of the Content-Type header field, describing the format of the value of the **`content`** argument.  This is only needed for **`:put`** and **`:post`** requests.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| **`query`**                                                                                                                | **`nil`**                          | This is a query alist of the form suitable for **`query-to-form-urlencoded`**. If the method is a **`:get`** then the value of  this argument is **`urlencoded`** and made the query string of the uri being accessed. If the method is **`:post`** then the query string is **`urlencoded`** and made the **`content`** of the request. Also the **`content-type`** is set to **`application/x-www-form-urlencoded.`**                                                                                                                                                                                                                                                                                                       |
-| **`format`**                                                                                                               | **`:text`**                        | The body of the response is returned as a string if the value is **`:text`** or as an array of type (unsigned-byte 8) if the value is **`:binary`**.  When the body is a string the external-format argument is important.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| **`cookies`**                                                                                                              | **`nil`**                          | If you wish the request to include applicable cookies and for returned cookies to be saved, then a **`cookie-jar`** object should be passed as the value of this argument.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| **`redirect`**                                                                                                             | **`5`**                            | If the response is a redirect (code 301, 302, 303), and the method is one given by the value of **`redirect-methods`** then if this argument is true (and, if an integer, positive), **`do-http-request`** will call itself to access the page to which the redirection is pointed. If **`redirect`** is an integer then in the recursive call the value passed for **`redirect`** will be one less than the current value. This prevents infinite recursion due to redirection loops.                                                                                                                                                                                                                                        |
-| **`redirect-methods`**                                                                                                     | **<code>(:get&nbsp;:head)</code>** | List of http methods which will be redirected if **`redirect`** is true.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| **`basic-authorization`**                                                                                                  | **`nil`**                          | If given, it is a cons whose **`car`** is the name and whose **`cdr`** is the password to be used to get authorization to access this page.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| **`digest-authorization`**                                                                                                 | **`nil`**                          | If given it is a **`digest-authorization`** object with values in the **`username`** and **`password`** slots. The digest-authorization object will be modified by do-http-request in order to store the information needed to send as authorization credentials.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| **`headers`**                                                                                                              | **`nil`**                          | An alist of conses **`(header-name . "header-value")`** for additional headers to send with the request. The header-name should be a keyword symbol naming the header, but it can be a string as well.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| **`proxy`**                                                                                                                | **`nil`**                          | The name and optionally the port number of a proxying web server through which this request should be made. The form is of the argument is `"www.machine.com"` or `"www.machine.com:8000"` if the web server is listening on port 8000 rather than 80. Proxying web servers are often used when clients are behind firewalls that prevent direct access to the internet. Another use is to centralize the page cache for a group of clients.                                                                                                                                                                                                                                                                                  |
-| **`no-proxy`**                                                                                                             | **`nil`**                          | A list of strings naming the host names that will be directly accessed rather than going through a proxy. An entry in this list of **`"foo.com"`** will match any host name with **`"foo.com"`** as a suffix, such as **`"www.foo.com"`**. If the value of no-proxy is a string then it is treated as if it were a list of that single string.                                                                                                                                                                                                                                                                                                                                                                                |
-| **<code>proxy&#8209;basic&#8209;authorization</code>**                                                                     | **`nil`**                          | A cons of **`("name" . "password")`** used to authenticate this request to the proxy being used.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| **`user-agent`**                                                                                                           | **`nil`**                          | If given it specifies the value of the User-Agent header to be sent with the request. Some sites respond differently based on the user-agent they believe has made the request. The lack of a User-Agent header may cause a server to ignore a request since it believes that it is being probed by a robot. The value of user-agent can be a string or one of the keywords **`:aserve`**, **`:netscape`** or **`:ie`** in which case an appropriate user agent string is sent.                                                                                                                                                                                                                                               |
-| **`external-format`**                                                                                                      | see description                    | This determines the socket stream's external format. Default is the value of **<code>\*default&#8209;aserve&#8209;external&#8209;format\*</code>**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| **`keep-alive`**                                                                                                           | **`nil`**                          | If true then the client will request that the server keep alive the connection. If the server agrees then that socket connection is returned as the fifth value.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| **`connection`**                                                                                                           | **`nil`**                          | If non nil then this is a socket connected to the server for which this request is made. If the socket is not valid (likely due to the server closing its end) then a new socket will be created. Thus it is not an error.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| **`ssl`**                                                                                                                  | **`nil`**                          | If true then the connection is made using the Secure Sockets Layer protocol. If the uri uses the **`https`** scheme then **`ssl`** is assumed to be true and the **`ssl`** argument need not be specified. NOTE: if the underlying Lisp implementation supports it, Service Name Indication (SNI) will automatically be be used. **`do-http-request`** will use the **`:server-name`** keyword to [**`acl-socket:make-ssl-client-stream`**]("https://franz.com/support/documentation/current/doc/operators/socket/make-ssl-client-stream.htm"), to indicate the hostname the client is attempting to connect to. This information is passed to the server to allow it to select the SSL certificate to present to the client. |
-| **`ssl-method`**                                                                                                           | **`nil`**                          | see [SSL/TLS](#ssltls) for the use of this argument.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| **`skip-body`**                                                                                                            | **`nil`**                          | If the value is a function (satisifies **`functionp`**) then the value is funcalled passing the **`client-request`** object as an argument. At this point the client-request object contains the information on the headers of the response. The function should return true if the body of the response should be skipped and **`nil`** returned as the first value from do-http-request. If skip-body is not a function and if its value is true then reading the body is skipped and **`nil`** returned in its place.                                                                                                                                                                                                      |
-| **`timeout`**                                                                                                              | **`nil`**                          | If given this is the number of seconds this function will block waiting to connect to the server and also to write or read to the socket connected to the web server. If an I/O request blocks for more than timeout seconds an error of class **`socket-error`** is signalled and the function **`stream-error-identifier`** on the error condition object will return **`:read-timeout`** or **`:write-timeout`**.                                                                                                                                                                                                                                                                                                          |
-| **`compress`**                                                                                                             | **`nil`**                          | If true then tell the server in the request that we are able to accept a compressed body. If the server decides to send a compressed body then the body will be uncompressed by do-http-request before being returned to the caller.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| **`certificate`**, **`key`**, **`certificate-password`**, **`ca-file`**, **`ca-directory`**, **`verify`**, **`max-depth`** | **`nil`**                          | These values are passed as the arguments to make-ssl-client-stream (documented in the ACL documentation). Specifying these values is optional but it does give you control of the client's SSL certificate management. These values are used in a fully patched ACL 8.0 (or newer). In older versions of ACL they are ignored.                                                                                                                                                                                                                                                                                                                                                                                                |
-| **`cache`**                                                                                                                | **`nil`**                          | A instance of class **`net.aserve.client:client-cache`** if you wish to consult and update this cache with this request. See the documentation on **`client-cache`** below.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Name                                                                                                                       | Default                            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+|----------------------------------------------------------------------------------------------------------------------------|------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **`method`**                                                                                                               | **`:get`**                         | The type of request to make. Other possible values are **`:put`**, **`:post`** and **`:head`**. **`:head`** is useful if you just want to see if the link works without downloading the data.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **`protocol`**                                                                                                             | **`:http/1.1`**                    | The other possible value is **`:http/1.0`**. Modern web servers will return the response body in chunks if told to use the **`:http/1.1`** protocol. Buggy web servers may do chunking incorrectly (even Apache has bugs in this regard but we've worked around them). If you have trouble talking to a web server you should try specifying the **`:http/1.0`** protocol to see if that works.                                                                                                                                                                                                                                                                                                                                                              |
+| **`accept`**                                                                                                               | `"*/*"`                            | A string listing of MIME types that are acceptable as a response to this request. The type listed can be simple such as `"text/html"` or more complex like `"text/html, audio/*"`.  The default is to accept anything which is expressed `"*/*"`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **`content`**                                                                                                              | **`nil`**                          | If the method is **`:put`** or **`:post`** then the request should include something to be sent to the web server. The value of this argument is either a string, a vector of type **`(unsigned-byte 8)`**, a pathname, a stream or an instance of a subclass of [**`computed-content`**](aserve.md#c-computed-content).  It may also be a list containing strings, vectors, pathnames, streams or instances of a subclass of [**`computed-content`**](aserve.md#c-computed-content). See the **`query`** argument for a more convenient way to **`:post`** data to a form.                                                                                                                                                                                                                                                  |
+| **`content-type`**                                                                                                         | **`nil`**                          | A string which is to be the value of the Content-Type header field, describing the format of the value of the **`content`** argument.  This is only needed for **`:put`** and **`:post`** requests.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **`query`**                                                                                                                | **`nil`**                          | This is a query alist of the form suitable for [**`query-to-form-urlencoded`**](aserve.md#f-query-to). If the method is a **`:get`** then the value of  this argument is **`urlencoded`** and made the query string of the uri being accessed. If the method is **`:post`** then the query string is **`urlencoded`** and made the **`content`** of the request. Also the **`content-type`** is set to **`application/x-www-form-urlencoded.`**                                                                                                                                                                                                                                                                                                              |
+| **`format`**                                                                                                               | **`:text`**                        | The body of the response is returned as a string if the value is **`:text`** or as an array of type (unsigned-byte 8) if the value is **`:binary`**.  When the body is a string the external-format argument is important.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **`cookies`**                                                                                                              | **`nil`**                          | If you wish the request to include applicable cookies and for returned cookies to be saved, then a [**`cookie-jar`**](aserve.md#c-cookie-jar) object should be passed as the value of this argument.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **`redirect`**                                                                                                             | **`5`**                            | If the response is a redirect (code 301, 302, 303), and the method is one given by the value of **`redirect-methods`** then if this argument is true (and, if an integer, positive), [**`do-http-request`**](aserve.md#f-do-http-request) will call itself to access the page to which the redirection is pointed. If **`redirect`** is an integer then in the recursive call the value passed for **`redirect`** will be one less than the current value. This prevents infinite recursion due to redirection loops.                                                                                                                                                                                                                                        |
+| **`redirect-methods`**                                                                                                     | **<code>(:get&nbsp;:head)</code>** | List of http methods which will be redirected if **`redirect`** is true.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| **`basic-authorization`**                                                                                                  | **`nil`**                          | If given, it is a cons whose **`car`** is the name and whose **`cdr`** is the password to be used to get authorization to access this page.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **`digest-authorization`**                                                                                                 | **`nil`**                          | If given it is a **`digest-authorization`** object with values in the **`username`** and **`password`** slots. The digest-authorization object will be modified by do-http-request in order to store the information needed to send as authorization credentials.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **`headers`**                                                                                                              | **`nil`**                          | An alist of conses **`(header-name . "header-value")`** for additional headers to send with the request. The header-name should be a keyword symbol naming the header, but it can be a string as well.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **`proxy`**                                                                                                                | **`nil`**                          | The name and optionally the port number of a proxying web server through which this request should be made. The form is of the argument is `"www.machine.com"` or `"www.machine.com:8000"` if the web server is listening on port 8000 rather than 80. Proxying web servers are often used when clients are behind firewalls that prevent direct access to the internet. Another use is to centralize the page cache for a group of clients.                                                                                                                                                                                                                                                                                                                 |
+| **`no-proxy`**                                                                                                             | **`nil`**                          | A list of strings naming the host names that will be directly accessed rather than going through a proxy. An entry in this list of **`"foo.com"`** will match any host name with **`"foo.com"`** as a suffix, such as **`"www.foo.com"`**. If the value of no-proxy is a string then it is treated as if it were a list of that single string.                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **<code>proxy&#8209;basic&#8209;authorization</code>**                                                                     | **`nil`**                          | A cons of **`("name" . "password")`** used to authenticate this request to the proxy being used.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **`user-agent`**                                                                                                           | **`nil`**                          | If given it specifies the value of the User-Agent header to be sent with the request. Some sites respond differently based on the user-agent they believe has made the request. The lack of a User-Agent header may cause a server to ignore a request since it believes that it is being probed by a robot. The value of user-agent can be a string or one of the keywords **`:aserve`**, **`:netscape`** or **`:ie`** in which case an appropriate user agent string is sent.                                                                                                                                                                                                                                                                              |
+| **`external-format`**                                                                                                      | see description                    | This determines the socket stream's external format. Default is the value of **<code>\*default&#8209;aserve&#8209;external&#8209;format\*</code>**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **`keep-alive`**                                                                                                           | **`nil`**                          | If true then the client will request that the server keep alive the connection. If the server agrees then that socket connection is returned as the fifth value.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **`connection`**                                                                                                           | **`nil`**                          | If non nil then this is a socket connected to the server for which this request is made. If the socket is not valid (likely due to the server closing its end) then a new socket will be created. Thus it is not an error.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **`ssl`**                                                                                                                  | **`nil`**                          | If true then the connection is made using the Secure Sockets Layer protocol. If the uri uses the **`https`** scheme then **`ssl`** is assumed to be true and the **`ssl`** argument need not be specified. NOTE: if the underlying Lisp implementation supports it, Service Name Indication (SNI) will automatically be be used. [**`do-http-request`**](aserve.md#f-do-http-request) will use the **`:server-name`** keyword to [**`acl-socket:make-ssl-client-stream`**]("https://franz.com/support/documentation/current/doc/operators/socket/make-ssl-client-stream.htm"), to indicate the hostname the client is attempting to connect to. This information is passed to the server to allow it to select the SSL certificate to present to the client. |
+| **`ssl-method`**                                                                                                           | **`nil`**                          | see [SSL/TLS](#ssltls) for the use of this argument.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **`skip-body`**                                                                                                            | **`nil`**                          | If the value is a function (satisifies **`functionp`**) then the value is funcalled passing the [**`client-request`**](aserve.md#c-client-request) object as an argument. At this point the client-request object contains the information on the headers of the response. The function should return true if the body of the response should be skipped and **`nil`** returned as the first value from do-http-request. If skip-body is not a function and if its value is true then reading the body is skipped and **`nil`** returned in its place.                                                                                                                                                                                                       |
+| **`timeout`**                                                                                                              | **`nil`**                          | If given this is the number of seconds this function will block waiting to connect to the server and also to write or read to the socket connected to the web server. If an I/O request blocks for more than timeout seconds an error of class **`socket-error`** is signalled and the function **`stream-error-identifier`** on the error condition object will return **`:read-timeout`** or **`:write-timeout`**.                                                                                                                                                                                                                                                                                                                                         |
+| **`compress`**                                                                                                             | **`nil`**                          | If true then tell the server in the request that we are able to accept a compressed body. If the server decides to send a compressed body then the body will be uncompressed by do-http-request before being returned to the caller.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **`certificate`**, **`key`**, **`certificate-password`**, **`ca-file`**, **`ca-directory`**, **`verify`**, **`max-depth`** | **`nil`**                          | These values are passed as the arguments to make-ssl-client-stream (documented in the ACL documentation). Specifying these values is optional but it does give you control of the client's SSL certificate management. These values are used in a fully patched ACL 8.0 (or newer). In older versions of ACL they are ignored.                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **`cache`**                                                                                                                | **`nil`**                          | A instance of class **`net.aserve.client:client-cache`** if you wish to consult and update this cache with this request. See the documentation on [**`client-cache`**](aserve.md#c-client-cache) below.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 
 For example:
@@ -2133,7 +2135,7 @@ user(5): (do-http-request "https://franz.com")
 ```
 
 
-It's easy to use **`do-http-request`** to fill in form objects on a page. If the
+It's easy to use [**`do-http-request`**](aserve.md#f-do-http-request) to fill in form objects on a page. If the
 form has input elements named **`width`** and **`height`** then you can send a request
 that specifies that information in this way:
 
@@ -2163,10 +2165,10 @@ If the page uses digest authorization then you would call with arguments like
 ## <span id="c-computed-content"></span>
 #### **`net.aserve.client:computed-content`** \[class\]
 
-**`computed-content`** is a class that is used to allow one to send data
+[**`computed-content`**](aserve.md#c-computed-content) is a class that is used to allow one to send data
 to a webserver when doing a PUT or POST operation without having to
 collect that data first in an object in Lisp memory.
-**`computed-content`** should be subclassed and these two methods written
+[**`computed-content`**](aserve.md#c-computed-content) should be subclassed and these two methods written
 over it:
 
 ```lisp
@@ -2195,37 +2197,37 @@ if that is the case.
 ## <span id="c-file-computed-content"></span>
 #### **`net.aserve.client:file-computed-content`** \[class\]
 
-We have a subclass of **`computed-content`** called **`file-computed-content`**.
-Instances of **`file-computed-content`** will send the contents of a file without
+We have a subclass of [**`computed-content`**](aserve.md#c-computed-content) called [**`file-computed-content`**](aserve.md#c-file-computed-content).
+Instances of [**`file-computed-content`**](aserve.md#c-file-computed-content) will send the contents of a file without
 first reading all of the file into memory at once. In order to create an
-instance of **`file-computed-content`** you do:
+instance of [**`file-computed-content`**](aserve.md#c-file-computed-content) you do:
 
 ```lisp
 (make-instance 'net.aserve.client:file-computed-content :filename "/a/b/myfile.txt")
 ```
 
-If the **`:content`** argument to **`do-http-request`** or
-**`make-http-client-request`** is a `pathname`, it is implicitly converted into
-an instance of **`file-computed-content`**.
+If the **`:content`** argument to [**`do-http-request`**](aserve.md#f-do-http-request) or
+[**`make-http-client-request`**](aserve.md#f-make-http-client-request) is a `pathname`, it is implicitly converted into
+an instance of [**`file-computed-content`**](aserve.md#c-file-computed-content).
 
 -----
 
 ## <span id="c-stream-computed-content"></span>
 #### **`net.aserve.client:stream-computed-content`** \[class\]
 
-Another handy subclass of **`computed-content`** is **`stream-computed-content`**.
-Instances of **`stream-computed-content`** will send the data read from inner stream,
+Another handy subclass of [**`computed-content`**](aserve.md#c-computed-content) is [**`stream-computed-content`**](aserve.md#c-stream-computed-content).
+Instances of [**`stream-computed-content`**](aserve.md#c-stream-computed-content) will send the data read from inner stream,
 using the chunking mechanism. Required `"Transfer-Encoding"` header is automatically
 set via specialized **`get-content-headers`** method. In order to create an instance
-of **`stream-computed-content`** you do:
+of [**`stream-computed-content`**](aserve.md#c-stream-computed-content) you do:
 
 ```lisp
 (make-instance 'net.aserve.client:stream-computed-content :stream input-stream)
 ```
 
-If the **`:content`** argument to **`do-http-request`** or
-**`make-http-client-request`** is a `stream`, it is implicitly converted into an
-instance of **`stream-computed-content`**.
+If the **`:content`** argument to [**`do-http-request`**](aserve.md#f-do-http-request) or
+[**`make-http-client-request`**](aserve.md#f-make-http-client-request) is a `stream`, it is implicitly converted into an
+instance of [**`stream-computed-content`**](aserve.md#c-stream-computed-content).
 
 Before we describe the lower level client request functions we will describe two
 classes of objects used in that interface.
@@ -2235,7 +2237,7 @@ classes of objects used in that interface.
 ## <span id="c-client-cache"></span>
 #### **`net.aserve.client:client-cache`** \[class\]
 
-The **`do-http-request`** function will cache responses if a **`client-cache`** object
+The [**`do-http-request`**](aserve.md#f-do-http-request) function will cache responses if a [**`client-cache`**](aserve.md#c-client-cache) object
 is passed as the value of the **`:cache`** argument.
 
 Only **`:get`** and **`:head`** requests meeting certain criteria are cacheable: The
@@ -2268,7 +2270,7 @@ expiration date **`auto-cache-seconds`** in the future.
 *Both **`auto-cache-codes`** and **`auto-cache-seconds`** must be given or auto caching
 will not occur.*
 
-Accessors for the **`client-cache`** object (in the **`net.aserve.client`** package):
+Accessors for the [**`client-cache`**](aserve.md#c-client-cache) object (in the **`net.aserve.client`** package):
   - **`client-cache-max-cache-entry-size`** - if a response to be cached exceeds
     this number of bytes the response will not be cached (default 1,000,000
     bytes). 
@@ -2317,11 +2319,11 @@ value.
 ## <span id="c-client-request"></span>
 #### **`net.aserve.client:client-request`** \[class\]
 
-A **`client-request`** object includes the information about the request and the
+A [**`client-request`**](aserve.md#c-client-request) object includes the information about the request and the
 response.
 
-The public fields of a **`client-request`** that are filled in after a call to
-**`make-http-client-request`** are:
+The public fields of a [**`client-request`**](aserve.md#c-client-request) that are filled in after a call to
+[**`make-http-client-request`**](aserve.md#f-make-http-client-request) are:
 
 | Accessor                     | Description                                                 |
 |------------------------------|-------------------------------------------------------------|
@@ -2331,8 +2333,8 @@ The public fields of a **`client-request`** that are filled in after a call to
 
 
 
-After **`read-client-response-headers`** is called, the following fields of the
-**`client-request`** objects are set:
+After [**`read-client-response-headers`**](aserve.md#f-read-client-response) is called, the following fields of the
+[**`client-request`**](aserve.md#c-client-request) objects are set:
 
 | Accessor                                                           | Description                                                                                                                                                                                                                             |
 |--------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -2346,16 +2348,16 @@ After **`read-client-response-headers`** is called, the following fields of the
 ## <span id="c-cookie-jar"></span>
 #### **`net.aserve.client:cookie-jar`** \[class\]
 
-A **`cookie-jar`** is a respository for cookies. Cookies are stored in a jar when a
+A [**`cookie-jar`**](aserve.md#c-cookie-jar) is a respository for cookies. Cookies are stored in a jar when a
 response from a client request includes Set-Cookie headers. Cookies from a jar
 are sent along with a request when they are applicable to the given request. We
 won't describe the rules for cookie applicability here, you need only know that
 if you use our client functions to access a site that uses cookies to implement
-persistence, then you should create a **`cookie-jar`** object and pass that same
+persistence, then you should create a [**`cookie-jar`**](aserve.md#c-cookie-jar) object and pass that same
 object in with each request. More information on cookies can be found
 [here](http://developer.netscape.com:80/docs/manuals/js/client/jsref/cookies.htm).
 
-A **`cookie-jar`** is created with **`(make-instance 'cookie-jar)`**.
+A [**`cookie-jar`**](aserve.md#c-cookie-jar) is created with **`(make-instance 'cookie-jar)`**.
 
 ```lisp
 (cookie-jar-items  cookie-jar)
@@ -2399,29 +2401,29 @@ that hostname. A **`cookie-item`** is a defstruct object and has these fields
 ```
 
 This function connects to the web server indicated by the **`uri`** and sends the
-request. The arguments are the same as those for **`do-http-request`** and are
+request. The arguments are the same as those for [**`do-http-request`**](aserve.md#f-do-http-request) and are
 documented there. There is one additional argument: **`content-length`**. This
 argument can be used to set the **`content-length`** header value in the
 request. After setting the content-length the caller of
-**`make-http-client-request`** would then be responsible for sending that many bytes
+[**`make-http-client-request`**](aserve.md#f-make-http-client-request) would then be responsible for sending that many bytes
 of data to the socket to serve as the body of the request. If **`content-length`**
 is given, then a value for **`content`** should not be given.
 
-If **`make-http-client-request`** succeeds in contacting the web server and sending
-a request, a **`client-request`** object is returned. If **`make-http-client-request`**
+If [**`make-http-client-request`**](aserve.md#f-make-http-client-request) succeeds in contacting the web server and sending
+a request, a [**`client-request`**](aserve.md#c-client-request) object is returned. If [**`make-http-client-request`**](aserve.md#f-make-http-client-request)
 fails, then an error is signalled.
 
-The returned **`client-request`** object contains an open socket to a web server,
+The returned [**`client-request`**](aserve.md#c-client-request) object contains an open socket to a web server,
 thus you must ensure that client-request object isn't discarded before
-**`client-request-close`** is called on it to close the socket and reclaim that
+[**`client-request-close`**](aserve.md#f-client-request-read-close) is called on it to close the socket and reclaim that
 resource.
 
-After calling **`make-http-client-request`** the program will send the body of the
-request (if any), and then it will call **`read-client-response-headers`** to
+After calling [**`make-http-client-request`**](aserve.md#f-make-http-client-request) the program will send the body of the
+request (if any), and then it will call [**`read-client-response-headers`**](aserve.md#f-read-client-response) to
 partially read the web server's response to the request.
 
 The default value for **`external-format`** is the value of
-**`*default-aserve-external-format*`**
+[**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format)
 
 -----
 
@@ -2433,11 +2435,11 @@ The default value for **`external-format`** is the value of
 ```
 
 This function reads the response code and response headers from the web server.
-After the function returns the program can use the **`client-request`** accessors
+After the function returns the program can use the [**`client-request`**](aserve.md#c-client-request) accessors
 noted above to read the web server's response. The body of the response (if any)
-has not been read at this point. You should use **`client-request-read-sequence`**
+has not been read at this point. You should use [**`client-request-read-sequence`**](aserve.md#f-client-request-read-sequence)
 to read the body of the response part by part, or
-[**`read-response-body`**](#f-read-response-body) to read it as a whole.
+[**`read-response-body`**](aserve.md#f-read-response-body) to read it as a whole.
 
 -----
 
@@ -2450,7 +2452,7 @@ to read the body of the response part by part, or
 
 This fills the **`buffer`** with the body of the response from the web server. The
 buffer should either be a character array or an array of **`(unsigned-byte 8)`**.
-If given, **`start`** specifies the index of the *first* element in the buffer in
+If given, [**`start`**](aserve.md#f-start) specifies the index of the *first* element in the buffer in
 which to store, and **`end`** is one plus the index of the *last* element in which
 to store.
 
@@ -2469,7 +2471,7 @@ condition.
 ```
 
 Should only be called after
-[**`read-client-response-headers`**](#f-read-client-response) has been called. Reads
+[**`read-client-response-headers`**](aserve.md#f-read-client-response) has been called. Reads
 the whole response body (if any) and returns it. If the **`format`** parameter has a
 value of **`:text`** (the default) the body is returned as a string, if given
 **`:binary`**, it will be an array of **`(unsigned-byte 8)`** elements. When reading
@@ -2485,7 +2487,7 @@ characters.
 (client-request-close client-request)
 ```
 
-The client-request object returned by **`make-http-client-request`** is closed.
+The client-request object returned by [**`make-http-client-request`**](aserve.md#f-make-http-client-request) is closed.
 This returns the resources used by this connection to the operating system.
 
 -----
@@ -2497,7 +2499,7 @@ This returns the resources used by this connection to the operating system.
 (compute-digest-authorization client-request digest-authorization)
 ```
 
-Given a **`client-request`** object after **`read-client-response-headers`** has been
+Given a [**`client-request`**](aserve.md#c-client-request) object after [**`read-client-response-headers`**](aserve.md#f-read-client-response) has been
 called on it, determine if digest authorization is being requested and if so
 compute the authorization values based on the username and password in the
 digest-authorization object. Returns true if Digest Authorization was requested
@@ -2505,9 +2507,9 @@ by the server and if the authorization values were successfully computed.
 
 Digest authorization is more difficult since the authorization key passed by the
 client is based on values passed by the server when it rejected the request.
-Thus you need to make the same request twice. The **`do-http-request`** function
+Thus you need to make the same request twice. The [**`do-http-request`**](aserve.md#f-do-http-request) function
 handles this retry automatically. If you need to use
-**`client-request-read-sequence`** to read the data then you will have to do the
+[**`client-request-read-sequence`**](aserve.md#f-client-request-read-sequence) to read the data then you will have to do the
 retry as well. This function demonstrates how you use the above functions to do
 the retry and then to retrieve the data:
 
@@ -2565,7 +2567,7 @@ url. In this conversion most printing characters are not changed All non
 printing characters and printing characters that could be confused with
 characters that separate fields in a url are encoded a %xy where xy is the
 hexadecimal representation of the char-code of the character. external-format
-defaults to the value of **`*default-aserve-external-format*`**.
+defaults to the value of [**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format).
 
 ## <span id="proxy"></span>Proxy
 
@@ -2607,7 +2609,7 @@ windows.
 > abused if accessible to strangers. This danger can be mitigated with
 > proxy-control objects, described next.
 
-### **`proxy-control`** objects
+### [**`proxy-control`**](aserve.md#c-proxy-control) objects
 
 -----
 
@@ -2615,7 +2617,7 @@ windows.
 #### **`net.aserve:proxy-control`** \[class\]
 
 In order to control who gets to use the proxy and what sites AllegroServe will
-proxy, you can pass a **`proxy-control`** object as the value of the **`:proxy`**
+proxy, you can pass a [**`proxy-control`**](aserve.md#c-proxy-control) object as the value of the **`:proxy`**
 argument instead of **`t`**.
 
 The proxy-control object has two fields:
@@ -2712,7 +2714,7 @@ change the authorization of the proxy.
 ```
 
 For each HTTP request that has the form of a proxy request the generic function
-**`authorize-proxy-request`** is called, passing the request and entity objects and
+[**`authorize-proxy-request`**](aserve.md#f-authorize-proxy-request) is called, passing the request and entity objects and
 the value of **`(wserver-proxy-control wserver)`**.
 
 **`(wserver-proxy-control wserver)`** is set to the value of the **`:proxy`** argument
@@ -2810,7 +2812,7 @@ When a filter function runs it's most likely going to be looking at two slots in
 the request object, which are accessed via these functions:
 
   - **`request-raw-uri`** - the actual uri given in the http command;
-  - **`request-uri`** - a constructed uri starting with the raw uri and adding
+  - [**`request-uri`**](aserve.md#f-request-uri) - a constructed uri starting with the raw uri and adding
     information from the Host header field. This value is used to find the
     entity to run thus it has all the information about the request.
 
@@ -2822,7 +2824,7 @@ user for `http://foo.bar.com:23/whatever` will cause the request to be sent to
 the server at `foo.bar.com` port 23 and the request will have:
 
   1. The **`request-raw-uri`** is `"/whatever"`.
-  2. The **`request-uri`** is `"http://foo.bar.com:23/whatever"`.
+  2. The [**`request-uri`**](aserve.md#f-request-uri) is `"http://foo.bar.com:23/whatever"`.
   3. The Host header value is `"foo.bar.com:23"`.
 
 
@@ -2831,7 +2833,7 @@ then a request for `http://foo.bar.com:23/whatever` will come to
 `proxy.blop.com` and will have a different raw uri:
 
   1. The **`request-raw-uri`** is now `"http://foo.bar.com:23/whatever"`.
-  2. The **`request-uri`** is still `"http://foo.bar.com:23/whatever"`.
+  2. The [**`request-uri`**](aserve.md#f-request-uri) is still `"http://foo.bar.com:23/whatever"`.
   3. The Host header value is still `"foo.bar.com:23"`.
 
 If the filter wants to alter the destination of request it should ensure that
@@ -2986,8 +2988,8 @@ seconds.
 **`(wserver-response-timeout wserver)`** - the number of seconds AllegroServe allows
 for an http request function to be run and finished sending back its
 response. The initial value for this slot of the wserver object is found in
-**`*http-response-timeout*`** which defaults to 120 seconds. You can alter this
-timeout value with the **`:timeout`** argument to **`with-http-response`** or by
+[**`*http-response-timeout*`**](aserve.md#v-http-response-timeout) which defaults to 120 seconds. You can alter this
+timeout value with the **`:timeout`** argument to [**`with-http-response`**](aserve.md#f-with-http-response) or by
 specifying a **`:timeout`** when publishing the entity.
 
 ### ACL 6.1 or newer
@@ -3008,12 +3010,12 @@ the socket to finish. The value is initialized to the value of
 <span id="f-wserver-response-timeout"></span>**`(wserver-response-timeout
 wserver)`** - the number of seconds AllegroServe allows for an http request
 function to be run and finished sending back its response. The initial value for
-this slot of the wserver object is found in **`*http-response-timeout*`** which
+this slot of the wserver object is found in [**`*http-response-timeout*`**](aserve.md#v-http-response-timeout) which
 defaults to 300 seconds. You can alter this timeout value with the :timeout
-argument to **`with-http-response`** or by specifying a **`:timeout`** argument to the
+argument to [**`with-http-response`**](aserve.md#f-with-http-response) or by specifying a **`:timeout`** argument to the
 publish function creating the entity.
 
-**`publish-directory`** and **`publish-file`** default their **`timeout`** argument in a way
+[**`publish-directory`**](aserve.md#f-publish-directory) and [**`publish-file`**](aserve.md#f-publish-file) default their **`timeout`** argument in a way
 that makes sense based on whether the Lisp supports I/O timeouts. If I/O
 timeouts are supported then there is no reason to do a global timeout for the
 whole response if you're just sending back a file. Thus in this case the
@@ -3095,7 +3097,12 @@ secure of the protocols.
 
 ## <span id="miscellaneous"></span>Miscellaneous
 
-<span id="f-ensure-stream-lock"></span>**`(ensure-stream-lock stream)`**
+<span id="f-ensure-stream-lock"></span>
+#### **`net.aserve:ensure-stream-lock`**
+
+```lisp
+(ensure-stream-lock stream)
+```
 
 The function adds a [process
 lock](https://franz.com/support/documentation/current/doc/multiprocessing.htm#process-locks-1)
@@ -3119,10 +3126,10 @@ log information from multiple threads will become intermixed.
 
 When one of the publish functions is called entities are placed in locator
 objects. The locator objects are then checked when http requests come in to
-find the appropriate entity. **`map-entities`** will apply the given **`function`** of
+find the appropriate entity. [**`map-entities`**](aserve.md#f-map-entities) will apply the given **`function`** of
 one argument to all the entities in the given **`locator`**. One common use of
-**`map-entities`** is to find entities that you no longer wish to be published. For
-that reason **`map-entities`** will remove the entity passed to the **`function`** if
+[**`map-entities`**](aserve.md#f-map-entities) is to find entities that you no longer wish to be published. For
+that reason [**`map-entities`**](aserve.md#f-map-entities) will remove the entity passed to the **`function`** if
 the **`function`** returns the keyword symbol **`:remove`** as its value.
 
 -----
@@ -3197,7 +3204,7 @@ only once and need not be done from within your application.
 
 Once an application is registered as a service you can start it by going to the
 Control Panel, selecting Administrative Tools and then Services. Locate the
-service you just added, right click on it and select **`start`**. You can stop the
+service you just added, right click on it and select [**`start`**](aserve.md#f-start). You can stop the
 service with a right click as well.
 
 -----
@@ -3266,14 +3273,14 @@ for the Allegro CL external format names.
 
 In order to make it easier to specify external formats in AllegroServe you can
 specify a default external format when you start the server (with the
-**`:external-format`** argument to the **`start`** function). The variable
-**`*default-aserve-external-format*`** will then be bound to this external format in
+**`:external-format`** argument to the [**`start`**](aserve.md#f-start) function). The variable
+[**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format) will then be bound to this external format in
 each of the threads that processes http requests. It's the value of
-**`*default-aserve-external-format*`** that is used as the default argument to the
-:external-format argument to **`with-http-body`**.
+[**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format) that is used as the default argument to the
+:external-format argument to [**`with-http-body`**](aserve.md#f-with-http-body).
 
-The default value of the **`:external-format`** argument to the **`start`** function,
-and thus the default value of **`*default-aserve-external-format*`**, is
+The default value of the **`:external-format`** argument to the [**`start`**](aserve.md#f-start) function,
+and thus the default value of [**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format), is
 **`(crlf-base-ef :latin1-base)`**. This means that regardless of the locale in
 which you run AllegroServe, AllegroServe will by default use the Latin1
 character set, which is what is expected by web clients..
@@ -3305,10 +3312,10 @@ a meta tag:
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 ```
 
-Retrieving form data in AllegroServe is done with the **`request-query`** function
+Retrieving form data in AllegroServe is done with the [**`request-query`**](aserve.md#f-request-query) function
 and that function takes an **`:external-format`** argument so you can specify how
 the form data can be decoded. If your form sends multipart data then you can
-use the **`:external-format`** argument to **`get-multipart-sequence`** to retrieve the
+use the **`:external-format`** argument to [**`get-multipart-sequence`**](aserve.md#f-get-multipart-sequence) to retrieve the
 form data and decode the data.
 
 ### Examples
@@ -3330,13 +3337,13 @@ separate lisp thread. Also AllegroServe catches errors in entity handler
 functions, thus preventing you from interactively diagnosing the problem.
 
 You can put AllegroServe in a mode that makes debugging easier with the
-**`net.aserve::debug-on`** function. Note that this is not an exported function to
+[**`net.aserve::debug-on`**](aserve.md#f-debug-on) function. Note that this is not an exported function to
 emphasize the fact that you are working with the internals of AllegroServe.
 
 -----
 
 <span id="f-debug-on"></span>
-#### **`net.aserve::debug-on`**
+#### [**`net.aserve::debug-on`**](aserve.md#f-debug-on)
 
 ```lisp
 (net.aserve::debug-on &rest debugging-features-to-enable)
@@ -3349,7 +3356,7 @@ This function turns on those named features. If no arguments are given, then
 -----
 
 <span id="f-debug-off"></span>
-#### **`net.aserve::debug-off`**
+#### [**`net.aserve::debug-off`**](aserve.md#f-debug-off)
 
 ```lisp
 (net.aserve::debug-off &rest debugging-features-to-disable)

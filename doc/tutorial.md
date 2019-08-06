@@ -89,7 +89,7 @@ We've emboldened the threads that are part of AllegroServe. The thread named
 **`aserve-accept-6`** is waiting for an http request. When one arrives it passes
 it off to one of the **`aserve-worker`** threads and then loops back to wait for
 the next request. The number of worker threads is determined by the
-**`:listeners`** argument to the **`start`** function.
+**`:listeners`** argument to the [**`start`**](aserve.md#f-start) function.
 
 ## Publishing a file
 
@@ -108,10 +108,10 @@ If you are running on Windows then the file will have a name like
 
 Now if we ask a web browser for `http://test.franz.com:8000/foo` we'll see the
 contents of the file in the web browser. Since we didn't specify a content-type
-in the call to **`publish-file`** the content-type will be determined by the
+in the call to [**`publish-file`**](aserve.md#f-publish-file) the content-type will be determined by the
 "`txt`" file type, which is associated with the "`text/plain`" content-type.
 
-Because we didn't specify a **`:host`** argument to **`publish-file`**
+Because we didn't specify a **`:host`** argument to [**`publish-file`**](aserve.md#f-publish-file)
 AllegroServe will return this page to any browser regardless of the host name
 used to name the machine. So AllegroServe will respond to requests for
 `http://test.franz.com:8000/foo`, `http://test:8000/foo` and
@@ -158,7 +158,7 @@ Now you will get different results if you ask for
 The most important reason for using the AllegroServe web server is that you can
 compute a web page when a request comes in. This allows your program to display
 the most up-to-date information on the page or tailor the page to each browser.
-Using the **`publish`** function, a lisp function called a *response function*
+Using the [**`publish`**](aserve.md#f-publish) function, a lisp function called a *response function*
 is associated with a **`url`**. When a request comes in that matches that url,
 the response function is run and it must generate the correct response which is
 sent back to the browser. The simplest response function is published here:
@@ -179,19 +179,19 @@ The request object contains all of the information about the request (such as
 the machine from which the request was made, and the headers passed along with
 the request). The request object is also used to store information about the
 response that is made to the request. The entity object contains the information
-passed to the **`publish`** function. One important item in the entity is the
+passed to the [**`publish`**](aserve.md#f-publish) function. One important item in the entity is the
 **`content-type`** which serves as the default content-type for the response (it
-can be overridden by an argument to **`with-http-response`**).
+can be overridden by an argument to [**`with-http-response`**](aserve.md#f-with-http-response)).
 
-A response function must use the **`with-http-response`** and
-**`with-http-body`** macros and then send any additional data to the stream
+A response function must use the [**`with-http-response`**](aserve.md#f-with-http-response) and
+[**`with-http-body`**](aserve.md#f-with-http-body) macros and then send any additional data to the stream
 **`*html-stream*`**. Despite the name of the stream, the data need not always be
-html. The purpose of **`with-http-response`** is to allow AllegroServe to
+html. The purpose of [**`with-http-response`**](aserve.md#f-with-http-response) is to allow AllegroServe to
 determine how it will setup streams to respond to the request. AllegroServe will
 also check to see if the browser already has an up-to-date copy of this page
 cached in which case it will not even run the code in the body of the
-**`with-http-response`** macro.  **`with-http-body`** is responsible for sending
-back the response code and headers, and the body of **`with-http-body`** is
+[**`with-http-response`**](aserve.md#f-with-http-response) macro.  [**`with-http-body`**](aserve.md#f-with-http-body) is responsible for sending
+back the response code and headers, and the body of [**`with-http-body`**](aserve.md#f-with-http-body) is
 where lisp code can send data which will be the body of the response.
 
 The preceding example sends a very simple plain text string, specifying the
@@ -294,12 +294,12 @@ Let's examine in detail each of the methods for sending form data:
 In a url like `http://www.machine.com/foo/bar?name=gen\&age=28` the characters
 after the question mark are the **`query-string`**. The query string is **not**
 used by AllegroServe to determine the entity to handle the request. When the
-entity begins processing the request it can ask for the **`request-query`** of
-the **`request`** object. **`request-query`** will return an assoc list where
+entity begins processing the request it can ask for the [**`request-query`**](aserve.md#f-request-query) of
+the **`request`** object. [**`request-query`**](aserve.md#f-request-query) will return an assoc list where
 the **`car`** of each entry is a string (e.g. "name" in the example) and the
 **`cdr`** is also a string (e.g. "gen" in the example). You can ask for the
-**`request-query`** of any request object and if there is no query string for
-the request, **`request-query`** will return **`nil`**.
+[**`request-query`**](aserve.md#f-request-query) of any request object and if there is no query string for
+the request, [**`request-query`**](aserve.md#f-request-query) will return **`nil`**.
 
 This is a typical entity handler that generates a form and handles the result of
 filling out the form:
@@ -353,8 +353,8 @@ method for the form. In this case the data for the form appears in the body of
 the request. There are two supported encodings of the form data in the body.  In
 this section we'll describe how to handle the default encoding, called:
 `"application/x-www-form-urlencoded"`. First you must call
-**`get-request-body`** to read and return the body of the request. Second you
-must call **`form-urlencoded-to-query`** to convert the encoded body into an
+[**`get-request-body`**](aserve.md#f-get-request-body) to read and return the body of the request. Second you
+must call [**`form-urlencoded-to-query`**](aserve.md#f-form-urlencoded-) to convert the encoded body into an
 assoc list, where every entry is a cons consisting of a string naming the value
 and then the string containing the value.
 
@@ -426,10 +426,10 @@ when you specify a **`:method`** of "POST" and an **`:enctype`** of
 `"multipart/form-data"`. The handler for this must detect when it is being
 called from a **`:post`** request and must call a sequence of functions to
 retrieve each item from the message body. First it calls
-**`get-multipart-header`** to get the next header (or **`nil`** if there are no
+[**`get-multipart-header`**](aserve.md#f-get-multipart-header) to get the next header (or **`nil`** if there are no
 more headers). The header data is an assoc list where the values have different
 formats as described in the AllegroServe manual. After reading the header the
-handler must call **`get-multipart-sequence`** to read successive chunks of data
+handler must call [**`get-multipart-sequence`**](aserve.md#f-get-multipart-sequence) to read successive chunks of data
 associated with this header.
 
 An example demonstrating this is too large to include here but can be found in
@@ -546,7 +546,7 @@ running on `test-franz.com`).
 AllegroServe can run multiple independent web servers. Each web server listens
 for requests on a different port. Because each web server can appear to be
 serving pages for different hosts (using the virtual host facility already
-described in the discussion of the **`publish`** functions), it is usually not
+described in the discussion of the [**`publish`**](aserve.md#f-publish) functions), it is usually not
 necessary to use the multiple server facility we describe here.
 
 All of the information about a web server, including the entities it serves, are
@@ -557,5 +557,5 @@ as the default server into which they publish entities.
 ## Debugging a computed response handler
 
 We will describe this in detail when the tutorial is updated. For now read the
-documentation on **`net.aserve::debug-on`** in the [AllegroServe](aserve.md)
+documentation on [**`net.aserve::debug-on`**](aserve.md#f-debug-on) in the [AllegroServe](aserve.md)
 manual.

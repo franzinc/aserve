@@ -33,7 +33,7 @@ on HTML as a reference.
 ## Example
 
 The following example of generated web page will be useful to refer to in the
-discussion below of the syntax of the **`html`** macro.
+discussion below of the syntax of the [**`html`**](htmlgen.md#f-html) macro.
 
 ```lisp
 (defvar *my-counter* 0)  ; initialize counter variable.
@@ -49,7 +49,7 @@ discussion below of the syntax of the **`html`** macro.
 ```
 
 This particular example generates a complete web page, but it's possible to use
-the **`html`** macro to generate partial pages as well. In this example, the
+the [**`html`**](htmlgen.md#f-html) macro to generate partial pages as well. In this example, the
 generated page is surrounded by `<html>` and `</html>` due to the **`:html`**
 form. The page contains a header and a body surrounded by their respective HTML
 markers. The body of the document contains a level 1 header followed by the text
@@ -59,15 +59,15 @@ first processed by lisp). The following **`incf`** expression is evaluated but t
 result is not printed. In this case we're keeping a private count of the number
 of times this page has been accessed.
 
-## **`html`** macros
+## `html` macros
 
-Now that you have a sense of how the **`html`** macro works, we will describe the
+Now that you have a sense of how the [**`html`**](htmlgen.md#f-html) macro works, we will describe the
 syntax in detail.
 
 -----
 
 <span id="f-html"></span>
-#### `net.html.generator:html` \[macro\]
+#### **`net.html.generator:html`** \[macro\]
 
 ```lisp
 (html form1 form2 ... formn)
@@ -75,10 +75,10 @@ syntax in detail.
 
 The forms are processed from left to right. The most likely effect is that HTML
 output is generated. The output is sent to the stream
-**`net.html.generator:*html-stream*`**. The **`html`** macro is designed to run
-inside AllegroServe's **`with-http-body`** macro which binds **`*html-stream*`**
-to the correct stream. Also the **`html-stream`** macro described below binds
-**`*html-stream*`** before calling **`html`**. The action taken by **`html`**
+**`net.html.generator:*html-stream*`**. The [**`html`**](htmlgen.md#f-html) macro is designed to run
+inside AllegroServe's [**`with-http-body`**](aserve.md#f-with-http-body) macro which binds **`*html-stream*`**
+to the correct stream. Also the [**`html-stream`**](htmlgen.md#f-html-stream) macro described below binds
+**`*html-stream*`** before calling [**`html`**](htmlgen.md#f-html). The action taken by [**`html`**](htmlgen.md#f-html)
 depends on what the form looks like at macro-expansion time. The possibilities
 are:
 
@@ -88,14 +88,14 @@ are:
     that the associated HTML markup command is sent to the output stream. The
     mapping of keyword to HTML command is trivial - the print name of the
     keyword is the HTML command. So **`:p`** emits `<p>`.
-  - list beginning with a keyword symbol - This names an **`html`** operator
+  - list beginning with a keyword symbol - This names an [**`html`**](htmlgen.md#f-html) operator
     that may or may not have an associated inverse operator beginning with
     "/". The typical result of this form is to emit the associated HTML markup
     command, then process the items in the list in the same way as the forms are
     processed, and then emit the inverse markup command. Thus **`(:i "foo")`**
     emits `<i>foo</i>`. There is a special case when a single element list is
     given (see below for details). Also there are some special keywords that are
-    commands to the **`html`** macro rather than markup commands. They are
+    commands to the [**`html`**](htmlgen.md#f-html) macro rather than markup commands. They are
     described below.
   - list beginning with a list beginning with a keyword symbol - This is used to
     specify markup commands that have parameters. For example **`((:a href
@@ -147,14 +147,14 @@ Special cases:
 -----
 
 <span id="f-html-stream"></span>
-#### `net.html.generator:html-stream` \[macro\]
+#### **`net.html.generator:html-stream`** \[macro\]
 
 ```lisp
 (html-stream stream form1 form2 ... formn)
 ```
 
 This binds **`net.html.generator:*html-stream*`** to the value of the stream
-argument and then evaluates the **`form*`** arguments just like the **`html`**
+argument and then evaluates the **`form*`** arguments just like the [**`html`**](htmlgen.md#f-html)
 macro.
 
 ## Examples
@@ -196,7 +196,7 @@ The function **`simple-table-a`** builds a page containing this table:
 | 5 | 25 |
 
 It isn't very pretty but it's easy to see the correspondence between the
-**`html`** macro and the resulting table. Note that if we had done, for example,
+[**`html`**](htmlgen.md#f-html) macro and the resulting table. Note that if we had done, for example,
 **`(:td 1)`** instead of **`(:td "1")`** then nothing would have been emitted. Only
 constant strings are printed, not constant integers. To use an integer here we
 would have had to do **`(:td (:princ 1))`**.
@@ -258,10 +258,10 @@ generation function to compute a table of any size:
 ```
  
 
-Note that we can freely imbed calls to the **`html`** macro within another call.
+Note that we can freely imbed calls to the [**`html`**](htmlgen.md#f-html) macro within another call.
 The **`dotimes`** call inside the **`:body`** expression is simply evaluated and its
 value ignored. However the side effect of the **`dotimes`** is to generate more
-HTML and to send it to the stream bound in the **`html-stream`** call. The result
+HTML and to send it to the stream bound in the [**`html-stream`**](htmlgen.md#f-html-stream) call. The result
 of **`(simple-table-c 8)`** is
 
 | A | B  |
@@ -367,7 +367,7 @@ is **`(simple-table-e 6)`**:
 ## HTML generation functions
 
 It's possible to express HTML using Lisp data structures. The form is based on
-how HTML is written using the **`html`** macro above.
+how HTML is written using the [**`html`**](htmlgen.md#f-html) macro above.
 
 Lisp HTML (**`lhtml`**) is defined as one of the following
 
@@ -377,7 +377,7 @@ Lisp HTML (**`lhtml`**) is defined as one of the following
     forms. The valid keywords are those corresponding to the HTML entity tags,
     plus the special tags **`:princ`**, **`:princ-safe`**, **`:prin1`**,
     **`:prin1-safe`**, **`:newline`** and **`:comment`**. These act just as they
-    do in the **`html`** macro. This form is rendered as an opening tag, then
+    do in the [**`html`**](htmlgen.md#f-html) macro. This form is rendered as an opening tag, then
     the rendering of the body, and a closing HTML tag if one exists.
   - a list beginning with a list beginning with an **`lhtml`** keyword. This is
     the form used when attributes are to be supplied with the opening entity
@@ -392,7 +392,7 @@ Examples of valid **`lhtml`**:
 -----
 
 <span id="f-html-print"></span>
-#### `net.html.generator:html-print`
+#### **`net.html.generator:html-print`**
 
 ```lisp
 (html-print lhtml stream)
@@ -403,11 +403,11 @@ Print the Lisp HTML expression **`lhtml`** to the **`stream`**.
 -----
 
 <span id="f-html-print-list"></span>
-#### `net.html.generator:html-print-list`
+#### **`net.html.generator:html-print-list`**
 
 ```lisp
 (html-print-list lhtml-list stream)
 ```
 
 Print the list of **`lhtml`** forms to the **`stream`**. This is equivalent to
-calling **`html-print`** on every element of **`lhtml-list`**.
+calling [**`html-print`**](htmlgen.md#f-html-print) on every element of **`lhtml-list`**.

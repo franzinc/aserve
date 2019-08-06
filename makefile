@@ -129,6 +129,9 @@ tags: FORCE
 	rm -f TAGS
 	find . -name '*.cl' -print | xargs etags -a
 
+doclinks:
+	cd doc && python3 doclinks.py
+
 FORCE:
 
 ## last, for including new rules which are not the default
