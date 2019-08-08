@@ -1,4 +1,4 @@
-#! /bin/env python3
+#!/usr/bin/scl enable rh-python36 -- python3
 
 import re
 

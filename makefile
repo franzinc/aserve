@@ -130,7 +130,7 @@ tags: FORCE
 	find . -name '*.cl' -print | xargs etags -a
 
 doclinks:
-	cd doc && python3 doclinks.py
+	cd doc && ./doclinks.py
 
 FORCE:
 
