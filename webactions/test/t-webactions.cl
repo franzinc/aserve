@@ -42,7 +42,7 @@
   
   (setq *cj* (make-instance 'cookie-jar))
   
-  (with-tests (:name "aserve")
+  (with-tests (:name "webactions")
     (let* ((*wserver* *wserver*)
 	   (port (start-aserve-running)))
       (format t "server started on port ~d~%" port)
@@ -290,6 +290,33 @@
         
         )
       
+      
+      ;; test that we can alter the response code
+      (multiple-value-bind (body retcode headers)
+          (x-do-http-request (format nil "~a/sitea/retcodetest" prefix-local)
+                             :redirect nil)
+        (declare (ignore body headers))
+        (test  201 retcode))
+      
+      ;; verify we can dynamically specify the return code
+      (multiple-value-bind (body retcode headers)
+          (x-do-http-request (format nil "~a/sitea/retanycodetest" prefix-local)
+                             :redirect nil)
+        (declare (ignore body headers))
+        (test  210 retcode))
+      
+      ;; test it works if use a string "210" value
+      (multiple-value-bind (body retcode headers)
+          (x-do-http-request (format nil "~a/sitea/retanycodetest-two" prefix-local)
+                             :redirect nil)
+        (declare (ignore body headers))
+        (test  210 retcode))
+      
+      (format t "~2%Expect an error message to be printed about a bad response code~2%")
+      (test-error
+          (x-do-http-request (format nil "~a/sitea/retanycodetest-bogus" prefix-local)
+                             :redirect nil))
+      
 
           
       )))
@@ -329,6 +356,27 @@
   (declare (ignore req ent))
   "thisdoesntexist")
 
+(defun action-set-retany (req ent)
+  (declare (ignore ent))
+  (set-retcode-value req 210))
+
+(defun action-set-retany-two (req ent)
+  (declare (ignore ent))
+  (set-retcode-value req "210"))
+
+(defun action-set-retany-bogus (req ent)
+  (declare (ignore ent))
+  (set-retcode-value req "garbage"))
+
+
+  
+(defun set-retcode-value (req code)  
+  ;; set the value of testretcode to the given code
+  (declare (ignore ent))
+  (let ((sess (websession-from-req req)))
+    (if* sess
+       then (setf (websession-variable sess "testretcode") code))
+    "retany.clp"))
 
 
 
@@ -350,6 +398,10 @@
       (declare (ignore retcode))
       ;; Without bug fix, the rewritten line does not have "sub/".
       (test "/sub/file2.html\">file2.html</a>" data
+	    :test #'(lambda (x y) (search x y)))
+      
+      ;; verify javascript src converted too
+      (test "/sub/js/foo.js\">" data
 	    :test #'(lambda (x y) (search x y))))
     (multiple-value-bind (data retcode)
 	(x-do-http-request (format nil "~a/siteb/pageb" prefix-local))
@@ -369,7 +421,9 @@
 
 
 
+(if* user::*do-aserve-test* 
+   then (net.aserve.testwa::test-webactions)
+   else (format t "~%(net.aserve.testwa::test-webactions) will run the webactions test~%"))
 
 
 
-(test-webactions)

@@ -1,6 +1,6 @@
 # Allegro Webactions
 
-##### v1.7
+##### v1.20
 
 #### Copyright (c) Franz Inc.
 
@@ -531,6 +531,8 @@ will be directed to the page associated with the page with the symbolic name
 "home". It's still possible to reference pages outside the project using
 absolute paths in url, such as `<a href="/othersite/index.html">check this out
 too</a>` or `<a href="http://www.cnn.com"> read the latest news</a>`
+
+The same conversion that applies to `href` links also applies to `src` links inside a `frame`, `script` or `img` element.
 
 Now we have the background to describe exactly what webaction-project does.
 **`webaction-project`** does a **`publish-prefix`** for the path that's the value of
@@ -1267,6 +1269,21 @@ confused by items inside the body of a `select` that aren't `option`
 elements. In a CLP file you might want to put `clp_options` or `clp_include`
 inside a `select` tag. If you use `clp_select` you can put whatever you want in
 the body and most html editors will not object.
+
+-----
+
+#### `clp_response`
+
+```html
+<clp_response code="201"/>
+<clp_response code="varname"/>
+```
+
+This function causes the given code to be returned to the browser when
+this page is returned (by default a code of 200 is returned).
+The code can either be expressed as an integer or as a session variable
+name whose value at runtime will be used as the return value.
+
 
 -----
 

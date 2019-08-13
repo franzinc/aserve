@@ -6,8 +6,9 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "webactions" 2
-  "v2: 1.18: can use cookies only for sessions; 
+(sys:defpatch "webactions" 3
+  "v3: 1.20 specify http return code, more clp transforms
+v2: 1.18: can use cookies only for sessions; 
 v1: 1.17: don't create session for non-existant urls, get session from ent;"
   :type :system
   :post-loadable t)
@@ -59,6 +60,13 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
    (external-format  :initform nil
 		     :initarg :external-format
 		     :accessor clp-entity-external-format)
+   
+   ;; if non-nil user has specified the response code for 
+   ;; this clp file with <clp_response code="433"/>
+   ;; response code can be an integer meaning that exact value
+   ;; or a string meaning the value of that session variable
+   (response-code    :initform nil
+                     :accessor clp-entity-response-code)
    ))
 
 
@@ -158,7 +166,7 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 	      (setq wa (getf (entity-plist ent) 'webaction))
 	      (setq sm (webaction-websession-master wa)))
        then ; try to find session via cookie and if that fails,
-	    ; make up a session
+            ; make up a session
 	    (let ((csessid (cdr (assoc (sm-cookie-name sm)
 				       
 				       (get-cookie-values req)
@@ -196,7 +204,13 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
        then (parse-clp-file ent))
   
     (with-http-response (req ent 
-			     :content-type (content-type ent))
+                         :content-type (content-type ent)
+                         :response (if* (clp-entity-response-code ent)
+                                      then (code-to-response 
+                                            (convert-response-code
+                                             websession
+                                             (clp-entity-response-code ent)))
+                                      else *response-ok*))
       
       (insert-cookie req ent sm wa websession)
       
@@ -204,10 +218,10 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
       (setf (reply-header-slot-value req :pragma) "no-cache")
       
       (with-http-body (req ent
-			   :external-format 
-			   (or (clp-entity-external-format ent)
-			       *default-aserve-external-format*)
-			   )
+                       :external-format 
+                       (or (clp-entity-external-format ent)
+                           *default-aserve-external-format*)
+                       )
 	(emit-clp-entity req ent (clp-entity-objects ent))))
     t))
 
@@ -225,6 +239,51 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
            :path (webaction-project-prefix wa)
            :http-only (webaction-use-http-only-cookies wa))))
 
+(defun convert-response-code (websession code)
+  ;; if code is a string lookup the value of that
+  ;; string as a websession variable, else return the code
+  ;; 
+  ;; code can be 
+  ;;  an integer  123
+  ;;  an integer written to a string   "123"
+  ;;  a variable name "foo"
+  ;;    the value of a variable can be   123 or "123"  
+  ;;
+  (flet ((string-to-integer (string)
+           ;; convert a string to an integer if possible
+           ;; if not just return the string
+           (or (ignore-errors (parse-integer string))
+               string)))
+    (if* (stringp code)
+       then (if* (fixnump (setq code (string-to-integer code)))
+               thenret ; we have the answer
+               else (setq code 
+                      (block nil
+                        (let ((var-value (websession-variable websession code)))
+                          (if* (stringp var-value)
+                             then (if* (fixnump
+                                        (setq var-value
+                                          (string-to-integer var-value)))
+                                     then (return var-value))
+                           elseif (fixnump var-value)
+                             then (return var-value))
+
+                          ;; fall through, can't calcuate a fixnum value
+                          (error "clp_response code ~s has variable value ~s that is not an integer"
+                                 code var-value)))))
+     elseif (fixnump code)
+       thenret
+       else (error "clp_response code is ~s which is an illegal value"
+                   code)))
+  code)
+                            
+                            
+                            
+                            
+                                    
+                            
+                            
+  
 
 (defun parse-clp-file (ent)
   ;; parse the clp file
@@ -235,21 +294,25 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 		       :direction :input
 		       :external-format (clp-entity-external-format ent))
 	
-	(let* ((objects (parse-clp-guts p (file ent)))
-	       (dependencies (expand-clp-includes objects (file ent)
-						  (clp-entity-external-format ent))))
-	  (if* dependencies 
-	     then (setf (clp-entity-dependencies ent)
-		    (mapcar #'(lambda (filename)
-				(cons filename (file-write-date filename)))
-			    dependencies)))
-	  (setf (clp-entity-objects ent) objects)
+        (multiple-value-bind (objects response-code) 
+            (parse-clp-guts p (file ent))
+          (let* (
+                 (dependencies (expand-clp-includes objects (file ent)
+                                                    (clp-entity-external-format ent))))
+            (if* dependencies 
+               then (setf (clp-entity-dependencies ent)
+                      (mapcar #'(lambda (filename)
+                                  (cons filename (file-write-date filename)))
+                              dependencies)))
+            (setf (clp-entity-objects ent) objects)
 	  
-	  (setf (clp-entity-file-write-date ent)
-	    (file-write-date (file ent)))
+            (setf (clp-entity-file-write-date ent)
+              (file-write-date (file ent)))
+            
+            (setf (clp-entity-response-code ent) response-code)
 	  
-	  objects
-	  ))
+            objects
+            )))
       
     (error (c)
       (logmess (format nil "processing clp file ~s got error ~a"
@@ -328,7 +391,15 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 
 
 (defun parse-clp-guts (p filename)
+  ;; p is a stream we'll read and parse
+  ;; filename is the name of the file we're reading.
+  ;; 
+  ;; return two values:
+  ;;   list of objects found in the file.  
+  ;;     objects are (:text "string") or (:clp ..) for clp directives
+  ;;   response-code-specified by <clp_response code="423">
   (let ((result)
+        response-code
 	(pos-start 0)
 	(chstart 0)
 	(chcount 0)
@@ -351,8 +422,8 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 		       
 		       (push `(:text ,ans) result))))
 	   (wa-cvt (dest)
-	     ;; convert dest to the appropriate wa_link command
-	     ;;
+             ;; convert dest to the appropriate wa_link command
+             ;;
 	     (let ((xpos (min (or (position #\? dest) most-positive-fixnum)
 			      (or (position #\# dest) most-positive-fixnum)))
 		   (extra))
@@ -363,8 +434,8 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 	       
 	       `(:clp "wa" "link"
 		      (("name" . ,dest)
-		       ;; added by cac 29jun16 -- pass to wa_link for
-		       ;; relative-path / webaction-destination fixup.
+                       ;; added by cac 29jun16 -- pass to wa_link for
+                       ;; relative-path / webaction-destination fixup.
 		       ("filename" . ,filename)
 		       ,@(if* extra then 
 				 `(("extra" . ,extra))))
@@ -383,21 +454,26 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 		  (if* res
 		     then (savestring p pos-start 
 				      (- chcount chstart 1))
-			  (push res result)
+                          ;; handle <clp_response ..> here
+                          (let ((code (clp-response-check res)))
+                            (if* code
+                               then (setq response-code code)
+                               else (push res result)))
 			  (setq pos-start (file-position p)
 				chstart chcount))
 	   elseif (eq ch #\")
 	     then (if* (or (match-buffer backbuffer backindex "=ferh")
-			   ;; check for action= within a form only since
-			   ;; backbase use b:action=
-			   ;; cac 2aug07
+                           ;; check for action= within a form only since
+                           ;; backbase use b:action=
+                           ;; cac 2aug07
  			   (and (equalp lasttag "form")
  				(match-buffer backbuffer backindex "=noitca"))
-			   (and (equalp lasttag "frame")
+			   (and (member lasttag '("frame" "script" "img")
+                                        :test #'equalp)
 				(match-buffer backbuffer backindex "=crs"))
 			   )
 		     then (savestring p pos-start (- chcount chstart))
-			  ; scan for tag name
+                          ; scan for tag name
 			  (let ((savepos (file-position p)))
 			    (setq chstart chcount)
 			    (loop
@@ -434,8 +510,37 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 		  (setf (aref backbuffer backindex) ch)))))
       
     ;; return
-    (nreverse result)))
+    (values (nreverse result) response-code)))
 
+(defun clp-response-check (form)
+  ;; test if we've encountered something like:
+  ;;  (:clp "clp" "response" (("code" . "233"))) 
+  ;; if so return  233
+  ;; or
+  ;;   (:clp "clp" "response" (("code" . "foo")))
+  ;; then return "foo"
+  ;;
+  (if* (consp form)
+     then 
+          (destructuring-bind (&optional tag module function args &rest ignore)
+              form
+
+            (declare (ignore ignore))
+            (if* (and (eq :clp tag)
+                      (equal "clp" module)
+                      (equal "response" function))
+               then (if* (and (consp args)
+                              (consp (car args))
+                              (equal "code" (car (car args))))
+                       then ;; if it's an integer return that
+                            ;; else return the value of code
+                            ;; which will be a string naming
+                            ;; a session variable
+                            (or (ignore-errors 
+                                 (parse-integer (cdr (car args))))
+                                (cdr (car args))))))))
+                                  
+           
 
 (defun match-buffer (buffer index string)
   ;; see if string matches what's in the buffer, case insensitive
