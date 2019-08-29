@@ -1230,7 +1230,7 @@
 	   else ; failed to authorize
 		(return-from authorize-and-process nil))))
     
-    (when (member (request-method req) '(:put :post))
+    (when (member (request-method req) '(:put :post :patch))
       (let ((cont (header-slot-value req :expect)))
 	(setf (request-has-continue-expectation req)
 	  (and cont (match-re "\\b100-continue\\b" cont :case-fold t :return nil))))

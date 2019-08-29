@@ -301,6 +301,7 @@
 		     (test-publish-computed port)
 		     (test-publish-multi port)
 		     (test-publish-prefix port)
+		     (test-put-patch port)
 		     (test-authorization port)
 		     (test-encoding)
                      (test-truncated-stream)
@@ -1636,6 +1637,28 @@ Returns a vector."
                             :content-type "application/binary")))
       (delete-file tfile)))
   )
+
+(defun test-put-patch (port)
+  (let ((prefix-local (format nil "http://localhost:~a" port))
+        (content "blah blah blah"))
+    (publish :path "/putpatch"
+             :content-type "text/plain"
+             :function #'(lambda (req ent)
+                           (let ((want (intern (request-query-value "want" req)
+                                               (find-package :keyword))))
+                             (test want (request-method req)))
+                           
+                           (test content (get-request-body req) :test #'equal)
+                           (with-http-response (req ent)
+                             (with-http-body (req ent)
+                               (net.html.generator:html "foo the bar")
+                               ))))
+    (dolist (method '(:put :patch))
+      (x-do-http-request (format nil "~a/putpatch?want=~a" prefix-local method)
+                         :method method
+                         :content content
+                         :content-type "text/plain"))))
+
 
 (defun test-request-character-encoding (port)
   (let ((prefix-local (format nil "http://localhost:~a" port)))

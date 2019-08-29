@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 74))
+(defparameter *aserve-version* '(1 3 75))
 
 (eval-when (eval load)
     (require :sock)
@@ -2129,6 +2129,7 @@ by keyword symbols and not by strings"
       ("HEAD " . :head)
       ("POST " . :post)
       ("PUT "  . :put)
+      ("PATCH "  . :patch)
       ("OPTIONS " . :options)
       ("DELETE " .  :delete)
       ("TRACE "  .  :trace)
@@ -2190,7 +2191,7 @@ by keyword symbols and not by strings"
 	    (header-slot-value-integer req :content-length))
     
 	  ;; Send  Continue status if requested, regardless of body indicators.
-	  (when (member (request-method req) '(:put :post))
+	  (when (member (request-method req) '(:put :post :patch))
 	    (when (request-has-continue-expectation req)
 	      (send-100-continue req)))
 
@@ -2255,7 +2256,7 @@ by keyword symbols and not by strings"
 	   elseif (keep-alive-specified req)
 	     then ;; must be no body
 		  ""
-	   elseif (member (request-method req) '(:put :post))					
+	   elseif (member (request-method req) '(:put :post :patch))
 	     then ;; read until the end of file to collect an implied body
 		  (with-timeout-local
 		      ((wserver-read-request-body-timeout *wserver*) 
@@ -2399,7 +2400,7 @@ by keyword symbols and not by strings"
 	     then ;; must be no body
 		  (funcall function nil 0)
 		  
-	   elseif (member (request-method req) '(:put :post))
+	   elseif (member (request-method req) '(:put :post :patch))
 	     then ;; read until the end of file to collect implied body
 		  (with-timeout-local
 		      ((wserver-read-request-body-timeout *wserver*) 
@@ -3158,7 +3159,7 @@ in get-multipart-sequence"))
 				   :external-format external-format)))))
 	      
       (if* post
-	 then (if* (and (member (request-method req) '(:post :put))
+	 then (if* (and (member (request-method req) '(:post :put :patch))
 			(search ; sometimes other stuff added we can ignore
 			 "application/x-www-form-urlencoded"
 			 (header-slot-value req :content-type))

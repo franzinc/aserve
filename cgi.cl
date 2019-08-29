@@ -117,7 +117,7 @@
     (if* auth-type
        then (push (cons "AUTH_TYPE" auth-type) envs))
     
-    (if* (member (request-method req) '(:put :post))
+    (if* (member (request-method req) '(:put :post :patch))
        then ; there is likely data coming along
 	    (setq body (get-request-body req	))
 	    (if* (equal body "") then (setq body nil)) ; trivial case

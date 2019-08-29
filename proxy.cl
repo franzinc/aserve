@@ -519,7 +519,7 @@ cached connection = ~s~%" cond cached-connection))
     
 	    ;; content-length is inserted if this is put or post method
 	    ;;    and others if there is a body.
-	    (if* (or (member method '(:put :post) :test #'eq)
+	    (if* (or (member method '(:put :post :patch) :test #'eq)
 		     ;; On PUT or POST we always send a content-length.
 		     ;; For other requests, send content-length if a body
 		     ;; was present.   [rfe15456]

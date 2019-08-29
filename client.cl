@@ -1169,7 +1169,7 @@ headers")
           
        ; some webservers (including AServe) have trouble with put/post
        ; requests without a body
-       (if* (and (not content) (member method '(:put :post)))
+       (if* (and (not content) (member method '(:put :post :patch)))
           then (setf content ""))
 
        ;; Content can be NIL, a single object or a list. Some objects
