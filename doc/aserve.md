@@ -2,7 +2,7 @@
 
 # AllegroServe - A Web Application Server
 
-##### Version 1.3.73
+##### Version 1.3.75
 
 #### Copyright (c) Franz Inc.
 
@@ -625,12 +625,13 @@ takes an **`:inherit`** argument which defaults to false. Information not given
 with **`:inherit t`** will be eliminated as AllegroServe descends directory
 levels.
 
-| Name            | Arguments                                        | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-|-----------------|--------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **`:ip`**       | **`:patterns`**<br>**`:inherit`**                | specifies a [`location-authorizer`](#c-location-authorizer) restriction on which machines can see published files. The value of the **`:patterns`** argument has the same form as the **`:patterns`** slot of a [**`location-authorizer`**](aserve.md#c-location-authorizer).                                                                                                                                                                                                |
-| **`:password`** | **`:realm`**<br>**`:allowed`**<br>**`:inherit`** | specifies a [`password-authorizer`](#c-password-authorizer) restriction on access to published files. See the password-authorizer documentation for a description of the **`:realm`** and **`:allowed`** arguments.                                                                                                                                                                                                                       |
-| **`:files`**    | **`:allow`**<br>**`:deny`**<br>**`:inherit`**    | specifies which files are visible to be published. To be visible a file must be allowed and not denied. What is tested is the filename only (that is the part after the last directory separator in the files's complete name). See below for the rules on how allow and denied is used.                                                                                                                                                  |
-| **`:mime`**     | **`:types`**<br>**`:inherit`**                   | specifies which mime types are to be associated with which file types. This list takes precedence over the built-in list inside AllegroServe. **`:types`** is a list of mime specifiers. A mime specifier is a list beginning with a string giving the mime type followed by the files types that should map to that mime type. A file type in a list (e.g. **`("ReadMe")`**) refers to the whole file name rather than the type component. |
+| Name             | Arguments                                                                | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+|------------------|--------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **`:ip`**        | **`:patterns`**<br>**`:inherit`**                                  | specifies a [`location-authorizer`](#c-location-authorizer) restriction on which machines can see published files. The value of the **`:patterns`** argument has the same form as the **`:patterns`** slot of a [**`location-authorizer`**](aserve.md#c-location-authorizer).                                                                                                                                                                                                |
+| **`:password`**  | **`:realm`**<br>**`:allowed`**<br>**`:inherit`**                   | specifies a [`password-authorizer`](#c-password-authorizer) restriction on access to published files. See the password-authorizer documentation for a description of the **`:realm`** and **`:allowed`** arguments.                                                                                                                                                                                                                       |
+| **`:files`**     | **`:allow`**<br>**`:deny`**<br>**`:inherit`**                      | specifies which files are visible to be published. To be visible a file must be allowed and not denied. What is tested is the filename only (that is the part after the last directory separator in the files's complete name). See below for the rules on how allow and denied is used.                                                                                                                                                  |
+| **`:directory`** | **`:list`**<br>**`:hidden`**<br>**`:files`**<br>**`:directories`** | **`:list`** specifies whether or not a directory listing is allowed for the directory in which the access file appears.  The default is to disallow directory listings.  **`:hidden`** can be used to ignore files and directories whose names begin with a dot.  The default is to show them.  **`:files`** and **`:directories`** can be used to show or hide files or directories.  By default, both are shown.  |
+| **`:mime`**      | **`:types`**<br>**`:inherit`**                                     | specifies which mime types are to be associated with which file types. This list takes precedence over the built-in list inside AllegroServe. **`:types`** is a list of mime specifiers. A mime specifier is a list beginning with a string giving the mime type followed by the files types that should map to that mime type. A file type in a list (e.g. **`("ReadMe")`**) refers to the whole file name rather than the type component. |
 
 
 ### Allow and Deny Processing
@@ -681,6 +682,10 @@ Here is a sample access file:
 ;; specify that a file named exactly ChangeLog should be given
 ;; mime type "text/plain"
 (:mime :types (("text/jil" "jil" "jlc") ("text/plain" "cl" ("ChangeLog"))))
+
+;; Allow listing the contents of this directory, but don't list dot
+;; files or directories
+(:directory :list t :hidden t :directories nil)
 ```
 
 -----

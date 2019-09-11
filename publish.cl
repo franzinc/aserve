@@ -1746,6 +1746,8 @@
 		     (setq postfix (subseq path (length (prefix ent))))))
 	 (redir-to)
 	 (info)
+	 (have-index)
+	 (directory-listing-allowed)
 	 (forbidden)
 	 (redirect-kind *response-temporary-redirect*)
 	 )
@@ -1810,9 +1812,7 @@
 				    (schar realname (1- (length realname)))))
 			 then (setq realname 
 				(concatenate 'string realname "/")))
-		      (dolist (index (directory-entity-indexes ent) 
-				; no match to index file, give up
-				(return-from process-entity-single-directory nil))
+		      (dolist (index (directory-entity-indexes ent))
 			(if* (eq :file (excl::filesys-type
 					(concatenate 'string realname index)))
 			   then ; we have an index
@@ -1822,8 +1822,14 @@
 					  (concatenate 'string realname index))
 				   else ; redirect to the index file
 					(setq redir-to index))
-				(return))))
-	      
+				(setq have-index t)
+				(return)))
+		      (when (null have-index)
+			;; Check for allowed directory listing access
+			(if* (directory-listing-allowed-p realname info)
+			   then (setq directory-listing-allowed t)
+			   else (return-from process-entity-single-directory
+				  nil))))
        elseif (not (eq :file type))
 	 then  ; bizarre object
 	      (return-from process-entity-single-directory nil)))
@@ -1851,6 +1857,12 @@
 		   nil))
 			     
 		(with-http-body (req ent))))
+     elseif directory-listing-allowed
+       then (return-from process-entity-single-directory
+	      (authorize-and-process 
+	       req
+	       (standard-directory-listing-entity-publisher
+		req ent realname postfix info)))
      elseif (and info (file-should-be-denied-p realname info))
        then ; we should ignore this file
 	    (return-from process-entity-single-directory nil)
@@ -1866,12 +1878,103 @@
 	       (funcall 
 		(or (directory-entity-publisher ent)
 		    #'standard-directory-entity-publisher)
-				       
 		req ent realname info))))
 					   
     t))
 
-    
+
+(defun standard-directory-listing-entity-publisher (req ent realname
+						    postfix info)
+  ;; The access-file allows a directory listing for the URI being
+  ;; processed.  Publish the path so a directory listing is returned to the
+  ;; client.
+  (publish :path (request-decoded-uri-path req)
+	   :host (host ent)
+	   :authorizer (entity-authorizer ent)
+	   :timeout (entity-timeout ent)
+	   :plist (list :parent ent)	; who spawned us
+	   :hook (entity-hook ent)
+	   :headers (entity-headers ent)
+	   :compress (entity-compress ent)
+	   :function
+	   (lambda (this-req this-ent)
+	     (show-directory-files
+	      this-req this-ent realname postfix
+	      ;; the original directory-entity, needed to re-check
+	      ;; the access-file on each access, since access data
+	      ;; is cached.
+	      ent
+	      info))))
+
+(defun show-directory-files (req ent dirname postfix dir-ent info)
+  (setq info (read-access-files dir-ent dirname postfix))
+  (cond
+   ((not (directory-listing-allowed-p dirname info))
+    ;; We get here if the access-file is changed to deny access.
+    (with-http-response (req ent)
+      (with-http-body (req ent)
+	(html (:b "Permission denied.")))))
+   (t
+    (with-http-response (req ent)
+      (with-http-body (req ent)
+	;; Present an extremely simple directory listing, taking care
+	;; to skip files for which access has been denied.
+	(html
+	 (:pre
+	  (ignore-errors
+	   (with-output-to-string (s)
+	     (let ((files (directory dirname))
+		   ns fns dirp pretty-fns
+		   subdir-ok subdirname subdir-postfix subdir-info)
+	       (html "Files in "
+		     (:princ-safe (request-decoded-uri-path req))
+		     :newline
+		     :newline)
+	       (dolist (file files)
+		 (setq ns (namestring file))
+		 (setq fns (file-namestring file))
+		 (setq dirp (file-directory-p ns))
+		 (setq pretty-fns (format nil "~a~@[/~]" fns dirp))
+		 (cond
+		  ((or (file-should-be-denied-p ns info)
+		       (and (char= #\. (elt fns 0))
+			    (directory-hide-dot-files-p ns info))
+		       (and dirp
+			    (not (directory-show-directories-p ns info)))
+		       (and (not dirp)
+			    (not (directory-show-files-p ns info))))
+		   ;; the conditions preclude showing this item, skip...
+		   )
+		  (t
+		   (when dirp
+		     ;; If we're looking at a directory, check if access is
+		     ;; allowed for it, and only link it if it is
+		     (setq subdirname
+		       (concatenate 'simple-string dirname pretty-fns))
+		     (setq subdir-postfix
+		       (concatenate 'simple-string postfix pretty-fns))
+		     (setq subdir-ok
+		       (cond
+			((and
+			  (setq subdir-info
+			    (read-access-files dir-ent
+					       subdirname
+					       subdir-postfix))
+			  (directory-listing-allowed-p subdirname
+						       subdir-info))
+			 t)
+			(t nil))))
+		   (let ((pretty-date
+			  (locale-format-time nil (file-write-date file)
+					      t nil nil "%F %T")))
+		     (html
+		      (:princ-safe pretty-date) " "
+		      (if* (or (not dirp)
+			       (and dirp subdir-ok))
+			 then (html ((:a :href fns) (:princ-safe pretty-fns)))
+			 else (html (:princ-safe pretty-fns)))
+		      :newline)))))))))))))))
+
 (defun standard-directory-entity-publisher (req ent realname info)
   ;; the default publisher used when directory entity finds
   ;; a file it needs to publish
@@ -1954,7 +2057,7 @@
   ; realname is the whole name of the file. Postfix is the part
   ; added by the uri and thus represents the part of the uri we
   ; need to scan for access files
-  
+
   (let ((access-file (directory-entity-access-file ent))
 	info
 	pos
@@ -1978,7 +2081,7 @@
 	 then (setq root "./")
 	      (setq pos 1)
 	 else (setq root (subseq realname 0 (1+ pos))))
-    
+
       (let ((aname (concatenate 'string root access-file)))
 	(if* (setq file-write-date (excl::file-write-date aname))
 	   then ; access file exists
@@ -2051,7 +2154,59 @@
 		       filename c))
       nil)))
 		
-   
+
+(defun directory-listing-allowed-p (dirname info)
+  ;; Given access 'info' check to see if directory listings for 'dirname'
+  ;; are allowed.  Return t to allow access.
+  (declare (ignore dirname))
+  (let ((match (and info (assoc :directory info :test #'eq))))
+    (if* (and match (cadr (member :list match)))
+       then t
+       else nil)))
+
+(defun directory-hide-dot-files-p (dirname info &aux temp)
+  ;; Given access 'info' check to see if dot files should be hidden.
+  ;; Return t to hide dot files.  The default is to show hidden files.
+  (declare (ignore dirname))
+  (let ((match (and info (assoc :directory info :test #'eq))))
+    (if* (and match (null (setq temp (member :hidden match))))
+       then ;; not there, do not hide
+	    nil
+     elseif (and temp (null (cadr temp)))
+       then ;; specified nil, hide
+	    t
+       else ;; option not present, do not hide
+	    nil)))
+
+(defun directory-show-files-p (dirname info &aux temp)
+  ;; Given access 'info' check to see if files should be shown.
+  ;; Return t to show files.  The default, if option is missing, is to show
+  ;; files.
+  (declare (ignore dirname))
+  (let ((match (and info (assoc :directory info :test #'eq))))
+    (if* (and match (null (setq temp (member :files match))))
+       then ;; not there, allow
+	    t
+     elseif (and temp (null (cadr temp)))
+       then ;; specified as nil, disallow
+	    nil
+       else ;; option not present, allow
+	    t)))
+
+(defun directory-show-directories-p (dirname info &aux temp)
+  ;; Given access 'info' check to see if directories should be shown.
+  ;; Return t to show directories.  The default, if option is missing, is
+  ;; to show directories.
+  (declare (ignore dirname))
+  (let ((match (and info (assoc :directory info :test #'eq))))
+    (if* (and match (null (setq temp (member :directories match))))
+       then ;; not there, allow
+	    t
+     elseif (and temp (null (cadr temp)))
+       then ;; specified as nil, disallow
+	    nil
+       else ;; option not present, allow
+	    t)))
 	    
 (defun file-should-be-denied-p (filename info)
   ;; given access info check to see if the given filename
@@ -3037,20 +3192,3 @@ list."))
 (if* (not (boundp '*wserver*))
    then ; create initial wserver object
 	(setq *wserver* (make-instance 'wserver)))
-
-
-
-
-  
-
-	  
-      
-
-
-
-		    
-		     
-		     
-		    
-		  
-    
