@@ -2920,13 +2920,18 @@
 	  (:body "500 - The server has taken too long to respond to the request"))))
 
   
-  
+
+(defclass http-stream ()
+  ()
+  (:documentation "Mixin for distinguishing HTTP-specific streams.
+All AllegroServe stream classes should include it in the superclass
+list."))
 
 ;; delayed send stream
 ;; 
 ;; 
 
-(def-stream-class prepend-stream (single-channel-simple-stream)
+(def-stream-class prepend-stream (single-channel-simple-stream http-stream)
   ((content :initform nil
 	    ;; what to send before the first write
 	    :initarg :content

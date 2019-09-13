@@ -3785,7 +3785,7 @@ in get-multipart-sequence"))
         (when external-format (find-external-format external-format :errorp nil))
 	(find-external-format *default-aserve-external-format*))))
 
-(def-stream-class truncated-stream (terminal-simple-stream)
+(def-stream-class truncated-stream (terminal-simple-stream http-stream)
   ((remaining :initarg :byte-length :accessor octets-remaining)))
 
 ;; Mention class in make-instance after class def to avoid bug24329.

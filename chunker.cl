@@ -17,7 +17,7 @@
 
 ; stream that reads the input and chunks the data to the output
 
-(def-stream-class chunking-stream (single-channel-simple-stream)
+(def-stream-class chunking-stream (single-channel-simple-stream http-stream)
   ((trailers :initform nil :accessor chunking-stream-trailers)
    (eof-sent :initform nil :accessor chunking-stream-eof-sent)))
 
@@ -252,7 +252,7 @@
 ;; unchunker stream returns eof when the end of the chunked data
 ;; is reached however the inner stream is not closed.
 ;;
-(def-stream-class unchunking-stream (single-channel-simple-stream)
+(def-stream-class unchunking-stream (single-channel-simple-stream http-stream)
   ((state :initform :need-count
 	  :accessor unchunking-state)
    (count  :initform 0

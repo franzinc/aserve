@@ -162,6 +162,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:handle-uri		; add-on component..
    #:header-slot-value
    #:http-request  	; class
+   #:http-stream
    #:locator		; class
    #:location-authorizer  ; class
    #:location-authorizer-patterns
