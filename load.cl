@@ -67,9 +67,10 @@
       "test/testdir/subb/access.cl"
       "test/testdir/subb/foo.html"
       "examples/cgitest.sh"
-      "doc/aserve.html"
-      "doc/tutorial.html"
-      "doc/htmlgen.html"
+      "doc/doclinks.py"
+      "doc/aserve.md"
+      "doc/tutorial.md"
+      "doc/htmlgen.md"
       ))
 
 (defparameter *aserve-examples*
@@ -103,8 +104,8 @@
 (defparameter *webactions-other-files*
     ;; other files to distribute with a source distribution
     '("webactions/load.cl"
-      "webactions/doc/using-webactions.html"
-      "webactions/doc/webactions.html"
+      "webactions/doc/using-webactions.md"
+      "webactions/doc/webactions.md"
       "webactions/test/t-webactions.cl"
       "webactions/test/sitea/project.cl"
       "webactions/test/sitea/file1.clp"
