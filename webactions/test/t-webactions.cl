@@ -318,6 +318,17 @@
                              :redirect nil))
       
 
+      (multiple-value-bind (body retcode headers)
+          (x-do-http-request (format nil "~a/sitea/retincluded" prefix-local)
+                             :redirect nil)
+        (declare (ignore retcode headers))
+        ;;
+        ;; note that Windows will return cr-lf and unix lf, so eliminate the cr
+        ;; as that's not the important part of the test.
+        (test "fooabc123def
+bar
+"  (delete #\^m body) :test #'equal))
+     
           
       )))
 
@@ -421,7 +432,7 @@
 
 
 
-(if* user::*do-aserve-test* 
+(if* (and (boundp 'user::*do-aserve-test*) user::*do-aserve-test*)
    then (net.aserve.testwa::test-webactions)
    else (format t "~%(net.aserve.testwa::test-webactions) will run the webactions test~%"))
 

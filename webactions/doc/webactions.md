@@ -964,7 +964,7 @@ databases).
 | Session                                                                                                  | Request Variable                      | Request Query                                                                                                        |
 |----------------------------------------------------------------------------------------------------------|---------------------------------------|----------------------------------------------------------------------------------------------------------------------|
 | **`(websession-variable session "name")`**                                                                   | **`(request-variable-value req "name")`** | **`(request-query-value "name" req)`**                                                                                   |
-| `<clp_value name="name" session/>`                                                                       | `<CLP_value name="name" request/>`    | `<CLP_value name="name" query/>`                                                                                     |
+| `<clp_value name="name" session/>`                                                                       | `<clp_value name="name" request/>`    | `<clp_value name="name" query/>`                                                                                     |
 | Lasts for the lifetime of a session. You can obtain the session object using **`(websession-from-req req)`** | Lasts for the lifetime of a request. | Lasts for the lifetime of a request. Initialized from the query string of the url of the request and from form data. |
 
 The values can be set using **`setf`** of the corresponding accessor.
@@ -1064,11 +1064,13 @@ The following CLP functions are supplied with AllegroServe.
 #### `clp_include`
 
 ```html
-<clp_include name="filename"/>
+<clp_include name="filename" arg1="value1" arg2="value2" .../>
 ```
 
 Insert the contents of the given file at this point. A relative filename will
 be relative to the location of the file containing this `clp_include` element.
+You may add additional arguments with names and values of your choosing.  These
+can then be referenced via  <clp_value name="arg1" include/> in the included file.
 
 -----
 
@@ -1091,15 +1093,17 @@ be within the `<head> .... </head>` part of the page.
 #### `clp_value`
 
 ```html
-<clp_value name="xxx" [safe] [query | request | session]/>
+<clp_value name="xxx" [safe] [query | request | session | include]/>
 ```
 
 Retrieve the value of the variable named xxx from the location specified and
-emit it to the html stream. If location is query then the value is retrieved
+emit it to the html stream. If location is `query` then the value is retrieved
 from the query string of a GET or the body and query string of the POST. If the
-location is request then the value is retrieved from the request variables. If
-the location is session then the values are retrieved from the session
-variables. If **`safe`** is given then the value will be printed in such a way to
+location is `request` then the value is retrieved from the request variables. If
+the location is `session` then the values are retrieved from the session
+variables.  If the location is `include` then the value is retrieved from the
+clp_include arguments for all includes nested above this one.
+If `safe` is given then the value will be printed in such a way to
 escape any characters that would be interpreted as html (e.g. as **`(html
 (:princ-safe xxx))`** would print the value). 
 

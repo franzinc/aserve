@@ -6,8 +6,9 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "webactions" 3
-  "v3: 1.20 specify http return code, more clp transforms
+(sys:defpatch "webactions" 4
+  "v4: 1.21 clp_include can take arguments
+v3: 1.20 specify http return code, more clp transforms
 v2: 1.18: can use cookies only for sessions; 
 v1: 1.17: don't create session for non-existant urls, get session from ent;"
   :type :system
@@ -68,6 +69,18 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
    (response-code    :initform nil
                      :accessor clp-entity-response-code)
    ))
+
+
+
+;; returned by a parse when the tag is :clp
+(defstruct (pobj (:type list))
+  tag
+  module
+  name
+  args
+  body)
+
+(defvar *include-args* nil)
 
 
 (defun publish-clp (&key (host nil host-p) port path class
@@ -288,36 +301,37 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 (defun parse-clp-file (ent)
   ;; parse the clp file
   ;;
-    
-  (handler-case 
-      (with-open-file (p (file ent)
-		       :direction :input
-		       :external-format (clp-entity-external-format ent))
+
+  (let (*include-args*)
+    (handler-case 
+        (with-open-file (p (file ent)
+                         :direction :input
+                         :external-format (clp-entity-external-format ent))
 	
-        (multiple-value-bind (objects response-code) 
-            (parse-clp-guts p (file ent))
-          (let* (
-                 (dependencies (expand-clp-includes objects (file ent)
-                                                    (clp-entity-external-format ent))))
-            (if* dependencies 
-               then (setf (clp-entity-dependencies ent)
-                      (mapcar #'(lambda (filename)
-                                  (cons filename (file-write-date filename)))
-                              dependencies)))
-            (setf (clp-entity-objects ent) objects)
+          (multiple-value-bind (objects response-code) 
+              (parse-clp-guts p (file ent))
+            (let* (
+                   (dependencies (expand-clp-includes objects (file ent)
+                                                      (clp-entity-external-format ent))))
+              (if* dependencies 
+                 then (setf (clp-entity-dependencies ent)
+                        (mapcar #'(lambda (filename)
+                                    (cons filename (file-write-date filename)))
+                                dependencies)))
+              (setf (clp-entity-objects ent) objects)
 	  
-            (setf (clp-entity-file-write-date ent)
-              (file-write-date (file ent)))
+              (setf (clp-entity-file-write-date ent)
+                (file-write-date (file ent)))
             
-            (setf (clp-entity-response-code ent) response-code)
+              (setf (clp-entity-response-code ent) response-code)
 	  
-            objects
-            )))
+              objects
+              )))
       
-    (error (c)
-      (logmess (format nil "processing clp file ~s got error ~a"
-		       (file ent)
-		       c)))))
+      (error (c)
+        (logmess (format nil "processing clp file ~s got error ~a"
+                         (file ent)
+                         c))))))
 
 
 
@@ -345,21 +359,23 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
   (do ((oo objects (cdr oo))
        (deps)
        (obj)
-       (fname))
+       (fname)
+       )
       ((null oo)
        deps)
     
     (setq obj (car oo))
     
     (if* (and (consp obj)
-	      (eq :clp (nth 0 obj))
-	      (equal "clp" (nth 1 obj))
-	      (equal "include" (nth 2 obj))
-	      (setq fname (cdr (assoc "name" (nth 3 obj) :test #'equal))))
+	      (eq :clp (pobj-tag obj))
+	      (equal "clp" (pobj-module obj))
+	      (equal "include" (pobj-name obj))
+	      (setq fname (cdr (assoc "name" (pobj-args obj) :test #'equal))))
        then (let ((newname (merge-pathnames fname filename)))
 	      (pushnew newname deps :test #'equal)
 	      
-	      (let* ((newobjs (parse-clp-filename newname external-format))
+	      (let* ((*include-args* (append (pobj-args obj) *include-args*))
+                     (newobjs (parse-clp-filename newname external-format))
 		     (newdeps (expand-clp-includes newobjs newname external-format)))
 		(dolist (dep newdeps)
 		  (pushnew dep deps :test #'equal))
@@ -371,7 +387,7 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 			      (car oo) (car newobjs))))))
     
     ; expand the body (if any)
-    (dolist (subdep (expand-clp-includes (nth 4 obj) filename external-format))
+    (dolist (subdep (expand-clp-includes (pobj-body obj) filename external-format))
       (pushnew subdep deps :test #'equal))))
 
 			
@@ -557,12 +573,18 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 				    #\/ #\>))
 )
 
-(defun parse-clp-tag (p filename)
-  ;; just read a <.. now see if there's a clp tag to read
-  ;;
+(defun parse-clp-tag  (p filename)
+  (multiple-value-bind (form lasttag) (parse-clp-tag-1 p filename)
+    (if* (and (consp form) (eq :clp (pobj-tag form)))
+       then (values (postprocess-clp-tag form)
+                    lasttag)
+       else (values form lasttag))))
+            
+(defun parse-clp-tag-1 (p filename)
+  ;; just read a <.. now see if there's a clp tag to read  ;;
   (macrolet ((no-tag-found (tag)
 	       `(progn (file-position p start-pos) ; restore position
-		       (return-from parse-clp-tag 
+		       (return-from parse-clp-tag-1 
 			 (values nil ,tag)))))
     
     (let ((start-pos (file-position p))
@@ -580,7 +602,7 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 					 :initial-contents (nreverse chars))))
 		    ;(format t "tag is ~s~%" tag)
 		    (if* (equal tag "!--")
-		       then (return-from parse-clp-tag
+		       then (return-from parse-clp-tag-1
 			      (collect-comment p)))
 		
 		    (let ((pos (position #\_ tag)))
@@ -598,7 +620,7 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 						       filename)))
 					  (if* clptag
 					     then 
-						  (return-from parse-clp-tag
+						  (return-from parse-clp-tag-1
 						    clptag))))))
 		      (no-tag-found tag)))
 	     else (push ch chars)))))))
@@ -611,7 +633,7 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
   ;; and recusively parse the guts
   (let (arg-values namechars valuechars seendq)
     (flet ((finish-attribute ()
-	     ;; build the attribute name,values
+             ;; build the attribute name,values
 	     (let ((name (make-array (length namechars)
 				     :element-type 'character
 				     :initial-contents (nreverse
@@ -644,21 +666,26 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 			  valuechars nil)
 		    (setq state 3))))
 	    
-	      ; seen /, expect > next
+              ; seen /, expect > next
 	      (1 (if* (eq ch #\>)
 		    then ; body-free clp tag
 			 (return-from process-clp-tag
-			   `(:clp ,module ,fcn ,(nreverse arg-values) nil))
+                           (make-pobj
+                            :tag :clp 
+                            :module module 
+                            :name fcn 
+                            :args (nreverse arg-values) 
+                            :body nil))
 		    else ; not a valid tag
 			 (return-from process-clp-tag nil)))
 	    
-	      ; seen end of tag, scan until </tag> seen
+              ; seen end of tag, scan until </tag> seen
 	      (2 (unread-char ch p)
 		 (let ((body-start (file-position p)))
 		   (let ((length (scan-for-end-tag p module fcn)))
 		     (if* length
 			then ; found end tag, now parse the 
-			     ; body
+                             ; body
 			     
 			     (let ((body (make-array length
 						     :element-type
@@ -669,16 +696,19 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 			       (file-position p curpos)
 			     
 			       (return-from process-clp-tag
-				 `(:clp ,module ,fcn 
-					,(nreverse arg-values)
-					,(parse-clp-guts 
-					  (make-string-input-stream body)
-					  filename
-					  ))))
+				 (make-pobj 
+                                  :tag :clp 
+                                  :module module 
+                                  :name fcn 
+                                  :args (nreverse arg-values)
+                                  :body (parse-clp-guts 
+                                         (make-string-input-stream body)
+                                         filename
+                                         ))))
 			else ; no end tag, bogus!
 			     (return-from process-clp-tag nil)))))
 	    
-	      ; collecting the attribute name
+              ; collecting the attribute name
 	      (3 (case ch
 		   (#\= ; end of name, time for value
 		    (setq valuechars nil)
@@ -694,23 +724,23 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 		    (setq state 2))
 		   (t (push ch namechars))))
 	    
-	      ; start collecting the attribute value
+              ; start collecting the attribute value
 	      
 	      (4 (case ch
 		   (#.*clp-white-space*
 		    (finish-attribute)
 		    (setq state 0))
 		   (#\/ (finish-attribute)
-			(setq state 1))
+                    (setq state 1))
 		   (#\> (finish-attribute)
-			(setq state 2))
+                    (setq state 2))
 		   (#\" (setq seendq t
 			      state 5))
 		   (t (push ch valuechars)
 		      (setq state 5)
 		      )))
 	      
-	      ; in the middle of collecting an attribute value
+              ; in the middle of collecting an attribute value
 	      (5 
 	       (if* seendq
 		  then (if* (eq ch #\")
@@ -722,9 +752,9 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 			  (finish-attribute)
 			  (setq state 0))
 			 (#\/ (finish-attribute)
-			      (setq state 1))
+                          (setq state 1))
 			 (#\> (finish-attribute)
-			      (setq state 2))
+                          (setq state 2))
 			 (t (push ch valuechars))))))))))))
 			     
 	
@@ -857,6 +887,29 @@ v1: 1.13: cosmetic: bump version #; code same as 10.0 initial release."
 			then (funcall func req ent args body)))))))))
 
 
+;; code for clp tags that need to be evaluated at parse time
+
+(defun postprocess-clp-tag (pobj)
+  ;; cases handled
+  ;;   <clp_value name=foo include>
+  ;; will look at the args supplied with enclosing clp_includes and retrieve
+  ;; the value of that arg
+  (if* (and (equal  (pobj-module pobj) "clp")
+            (equal  (pobj-name pobj) "value")
+            (assoc "include" (pobj-args pobj) :test #'equal))
+     then ;; retrieve value of 
+          (let* ((name (cdr (assoc "name" (pobj-args pobj) :test #'equal)))
+                 (arg-value
+                  (and name (cdr (assoc name *include-args* :test #'equal)))))
+            `(:text ,(or arg-value "")))
+     else pobj))
+
+            
+            
+          
+          
+          
+         
 		   
 
 

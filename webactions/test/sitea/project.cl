@@ -53,6 +53,10 @@
                           
                           ;; here we have a bogus string value
                           ("retanycodetest-bogus" action-set-retany-bogus)
+                          
+                          ;; test clp_include with args
+                          ("retincluded" "retwithinclude.clp")
+                          
                           )))
 		   
 		   
