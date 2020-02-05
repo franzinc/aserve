@@ -4,7 +4,7 @@
 # Export everything
 export
 
-SHELL = sh
+SHELL = bash
 
 ## First, so it can set variables and even change the default rule
 makefile_local = $(shell if test -f makefile.local;then echo makefile.local;fi)
@@ -17,7 +17,14 @@ on_windows = $(shell if test -d "c:/"; then echo yes; else echo no; fi)
 use_dcl = $(shell if test -f ../dcl.dxl; then echo yes; else echo no; fi)
 
 ifeq ($(use_dcl),yes)
-mlisp = ../lisp
+
+on_macOS = $(shell if test `uname -s` = Darwin; then echo yes; fi)
+
+ifeq ($(on_macOS),yes)
+mlisp_env = MACHINE=x86 OS_NAME=darwin source ../scm-bin/aclbuildenv.sh &&
+endif
+
+mlisp = $(mlisp_env) ../lisp
 image = dcl.dxl
 endif
 
