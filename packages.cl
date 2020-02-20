@@ -244,6 +244,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:wserver-io-timeout
    #:wserver-log-function
    #:wserver-log-stream
+   #:wserver-max-content-length
    #:wserver-response-timeout
    #:wserver-free-worker-timeout
    #:wserver-socket

@@ -405,6 +405,7 @@
 		       (test-publish-multi port)
 		       (test-publish-prefix port)
 		       (test-put-patch port)
+                       (test-content-length port)
 		       (test-authorization port)
 		       (test-encoding)
 		       (test-truncated-stream)
@@ -3393,6 +3394,46 @@ Returns a vector."
                    (buffer (make-array 256 :element-type '(unsigned-byte 8))))
                (test 4 (device-read truncated-stream buffer 0 4 nil)))))
       (delete-file temp-file-name))))
+
+
+(defun test-content-length (port)
+  ;; verify that we check the content length
+  (if* (not (asc x-proxy))
+     then ;; only do test when direct to the web server
+          (format t "doing content-length test~%")
+          
+          (publish :path "/test-content-length"
+                   :function #'(lambda (req ent)
+                                 (with-http-response (req ent)
+                                   (with-http-body (req ent)
+                                     (get-request-body req)))))
+          
+          
+          (let ((url (format nil "http://localhost:~d/test-content-length" port))
+                (content (make-array 2048 :element-type 'character :initial-element #\a)))
+            
+            (multiple-value-bind (body code)
+                (x-do-http-request url  
+                                   :method :post 
+                                   :content content)
+              (declare (ignore body))
+              (test 200 code))
+
+            ;; change to limit the content length to 512
+            (let ((old (wserver-max-content-length *wserver*)))
+              (setf (wserver-max-content-length *wserver*) 512)
+                 (test-error
+                  (x-do-http-request url  
+                                     :method :post 
+                                     :content (and :second content)))
+          
+                 ;; set the limit back to what it was before
+                 (setf (wserver-max-content-length *wserver*) old)))))
+          
+            
+            
+            
+  
     
 (defun test-spr44282 ()
   (test '(("bar" . " ") ("foo" . " ")) 

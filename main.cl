@@ -570,6 +570,13 @@ died. Use nil to specify no timeout.")
     :initarg :free-worker-timeout
     :accessor wserver-free-worker-timeout)
    
+   (max-content-length
+    ;; maximum Content-Length we'll read
+    ;; nil means no limit
+    :initform nil
+    :initarg :max-content-length
+    :accessor wserver-max-content-length)
+   
    ;;
    ;; -- internal slots --
    ;;
@@ -1305,7 +1312,7 @@ by keyword symbols and not by strings"
 		   accept-hook
 		   ssl		 ; enable ssl
 		   ssl-args	 ; plist of make-ssl-server-stream args
-		   ; overrides other ssl args when specified
+                   ; overrides other ssl args when specified
 		   ssl-key       ; File containing private key. 
 		   ssl-password  ; for ssl: pswd to decode priv key
 		   ssl-method	 ; protocols for ssl server
@@ -1320,6 +1327,7 @@ by keyword symbols and not by strings"
 		   (external-format nil efp); to set external format
 		   backlog
 		   (compress (and (member :zlib-deflate *features*) t))
+                   (max-content-length nil max-content-length-p)
 		   )
   ;; -exported-
   ;;
@@ -1344,6 +1352,14 @@ by keyword symbols and not by strings"
 			 :enable-compression compress)))
 
   (if* efp then (setf (wserver-external-format server) external-format))
+  
+  (if* max-content-length-p
+     then (if*  (not (or (null max-content-length)
+                         (integerp max-content-length)))
+             then (error "max-content-length must be nil or an integer, not ~s" max-content-length))
+          (if* server
+             then (setf (wserver-max-content-length server) max-content-length)))
+           
 	  
   ;; the only required ssl arg is a certificate. check that a certificate has been specified here, so
   ;; that we can error immediately instead of when the first https connection is attempted.
@@ -1392,7 +1408,7 @@ by keyword symbols and not by strings"
 
     (if* test-ssl
        then ;; test the accept hook to see if the
-	    ;; certificates are correct
+            ;; certificates are correct
 	    (let (csock psock sock)
 	      (unwind-protect 
 		  (progn
@@ -1402,8 +1418,8 @@ by keyword symbols and not by strings"
 				 :remote-host "127.1"
 				 :remote-port (socket:local-port psock)))
 		    (setq sock (socket:accept-connection psock))
-		    ;; if the verification fails the appropriate
-		    ;; error will be signalled
+                    ;; if the verification fails the appropriate
+                    ;; error will be signalled
 		    (funcall accept-hook sock))
 		(progn (and sock  (close sock))
 		       (and psock (close psock))
@@ -1427,7 +1443,7 @@ by keyword symbols and not by strings"
   (if* (and (or restore-cache cache)
 	    os-processes)
      then ; coordinating the cache between processes is something we're
-	  ; not ready to do ... *yet*.
+          ; not ready to do ... *yet*.
 	  (error "Can't have caching and os-processes in the same server"))
   
   #-unix
@@ -1499,7 +1515,7 @@ by keyword symbols and not by strings"
     #+unix
     (if* os-processes
        then ; create a number of processes, letting only the main
-	    ; one keep access to the tty
+            ; one keep access to the tty
 	    (if* (not (and (integerp os-processes) 
 			   (>= os-processes 1)))
 	       then (error "os-processes should be an integer greater than zero"))
@@ -1507,7 +1523,7 @@ by keyword symbols and not by strings"
 	      (dotimes (i (1- os-processes))
 		(if* (zerop (setq child (unix-fork)))
 		   then ; we're a child, let the *lisp-listener* go 
-			; catatonic
+                        ; catatonic
 			(excl::unix-signal 15 0) ; let term kill it
 			(setq is-a-child t 
 			      children nil)
@@ -1515,13 +1531,13 @@ by keyword symbols and not by strings"
 		   else (push child children)))
 	      (if* children
 		 then ; setup to kill children when main server 
-		      ; shutdown
+                      ; shutdown
 		      (push #'(lambda (wserver)
 				(declare (ignore wserver))
 				(dolist (proc children)
 				  (unix-kill proc 15) ; 15 is sigterm
 				  )
-				; allow zombies to die
+                                ; allow zombies to die
 				(sleep 2)
 				(loop (if* (null
 					    (sys:reap-os-subprocess :wait nil))
@@ -2197,6 +2213,10 @@ by keyword symbols and not by strings"
 
 	  (if* (and believe-it (> length 0))
 	     then ;; we know the length
+                  (if* (and (wserver-max-content-length *wserver*)
+                            (> length (wserver-max-content-length *wserver*)))
+                     then (error "Content-Length of ~s exceeds acceptable length" length))
+                  
 		  (prog1 (let ((ret (make-string length)))
 			   (read-sequence-with-timeout 
 			    ret length 

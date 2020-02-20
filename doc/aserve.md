@@ -182,7 +182,7 @@ The function **`net.aserve:start`** is used to start the server running.
             setuid setgid debug proxy proxy-proxy cache restore-cache
             accept-hook ssl ssl-password os-processes external-format
             compress ssl-key ssl-password ssl-method test-ssl ca-file
-            ca-directory verify max-depth)
+            ca-directory verify max-depth max-content-length)
 ```
 
 If no arguments are given then [**`start`**](aserve.md#f-start) starts a multi-threaded web server on
@@ -287,6 +287,9 @@ following meanings:
   - **`compress`** - if true then the server will send the body gzip compressed if
     the client can accept it and the entity being returned is enabled for
     compression.
+  - **`max-content-length`** - The server will refuse to read a body with a declared Content-Length
+    more than this amount.  The default is nil meaning there is no limit.  This limit only applies
+    when **`get-request-body`** is called.  If the request body is read incrementally then there is no limit.
   - **`ssl-key`**, **`ssl-password`**, **`ca-file`**, **`ca-directory`**,
     **`verify`** and **`max-depth`** - these values are passed to
     **`make-ssl-server-stream`** (documented with the ACL documentation) should the
