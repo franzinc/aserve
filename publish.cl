@@ -584,6 +584,7 @@
       ("text/vnd.wap.sl") ("text/vnd.wap.wml" "wml")
       ("text/vnd.wap.wmlscript" "wmls") ("text/x-setext" "etx")
       ("text/xml" "xml" "xsl") ("text/xml-external-parsed-entity")
+      ("text/yaml" "yaml")
       ("video/mp4v-es") ("video/mpeg" "mpeg" "mpg" "mpe")
       ("video/parityfec") ("video/pointer") ("video/quicktime" "qt" "mov")
       ("video/vnd.fvt") ("video/vnd.motorola.video")
