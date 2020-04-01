@@ -27,6 +27,7 @@
       "log" 
       "cache"
       "client"
+      "creq-stream"
       "proxy"
       "cgi"
       "chunker"

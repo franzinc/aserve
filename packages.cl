@@ -5,8 +5,9 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 23
-  "v23: 1.3.75: add support for PATCH http verb;
+(sys:defpatch "aserve" 24
+  "v24: 1.3.76: do-http-request can return a stream to read the body
+v23: 1.3.75: add support for PATCH http verb;
 v22: 1.3.74: handle input from stream for MAKE-HTTP-CLIENT-REQUEST;
 v21: 1.3.73: allow free worker wait timeout configuration;
 v20: 1.3.71: cache reuses previous accept header

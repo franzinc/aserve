@@ -2069,12 +2069,12 @@ If you need more control over the process you can use the functions:
                           skip-body timeout compress keep-alive
                           connection
                           certificate key certificate-password ca-file
-                          ca-directory verify max-depth)
+                          ca-directory verify max-depth return)
 ```
 
-Sends a request to **`uri`** and returns four values:
+Sends a request to **`uri`** and returns six values:
 
-  1. The body of the response. If there is no body the empty string returned.
+  1. The body of the response. If there is no body the empty string returned.  If **`:return :stream`** was given then a stream will be returned instead of a string.
   2. The response code (for example, 200, meaning that the request succeeded).
   3. An alist of headers where the **`car`** of each entry is a keyword symbol or a
      lowercase string with the header name and the **`cdr`** is a string with the
@@ -2089,6 +2089,9 @@ Sends a request to **`uri`** and returns four values:
      keep-alive request. This socket can be used as the value of the
      **`:connection`** argument in a subsequent call to [**`do-http-request`**](aserve.md#f-do-http-request) to the
      same server.
+  6. The **`client-request`** object used make the request.  If you specified **`:return :stream`** and
+     there are trailers in the response then you'll need to look in this object for the final headers once
+     you've encountered an end of file reading the body from the stream.
 
 The **`uri`** can be a uri object or a string. The scheme of the **`uri`** must be **`nil`**
 or `"http"`. The keyword arguments to [**`do-http-request`**](aserve.md#f-do-http-request) are
@@ -2122,6 +2125,7 @@ or `"http"`. The keyword arguments to [**`do-http-request`**](aserve.md#f-do-htt
 | **`compress`**                                                                                                             | **`nil`**                          | If true then tell the server in the request that we are able to accept a compressed body. If the server decides to send a compressed body then the body will be uncompressed by do-http-request before being returned to the caller.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **`certificate`**, **`key`**, **`certificate-password`**, **`ca-file`**, **`ca-directory`**, **`verify`**, **`max-depth`** | **`nil`**                          | These values are passed as the arguments to make-ssl-client-stream (documented in the ACL documentation). Specifying these values is optional but it does give you control of the client's SSL certificate management. These values are used in a fully patched ACL 8.0 (or newer). In older versions of ACL they are ignored.                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **`cache`**                                                                                                                | **`nil`**                          | A instance of class **`net.aserve.client:client-cache`** if you wish to consult and update this cache with this request. See the documentation on [**`client-cache`**](aserve.md#c-client-cache) below.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **`return`**                                                                                                                | **`:string`**                          | The default behavior is to return the body as a string as the first value.  If **`:return`** is given the value **`:stream`** then  a stream from which you can read the contents of the body is returned.  In this case it is the caller's responsibility to close this stream.  If **`:return`** is **`:stream`** then **`:keep-alive`** and **`:cache`** must be **`nil`**.                    | 
 
 
 For example:

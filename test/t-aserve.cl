@@ -892,7 +892,44 @@ Returns a vector."
     (delete-file dummy-1-name)
     (delete-file dummy-2-name)
     ))
+
+(defun read-from-stream-to-buffer (stream buffer)
+  ;; we want to read the stream into the 
+  ;; given buffer which we ensure is big enough.
+  ;;
+  ;; we do a sequence of read-chars and read-sequences
+  ;; calls to exercise the stream class's buffering.
+  ;; 
+  (let ((bytes 0)
+        (ch))
+    (flet ((finish ()
+             (return-from read-from-stream-to-buffer
+               (subseq buffer 0 bytes))))
+           
+      ;; do a few read-chars
+      (dotimes (i 15)
+        (if* (setq ch (read-char stream nil nil))
+           then (setf (aref buffer bytes) ch)
+                (incf bytes)
+           else ; end of file
+                (finish)))
+      ;; do read sequences of bigger and bigger amounts
+      (dolist (size '(5 50 1000 10000))
+        (dotimes (i 20)
+          (if* (> (+ bytes size) (length buffer))
+             then (error "buffer given was too small"))
+          
+          (let ((got (read-sequence  buffer stream :start bytes :end (+ bytes size))))
+            (if* (<=  got bytes)
+               then (finish)
+               else (setq bytes got)))))
     
+    
+      ;; should never happen
+      (error "did not see  eof"))))
+    
+               
+            
 
 
 
@@ -906,6 +943,9 @@ Returns a vector."
 	(dummy-6-content (build-dummy-file 100000 50 nil nil))
 	
 	(prefix-local (format nil "http://localhost:~a" port))
+        ;; must be at least as big as the largest body we'll read
+        ;; since we only do one read-sequence
+        (big-buffer (make-array 200000 :element-type 'character))
 	)
 
     ;;
@@ -920,7 +960,7 @@ Returns a vector."
 		    ("/dum6" ,dummy-6-content)))
 
       (let ((this (cadr pair)))
-	;; to make a separate binding for each function
+        ;; to make a separate binding for each function
 	(publish :path (car pair) 
 		 :content-type "text/plain"
 		 :headers '((:testhead . "testval"))
@@ -937,8 +977,8 @@ Returns a vector."
 				 :keep-alive keep-alive)
 	    (test 200 code)
 	    (test "testval"
-		    (cdr (assoc :testhead headers :test #'equal))
-		    :test #'equal)
+                  (cdr (assoc :testhead headers :test #'equal))
+                  :test #'equal)
 	    (test (format nil "text/plain" port)
 		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
@@ -950,7 +990,34 @@ Returns a vector."
 			  (cdr (assoc :transfer-encoding headers 
 				      :test #'eq))
 			  :test #'equalp))
-	    (test (cadr pair) body :test #'equal)))))
+	    (test (cadr pair) body :test #'equal))
+          
+          ;; test  :return :stream
+          
+          (multiple-value-bind (stream code headers)
+	      (x-do-http-request (format nil "~a~a" prefix-local (car pair))
+				 :protocol protocol
+				 :keep-alive keep-alive
+                                 :return :stream)
+	    (test 200 code)
+	    (test "testval"
+                  (cdr (assoc :testhead headers :test #'equal))
+                  :test #'equal)
+	    (test (format nil "text/plain" port)
+		  (cdr (assoc :content-type headers :test #'eq))
+		  :test #'equal)
+	    (if* (and (eq protocol :http/1.1)
+		      (null (asc x-proxy))
+		      (null (asc x-ssl))
+		      )
+	       then (test "chunked"
+			  (cdr (assoc :transfer-encoding headers 
+				      :test #'eq))
+			  :test #'equalp))
+            (test (cadr pair) 
+                  (read-from-stream-to-buffer stream big-buffer)
+                  :test #'equal))
+          )))
     
     
     ;; test whether we can read urls with space in them
@@ -994,30 +1061,30 @@ Returns a vector."
     ;; test that if an error occurs we don't send out the
     ;; header before we encounter the error
     (publish :path "/error-computed-error"
-	 :content-type "text/plain"
-	 :function
-	 #'(lambda (req ent)
-	     ;; this will get an error after the header is geneated
-	     ;; but before the first body output is done
-	     ;; this will test the delayed header send.
-	     ;; the user should see a 500 "internal server error"
-	     (handler-case
-		 (with-http-response (req ent)
-		   (with-http-body (req ent)
-		     ; make an error
-		     (let ((a (+ 1 2 3 :bogus)))
-		       (+ a a))
-		     (html "done")))
-	       (error (c)
-		 (with-http-response (req ent 
-					  :response 
-					  *response-internal-server-error*
-					  :content-type
-					  "text/html")
-		   (with-http-body (req ent)
-		     (html (:head (:title "Internal Server Error"))
-			   (:body "As expected this entity caused error " 
-				  (:princ c)))))))))
+             :content-type "text/plain"
+             :function
+             #'(lambda (req ent)
+                 ;; this will get an error after the header is geneated
+                 ;; but before the first body output is done
+                 ;; this will test the delayed header send.
+                 ;; the user should see a 500 "internal server error"
+                 (handler-case
+                     (with-http-response (req ent)
+                       (with-http-body (req ent)
+                         ; make an error
+                         (let ((a (+ 1 2 3 :bogus)))
+                           (+ a a))
+                         (html "done")))
+                   (error (c)
+                     (with-http-response (req ent 
+                                              :response 
+                                              *response-internal-server-error*
+                                              :content-type
+                                              "text/html")
+                       (with-http-body (req ent)
+                         (html (:head (:title "Internal Server Error"))
+                               (:body "As expected this entity caused error " 
+                                      (:princ c)))))))))
     
     (multiple-value-bind (body code headers)
 	(x-do-http-request (format nil "~a/error-computed-error" prefix-local)
