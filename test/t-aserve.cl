@@ -3475,8 +3475,22 @@ Returns a vector."
                                    (with-http-body (req ent)
                                      (get-request-body req)))))
           
+          (publish :path "/test-no-content"
+                   :function #'(lambda (req ent)
+                                 (with-http-response (req ent
+                                                      :response
+                                                      *response-no-content*)
+                                   (with-http-body (req ent)
+                                     ;; We'll send a body but 
+                                     ;; it should be ignored because
+                                     ;; it's a 204 response
+                                     (html "this should not be seen")
+                                     ))))
+          
           
           (let ((url (format nil "http://localhost:~d/test-content-length" port))
+                (nc-url
+                 (format nil "http://localhost:~d/test-no-content" port))
                 (content (make-array 2048 :element-type 'character :initial-element #\a)))
             
             (multiple-value-bind (body code)
@@ -3489,13 +3503,21 @@ Returns a vector."
             ;; change to limit the content length to 512
             (let ((old (wserver-max-content-length *wserver*)))
               (setf (wserver-max-content-length *wserver*) 512)
-                 (test-error
-                  (x-do-http-request url  
-                                     :method :post 
-                                     :content (and :second content)))
+              (test-error
+               (x-do-http-request url  
+                                  :method :post 
+                                  :content (and :second content)))
           
-                 ;; set the limit back to what it was before
-                 (setf (wserver-max-content-length *wserver*) old)))))
+              ;; set the limit back to what it was before
+              (setf (wserver-max-content-length *wserver*) old))
+          
+            ;; test that a 204 returns nil to indicate no body
+            (multiple-value-bind (body code) 
+                (x-do-http-request nc-url
+                                   :method :get)
+              (test 204 code)
+              (test nil body)))))
+              
           
             
             
