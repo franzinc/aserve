@@ -1046,12 +1046,13 @@ headers")
                       (with-socket-connect-timeout (:timeout timeout
                                                              :host phost 
                                                              :port pport)
-                        (socket:make-socket :remote-host phost
-                                            :remote-port pport
-                                            :format :bivalent
-                                            :type net.aserve::*socket-stream-type*
-                                            :nodelay t
-                                            )))))
+                        (wrap-enable-keepalive
+                         (socket:make-socket :remote-host phost
+                                             :remote-port pport
+                                             :format :bivalent
+                                             :type net.aserve::*socket-stream-type*
+                                             :nodelay t
+                                             ))))))
        elseif use-socket
          then ; persistent connection
               (setq sock use-socket)
@@ -1084,14 +1085,15 @@ headers")
                 (with-socket-connect-timeout (:timeout timeout
                                                        :host host
                                                        :port port)
-                  (socket:make-socket :remote-host host
-                                      :remote-port port
-                                      :format :bivalent
-                                      :type 
-                                      net.aserve::*socket-stream-type*
-                                      :nodelay t
+                  (wrap-enable-keepalive
+                   (socket:make-socket :remote-host host
+                                       :remote-port port
+                                       :format :bivalent
+                                       :type 
+                                       net.aserve::*socket-stream-type*
+                                       :nodelay t
                                                
-                                      )))
+                                       ))))
               (if* ssl
                  then (setq sock
                         (apply #'convert-to-ssl-stream sock :host host args))))
@@ -1409,12 +1411,13 @@ headers")
       (let ((sock (with-socket-connect-timeout (:timeout nil
                                                          :host phost 
                                                          :port pport)
-                    (socket:make-socket :remote-host phost
-                                        :remote-port pport
-                                        :format :bivalent
-                                        :type net.aserve::*socket-stream-type*
-                                        :nodelay t
-                                        ))))
+                    (wrap-enable-keepalive
+                     (socket:make-socket :remote-host phost
+                                         :remote-port pport
+                                         :format :bivalent
+                                         :type net.aserve::*socket-stream-type*
+                                         :nodelay t
+                                         )))))
         (let ((cmd (format nil "CONNECT ~a:~d HTTP/1.1"
                            host
                            port)))

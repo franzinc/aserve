@@ -647,51 +647,59 @@ Returns a vector."
     ;; the result will be the same since given that we know the
     ;; length of the file, chunking won't be needed
     ;; 
-    (let ((ent (publish-file :path "/frob" :file dummy-1-name
-			     :content-type "text/plain"
-			     :cache-p t
-			     :hook #'(lambda (req ent extra)
-				       (declare (ignore req ent extra))
-				       (setq got-reps (or got-reps 0))
-				       (incf got-reps))
-			     :headers '((:testhead . "testval"))
-			     :compress compress
-			     )))
-      (test nil (net.aserve::contents ent)) ; nothing cached yet
+    ;; turn on *enable-keepalive* to test that things don't
+    ;; fail in the server and client with it turned on.
+    ;; We can't test that the packets are sent.  We just
+    ;; want to make sure aserve doesn't signal an error on
+    ;; any machine
+    (let ((prev-keepalive *enable-keepalive*))
+      (setq *enable-keepalive* 10)
+      (let ((ent (publish-file :path "/frob" :file dummy-1-name
+                               :content-type "text/plain"
+                               :cache-p t
+                               :hook #'(lambda (req ent extra)
+                                         (declare (ignore req ent extra))
+                                         (setq got-reps (or got-reps 0))
+                                         (incf got-reps))
+                               :headers '((:testhead . "testval"))
+                               :compress compress
+                               )))
+        (test nil (net.aserve::contents ent)) ; nothing cached yet
 
-      ;; 
-      (dolist (cur-prefix (list prefix-local prefix-dns))
-	;* don't specify keep-alive unless you're willing
-	;  to close the resulting socket
-	(dolist (keep-alive '(nil))
-	  (dolist (protocol '(:http/1.0 :http/1.1))
-	    (asc-format "test 1 - ~s" (list keep-alive protocol))
-	    (multiple-value-bind (body code headers)
-		(x-do-http-request (format nil "~a/frob" cur-prefix)
-				   :protocol protocol
-				   :keep-alive keep-alive)
-	      (incf reps)
-	      (test 200 code)
-	      (test (format nil "text/plain")
-		    (cdr (assoc :content-type headers :test #'eq))
-		    :test #'equal)
+        ;; 
+        (dolist (cur-prefix (list prefix-local prefix-dns))
+          ;* don't specify keep-alive unless you're willing
+          ;  to close the resulting socket
+          (dolist (keep-alive '(nil))
+            (dolist (protocol '(:http/1.0 :http/1.1))
+              (asc-format "test 1 - ~s" (list keep-alive protocol))
+              (multiple-value-bind (body code headers)
+                  (x-do-http-request (format nil "~a/frob" cur-prefix)
+                                     :protocol protocol
+                                     :keep-alive keep-alive)
+                (incf reps)
+                (test 200 code)
+                (test (format nil "text/plain")
+                      (cdr (assoc :content-type headers :test #'eq))
+                      :test #'equal)
 	      
-	      (test "testval"
-		    (cdr (assoc :testhead headers :test #'equal))
-		    :test #'equal)
+                (test "testval"
+                      (cdr (assoc :testhead headers :test #'equal))
+                      :test #'equal)
 	      
-	      #+ignore (if* (eq protocol :http/1.1)
-			  then (test "chunked"
-				     (cdr (assoc :transfer-encoding headers 
-						 :test #'eq))
-				     :test #'equalp))
-	      (test dummy-1-contents body :test #'equal)))))
+                #+ignore (if* (eq protocol :http/1.1)
+                            then (test "chunked"
+                                       (cdr (assoc :transfer-encoding headers 
+                                                   :test #'eq))
+                                       :test #'equalp))
+                (test dummy-1-contents body :test #'equal)))))
       
-      ;; stuff should be cached by now
-      ;; but when doing a compressed retrieval caching isn't done
-      (if* (not compress)
-	 then (test t (not (null (net.aserve::contents ent)))))
-      )
+        ;; stuff should be cached by now
+        ;; but when doing a compressed retrieval caching isn't done
+        (if* (not compress)
+           then (test t (not (null (net.aserve::contents ent)))))
+        )
+      (setq *enable-keepalive* prev-keepalive))
 
     (test reps got-reps)  ; verify hook function worked
 
@@ -733,8 +741,8 @@ Returns a vector."
 		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
 	    (test "testval"
-		    (cdr (assoc :testhead headers :test #'equal))
-		    :test #'equal)
+                  (cdr (assoc :testhead headers :test #'equal))
+                  :test #'equal)
 	    #+ignore (if* (eq protocol :http/1.1)
 			then (test "chunked"
 				   (cdr (assoc :transfer-encoding headers 
@@ -742,7 +750,7 @@ Returns a vector."
 				   :test #'equalp))
 	    (test dummy-2-contents body :test #'equal))
 	  
-	  ; try partial gets
+          ; try partial gets
 	  (multiple-value-bind (body code headers)
 	      (x-do-http-request (format nil "~a/frob2-npl" cur-prefix)
 				 :protocol protocol
@@ -860,26 +868,26 @@ Returns a vector."
       (let ((body2 (x-do-http-request (format nil "~a/check-uncache" 
 					      prefix-local))))
 	
-	; verify result was correct
+        ; verify result was correct
 	(test dummy-1-contents body2 :test #'equal)
 
-	; verify that something's cached.
+        ; verify that something's cached.
 	(if* (not compress)
 	   then (test t (not (null (and :second (net.aserve::contents ent))))))
 
-	; overwrite dummy file with new contents
+        ; overwrite dummy file with new contents
 	(sleep 2) ; pause to get file write date to noticably advance
 	(setq dummy-1-contents (build-dummy-file 555 44 dummy-1-name
 						 compress))
 	
-	; verify that the contents are in fact different
+        ; verify that the contents are in fact different
 	(test nil (equal dummy-1-contents body2))
 
-	; now do the same request.. but we should get new things back
-	; since the last modified time of the file
+        ; now do the same request.. but we should get new things back
+        ; since the last modified time of the file
 	(setq body2
 	  (x-do-http-request (format nil "~a/check-uncache" prefix-local)))
-	; verify that we did get the new stuff back.
+        ; verify that we did get the new stuff back.
 	
 	(test t (equal dummy-1-contents body2))))
     

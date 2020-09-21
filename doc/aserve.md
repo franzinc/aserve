@@ -74,6 +74,7 @@ version of this document can be found [here][latest].
 * [Variables](#variables)
   * [**`*aserve-version*`**](aserve.md#v-aserve-version)
   * [**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format)
+  * [**`*enable-keepalive*`**](aserve.md#v-enable-keepalive)
   * [**`*http-response-timeout*`**](aserve.md#v-http-response-timeout)
   * [**`*http-free-worker-timeout*`**](aserve.md#v-http-free-worker-timeout)
   * [**`*mime-types*`**](aserve.md#v-mime-types)
@@ -1904,6 +1905,20 @@ value of the external-format argument to the start function. Thus changing the
 value of [**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format) in one thread will not affect
 its value in other threads. You should decide the default external format before
 you start AllegroServe running.
+
+<span id="v-enable-keepalive"></span>
+**`net.aserve:*enable-keepalive*`** - If true then all sockets created by the server
+or by the client (e.g. `do-http-request`) will have TCP keepalive enabled. This
+feature causes empty packets to be sent over a TCP connection after the connection
+has been idle for a certain period of time.  The reason for doing this is to
+satisfy routers and firewalls that will drop idle connections.  Also by doing this
+the sender of the keepalive packet can verify that it is still connected to its peer
+on the other side of the connection.  If `*enable-keepalive*` is an integer then
+it specifies how long after a connection is idle that the first keepalive packet is
+sent.  We've observed in the Linux operating system that the first keepalive packet is sent two hours
+after the connection is idle.  If you need a shorter time than this to keep the firewall
+from dropping the connection then set `*enable-keepalive*` to the desired number of seconds.
+This works on ACL 10.1 with a patch released September 2020 and on all subsequent ACL versions.
 
 <span id="v-http-response-timeout"></span>
 **`net.aserve:*http-response-timeout*`** - the default value for the timeout

@@ -5,8 +5,9 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 24
-  "v24: 1.3.76: do-http-request can return a stream to read the body
+(sys:defpatch "aserve" 25
+  "v25: 1.3.77: add switch to enable TCP keepalive for sockets
+v24: 1.3.76: do-http-request can return a stream to read the body
 v23: 1.3.75: add support for PATCH http verb;
 v22: 1.3.74: handle input from stream for MAKE-HTTP-CLIENT-REQUEST;
 v21: 1.3.73: allow free worker wait timeout configuration;
@@ -128,6 +129,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
 
 (defpackage :net.aserve
   (:use :common-lisp :excl :net.html.generator :net.uri :util.zip)
+  (:intern #:wrap-enable-keepalive)
   (:export
    #:allegroserve-error
    #:allegroserve-error-action
@@ -254,6 +256,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
 
    #:*aserve-version*
    #:*default-aserve-external-format*
+   #:*enable-keepalive*
    #:*http-header-read-timeout*
    #:*http-io-timeout*
    #:*http-response-timeout*
@@ -297,6 +300,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
 
 (defpackage :net.aserve.client 
   (:use :net.aserve :excl :common-lisp)
+  (:import-from :net.aserve #:wrap-enable-keepalive)
   (:export 
    #:client-cache   ; class
    #:client-cache-max-cache-entry-size

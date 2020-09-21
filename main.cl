@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 76))
+(defparameter *aserve-version* '(1 3 77))
 
 (eval-when (eval load)
     (require :sock)
@@ -420,6 +420,23 @@ died. Use nil to specify no timeout.")
 (defvar *http-free-worker-timeout* 3
   "Number of seconds to wait for a free worker thread.")
 
+
+
+(defvar *enable-keepalive* nil
+  "If true turn on keepalive for all sockets created. If an integer then also
+set the time of the first keepalive packet to be that many seconds
+after the connection goes idle")
+
+(defmacro wrap-enable-keepalive (&body body)
+  ;; the body will return a socket. 
+  ;; We enable keepalive if *enable-keepalive* is true
+  (let ((gs (gensym)))
+    `(let ((,gs (progn ,@body)))
+       (enable-keepalive ,gs)
+       ,gs)))
+        
+  
+
 ; usually set to the default server object created when aserve is loaded.
 ; users may wish to set or bind this variable to a different server
 ; object so it is the default for publish calls.
@@ -462,7 +479,11 @@ died. Use nil to specify no timeout.")
     :initform nil
     :initarg :socket
     :accessor wserver-socket)
-     
+
+   ;; This was never used. We'll leave it in place for backward
+   ;; compatiblity.
+   ;; We now use a global *enable-keepalive* variable which applies
+   ;; to both the server and client.
    (enable-keep-alive ;; Set to nil or the timeout used by keep-alive
     :initform *http-header-read-timeout*
     :initarg :enable-keep-alive
@@ -1618,7 +1639,9 @@ by keyword symbols and not by strings"
 		 sock 
 		 :read-timeout (wserver-io-timeout *wserver*)
 		 :write-timeout (wserver-io-timeout *wserver*))
-		       
+
+                (enable-keepalive sock)
+                
 		(process-connection sock))
 	    
 	    (:loop ()  ; abort out of error without closing socket
@@ -1837,6 +1860,8 @@ by keyword symbols and not by strings"
 		 :read-timeout (wserver-io-timeout *wserver*)
 		 :write-timeout (wserver-io-timeout *wserver*))
 		
+                (enable-keepalive sock)
+                
 		; another useful test to see if we're losing file
 		; descriptors
                 (if* *max-socket-fd*
@@ -3841,3 +3866,16 @@ in get-multipart-sequence"))
     (stream-closed-error ())))
 
 
+;============
+(defun enable-keepalive (socket)
+  (if* *enable-keepalive*
+     then (ignore-errors
+           ;; not supported in all ports so ignore
+           ;; any error doing this.
+           (socket:set-socket-options socket :keepalive t)
+           (if* (and (fixnump *enable-keepalive*)
+                     (> *enable-keepalive* 0))
+              then (socket:set-socket-options socket :tcp-keepalive-idle-time *enable-keepalive*)))))
+
+                   
+          
