@@ -252,13 +252,11 @@
 				 (wait t) ; wait for tests to finish
 				 (exit nil) ; ignored if wait=nil
 				 (pause-on-break (when (excl.osi:getenv "ASERVE_PAUSE_ON_BREAK") :pause))
-				 (room-on-error (when (excl.osi:getenv "ASERVE_ROOM_ON_BREAK") t))
 			    &aux wname)
   (unwind-protect
       (let ()
 	(when pause-on-break 
 	  (pause-test-on-break pause-on-break))	
-	(when room-on-error (enable-room-on-storage-condition))
 	(typecase n
 	  ((integer 0) nil)
 	  (null (return-from user::test-aserve-n nil))
@@ -4202,34 +4200,8 @@ Returns a vector."
   
 
 
-
-(in-package :excl)
-
-;; It might make sense to include this as a feature of backtrace-on-error.
-
-(defvar *print-room-on-storage-condition* nil)
-
-(def-fwrapper wrap-print-bkt-on-err (&rest args)
-  (declare (ignorable args))
-  (call-next-fwrapper)
-  (when *print-room-on-storage-condition*
-    (ignore-errors (room t))))
-
-(def-fwrapper wrap-exit-on-error-hook (frame type continue-string continue-args condition)
-  (declare (ignorable frame type continue-string continue-args))
-  (typecase condition
-    (storage-condition 
-     (let ((*print-room-on-storage-condition* condition))
-       (call-next-fwrapper)))
-    (otherwise (call-next-fwrapper))))
-
-(defun net.aserve.test::enable-room-on-storage-condition ()
-  (format t "~&; Enabling room-on-storage-condition in backtrace.~%")
-  (fwrap 'print-backtrace-on-error :room-on-storage-condition 'wrap-print-bkt-on-err)
-  (fwrap 'exit-on-error-hook :room-on-storage-condition 'wrap-exit-on-error-hook))
-
-
-(in-package :net.aserve.test)      
+  
+      
 
 ;; (net.aserve::debug-on :xmit)
 ;; (net.aserve::debug-off :body)
