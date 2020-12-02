@@ -2953,8 +2953,14 @@
   ;;
   (setf (request-reply-stream req) (request-socket req)))
 
+(eval-when (compile)
+  (require :datetime)
+  (use-package :util.date-time))
+
 (defvar *far-in-the-future*
-    (encode-universal-time 12 32 12 11 8 2020 0))
+    #.(date-time-to-ut
+       (add-duration (ut-to-date-time (get-universal-time))
+		     (time-interval-duration (time-interval "P29Y")))))
 
 (defmethod set-cookie-header ((req http-request)
 			      &key name value expires domain 
