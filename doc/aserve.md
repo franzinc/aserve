@@ -1503,7 +1503,8 @@ know the values retrieved are either very small or very large it may make the
 operation run faster to specify an appropriate **`size`**. **`external-format`** is
 used when **`type`** is **`:text`** to convert the octet stream into characters. It
 defaults to the value of [**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format). **`limit`** can be
-given an integer value that specifies the maximum size of data you're willing to
+given an integer value that specifies the maximum size, in bytes, 
+of data you're willing to
 retrieve. By default there is no limit. This can be dangerous as a user may try
 to upload a huge data file which will take up so much Lisp heap space that it
 takes down the server. If a **`limit`** is given and that limit is reached,
