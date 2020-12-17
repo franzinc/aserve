@@ -2958,9 +2958,8 @@
   (use-package :util.date-time))
 
 (defvar *far-in-the-future*
-    #.(date-time-to-ut
-       (add-duration (ut-to-date-time (get-universal-time))
-		     (time-interval-duration (time-interval "P29Y")))))
+    ;; Approximately 29 years in the future.
+    (+ (get-universal-time) (* 29 365 24 60 60)))
 
 (defmethod set-cookie-header ((req http-request)
 			      &key name value expires domain 
