@@ -430,8 +430,9 @@
 			       (test-spr27296))
 		       (if* test-timeouts 
 			  then (test-timeouts port))
-		       (test-body-in-get-request :port port :ssl https)	 ;;; rfe15456
-		       )))
+                       (test-body-in-get-request :port port :ssl https)	 ;;; rfe15456
+                       )))
+                       
 	    
 	    
 	    (with-stopper-checks
@@ -1101,7 +1102,34 @@ Returns a vector."
       
       (test 500 code))
     
-    ))
+    
+    ;; test we can send and receive cookie info
+    (let ((cookie-value (make-array 10000 :element-type 'character :initial-element #\a))
+          (cookie-name  "the-cookie-name"))
+      
+      (publish :path "/cookie-test"
+               :content-type "text/plain"
+               :function
+               #'(lambda (req ent)
+                   (with-http-response (req ent)
+                     (set-cookie-header req :name cookie-name :value cookie-value)
+                     (with-http-body (req ent)
+                       (html "simple body")))))
+      
+      (let ((jar (make-instance 'cookie-jar)))
+        (multiple-value-bind (body c-code headers)
+            (x-do-http-request (format nil "~a/cookie-test" prefix-local)
+                               :cookies jar)
+          (declare (ignore body headers))
+                   
+          (test 200 c-code)
+        
+          (test  1 (length (net.aserve.client::cookie-jar-items jar)))
+          (let ((ci (cadr (car (net.aserve.client::cookie-jar-items jar)))))
+            (test cookie-name (cookie-item-name ci) :test #'equal)
+            (test cookie-value (cookie-item-value ci) :test #'equal))
+    
+          )))))
 
 
 (defun test-authorization (port)

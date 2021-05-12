@@ -61,7 +61,7 @@
     )
     
 
-(defconstant *header-block-size* 8192) ; bytes in a header block
+(defconstant *header-block-size* #.(* 16 1024)) ; bytes in a header block
 (defconstant *header-block-used-size-index*
     ;; where the size of lower part of the buffer is kept
     (- *header-block-size* 2))
@@ -247,7 +247,7 @@
 
 
 (defparameter *header-block-sresource*
-    ;; 8192 element usb8 arrays
+    ;; 16k element usb8 arrays
     ;; used to hold header contents with index at the end
     (create-sresource
      :one-size t
@@ -261,7 +261,7 @@
 			     :element-type '(unsigned-byte 8)))))
 
 (defparameter *header-block-plus-sresource*
-    ;; (+ 8192 100) element usb8 arrays
+    ;; (+ 16k 100) element usb8 arrays
     ;; used to hold things slight larger than a header block will hold
     (create-sresource
      :one-size t
@@ -318,7 +318,7 @@
 ;; parsed header array
 ;;  We have to work with headers and to reduce consing we work with
 ;;  them in place in a structure called a parsed header block
-;;  This is stored in a 8192 byte usb8 vector.
+;;  This is stored in a 16k byte usb8 vector.
 ;;  The layout is:
 ;;  headers and values .. empty .. data-block header-index-block min-db size
 ;;
