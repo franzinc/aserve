@@ -911,6 +911,8 @@ headers")
   (when user
     (format nil "Basic ~a" (base64-encode (format nil "~a:~a" user password)))))
 
+(defvar *aserve-client-handshake-lock* (mp:make-process-lock :name "aserve client handshake"))
+
 (defun make-http-client-request (uri &rest args
 				 &key 
 				 (method  :get)  ; :get, :post, ....
@@ -1080,25 +1082,39 @@ headers")
                                               method))))
                 (if* centry
                    then (return-from make-http-client-request centry)))
-                                                     
-              (setq sock
-                (with-socket-connect-timeout (:timeout timeout
-                                                       :host host
-                                                       :port port)
-                  (wrap-enable-keepalive
-                   (socket:make-socket :remote-host host
-                                       :remote-port port
-                                       :format :bivalent
-                                       :type 
-                                       net.aserve::*socket-stream-type*
-                                       :nodelay t
+
+	      (flet ((make-new ()
+		       (setq sock
+			 (with-socket-connect-timeout (:timeout timeout
+								:host host
+								:port port)
+			   (wrap-enable-keepalive
+			    (socket:make-socket :remote-host host
+						:remote-port port
+						:format :bivalent
+						:type 
+						net.aserve::*socket-stream-type*
+						:nodelay t
                                                
-                                       ))))
-              (if* ssl
-                 then (setq sock
-                        (apply #'convert-to-ssl-stream sock :host host args))))
-                         
-                                
+						)))))
+		     (make-ssl () 
+		       (setq sock
+                        (apply #'convert-to-ssl-stream sock :host host args)))
+		     )
+		(cond ((null ssl)
+		       ;; Without SSL, all we need is a socket.
+		       (make-new))
+		      ((null *aserve-client-handshake-lock*)
+		       ;; With SSL, we need to prepare the stream for SSL.
+		       (make-new)
+		       (make-ssl))
+		      (t (mp:with-process-lock (*aserve-client-handshake-lock*)
+			   ;; By default. we take this path to serialize client
+			   ;; handshakes.  This avoids a race that causes connections
+			   ;; to fail occasionally. [rfe16663] [rfe16686]
+			   (make-new)
+			   (make-ssl)
+			   (funcall 'socket::ssl-do-handshake sock))))))                                
   
       (if* (not use-socket)
          then ; a fresh socket, so set params
