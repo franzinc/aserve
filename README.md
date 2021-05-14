@@ -48,7 +48,7 @@ We've recently added these features:
   * Security up through TLS 1.0 (SSL 3.1).
 
 See [the latest Allegro CL Release
-Notes](https://franz.com/support/documentation/current/doc/release-notes.htm)
+Notes](doc/aserve.md#release-notes)
 for more information on AllegroServe changes.
 
 ## <span id="author"></span>Author

@@ -13,6 +13,7 @@ version of this document can be found [here][latest].
 ## Table of Contents
 
 * [Introduction](#introduction)
+* [Release Notes](#release-notes)
 * [Running AllegroServe](#running-AllegroServe)
 * [Starting the Server](#starting-the-server)
   * [**`start`**](aserve.md#f-start)
@@ -122,6 +123,35 @@ version of this document can be found [here][latest].
   * [**`net.aserve::debug-on`**](aserve.md#f-debug-on)
   * [**`net.aserve::debug-off`**](aserve.md#f-debug-off)
 
+## <span id="release-notes"></span>Release Notes
+
+ * **1.3.79**: avoid race during SSL handshake in client.
+ * **1.3.78**: increase max header size to 16K to allow for larger cookies.
+ * **1.3.77**: add switch to enable TCP keepalive for sockets.
+ * **1.3.76**: [**`do-http-request`**](aserve.md#f-do-http-request) can return a stream to read the body.
+ * **1.3.75**: add support for the `:patch` HTTP verb.
+ * **1.3.74**: handle input from stream for [**`make-http-client-request`**](aserve.md#f-make-http-client-request).
+ * **1.3.73**: add [**`*http-free-worker-timeout*`**](aserve.md#v-http-free-worker-timeout).
+ * **1.3.71**: cache reuses previous accept header.
+ * **1.3.70**: caching of redirects.
+ * **1.3.69**: automatic caching in the client.
+ * **1.3.68**: [**`computed-content`**](aserve.md#c-computed-content) for [**`do-http-request`**](aserve.md#f-do-http-request).
+ * **1.3.67**: improve redirection for SSL, caching for [**`do-http-request`**](aserve.md#f-do-http-request).
+ * **1.3.65**: `device-read` fix for `truncated-stream`; remove duplicate authorization header.
+ * **1.3.64**: proxing HTTPS through a tunnel.
+ * **1.3.63**: do request timings in microseconds.
+ * **1.3.62**: fix `x-www-form-encoded` decoding.
+ * **1.3.61**: make `:keep-alive` timeout configurable at startup.
+ * **1.3.60**: use SNI if available in [**`acl-socket:make-ssl-client-stream`**](https://franz.com/support/documentation/current/doc/operators/socket/make-ssl-client-stream.htm).
+ * **1.3.57**: fix setting response trailers when `:xmit-server-response-body` debug option enabled.
+ * **1.3.56**: `force-output` of a `prepend-stream` supported.
+ * **1.3.55**: add and export a more full set of HTTP response codes.
+ * **1.3.54**: use Allegro CL's built-in base64 routines when available.
+ * **1.3.53**: add `:no-keep-alive` strategy.
+ * **1.3.52**: optimize compilation for speed.
+ * **1.3.51**: add [**`get-request-body-incremental`**](aserve.md#f-get-request-body-incremental).
+ * **1.3.50**: always define `deflate-stream` methods.
+ * **1.3.49**: speed up `read-sock-line`.
 
 ## <span id="introduction"></span>Introduction
 
@@ -2134,7 +2164,7 @@ or `"http"`. The keyword arguments to [**`do-http-request`**](aserve.md#f-do-htt
 | **`external-format`**                                                                                                      | see description                    | This determines the socket stream's external format. Default is the value of **<code>\*default&#8209;aserve&#8209;external&#8209;format\*</code>**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | **`keep-alive`**                                                                                                           | **`nil`**                          | If true then the client will request that the server keep alive the connection. If the server agrees then that socket connection is returned as the fifth value.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | **`connection`**                                                                                                           | **`nil`**                          | If non nil then this is a socket connected to the server for which this request is made. If the socket is not valid (likely due to the server closing its end) then a new socket will be created. Thus it is not an error.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| **`ssl`**                                                                                                                  | **`nil`**                          | If true then the connection is made using the Secure Sockets Layer protocol. If the uri uses the **`https`** scheme then **`ssl`** is assumed to be true and the **`ssl`** argument need not be specified. NOTE: if the underlying Lisp implementation supports it, Service Name Indication (SNI) will automatically be be used. [**`do-http-request`**](aserve.md#f-do-http-request) will use the **`:server-name`** keyword to [**`acl-socket:make-ssl-client-stream`**]("https://franz.com/support/documentation/current/doc/operators/socket/make-ssl-client-stream.htm"), to indicate the hostname the client is attempting to connect to. This information is passed to the server to allow it to select the SSL certificate to present to the client. |
+| **`ssl`**                                                                                                                  | **`nil`**                          | If true then the connection is made using the Secure Sockets Layer protocol. If the uri uses the **`https`** scheme then **`ssl`** is assumed to be true and the **`ssl`** argument need not be specified. NOTE: if the underlying Lisp implementation supports it, Service Name Indication (SNI) will automatically be be used. [**`do-http-request`**](aserve.md#f-do-http-request) will use the **`:server-name`** keyword to [**`acl-socket:make-ssl-client-stream`**](https://franz.com/support/documentation/current/doc/operators/socket/make-ssl-client-stream.htm), to indicate the hostname the client is attempting to connect to. This information is passed to the server to allow it to select the SSL certificate to present to the client. |
 | **`ssl-method`**                                                                                                           | **`nil`**                          | see [SSL/TLS](#ssltls) for the use of this argument.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **`skip-body`**                                                                                                            | **`nil`**                          | If the value is a function (satisifies **`functionp`**) then the value is funcalled passing the [**`client-request`**](aserve.md#c-client-request) object as an argument. At this point the client-request object contains the information on the headers of the response. The function should return true if the body of the response should be skipped and **`nil`** returned as the first value from do-http-request. If skip-body is not a function and if its value is true then reading the body is skipped and **`nil`** returned in its place.                                                                                                                                                                                                       |
 | **`timeout`**                                                                                                              | **`nil`**                          | If given this is the number of seconds this function will block waiting to connect to the server and also to write or read to the socket connected to the web server. If an I/O request blocks for more than timeout seconds an error of class **`socket-error`** is signalled and the function **`stream-error-identifier`** on the error condition object will return **`:read-timeout`** or **`:write-timeout`**.                                                                                                                                                                                                                                                                                                                                         |
