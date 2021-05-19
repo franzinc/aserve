@@ -21,7 +21,7 @@ ifeq ($(use_dcl),yes)
 on_macOS = $(shell if test `uname -s` = Darwin; then echo yes; fi)
 
 ifeq ($(on_macOS),yes)
-mlisp_env = MACHINE=x86 OS_NAME=darwin source ../scm-bin/aclbuildenv.sh &&
+mlisp_env = MACHINE=x86 OS_NAME=darwin; source ../scm-bin/aclbuildenv.sh; LD_LIBRARY_PATH=$$LD_LIBRARY_PATH; 
 endif
 
 mlisp = $(mlisp_env) ../lisp
@@ -98,14 +98,14 @@ stress: test.tmp
 #### this causes failures [bug26478]
 #	echo '(net.aserve::debug-on :notrap)' >> test.tmp
 	echo '(time (test-aserve-n $(NSERVERS) :exit nil))' >> test.tmp
-	../bin/repeat.sh 10 $(mlisp) -L test.tmp -kill
+	../bin/repeat.sh 10 bash -c "$(mlisp) -L test.tmp -kill"
 
 stresswp: test.tmp
 #### this causes failures [bug26478]
 #	echo '(net.aserve::debug-on :notrap)' >> test.tmp
 	echo '(setq excl::*break-on-warnings* :pause)' >> test.tmp
 	echo '(time (test-aserve-n $(NSERVERS) :exit nil))' >> test.tmp
-	../bin/repeat.sh 10 $(mlisp) -L test.tmp -kill
+	../bin/repeat.sh 10 bash -c "$(mlisp) -L test.tmp -kill"
 
 test-from-asdf: FORCE
 	rm -f build.tmp
