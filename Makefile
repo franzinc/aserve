@@ -6,7 +6,14 @@ export
 
 SHELL = bash
 
-## First, so it can set variables and even change the default rule
+## include ../../makefile.top if it exists
+makefile_top = $(shell if test -f ../../makefile.top;then echo yes;fi)
+ifeq ($(makefile_top),yes)
+include ../../makefile.top
+endif
+
+## include makefile.local, if it exists, so it can set variables and
+## even change the default rule
 makefile_local = $(shell if test -f makefile.local;then echo makefile.local;fi)
 ifneq ($(makefile_local),)
 include $(makefile_local)
@@ -21,7 +28,7 @@ ifeq ($(use_dcl),yes)
 on_macOS = $(shell if test `uname -s` = Darwin; then echo yes; fi)
 
 ifeq ($(on_macOS),yes)
-mlisp_env = MACHINE=x86 OS_NAME=darwin; source ../scm-bin/aclbuildenv.sh; LD_LIBRARY_PATH=$$LD_LIBRARY_PATH; 
+mlisp_env = SIXTYFOURBIT=$(SIXTYFOURBIT) MACHINE=$(MACHINE) OS_NAME=$(OS_NAME); source ../scm-bin/aclbuildenv.sh; env LD_LIBRARY_PATH=$$LD_LIBRARY_PATH
 endif
 
 mlisp = $(mlisp_env) ../lisp
@@ -98,14 +105,22 @@ stress: test.tmp
 #### this causes failures [bug26478]
 #	echo '(net.aserve::debug-on :notrap)' >> test.tmp
 	echo '(time (test-aserve-n $(NSERVERS) :exit nil))' >> test.tmp
-	../bin/repeat.sh 10 bash -c "$(mlisp) -L test.tmp -kill"
+# iterating and setting environment is tricky, do it the easy way
+	set -eu; \
+	for i in 1 2 3 4 5 6 7 8 9 10; do \
+	    $(mlisp) -L test.tmp -kill; \
+	done
 
 stresswp: test.tmp
 #### this causes failures [bug26478]
 #	echo '(net.aserve::debug-on :notrap)' >> test.tmp
 	echo '(setq excl::*break-on-warnings* :pause)' >> test.tmp
 	echo '(time (test-aserve-n $(NSERVERS) :exit nil))' >> test.tmp
-	../bin/repeat.sh 10 bash -c "$(mlisp) -L test.tmp -kill"
+# iterating and setting environment is tricky, do it the easy way
+	set -eu; \
+	for i in 1 2 3 4 5 6 7 8 9 10; do \
+	    $(mlisp) -L test.tmp -kill; \
+	done
 
 test-from-asdf: FORCE
 	rm -f build.tmp
