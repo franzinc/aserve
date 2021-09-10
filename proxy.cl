@@ -15,7 +15,7 @@
 
 (in-package :net.aserve)
 
-(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
+(eval-when (compile) (declaim (optimize (speed 3))))
 
 (check-smp-consistency)
 
@@ -50,7 +50,7 @@
    (nil `(si::without-scheduling ,s ,@body)))) ;; in a #-smp block
 
 ; denotes a request from the browser
-(defconstant +browser-level+ 100) ;
+(defconstant *browser-level* 100) ;
 
 (defparameter *extra-lifetime-factor* 1.1)
 
@@ -432,7 +432,7 @@
 		      (handle-request req)
 		 else ; must really proxy
 		      (check-cache-then-proxy-request 
-		       req ent t +browser-level+))))))
+		       req ent t *browser-level*))))))
 
 
   
@@ -443,7 +443,7 @@
 		     
 
 (defun proxy-request (req ent &key pcache-ent (respond t) 
-				   (level +browser-level+))
+				   (level *browser-level*))
   ;; a request has come in with an http scheme given in uri
   ;; and a machine name which isn't ours.
   ;; 
@@ -519,7 +519,7 @@ cached connection = ~s~%" cond cached-connection))
     
 	    ;; content-length is inserted if this is put or post method
 	    ;;    and others if there is a body.
-	    (if* (or (member method '(:put :post) :test #'eq)
+	    (if* (or (member method '(:put :post :patch) :test #'eq)
 		     ;; On PUT or POST we always send a content-length.
 		     ;; For other requests, send content-length if a body
 		     ;; was present.   [rfe15456]
@@ -1296,7 +1296,7 @@ cached connection = ~s~%" cond cached-connection))
        then (error "There is no memory cache to size"))
     
     ; store it in blocks
-    (setf (pcache-size pcache) (truncate size +header-block-size+))
+    (setf (pcache-size pcache) (truncate size *header-block-size*))
     
     (setf (pcache-high-water pcache) (truncate (* .90 (pcache-size pcache))))
     (setf (pcache-low-water pcache) (truncate (* .80 (pcache-size pcache))))))
@@ -1311,7 +1311,7 @@ cached connection = ~s~%" cond cached-connection))
 	      (if* (not (probe-file name))
 		 then (setq filename name) 
 		      (return)))))
-  (let* ((blocks (truncate size +header-block-size+))
+  (let* ((blocks (truncate size *header-block-size*))
 	 (pcache-disk (make-pcache-disk
 		       :filename filename
 		       :queueobj (make-and-init-queueobj)
@@ -1429,7 +1429,7 @@ cached connection = ~s~%" cond cached-connection))
 		  (:td (:princ (queueobj-blocks (pcache-queueobj pcache)))
 		       " ("
 		       (:princ (* (queueobj-blocks (pcache-queueobj pcache)) 
-				  +header-block-size+))
+				  *header-block-size*))
 		
 		       " bytes)")))
 	    
@@ -1439,7 +1439,7 @@ cached connection = ~s~%" cond cached-connection))
 	     (:td (:princ dead-bytes))
 	     (:td (:princ dead-blocks)
 		  " ("
-		  (:princ (* dead-blocks +header-block-size+)) " bytes)"
+		  (:princ (* dead-blocks *header-block-size*)) " bytes)"
 		  ))
 	    )
 	   :br
@@ -1641,7 +1641,7 @@ cached connection = ~s~%" cond cached-connection))
 	      ; result looks good
 	      (progn
 		(dlogmess (format nil "not in cache, proxy it level ~d" level))
-		(if* (eql +browser-level+ level)
+		(if* (eql *browser-level* level)
 		   then (incf (pcache-r-miss pcache))
 			(log-proxy rendered-uri level :mi nil)
 		   else (incf (pcache-r-cache-fill pcache))
@@ -1666,7 +1666,7 @@ cached connection = ~s~%" cond cached-connection))
 			    ; of if this wasn't a fast hit and thus there
 			    ; is new data to cache
 			    (if* (and (pcache-entry-cached-hook pcache)
-				      (or (eql level +browser-level+)
+				      (or (eql level *browser-level*)
 					  (not (member response '(:fh :fv :sh)
 						       :test #'eq))))
 			       then ; we want to do link scanning of this
@@ -2549,7 +2549,7 @@ cached connection = ~s~%" cond cached-connection))
 	 (pcache-disk (pcache-ent-pcache-disk pcache-ent))
 	 (stream (pcache-disk-stream pcache-disk))
 	 (bytes (+ (pcache-ent-data-length pcache-ent)
-		   +header-block-size+))
+		   *header-block-size*))
 	 (res))
     (dlogmess (format nil "retrieve ~s in blocks ~s~%"
 		      (pcache-ent-key pcache-ent)
@@ -2560,12 +2560,12 @@ cached connection = ~s~%" cond cached-connection))
       ;; get a lock so we're the only thread doing operations
       ;; on the stream to the cache
       (dolist (ent block-list)
-	(file-position stream (* (car ent) +header-block-size+))
+	(file-position stream (* (car ent) *header-block-size*))
 	(dotimes (i (1+ (- (cdr ent) (car ent))))
 	  (let ((buff (get-header-block)))
-	    (read-sequence buff stream :end (min +header-block-size+
+	    (read-sequence buff stream :end (min *header-block-size*
 						 bytes))
-	    (decf bytes +header-block-size+)
+	    (decf bytes *header-block-size*)
 	    (push buff res))))
       (setf (pcache-ent-data pcache-ent) (nreverse res))
       
@@ -2686,23 +2686,23 @@ cached connection = ~s~%" cond cached-connection))
   ;;
   (let ((buffers (pcache-ent-data pcache-ent))
 	(stream (pcache-disk-stream pcache-disk))
-	(bytes (+  +header-block-size+  ; for header block
+	(bytes (+  *header-block-size*  ; for header block
 		   (pcache-ent-data-length pcache-ent))))
     (dlogmess (format nil "writing ~d buffers to list ~d~%" 
 		     (length buffers)
 		     list-of-blocks))
     (dolist (ent list-of-blocks)
       ; prepare to write
-      (file-position stream (* (car ent) +header-block-size+))
+      (file-position stream (* (car ent) *header-block-size*))
       
       (dotimes (i (1+ (- (cdr ent) (car ent))))
 	(if* (null buffers)
 	   then (error "ran out of buffers before blocks"))
-	(let ((length (min +header-block-size+ bytes)))
+	(let ((length (min *header-block-size* bytes)))
 	  (if* (> length 0)
 	     then (write-sequence (car buffers) stream :end length)))
 	(pop buffers)
-	(decf bytes +header-block-size+)))))
+	(decf bytes *header-block-size*)))))
     
 
 				      
@@ -2861,21 +2861,6 @@ cached connection = ~s~%" cond cached-connection))
 (without-package-locks
 (defmethod make-load-form ((obj mp:process-lock) &optional env)
   (make-load-form-saving-slots obj :environment env))
-
-; this is just temporary until we get a patch for this in uri.fasl
-(defmethod make-load-form ((self net.uri:uri) &optional env)
-  (declare (ignore env))
-  `(make-instance ',(class-name (class-of self))
-     :scheme ,(uri-scheme self)
-     :host ,(uri-host self)
-     :port ,(uri-port self)
-     :path ',(uri-path self)
-     :query ,(uri-query self)
-     :fragment ,(uri-fragment self)
-     :plist ',(uri-plist self)
-     :string ,(net.uri::uri-string self)
-     ; bug is missing ' in parsed-path value
-     :parsed-path ',(net.uri::.uri-parsed-path self)))
 )
 
 (defun save-proxy-cache (filename &key (server *wserver*))

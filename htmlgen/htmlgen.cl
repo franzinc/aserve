@@ -32,7 +32,7 @@
 
 (in-package :net.html.generator)
 
-(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
+(eval-when (compile) (declaim (optimize (speed 3))))
 
 ;; html generation
 

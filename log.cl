@@ -15,7 +15,7 @@
 
 (in-package :net.aserve)
 
-(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
+(eval-when (compile) (declaim (optimize (speed 3))))
 
 (defun log1 (category level message &key (logger *logger*))
   (log1* logger category level message))

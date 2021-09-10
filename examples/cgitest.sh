@@ -1,8 +1,12 @@
-#! /bin/sh
+#! /usr/bin/env bash
 #
 # return various cgi responses based on the first argument
 #
-case $1 in
+
+# On Windows, the invoking makefile, for 'make stress', uses "set -u"
+# and that is propagated to us here.  Be aware of that.
+
+case ${1-} in
 
     1) # bogus but common lf headers
         echo 'Content-Type: text/plain'

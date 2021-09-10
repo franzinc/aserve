@@ -21,7 +21,7 @@
 
 (in-package :net.aserve)
 
-(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
+(eval-when (compile) (declaim (optimize (speed 3))))
 
 ;; add features based on the capabilities of the host lisp
 #+(version>= 6 1) (pushnew :io-timeout *features*) ; support i/o timeouts

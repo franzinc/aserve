@@ -1,5 +1,5 @@
 *.fasl
-*.dx64fsl
+*.gz
 .git-branch-name
 /build.tmp
 /test.out

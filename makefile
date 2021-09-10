@@ -1,9 +1,19 @@
 # On Windows, this makefile requires the use of GNU make from Redhat
 # (http://sources.redhat.com/cygwin/).
 
-SHELL = sh
+# Export everything
+export
 
-## First, so it can set variables and even change the default rule
+SHELL = bash
+
+## include ../../makefile.top if it exists
+makefile_top = $(shell if test -f ../../makefile.top;then echo yes;fi)
+ifeq ($(makefile_top),yes)
+include ../../makefile.top
+endif
+
+## include makefile.local, if it exists, so it can set variables and
+## even change the default rule
 makefile_local = $(shell if test -f makefile.local;then echo makefile.local;fi)
 ifneq ($(makefile_local),)
 include $(makefile_local)
@@ -14,7 +24,14 @@ on_windows = $(shell if test -d "c:/"; then echo yes; else echo no; fi)
 use_dcl = $(shell if test -f ../dcl.dxl; then echo yes; else echo no; fi)
 
 ifeq ($(use_dcl),yes)
-mlisp = ../lisp
+
+on_macOS = $(shell if test `uname -s` = Darwin; then echo yes; fi)
+
+ifeq ($(on_macOS),yes)
+mlisp_env = SIXTYFOURBIT=$(SIXTYFOURBIT) MACHINE=$(MACHINE) OS_NAME=$(OS_NAME); source ../scm-bin/aclbuildenv.sh; env LD_LIBRARY_PATH=$$LD_LIBRARY_PATH
+endif
+
+mlisp = $(mlisp_env) ../lisp
 image = dcl.dxl
 endif
 
@@ -58,13 +75,16 @@ test.tmp: FORCE
 	echo '(setq user::*do-aserve-test* nil)' >> test.tmp
 ifeq ($(COMPILE_TESTS),yes)
 	echo '(load (compile-file "test/t-aserve.cl"))' >> test.tmp
+	echo '(load (compile-file "webactions/test/t-webactions.cl"))' >> test.tmp
 else
 	echo '(load "test/t-aserve.cl")' >> test.tmp
+	echo '(load "webactions/test/t-webactions.cl")' >> test.tmp
 endif
 
 # Run tests with default setting of *hiper-socket-is-stream-socket* switch.
 test: test.tmp
 	echo '(time (test-aserve-n :n 1 :exit nil))' >> test.tmp
+	echo '(time (net.aserve.testwa::test-webactions))'  >> test.tmp
 	$(mlisp) -L test.tmp -kill
 
 test-do-hiper: test.tmp
@@ -82,15 +102,25 @@ testsmp: test.tmp
 	$(mlisp) -L test.tmp -kill
 
 stress: test.tmp
-	echo '(net.aserve::debug-on :notrap)' >> test.tmp
+#### this causes failures [bug26478]
+#	echo '(net.aserve::debug-on :notrap)' >> test.tmp
 	echo '(time (test-aserve-n $(NSERVERS) :exit nil))' >> test.tmp
-	../bin/repeat.sh 10 $(mlisp) -L test.tmp -kill
+# iterating and setting environment is tricky, do it the easy way
+	set -eu; \
+	for i in 1 2 3 4 5 6 7 8 9 10; do \
+	    $(mlisp) -L test.tmp -kill; \
+	done
 
 stresswp: test.tmp
-	echo '(net.aserve::debug-on :notrap)' >> test.tmp
+#### this causes failures [bug26478]
+#	echo '(net.aserve::debug-on :notrap)' >> test.tmp
 	echo '(setq excl::*break-on-warnings* :pause)' >> test.tmp
 	echo '(time (test-aserve-n $(NSERVERS) :exit nil))' >> test.tmp
-	../bin/repeat.sh 10 $(mlisp) -L test.tmp -kill
+# iterating and setting environment is tricky, do it the easy way
+	set -eu; \
+	for i in 1 2 3 4 5 6 7 8 9 10; do \
+	    $(mlisp) -L test.tmp -kill; \
+	done
 
 test-from-asdf: FORCE
 	rm -f build.tmp
@@ -102,8 +132,10 @@ test-from-asdf: FORCE
 	echo "(asdf:operate 'asdf:load-op :aserve)" >> build.tmp
 ifeq ($(COMPILE_TESTS),yes)
 	echo '(time (load (compile-file "test/t-aserve.cl")))' >> build.tmp
+	echo '(time (load (compile-file "webactions/test/t-webactions.cl")))' >> build.tmp
 else
 	echo '(time (load "test/t-aserve.cl"))' >> build.tmp
+	echo '(time (load "webactions/test/t-webactions.cl"))' >> build.tmp
 endif
 	echo '(exit util.test::*test-errors*)' >> build.tmp
 	$(mlisp) -L build.tmp -kill
@@ -125,6 +157,9 @@ cleanall distclean: clean
 tags: FORCE
 	rm -f TAGS
 	find . -name '*.cl' -print | xargs etags -a
+
+doclinks:
+	cd doc && ./doclinks.py
 
 FORCE:
 

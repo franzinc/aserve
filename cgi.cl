@@ -16,7 +16,7 @@
 
 (in-package :net.aserve)
 
-(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
+(eval-when (compile) (declaim (optimize (speed 3))))
 
 (defun run-cgi-program (req ent program
 			&key
@@ -117,7 +117,7 @@
     (if* auth-type
        then (push (cons "AUTH_TYPE" auth-type) envs))
     
-    (if* (member (request-method req) '(:put :post))
+    (if* (member (request-method req) '(:put :post :patch))
        then ; there is likely data coming along
 	    (setq body (get-request-body req	))
 	    (if* (equal body "") then (setq body nil)) ; trivial case
@@ -174,6 +174,7 @@
 			   :wait nil
 			   :environment envs
 			   :show-window :hide)
+      (declare (ignore ignore-this))
 	    
       (unwind-protect
 	  ; first send the body to the script

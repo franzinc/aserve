@@ -14,7 +14,7 @@
 
 (in-package :net.aserve)
 
-(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
+(eval-when (compile) (declaim (optimize (speed 3))))
 
 ;---------------- urlencoding ----------------
 ; there are two similar yet distinct encodings for character strings
@@ -625,7 +625,7 @@
 
 #+allegro
 (defun base64-encode (str)
-  (excl:string-to-base64-string str))
+  (excl:string-to-base64-string str :wrap-at-column nil))
 
 #-allegro
 (defun base64-encode (str)

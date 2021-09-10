@@ -4,9 +4,21 @@
 ;;
 ;; See the file LICENSE for the full license governing this code.
 
-#+(and (not zacl) (version= 10 1))
-(sys:defpatch "aserve" 15
-  "v15: 1.3.65: device-read fix for truncated-stream; remove dup auth header;
+#+(version= 10 1)
+(sys:defpatch "aserve" 27
+  "v27: 1.2.79: add client SSL handshake lock;
+v26: 1.3.78: increase max header size to 16k;
+v25: 1.3.77: add switch to enable TCP keepalive for sockets
+v24: 1.3.76: do-http-request can return a stream to read the body
+v23: 1.3.75: add support for PATCH http verb;
+v22: 1.3.74: handle input from stream for MAKE-HTTP-CLIENT-REQUEST;
+v21: 1.3.73: allow free worker wait timeout configuration;
+v20: 1.3.71: cache reuses previous accept header
+v19: 1.3.70: caching of redirects
+v18: 1.3.69: automatic caching in the client
+v17: 1.3.68: computed-content for do-http-request
+v16: 1.3.67: improve redirection for SSL, caching for do-http-request;
+v15: 1.3.65: device-read fix for truncated-stream; remove dup auth header;
 v14: 1.3.64: proxing https through a tunnel
 v13: 1.3.63: do request timing in microseconds
 v12: 1.3.62: fix x-www-form-encoded decoding
@@ -24,9 +36,12 @@ v1: 1.3.49: speed up read-sock-line."
   :type :system
   :post-loadable t)
 
-#+(and (not zacl) (version= 10 0))
-(sys:defpatch "aserve" 23
-  "v23: 1.3.64: proxing https through a tunnel 
+#+(version= 10 0)
+(sys:defpatch "aserve" 26
+  "v26: 1.3.70: caching of redirects
+v25: 1.3.68: computed-content for do-http-request
+v24: 1.3.67: improve redirection for SSL, caching for do-http-request;
+v23: 1.3.64: proxing https through a tunnel 
 v22: 1.3.63: do request timing in microseconds
 v21: 1.3.62: fix x-www-form-encoded decoding
 v20: 1.3.57: fix setting response trailers when :xmit-server-response-body debug option enabled;
@@ -52,9 +67,10 @@ v1: 1.3.36: cosmetic: bump version #; code same as 10.0 initial release."
   :type :system
   :post-loadable t)
 
-#+(and (not zacl) (version= 9 0))
-(sys:defpatch "aserve" 23
-  "v23: 1.3.62: proxing https through a tunnel
+#+(version= 9 0)
+(sys:defpatch "aserve" 24
+  "v24: 1.3.67: improve redirection for SSL, caching for do-http-request;
+v23: 1.3.62: proxing https through a tunnel
 v22: 1.3.52: optimize compilation for speed;
 v21: 1.3.50: define deflate-stream methods all the time;
 v20: 1.3.38: call make-ssl-client-stream with :method instead of :ssl-method;
@@ -93,9 +109,9 @@ v1: 1.3.16: fix freeing freed buffer."
 ;
 (in-package :user)
 
-(eval-when (:compile-toplevel) (declaim (optimize (speed 3))))
+(eval-when (compile) (declaim (optimize (speed 3))))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (compile load eval)
   (require :osi)
   (require :autozoom)
   (require :uri)
@@ -103,7 +119,7 @@ v1: 1.3.16: fix freeing freed buffer."
   (require :streamc)
   (require :inflate))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(eval-when (compile load eval)
   (defvar sys::*user-warned-about-deflate* nil)
   (handler-case (require :deflate)
     (error (c)
@@ -115,6 +131,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
 
 (defpackage :net.aserve
   (:use :common-lisp :excl :net.html.generator :net.uri :util.zip)
+  (:intern #:wrap-enable-keepalive)
   (:export
    #:allegroserve-error
    #:allegroserve-error-action
@@ -151,6 +168,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:handle-uri		; add-on component..
    #:header-slot-value
    #:http-request  	; class
+   #:http-stream
    #:locator		; class
    #:location-authorizer  ; class
    #:location-authorizer-patterns
@@ -231,16 +249,20 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:wserver-io-timeout
    #:wserver-log-function
    #:wserver-log-stream
+   #:wserver-max-content-length
    #:wserver-response-timeout
+   #:wserver-free-worker-timeout
    #:wserver-socket
    #:wserver-vhosts
    #:log-for-wserver
 
    #:*aserve-version*
    #:*default-aserve-external-format*
+   #:*enable-keepalive*
    #:*http-header-read-timeout*
    #:*http-io-timeout*
    #:*http-response-timeout*
+   #:*http-free-worker-timeout*
    #:*mime-types*
    #:*response-continue*
    #:*response-switching-protocols*
@@ -250,6 +272,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:*response-non-authoritative-information*
    #:*response-no-content*
    #:*response-partial-content*
+   #:*response-multiple-choices*
    #:*response-moved-permanently*
    #:*response-found*
    #:*response-see-other*
@@ -264,6 +287,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:*response-proxy-unauthorized*
    #:*response-request-timeout*
    #:*response-conflict*
+   #:*response-gone*
    #:*response-precondition-failed*
    #:*response-uri-too-long*
    #:*response-unsupported-media-type*
@@ -278,7 +302,17 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
 
 (defpackage :net.aserve.client 
   (:use :net.aserve :excl :common-lisp)
+  (:import-from :net.aserve #:wrap-enable-keepalive)
   (:export 
+   #:client-cache   ; class
+   #:client-cache-max-cache-entry-size
+   #:client-cache-max-cache-size
+   #:client-cache-cache-size
+   #:client-cache-lookups
+   #:client-cache-alive
+   #:client-cache-revalidate
+   #:client-cache-validated
+   
    #:client-request  ; class
    #:client-request-close
    #:client-request-cookies
@@ -305,15 +339,26 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:digest-realm
    #:digest-username
    #:do-http-request
+   #:flush-client-cache
    #:http-copy-file
    #:make-http-client-request
    #:read-client-response-headers
+   
+   #:*cache-size-slop*   ;; variable
+   
+   ;; computed content exports:
+   #:computed-content
+   #:get-content-length
+   #:get-content-headers
+   #:write-content
+   #:file-computed-content
+   #:stream-computed-content
    ))
 
 ;; These functions must be undefined in case new aserve is loaded on
 ;;   top of older aserve in 8.1. [bug23328] 
-#+(and (not zacl) (version= 8 1))
-(eval-when (:compile-toplevel :load-toplevel :execute)
+#+(version= 8 1)
+(eval-when (compile load eval)
   (fmakunbound 'net.aserve::logmess)
   (fmakunbound 'net.aserve::logmess-stream)
   (fmakunbound 'net.aserve.client::read-client-response-headers)

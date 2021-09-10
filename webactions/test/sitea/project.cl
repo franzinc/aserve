@@ -41,7 +41,23 @@
                           
                           ;; redirect test
                           ("redirtest" "action" (:redirect t))
-			  )))
+                          
+                          ;; integer return code test
+                          ("retcodetest" "ret201.clp")
+                          
+                          ;; session var return code test
+                          ("retanycodetest" action-set-retany)
+                          
+                          ;; here the value is specified as a string
+                          ("retanycodetest-two" action-set-retany-two)
+                          
+                          ;; here we have a bogus string value
+                          ("retanycodetest-bogus" action-set-retany-bogus)
+                          
+                          ;; test clp_include with args
+                          ("retincluded" "retwithinclude.clp")
+                          
+                          )))
 		   
 		   
 

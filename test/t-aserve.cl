@@ -7,9 +7,8 @@
 ;;
 
 ;; Description:
-;;  This file is a copy of aserve/test/t-aserve.cl 
-;;  modified to run the same tests in several servers
-;;  simultaneously.
+;;  
+;; This test suite for aserve can be run in several different test modes.
 ;;
 ;; THIS FILE MUST BE COMPILED WITH THE CURRENT DIRECTORY 
 ;;  set to the aserve source directory,
@@ -21,7 +20,30 @@
 ;;        n>0  --- run n servers in n new threads
 ;;        n=1 is like n=nil or 0 but leaves the initial listener 
 ;;            free for console interactions
-
+;;
+;; WHEN WRITING A NEW TEST:
+;;  - Do not use global variables specific to a test. When stress-aserve
+;;    is running, several instances of the same test will be running in
+;;    the same Lisp address space.  Each instance has its own test config
+;;    accessed with the asc macro;  it can be used to hold or point to 
+;;    private test data.
+;;  - Do not use constant file names for the same reason as above.
+;;    Use the value of (asc index) to generate a name based on the
+;;    test instance.
+;;
+;; SPECIAL TEST MODE OPTION FOR STRESS TESTS:
+;; (pause-test-on-break onoff)  When called with non-nil, run the tests with
+;;    :notrap and if any thread calls break, signal all other threads to stop 
+;;    as soon as possible.   See stopper functions for details of when and how.
+;;  Also enabled by setting ASERVE_PAUSE_ON_BREAK.
+;;   This option is most useful when running the tests from an interactive
+;;   top-level.
+;; Running with this option enabled in -batch mode will only yield a 
+;;   backtrace of the failing thread, and the run will be cancelled with 
+;;   Lisp exit.  
+;; In addition, this option should be disabled before running webactions 
+;;   tests because these depend on :notrap being nil for non-stop operation.
+;;   This is done automatically in a normal test run
 
 (eval-when (compile load eval)
   (require :tester)
@@ -39,6 +61,7 @@
     (defun net.aserve::wserver-name (x) (declare (ignore x)) "")
     (setq user::*default-log-wserver-name* nil)
     )
+  (set 'excl::*aclssl-verbose* t)
   )
 
 
@@ -83,6 +106,15 @@
 ; if true run timeout test
 (defvar *test-timeouts* nil)
 
+(defvar-nonbindable *asc-stop-mode*
+    ;; Global stop mode ->  (indicator stop-flag stop-gate)
+    ;; stop-flag -> nil  
+    ;;           -> :kill     Throw to asc-stopper-catch or kill the current process.
+    ;;           -> :pause    Sleep forever or wait for gate to open.
+    ;; indicator starts as nil; is set to t when error break is entered.
+    nil)
+
+(defvar *aserve-test-config* nil)
 
 (defclass aserve-test-config ()
   ;; Keep a separate test config for each server.
@@ -108,9 +140,9 @@
 		       ;; stack of old values
 		       :initform nil)
    (wserver :accessor asc-wserver :initform nil)
-   (done    :accessor asc-done    :initform nil)
+   (done    :accessor asc-done    :initform nil) 
    ))
-(defvar *aserve-test-config* (make-instance 'aserve-test-config))
+
 (defmacro asc (slot &aux (accessor
 			  (read-from-string
 			   (format nil "~A::asc-~A "
@@ -118,6 +150,73 @@
 				    (find-package :net.aserve.test))
 				   slot))))
   `(,accessor *aserve-test-config*))
+
+(defun set-stop-mode (value &optional gated)
+  ;; Set the stop flag.
+  (ecase value 
+    ((:pause :kill)  
+     (setq *asc-stop-mode* (list nil value (when gated (mp:make-gate nil)))))
+    ((nil)
+     (when (and (consp *asc-stop-mode*) (third *asc-stop-mode*))
+       (mp:open-gate (third *asc-stop-mode*)))
+     (setq *asc-stop-mode* nil))))
+
+(defun set-stop-indicator (&rest args)
+  (declare (ignore args))
+  (when (consp *asc-stop-mode*) (setf (car *asc-stop-mode*) t)))
+
+(def-fwrapper wrapper-with-check-stopper (&rest args)
+  (declare (ignorable args))
+  ;; Generic fwrapper that can be wrapped around any function where a stopper
+  ;;  check could be useful.
+  (net.aserve.test::asc-check-stopper)
+  (multiple-value-prog1 (call-next-fwrapper)
+    (net.aserve.test::asc-check-stopper)))
+
+(defun pause-test-on-break (onoff &optional gated)
+  (ecase onoff
+    ((:pause :kill)
+     (format t "~&; ASERVE TEST - Enabling pause-test-on-break ~S ~S" onoff gated)
+     (set-stop-mode onoff gated)
+     (net.aserve::debug-on :notrap)
+     (fwrap 'util.test::test-check :aserve-stopper 'wrapper-with-check-stopper)
+     (setq excl::*internal-invoke-debugger-hook* 'set-stop-indicator))
+    ((nil)
+     (format t "~&; ASERVE TEST - Disabling pause-test-on-break.")
+     (set-stop-mode nil)
+     (net.aserve::debug-off :notrap)
+     (funwrap 'util.test::test-check :aserve-stopper)
+     (setq excl::*internal-invoke-debugger-hook* nil))))
+
+(defvar *asc-stopper-catch* nil)
+
+(defun asc-check-stopper (&optional from-where &aux stopper stop-flag stop-gate)
+  ;; Check the stopper and pause, throw, kill or wait as required.
+  (when (consp (setq stopper *asc-stop-mode*))
+    (when (first stopper)
+      (setq stop-flag (second stopper))
+      (setq stop-gate (third stopper))
+      (case stop-flag
+	(:kill (if *asc-stopper-catch* 
+		   (throw 'asc-stopper-catch from-where)
+		 (mp:process-kill mp:*current-process*)))
+	(otherwise (if stop-gate
+		       (mp:process-wait "stopper" #'mp:gate-open-p stop-gate) 
+		     (sleep most-positive-fixnum))))
+      )))
+
+(defmacro with-stopper-catch (name &body body)
+  `(let ((*asc-stopper-catch* ,name))
+     (catch 'asc-stopper-catch ,@body)))
+  
+
+(defmacro with-stopper-checks (options &body body)
+  ;; Insert stopper checks beween forms in body.
+  ;; Options may be needed in the future for more detailed checks.
+  (declare (ignore options))
+  `(multiple-value-prog1 
+       (progn ,@(mapcan (lambda (form) `((asc-check-stopper) ,form)) body))
+       (asc-check-stopper)))
 
 
 
@@ -152,92 +251,105 @@
 				 (name "ast") (log-name nil l-n-p)
 				 (wait t) ; wait for tests to finish
 				 (exit nil) ; ignored if wait=nil
+				 (pause-on-break (when (excl.osi:getenv "ASERVE_PAUSE_ON_BREAK") :pause))
 			    &aux wname)
-  (typecase n
-    ((integer 0) nil)
-    (null (return-from user::test-aserve-n nil))
-    (otherwise 
-     ;; In case someone sets *do-aserve-test* to t.
-     (setq n 0)))
-  (setq *aserve-test-configs* (make-array (if (eql n 0) 1 n)))
+  (unwind-protect
+      (let ()
+	(when pause-on-break 
+	  (pause-test-on-break pause-on-break))	
+	(typecase n
+	  ((integer 0) nil)
+	  (null (return-from user::test-aserve-n nil))
+	  (otherwise 
+	   ;; In case someone sets *do-aserve-test* to t.
+	   (setq n 0)))
+	(setq *aserve-test-configs* (make-array (if (eql n 0) 1 n)))
   
-  (format t "~&; *hiper-socket-is-stream-socket* = ~S~%" 
-	  (let (v) 
-	    (or (ignore-errors (setq v (eval 'excl::*hiper-socket-is-stream-socket*)) t)
-		(setq v :undefined))
-	    v))
+	(format t "~&; *hiper-socket-is-stream-socket* = ~S~%" 
+		(let (v) 
+		  (or (ignore-errors (setq v (eval 'excl::*hiper-socket-is-stream-socket*)) t)
+		      (setq v :undefined))
+		  v))
   
-  (case n
-    (0
-     ;; In simple one-thread test, log server name only if requested
-     ;; explicitly.
-     (if l-n-p
-	 (setq *log-wserver-name* log-name)
-       (setq *log-wserver-name* nil))
-     (test-aserve test-timeouts :direct direct :proxy proxy :proxyproxy proxyproxy 
-		  :ssl ssl :proxy-auth proxy-auth))
-    (otherwise
-     (let ((procs '()))
-       (when (cond (l-n-p (setq *log-wserver-name* log-name))
-		   ((eql n 1) (setq *log-wserver-name* nil))
-		   (t  (setq *log-wserver-name* user::*default-log-wserver-name*)))
-	 (when (boundp 'util.test::*test-report-thread*)
-	   (set 'util.test::*test-report-thread* t)))	 
-       (dotimes (i n)
-	 (push
-	  (mp:process-run-function
-	      (setq wname (format nil "~A~A" i name))
-	    (lambda (i name)
-	      (let* (os
-		     clean 
-		     (*standard-output*
-		      (if logs
-			  (setq os
-			    (open (format nil "~A~A.log" logs i) :direction :output
-				  :if-exists :supersede))
-			*standard-output*))
-		     (*aserve-test-config* 
-		      (setf (aref *aserve-test-configs* i)
-			(make-instance 'aserve-test-config
-			  :name name :index i
-			  :test-timeouts test-timeouts)))
-		     (*wserver* (apply #'make-instance 'wserver 
-				       (when user::*default-log-wserver-name* (list :name name)))))
-		(unwind-protect
-		    (let ()
-		      (asc-format "~&~%============ STARTING SERVER ~A ~A ~%~%" i name)
-		      (setf (asc wserver) *wserver*)
-		      (test-aserve test-timeouts
-				   :direct direct :proxy proxy :proxyproxy proxyproxy :ssl ssl
-				   :proxy-auth proxy-auth
-				   )
-		      (setq clean t))
-		  (asc-format "~&~%============ ENDING SERVER ~A ~A ~A ~%~%" i name 
-			      (if clean "normally" "ABRUPTLY"))
-		  (when os (close os))
-		  (setf (asc done) (if clean :clean :abrupt))
-		  (dotimes (j (length *aserve-test-configs*)
-			     (format *initial-terminal-io* "~&~%~%ALL SERVERS ENDED~%~%"))
-		    (or (asc-done (aref *aserve-test-configs* j)) (return)))
-		  )))
-	    i wname)
-	  procs)
-	 ;; should be able to handle a delay = 0
-	 (sleep delay))
+	(case n
+	  (0
+	   ;; In simple one-thread test, log server name only if requested
+	   ;; explicitly.
+	   (if l-n-p
+	       (setq *log-wserver-name* log-name)
+	     (setq *log-wserver-name* nil))
+	   (with-stopper-catch
+	       :single-test-instance
+	     (test-aserve test-timeouts :direct direct :proxy proxy :proxyproxy proxyproxy 
+			  :ssl ssl :proxy-auth proxy-auth)))
+	  (otherwise
+	   (let ((procs '()))
+	     (when (cond (l-n-p (setq *log-wserver-name* log-name))
+			 ((eql n 1) (setq *log-wserver-name* nil))
+			 (t  (setq *log-wserver-name* user::*default-log-wserver-name*)))
+	       (when (boundp 'util.test::*test-report-thread*)
+		 (set 'util.test::*test-report-thread* t)))	 
+	     (dotimes (i n)
+	       (push
+		(mp:process-run-function
+		    (setq wname (format nil "~A~A" i name))
+		  (lambda (i name)
+		    (let* (os
+			   clean 
+			   (*standard-output*
+			    (if logs
+				(setq os
+				  (open (format nil "~A~A.log" logs i) :direction :output
+					:if-exists :supersede))
+			      *standard-output*))
+			   (*aserve-test-config* 
+			    (setf (aref *aserve-test-configs* i)
+			      (make-instance 'aserve-test-config
+				:name name :index i
+				:test-timeouts test-timeouts)))
+			   (*wserver* (apply #'make-instance 'wserver 
+					     (when user::*default-log-wserver-name* (list :name name)))))
+		      (unwind-protect
+			  (let ()
+			    (asc-format "~&~%============ STARTING SERVER ~A ~A ~%~%" i name)
+			    (setf (asc wserver) *wserver*)
+			    (with-stopper-catch
+				wname
+			      (test-aserve test-timeouts
+					   :direct direct :proxy proxy :proxyproxy proxyproxy :ssl ssl
+					   :proxy-auth proxy-auth
+					   )
+			      (setq clean t)))
+			(asc-format "~&~%============ ENDING SERVER ~A ~A ~A ~%~%" i name 
+				    (if clean "normally" "ABRUPTLY"))
+			(when os (close os))
+			(setf (asc done) (if clean :clean :abrupt))
+			(dotimes (j (length *aserve-test-configs*)
+				   (format *initial-terminal-io* "~&~%~%ALL SERVERS ENDED~%~%"))
+			  (or (asc-done (aref *aserve-test-configs* j)) (return)))
+			)))
+		  i wname)
+		procs)
+	       ;; should be able to handle a delay = 0
+	       (sleep delay))
 
-       (when wait
-	 (dolist (p procs)
-	   (mp:process-wait
-	    (format nil "waiting for ~a"
-		    (mp:process-name p))
-	    (lambda (p) (eq :terminated (mp::process-state p)))
-	    p))))))
-  (when wait
-    (let ((code (+ util.test::*test-unexpected-failures*
-		   util.test::*test-errors*)))
-      (if* exit
-	 then (exit code :quiet t)
-	 else code))))
+	     (when wait
+	       (dolist (p procs)
+		 (mp:process-wait
+		  (format nil "waiting for ~a"
+			  (mp:process-name p))
+		  (lambda (p) (eq :terminated (mp::process-state p)))
+		  p))))))
+	(when wait
+	  (let ((code (+ util.test::*test-unexpected-failures*
+			 util.test::*test-errors*)))
+	    (if* exit
+	       then (exit code :quiet t)
+	       else code))))
+    (cond ((null pause-on-break))
+	  (wait (pause-test-on-break nil))
+	  (t 	(format t "~&; test-aserve-n: pause-test-on-break is left enabled.~%")))))
+
 
 (defvar *asc-lock* (mp:make-process-lock :name "asc"))
 (defun asc-format (fmt &rest args)
@@ -283,44 +395,48 @@
 			       (do-tests-inner))
 			   (setf (asc x-compress) prev)))))
 		   (do-tests-inner ()
-				   
-		     (test-publish-file port nil) ; no compression
-		     #+unix
-		     (test-publish-file port t) ; with compression
-		     
-		     (test-publish-directory port)
-		     (test-publish-computed port)
-		     (test-publish-multi port)
-		     (test-publish-prefix port)
-		     (test-authorization port)
-		     (test-encoding)
-                     (test-truncated-stream)
-		     (test-forms port)
-		     (test-get-request-body-incr port)
-                     (test-request-character-encoding port)
-		     (test-client port)
-		     (test-cgi port)
-		     (test-http-copy-file port)
-		     (test-client-unicode-content-length)
-		     (test-expect-header-responses)
-		     (test-retry-on-timeout port)
-                     (test-chunked-request port https)
-                     (test-chunked-request-set-trailers port https)
-                     (test-chunked-request-set-trailers-while-debugging port https)
-		     (test-server-request-body port :https https)
-                     (test-request-uri port https)
-                     (test-spr44282)
+		     (with-stopper-checks
+			 nil
+		       (test-publish-file port nil) ; no compression
+		       #+unix
+		       (test-publish-file port t) ; with compression
+		       (test-publish-directory port)
+		       (test-publish-computed port)
+		       (test-publish-multi port)
+		       (test-publish-prefix port)
+		       (test-put-patch port)
+                       (test-content-length port)
+		       (test-authorization port)
+		       (test-encoding)
+		       (test-truncated-stream)
+		       (test-forms port)
+		       (test-get-request-body-incr port)
+		       (test-request-character-encoding port)
+		       (test-client port)
+		       (test-cgi port)
+		       (test-http-copy-file port)
+		       (test-client-unicode-content-length)
+		       (test-expect-header-responses)
+		       (test-retry-on-timeout port)
+		       (test-chunked-request port https)
+		       (test-chunked-request-set-trailers port https)
+		       (test-chunked-request-set-trailers-while-debugging port https)
+		       (test-server-request-body port :https https)
+		       (test-request-uri port https)
+		       (test-spr44282)
                      
-		     (if* (member :ics *features*)
-			then (test-international port)
-			     (test-spr27296))
-		     (if* test-timeouts 
-			then (test-timeouts port))
-		     (test-body-in-get-request :port port :ssl https)  ;;; rfe15456
-		     ))
+		       (if* (member :ics *features*)
+			  then (test-international port)
+			       (test-spr27296))
+		       (if* test-timeouts 
+			  then (test-timeouts port))
+                       (test-body-in-get-request :port port :ssl https)	 ;;; rfe15456
+                       )))
+                       
 	    
 	    
-		    
+	    (with-stopper-checks
+		nil
 	    (if*  direct
 	       then (asc-format "~%~%===== test direct ~%~%")
 		    (do-tests))
@@ -353,7 +469,7 @@
                             (setq https t)
 			    (do-tests)
 		       else (asc-format "~%>> it isn't so ssl tests skipped~%~%")))
-	    ) ;;; end body of unwind-protect 
+	    )) ;;; end body of unwind-protect 
 	; cleanup forms:
 	(stop-aserve-running)
 	(stop-proxy-running)
@@ -363,8 +479,14 @@
     ;; independent test of a stream used in aserve
     (test-force-output-prepend-stream)
     
+    ;; test the caching object
+    (test-caching)
+    
     (if* (and ssl (errorset (as-require :ssl)))
-       then (test-aserve-extra-ssl))
+       then 
+	    (test-aserve-extra-ssl)
+	    (test-aserve-ssl-redirect) 
+	    )
     )
   (if* (or (> util.test::*test-errors* 0)
 	   (> util.test::*test-successes* 0)
@@ -526,51 +648,59 @@ Returns a vector."
     ;; the result will be the same since given that we know the
     ;; length of the file, chunking won't be needed
     ;; 
-    (let ((ent (publish-file :path "/frob" :file dummy-1-name
-			     :content-type "text/plain"
-			     :cache-p t
-			     :hook #'(lambda (req ent extra)
-				       (declare (ignore req ent extra))
-				       (setq got-reps (or got-reps 0))
-				       (incf got-reps))
-			     :headers '((:testhead . "testval"))
-			     :compress compress
-			     )))
-      (test nil (net.aserve::contents ent)) ; nothing cached yet
+    ;; turn on *enable-keepalive* to test that things don't
+    ;; fail in the server and client with it turned on.
+    ;; We can't test that the packets are sent.  We just
+    ;; want to make sure aserve doesn't signal an error on
+    ;; any machine
+    (let ((prev-keepalive *enable-keepalive*))
+      (setq *enable-keepalive* 10)
+      (let ((ent (publish-file :path "/frob" :file dummy-1-name
+                               :content-type "text/plain"
+                               :cache-p t
+                               :hook #'(lambda (req ent extra)
+                                         (declare (ignore req ent extra))
+                                         (setq got-reps (or got-reps 0))
+                                         (incf got-reps))
+                               :headers '((:testhead . "testval"))
+                               :compress compress
+                               )))
+        (test nil (net.aserve::contents ent)) ; nothing cached yet
 
-      ;; 
-      (dolist (cur-prefix (list prefix-local prefix-dns))
-	;* don't specify keep-alive unless you're willing
-	;  to close the resulting socket
-	(dolist (keep-alive '(nil))
-	  (dolist (protocol '(:http/1.0 :http/1.1))
-	    (asc-format "test 1 - ~s" (list keep-alive protocol))
-	    (multiple-value-bind (body code headers)
-		(x-do-http-request (format nil "~a/frob" cur-prefix)
-				   :protocol protocol
-				   :keep-alive keep-alive)
-	      (incf reps)
-	      (test 200 code)
-	      (test (format nil "text/plain")
-		    (cdr (assoc :content-type headers :test #'eq))
-		    :test #'equal)
+        ;; 
+        (dolist (cur-prefix (list prefix-local prefix-dns))
+          ;* don't specify keep-alive unless you're willing
+          ;  to close the resulting socket
+          (dolist (keep-alive '(nil))
+            (dolist (protocol '(:http/1.0 :http/1.1))
+              (asc-format "test 1 - ~s" (list keep-alive protocol))
+              (multiple-value-bind (body code headers)
+                  (x-do-http-request (format nil "~a/frob" cur-prefix)
+                                     :protocol protocol
+                                     :keep-alive keep-alive)
+                (incf reps)
+                (test 200 code)
+                (test (format nil "text/plain")
+                      (cdr (assoc :content-type headers :test #'eq))
+                      :test #'equal)
 	      
-	      (test "testval"
-		    (cdr (assoc :testhead headers :test #'equal))
-		    :test #'equal)
+                (test "testval"
+                      (cdr (assoc :testhead headers :test #'equal))
+                      :test #'equal)
 	      
-	      #+ignore (if* (eq protocol :http/1.1)
-			  then (test "chunked"
-				     (cdr (assoc :transfer-encoding headers 
-						 :test #'eq))
-				     :test #'equalp))
-	      (test dummy-1-contents body :test #'equal)))))
+                #+ignore (if* (eq protocol :http/1.1)
+                            then (test "chunked"
+                                       (cdr (assoc :transfer-encoding headers 
+                                                   :test #'eq))
+                                       :test #'equalp))
+                (test dummy-1-contents body :test #'equal)))))
       
-      ;; stuff should be cached by now
-      ;; but when doing a compressed retrieval caching isn't done
-      (if* (not compress)
-	 then (test t (not (null (net.aserve::contents ent)))))
-      )
+        ;; stuff should be cached by now
+        ;; but when doing a compressed retrieval caching isn't done
+        (if* (not compress)
+           then (test t (not (null (net.aserve::contents ent)))))
+        )
+      (setq *enable-keepalive* prev-keepalive))
 
     (test reps got-reps)  ; verify hook function worked
 
@@ -612,8 +742,8 @@ Returns a vector."
 		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
 	    (test "testval"
-		    (cdr (assoc :testhead headers :test #'equal))
-		    :test #'equal)
+                  (cdr (assoc :testhead headers :test #'equal))
+                  :test #'equal)
 	    #+ignore (if* (eq protocol :http/1.1)
 			then (test "chunked"
 				   (cdr (assoc :transfer-encoding headers 
@@ -621,7 +751,7 @@ Returns a vector."
 				   :test #'equalp))
 	    (test dummy-2-contents body :test #'equal))
 	  
-	  ; try partial gets
+          ; try partial gets
 	  (multiple-value-bind (body code headers)
 	      (x-do-http-request (format nil "~a/frob2-npl" cur-prefix)
 				 :protocol protocol
@@ -739,26 +869,26 @@ Returns a vector."
       (let ((body2 (x-do-http-request (format nil "~a/check-uncache" 
 					      prefix-local))))
 	
-	; verify result was correct
+        ; verify result was correct
 	(test dummy-1-contents body2 :test #'equal)
 
-	; verify that something's cached.
+        ; verify that something's cached.
 	(if* (not compress)
 	   then (test t (not (null (and :second (net.aserve::contents ent))))))
 
-	; overwrite dummy file with new contents
+        ; overwrite dummy file with new contents
 	(sleep 2) ; pause to get file write date to noticably advance
 	(setq dummy-1-contents (build-dummy-file 555 44 dummy-1-name
 						 compress))
 	
-	; verify that the contents are in fact different
+        ; verify that the contents are in fact different
 	(test nil (equal dummy-1-contents body2))
 
-	; now do the same request.. but we should get new things back
-	; since the last modified time of the file
+        ; now do the same request.. but we should get new things back
+        ; since the last modified time of the file
 	(setq body2
 	  (x-do-http-request (format nil "~a/check-uncache" prefix-local)))
-	; verify that we did get the new stuff back.
+        ; verify that we did get the new stuff back.
 	
 	(test t (equal dummy-1-contents body2))))
     
@@ -771,7 +901,44 @@ Returns a vector."
     (delete-file dummy-1-name)
     (delete-file dummy-2-name)
     ))
+
+(defun read-from-stream-to-buffer (stream buffer)
+  ;; we want to read the stream into the 
+  ;; given buffer which we ensure is big enough.
+  ;;
+  ;; we do a sequence of read-chars and read-sequences
+  ;; calls to exercise the stream class's buffering.
+  ;; 
+  (let ((bytes 0)
+        (ch))
+    (flet ((finish ()
+             (return-from read-from-stream-to-buffer
+               (subseq buffer 0 bytes))))
+           
+      ;; do a few read-chars
+      (dotimes (i 15)
+        (if* (setq ch (read-char stream nil nil))
+           then (setf (aref buffer bytes) ch)
+                (incf bytes)
+           else ; end of file
+                (finish)))
+      ;; do read sequences of bigger and bigger amounts
+      (dolist (size '(5 50 1000 10000))
+        (dotimes (i 20)
+          (if* (> (+ bytes size) (length buffer))
+             then (error "buffer given was too small"))
+          
+          (let ((got (read-sequence  buffer stream :start bytes :end (+ bytes size))))
+            (if* (<=  got bytes)
+               then (finish)
+               else (setq bytes got)))))
     
+    
+      ;; should never happen
+      (error "did not see  eof"))))
+    
+               
+            
 
 
 
@@ -785,6 +952,9 @@ Returns a vector."
 	(dummy-6-content (build-dummy-file 100000 50 nil nil))
 	
 	(prefix-local (format nil "http://localhost:~a" port))
+        ;; must be at least as big as the largest body we'll read
+        ;; since we only do one read-sequence
+        (big-buffer (make-array 200000 :element-type 'character))
 	)
 
     ;;
@@ -799,7 +969,7 @@ Returns a vector."
 		    ("/dum6" ,dummy-6-content)))
 
       (let ((this (cadr pair)))
-	;; to make a separate binding for each function
+        ;; to make a separate binding for each function
 	(publish :path (car pair) 
 		 :content-type "text/plain"
 		 :headers '((:testhead . "testval"))
@@ -816,8 +986,8 @@ Returns a vector."
 				 :keep-alive keep-alive)
 	    (test 200 code)
 	    (test "testval"
-		    (cdr (assoc :testhead headers :test #'equal))
-		    :test #'equal)
+                  (cdr (assoc :testhead headers :test #'equal))
+                  :test #'equal)
 	    (test (format nil "text/plain" port)
 		  (cdr (assoc :content-type headers :test #'eq))
 		  :test #'equal)
@@ -829,7 +999,34 @@ Returns a vector."
 			  (cdr (assoc :transfer-encoding headers 
 				      :test #'eq))
 			  :test #'equalp))
-	    (test (cadr pair) body :test #'equal)))))
+	    (test (cadr pair) body :test #'equal))
+          
+          ;; test  :return :stream
+          
+          (multiple-value-bind (stream code headers)
+	      (x-do-http-request (format nil "~a~a" prefix-local (car pair))
+				 :protocol protocol
+				 :keep-alive keep-alive
+                                 :return :stream)
+	    (test 200 code)
+	    (test "testval"
+                  (cdr (assoc :testhead headers :test #'equal))
+                  :test #'equal)
+	    (test (format nil "text/plain" port)
+		  (cdr (assoc :content-type headers :test #'eq))
+		  :test #'equal)
+	    (if* (and (eq protocol :http/1.1)
+		      (null (asc x-proxy))
+		      (null (asc x-ssl))
+		      )
+	       then (test "chunked"
+			  (cdr (assoc :transfer-encoding headers 
+				      :test #'eq))
+			  :test #'equalp))
+            (test (cadr pair) 
+                  (read-from-stream-to-buffer stream big-buffer)
+                  :test #'equal))
+          )))
     
     
     ;; test whether we can read urls with space in them
@@ -873,30 +1070,30 @@ Returns a vector."
     ;; test that if an error occurs we don't send out the
     ;; header before we encounter the error
     (publish :path "/error-computed-error"
-	 :content-type "text/plain"
-	 :function
-	 #'(lambda (req ent)
-	     ;; this will get an error after the header is geneated
-	     ;; but before the first body output is done
-	     ;; this will test the delayed header send.
-	     ;; the user should see a 500 "internal server error"
-	     (handler-case
-		 (with-http-response (req ent)
-		   (with-http-body (req ent)
-		     ; make an error
-		     (let ((a (+ 1 2 3 :bogus)))
-		       (+ a a))
-		     (html "done")))
-	       (error (c)
-		 (with-http-response (req ent 
-					  :response 
-					  *response-internal-server-error*
-					  :content-type
-					  "text/html")
-		   (with-http-body (req ent)
-		     (html (:head (:title "Internal Server Error"))
-			   (:body "As expected this entity caused error " 
-				  (:princ c)))))))))
+             :content-type "text/plain"
+             :function
+             #'(lambda (req ent)
+                 ;; this will get an error after the header is geneated
+                 ;; but before the first body output is done
+                 ;; this will test the delayed header send.
+                 ;; the user should see a 500 "internal server error"
+                 (handler-case
+                     (with-http-response (req ent)
+                       (with-http-body (req ent)
+                         ; make an error
+                         (let ((a (+ 1 2 3 :bogus)))
+                           (+ a a))
+                         (html "done")))
+                   (error (c)
+                     (with-http-response (req ent 
+                                              :response 
+                                              *response-internal-server-error*
+                                              :content-type
+                                              "text/html")
+                       (with-http-body (req ent)
+                         (html (:head (:title "Internal Server Error"))
+                               (:body "As expected this entity caused error " 
+                                      (:princ c)))))))))
     
     (multiple-value-bind (body code headers)
 	(x-do-http-request (format nil "~a/error-computed-error" prefix-local)
@@ -905,14 +1102,41 @@ Returns a vector."
       
       (test 500 code))
     
-    ))
+    
+    ;; test we can send and receive cookie info
+    (let ((cookie-value (make-array 10000 :element-type 'character :initial-element #\a))
+          (cookie-name  "the-cookie-name"))
+      
+      (publish :path "/cookie-test"
+               :content-type "text/plain"
+               :function
+               #'(lambda (req ent)
+                   (with-http-response (req ent)
+                     (set-cookie-header req :name cookie-name :value cookie-value)
+                     (with-http-body (req ent)
+                       (html "simple body")))))
+      
+      (let ((jar (make-instance 'cookie-jar)))
+        (multiple-value-bind (body c-code headers)
+            (x-do-http-request (format nil "~a/cookie-test" prefix-local)
+                               :cookies jar)
+          (declare (ignore body headers))
+                   
+          (test 200 c-code)
+        
+          (test  1 (length (net.aserve.client::cookie-jar-items jar)))
+          (let ((ci (cadr (car (net.aserve.client::cookie-jar-items jar)))))
+            (test cookie-name (cookie-item-name ci) :test #'equal)
+            (test cookie-value (cookie-item-value ci) :test #'equal))
+    
+          )))))
 
 
 (defun test-authorization (port)
-  (let ((prefix-local (format nil "http://localhost:~a" port))
-	(prefix-dns   (format nil "http://~a:~a" 
-			      (long-site-name) port)))
-    
+  (let ((prefix-local  (format nil "http://localhost:~a" port))
+        (prefix-dns    (format nil "http://~a:~a" (long-site-name) port))
+        (long-password "abcdefghijklmnopqrstuvwxyz1234567890"))
+
     ;; manual authorization testing
     ;; basic authorization
     ;;
@@ -921,7 +1145,9 @@ Returns a vector."
 	     :function
 	     #'(lambda (req ent)
 		 (multiple-value-bind (name password) (get-basic-authorization req)
-		   (if* (and (equal name "foo") (equal password "bar"))
+                   (if* (and (equal name "foo")
+                             (or (equal password "bar")
+                                 (equal password long-password)))
 		      then (with-http-response (req ent)
 			     (with-http-body (req ent)
 			       (html (:head (:title "Secret page"))
@@ -948,6 +1174,11 @@ Returns a vector."
     (test 200
 	  (values2 (x-do-http-request (format nil "~a/secret" prefix-local)
 				      :basic-authorization '("foo" . "bar"))))
+
+    ; long password
+    (test 200
+          (values2 (x-do-http-request (format nil "~a/secret" prefix-local)
+                                      :basic-authorization `("foo" . ,long-password))))
     
     ; bad password
     (test 401
@@ -957,6 +1188,11 @@ Returns a vector."
     ; auth via userinfo
     (test 200
 	  (values2 (x-do-http-request (format nil "http://foo:bar@localhost:~a/secret" port))))
+
+    ; long password auth via userinfo
+    (test 200
+	  (values2 (x-do-http-request (format nil "http://foo:~a@localhost:~a/secret" long-password port))))
+
 
     ; test conflicting auth headers.
     (let ((bad-auth '("bad" "password"))
@@ -1197,11 +1433,11 @@ Returns a vector."
 
 (defun as-require (&rest args)
   (mp:with-process-lock
-   ;; 2010-12 mm: Use a process-lock to avoid conditionalizing on smp...
-   ;; We need a lock to avoid race on require.
-   ;; If and when require code is fixed, this lock could be removed.
-   (*as-test-lock*)
-   (apply #'require args)))
+      ;; 2010-12 mm: Use a process-lock to avoid conditionalizing on smp...
+      ;; We need a lock to avoid race on require.
+      ;; If and when require code is fixed, this lock could be removed.
+      (*as-test-lock*)
+    (apply #'require args)))
 
 (defun test-encoding ()
   ;; test the encoding and decoding
@@ -1486,34 +1722,33 @@ Returns a vector."
 		       got-zero
 		       after-zero)
 				    
-				    
 		   (get-request-body-incremental
 		    req #'(lambda (buffer size)
 			    (if* got-zero
 			       then ; never should get
-				    ; callback after zero
+                                    ; callback after zero
 				    (setq after-zero t))
 			    (if* (eql size 0)
 			       then (setq got-zero t)
 			       else (push (subseq buffer 0 size) bufs))))
 
-		   ; test that the callback function got a zero size
+                   ; test that the callback function got a zero size
 		   (test t got-zero)
 		 
-		   ; test that the zero was the last value sent the
-		   ; callback function
+                   ; test that the zero was the last value sent the
+                   ; callback function
 		   (test nil after-zero)
 		 
-		   ; test that the callback function received
-		   ; the correct value
+                   ; test that the callback function received
+                   ; the correct value
 		   (let ((res (apply #'concatenate
 				     'vector
 				     (nreverse bufs))))
 		     (test t
-		      (equalp res *get-request-body-incr-value*))))
+                           (equalp res *get-request-body-incr-value*))))
 				  
 
-		 ; response doesn't matter, we'e done the testing already
+                 ; response doesn't matter, we'e done the testing already
    
 		 (with-http-response (req ent)
 		   (with-http-body (req ent)
@@ -1526,7 +1761,112 @@ Returns a vector."
 		       :method :put
 		       :content *get-request-body-incr-value*
 		       :content-type "application/binary")
-    ))
+    )
+
+  (let ((tfile (format nil "~a/test~A-computed-content" *aserve-test-dir* (asc index))))
+    (with-open-file  (p tfile :direction :output
+                      :if-exists :supersede
+                      :if-does-not-exist :create)
+      (write-sequence *get-request-body-incr-value* p))
+    (let ((prefix-local (format nil "http://localhost:~a" port)))
+      ;; We append ?use=<tag> here just to make it clear in the log
+      ;; file which request failed, should we see a failure.
+      ;; The query here will have no effect at the http server.
+      (x-do-http-request (format nil "~a/get-request-body-incr-test?use=file-computed-content"
+                                 prefix-local)
+                         :method :put
+                         :content (make-instance 'file-computed-content
+                                    :filename tfile)
+                         :content-type "application/binary")
+      ;; Test pathname is automatically wrapped in file-computed-content.
+      (x-do-http-request (format nil "~a/get-request-body-incr-test?use=pathname"
+                                 prefix-local)
+                         :method :put
+                         :content (pathname tfile)
+                         :content-type "application/binary")
+      ;; Test chunked body request by using the stream-computed-content.
+      (with-open-file (stream tfile :direction :input :element-type '(unsigned-byte 8))
+        (x-do-http-request (format nil "~a/get-request-body-incr-test?use=stream-computed-content"
+                                   prefix-local)
+                           :method :put
+                           :content (make-instance 'stream-computed-content :stream stream)
+                           :content-type "application/binary"))
+      ;; Test stream is automatically wrapped in stream-computed-content.
+      (with-open-file (stream tfile :direction :input :element-type '(unsigned-byte 8))
+        (x-do-http-request (format nil "~a/get-request-body-incr-test?use=stream"
+                                   prefix-local)
+                           :method :put
+                           :content stream
+                           :content-type "application/binary"))
+      ;; Test connection is kept alive.
+      (if* (and (not (asc x-proxy))
+                (not (asc x-ssl)))
+         then (multiple-value-bind (body code headers uri socket1)
+                  (with-open-file (stream tfile :direction :input :element-type '(unsigned-byte 8))
+                    (x-do-http-request (format nil "~a/get-request-body-incr-test?use=socket1"
+                                               prefix-local)
+                                       :method :put
+                                       :content stream
+                                       :content-type "application/binary"
+                                       :keep-alive t))
+                (declare (ignore body code headers uri))
+                (test t (not (null socket1)) :fail-info "socket is nil")
+                (multiple-value-bind (body code headers uri socket2)
+                    (with-open-file (stream tfile :direction :input :element-type '(unsigned-byte 8))
+                      (x-do-http-request (format nil "~a/get-request-body-incr-test?use=socket2"
+                                                 prefix-local)
+                                         :method :put
+                                         :content stream
+                                         :content-type "application/binary"
+                                         :keep-alive t
+                                         :connection socket1))
+                  (declare (ignore body code headers uri))
+                  (test socket1 socket2 :fail-info "socket is not reused"))))
+      ;; Multiple values in 'Transfer-Encoding' header are legal
+      ;; accoding to the MDN resource:
+      ;;    https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding,
+      ;; but aserve does not handle this, so error is expected.
+      (with-open-file (stream tfile :direction :input :element-type '(unsigned-byte 8))
+        (test-error
+         (x-do-http-request (format nil "~a/get-request-body-incr-test?use=stream-error"
+                                    prefix-local)
+                            :method :put
+                            :content stream
+                            :content-type "application/binary"
+                            :headers '(("Transfer-Encoding" . "gzip, chunked")))))
+      ;; Test that error is thrown when attempting to use chunking with HTTP/1.0.
+      (with-open-file (stream tfile :direction :input :element-type '(unsigned-byte 8))
+        (test-error
+         (x-do-http-request (format nil "~a/get-request-body-incr-test?use=stream-error"
+                                    prefix-local)
+                            :protocol :http/1.0
+                            :method :put
+                            :content stream
+                            :content-type "application/binary")))
+      (delete-file tfile)))
+  )
+
+(defun test-put-patch (port)
+  (let ((prefix-local (format nil "http://localhost:~a" port))
+        (content "blah blah blah"))
+    (publish :path "/putpatch"
+             :content-type "text/plain"
+             :function #'(lambda (req ent)
+                           (let ((want (intern (request-query-value "want" req)
+                                               (find-package :keyword))))
+                             (test want (request-method req)))
+                           
+                           (test content (get-request-body req) :test #'equal)
+                           (with-http-response (req ent)
+                             (with-http-body (req ent)
+                               (net.html.generator:html "foo the bar")
+                               ))))
+    (dolist (method '(:put :patch))
+      (x-do-http-request (format nil "~a/putpatch?want=~a" prefix-local method)
+                         :method method
+                         :content content
+                         :content-type "text/plain"))))
+
 
 (defun test-request-character-encoding (port)
   (let ((prefix-local (format nil "http://localhost:~a" port)))
@@ -1567,7 +1907,8 @@ Returns a vector."
     (if* (net.aserve.client::ssl-has-sni-p)
        then (test t (stringp (values (net.aserve.client:do-http-request url))))
        else (test-error (net.aserve.client:do-http-request url)
-                        :condition-type 'excl::ssl-error)))
+                        :condition-type 'error
+                        :include-subtypes t)))
   
   (let ((prefix-local (format nil "http://localhost:~a" port)))
   
@@ -2934,7 +3275,8 @@ Returns a vector."
       (sleep 1)
       (setq b (chunked-sender (format nil "http~A://localhost:~A/stream3" https port)))
       (test nil (null (search "after 1510" b)))
-      )))
+      
+      (format t "~&Done with test with-body-input-stream~%"))))
 
 (defun test-request-uri (port https)
   (publish :path "/request-uri" :content-type "text/plain"
@@ -3005,6 +3347,42 @@ Returns a vector."
       
       (test t seen-error-3)
       (and *wserver* (shutdown)))))
+
+(defun test-aserve-ssl-redirect (&aux server1 server2 port1 port2 context test-dir text)
+  (unwind-protect
+      (let ()
+	(setq context (socket:make-ssl-server-context 
+		       :certificate (merge-pathnames "server.pem" *aserve-load-truename*)))
+	(setq server1 (start :port nil :server :new :ssl-args (list :context context)))
+	(setq port1 (socket::local-port (net.aserve::wserver-socket server1)))
+	(setq server2 (start :port nil :server :new :ssl-args (list :context context)))
+	(setq port2 (socket::local-port (net.aserve::wserver-socket server2)))
+	(test nil (eql port1 port2) :fail-info (format nil "test-aserve-ssl-redirect ports ~A ~A" port1 port2))
+	
+	(multiple-value-bind (ok whole dir)
+	    (match-regexp "\\(.*[/\\]\\).*" (namestring *aserve-load-truename*))
+	  (declare (ignore whole))
+	  (if* (not ok) 
+	     then (error "can't find the server.pem directory"))
+      
+	  (setq test-dir dir))
+	(publish-directory :server server1 :prefix "/"
+			   :destination (concatenate 'string test-dir "testdir3/"))
+	(test-no-error (setq text (do-http-request (format nil "https://localhost:~A/" port1))))
+	(test 12 (search "topfile</body>" text))
+	(shutdown :server server1)
+	(setq server1 nil)
+	(sleep 1)
+
+	(publish-directory :server server2 :prefix "/"
+			   :destination (concatenate 'string test-dir "testdir3/"))
+	(test-no-error (setq text (do-http-request (format nil "https://localhost:~A/" port2))))
+	(test 12 (search "topfile</body>" text))
+
+	)
+    (when server1 (shutdown :server server1))
+    (when server2 (shutdown :server server2))
+    ))
 
 
 (defun test-force-output-prepend-stream ()
@@ -3119,6 +3497,68 @@ Returns a vector."
                    (buffer (make-array 256 :element-type '(unsigned-byte 8))))
                (test 4 (device-read truncated-stream buffer 0 4 nil)))))
       (delete-file temp-file-name))))
+
+
+(defun test-content-length (port)
+  ;; verify that we check the content length
+  (if* (not (asc x-proxy))
+     then ;; only do test when direct to the web server
+          (format t "doing content-length test~%")
+          
+          (publish :path "/test-content-length"
+                   :function #'(lambda (req ent)
+                                 (with-http-response (req ent)
+                                   (with-http-body (req ent)
+                                     (get-request-body req)))))
+          
+          (publish :path "/test-no-content"
+                   :function #'(lambda (req ent)
+                                 (with-http-response (req ent
+                                                      :response
+                                                      *response-no-content*)
+                                   (with-http-body (req ent)
+                                     ;; We'll send a body but 
+                                     ;; it should be ignored because
+                                     ;; it's a 204 response
+                                     (html "this should not be seen")
+                                     ))))
+          
+          
+          (let ((url (format nil "http://localhost:~d/test-content-length" port))
+                (nc-url
+                 (format nil "http://localhost:~d/test-no-content" port))
+                (content (make-array 2048 :element-type 'character :initial-element #\a)))
+            
+            (multiple-value-bind (body code)
+                (x-do-http-request url  
+                                   :method :post 
+                                   :content content)
+              (declare (ignore body))
+              (test 200 code))
+
+            ;; change to limit the content length to 512
+            (let ((old (wserver-max-content-length *wserver*)))
+              (setf (wserver-max-content-length *wserver*) 512)
+              (test-error
+               (x-do-http-request url  
+                                  :method :post 
+                                  :content (and :second content)))
+          
+              ;; set the limit back to what it was before
+              (setf (wserver-max-content-length *wserver*) old))
+          
+            ;; test that a 204 returns nil to indicate no body
+            (multiple-value-bind (body code) 
+                (x-do-http-request nc-url
+                                   :method :get)
+              (test 204 code)
+              (test nil body)))))
+              
+          
+            
+            
+            
+  
     
 (defun test-spr44282 ()
   (test '(("bar" . " ") ("foo" . " ")) 
@@ -3127,7 +3567,676 @@ Returns a vector."
   (test '(("b ar" . " +") ("foo" . " +")) 
         (net.aserve::form-urlencoded-to-query "b+ar=+%2b&foo=+%2b")
         :test #'equal))
-         
+
+
+
+;;;; caching test
+
+(defparameter *test-auto-cache-seconds* 10)
+;; Delay long enough past lifetime to detect cache entry expiration reliably.
+(defparameter *test-auto-cache-delay* 3)
+
+(defmacro with-new-cache ((var &key (max-cache-size 1000000)
+                                     auto-cache-codes 
+                                     auto-cache-seconds) &body body)
+  `(let ((,var (make-instance 'net.aserve.client:client-cache
+                 :max-cache-size ,max-cache-size
+                 :auto-cache-codes ,auto-cache-codes
+                 :auto-cache-seconds ,auto-cache-seconds)))
+     ,@body))
+
+(defun test-caching (&key (cache-seconds *test-auto-cache-seconds*)
+			  (cache-delay (+ cache-seconds *test-auto-cache-delay*)))
+  (let ((port (start-aserve-running)))
+    (unwind-protect
+        (progn
+          ;; test something that has no cache-control specifier
+          ;; but is cached anyway
+          (with-new-cache (cache)
+            ;; all counters are zero
+            
+            (dopublish "/simple" :last-modified (get-universal-time)) 
+            (dohttp "/simple" :cache cache :port port :expect 200 :name "aaa") 
+            
+            (check-cache cache "aa"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+                         
+            
+            ;; call again this time will validate cache result
+            (dohttp "/simple" :cache cache :port port :expect 200 :name "bbb")
+            (check-cache cache "bb"
+                         :lookups 2
+                         :alive   0
+                         :revalidate 1
+                         :validated 1))
+          
+          ;; test cache-control: max-age=N
+          ;;
+          (with-new-cache (cache)
+            
+            ;; set the max age so the page will be valid for cache-seconds seconds
+            (dopublish "/maxage" :last-modified (get-universal-time)
+                       :headers `(("cache-control" . ,(format nil "private, max-age=~A" cache-seconds))))
+            (dohttp "/maxage" :cache cache :port port :expect 200 :name "ccc")
+            (check-cache cache "cc"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            ;; call again within cache-seconds seconds so it will be valid in the cache
+            (dohttp "/maxage" :cache cache :port port :expect 200 :name "ddd")
+            (check-cache cache "dd"
+                         :lookups 2
+                         :alive   1
+                         :revalidate 0
+                         :validated 0)
+            
+            ;; now wait cache-delay seconds to ensure that it has expired in
+            ;; the cache
+            (sleep cache-delay)
+            (dohttp "/maxage" :cache cache :port port :expect 200 :name "eee")
+            (check-cache cache "ee"
+                         :lookups 3
+                         :alive   1
+                         :revalidate 1
+                         :validated 1)
+            
+          
+            )
+          
+          ;; test using an expires header
+          (with-new-cache (cache)
+            
+            ;; set the max age so the page will be valid for cache-seconds seconds
+            (dopublish "/expire" :last-modified (get-universal-time)
+                       :headers `(("expires" . 
+                                             ,(net.aserve::universal-time-to-date 
+                                               (+ (get-universal-time) cache-seconds)))))
+            (dohttp "/expire" :cache cache :port port :expect 200 :name "fff")
+            (check-cache cache "cc"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            ;; call again within cache-seconds seconds so it will be valid in the cache
+            (dohttp "/expire" :cache cache :port port :expect 200 :name "ggg")
+            (check-cache cache "dd"
+                         :lookups 2
+                         :alive   1
+                         :revalidate 0
+                         :validated 0)
+            
+            ;; now wait cache-delay seconds to ensure that it has expired in
+            ;; the cache
+            (sleep cache-delay)
+            (dohttp "/expire" :cache cache :port port :expect 200 :name "hhh")
+            (check-cache cache "ee"
+                         :lookups 3
+                         :alive   1
+                         :revalidate 1
+                         :validated 1)
+            
+          
+            )
+          
+          
+          ;; we set max-age to cache-seconds and expires to 30 seconds in the future
+          ;; we check that max-age takes precedence in ths case
+          (with-new-cache (cache)
+            
+            ;; set the max age so the page will be valid for cache-seconds seconds
+            (dopublish "/expmax" :last-modified (get-universal-time)
+                       :headers `(("cache-control" . ,(format nil "private, max-age=~A" cache-seconds))
+                                  ("expires" . 
+                                             ,(net.aserve::universal-time-to-date 
+                                               (+ (get-universal-time) 30)))))
+            (dohttp "/expmax" :cache cache :port port :expect 200 :name "ppp")
+            (check-cache cache "ff"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            ;; call again within cache-seconds seconds so it will be valid in the cache
+            (dohttp "/expmax" :cache cache :port port :expect 200 :name "qqq")
+            (check-cache cache "gg"
+                         :lookups 2
+                         :alive   1
+                         :revalidate 0
+                         :validated 0)
+            
+            ;; now wait cache-delay seconds to ensure that it has expired in
+            ;; the cache
+            (sleep cache-delay)
+            (dohttp "/expmax" :cache cache :port port :expect 200 :name "rrr")
+            (check-cache cache "hh"
+                         :lookups 3
+                         :alive   1
+                         :revalidate 1
+                         :validated 1)
+            
+          
+            )
+
+          
+          ;; test that using a different accept header will not return a cached
+          ;; entry with a different accept header
+          (with-new-cache (cache)
+            
+            ;; set the max age so the page will be valid for cache-seconds seconds
+            (dopublish "/maxage" :last-modified (get-universal-time)
+                       :headers `(("cache-control" . ,(format nil "private, max-age=~A" cache-seconds))))
+            (dohttp "/maxage" :cache cache :port port :expect 200 :name "ccc2"
+                    :accept "one/two")
+            (check-cache cache "cc2"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            ;; call again within cache-seconds seconds so it will be valid in the cache
+            (dohttp "/maxage" :cache cache :port port :expect 200 :name "ddd2"
+                    :accept "one/two")
+            (check-cache cache "dd2"
+                         :lookups 2
+                         :alive   1
+                         :revalidate 0
+                         :validated 0)
+            
+            ;; call with a different accept header
+            (dohttp "/maxage" :cache cache :port port :expect 200 :name "ddd2"
+                    :accept "three/four")
+            (check-cache cache "dd3"
+                         :lookups 3
+                         :alive   1
+                         :revalidate 0
+                         :validated 0)
+            
+            
+            ;; now wait cache-delay seconds to ensure that it has expired in
+            ;; the cache
+            (sleep cache-delay)
+            (dohttp "/maxage" :cache cache :port port :expect 200 :name "eee"
+                    :accept "one/two")
+            (check-cache cache "ee2"
+                         :lookups 4
+                         :alive   1
+                         :revalidate 1
+                         :validated 1)
+            
+            )
+          ;; cache-control: no-store
+          ;;  does not let the response be stored in the cache
+            
+          (with-new-cache (cache)
+            
+            ;; set the max age so the page will be valid for cache-seconds seconds
+            (dopublish "/nostore" :last-modified (get-universal-time)
+                       :headers `(("cache-control" . "no-store")
+                                  ("expires" . 
+                                             ,(net.aserve::universal-time-to-date 
+                                               (+ (get-universal-time) cache-seconds)))))
+            (dohttp "/nostore" :cache cache :port port :expect 200 :name "abbb")
+            (check-cache cache "ii"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            ;; call again quickly and note that the response wasn't cached
+            (dohttp "/nostore" :cache cache :port port :expect 200 :name "bbbb")
+            (check-cache cache "jj"
+                         :lookups 2
+                         :alive 0  
+                         :revalidate 0
+                         :validated 0)
+            
+            ;; now wait cache-delay seconds to ensure and try the call again.
+            ;; verify not cached
+            (sleep cache-delay)
+            (dohttp "/nostore" :cache cache :port port :expect 200 :name "cbbb")
+            (check-cache cache "kk"
+                         :lookups 3
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            
+          
+            )
+          
+          
+          ;; cache-control: no-cache allows you to cache
+          ;; an item but you must validate on each access
+          (with-new-cache (cache)
+            
+            ;; set the max age so the page will be valid for cache-seconds seconds
+            (dopublish "/nocache" :last-modified (get-universal-time)
+                       :headers `(("expires" . 
+                                             ,(net.aserve::universal-time-to-date 
+                                               (+ (get-universal-time) cache-seconds)))
+                                  ("cache-control" . "no-cache")))
+            (dohttp "/nocache" :cache cache :port port :expect 200 :name "aa1")
+            (check-cache cache "a1"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            ;; call again within cache-seconds seconds so it will be valid in the cache
+            ;; but we must revalidate anyway becuase of 'no-cache'
+            (dohttp "/nocache" :cache cache :port port :expect 200 :name "aa2")
+            (check-cache cache "a2"
+                         :lookups 2
+                         :alive   0
+                         :revalidate 1
+                         :validated 1)
+            
+            ;; now wait cache-delay seconds to ensure that it has expired in
+            ;; the cache
+            (sleep cache-delay)
+            (dohttp "/nocache" :cache cache :port port :expect 200 :name "aa3")
+            (check-cache cache "a3"
+                         :lookups 3
+                         :alive   0
+                         :revalidate 2
+                         :validated 2)
+            
+          
+            )
+
+          ;; test no-cache=headerfield  which allows certain
+          ;; headers to not be stored in the cache.
+          ;;
+          (with-new-cache (cache)
+            
+            ;; set the max age so the page will be valid for cache-seconds seconds
+            (dopublish "/nohead" :last-modified (get-universal-time)
+                       :headers `(("cache-control"
+				   . ,(format nil "private, max-age=~A, no-cache=fancy, no-cache=schmansy" 
+					      cache-seconds))
+                                  ("fancy" . "foo")
+                                  ("schmansy" . "bar")
+                                  ("flippy"  . "flop")))
+            
+            
+            ;; when we do the http request it won't be in the
+            ;; the cache so we will return all headers, when
+            ;; we call it later and get the value from the
+            ;; cache the fancy and schmansy headers will not be
+            ;; present because we said they should not be cached.
+            (multiple-value-bind (body code headers) 
+                (dohttp "/nohead" :cache cache :port port 
+                        :expect 200 
+                        :name "ppp")
+              (declare (ignore body code))
+              (check-cache cache "ff"
+                           :lookups 1
+                           :alive   0
+                           :revalidate 0
+                           :validated 0)
+              (test '(:fancy . "foo") (assoc :fancy headers)
+                    :test #'equal
+                    :fail-info "111")
+              (test '(:schmansy . "bar") (assoc :schmansy headers)
+                    :test #'equal
+                    :fail-info "111")
+              (test '(:flippy  . "flop") (assoc :flippy headers)
+                    :test #'equal
+                    :fail-info "111"))
+            
+            ;; call again within cache-seconds seconds so it will be valid in the cache
+            (multiple-value-bind (body code headers)
+                (dohttp "/nohead" :cache cache :port port :expect 200 :name "qqq")
+              (declare (ignore body code))
+              (check-cache cache "gg"
+                           :lookups 2
+                           :alive   1
+                           :revalidate 0
+                           :validated 0)
+           
+              (test 'nil (assoc :fancy headers)
+                    :test #'equal
+                    :fail-info "222")
+              (test 'nil (assoc :schmansy headers)
+                    :test #'equal
+                    :fail-info "222")
+              (test '(:flippy  . "flop") 
+                    (assoc :flippy headers)
+                    :test #'equal
+                    :fail-info "222"))
+            
+            
+            ;; now wait cache-delay seconds to ensure that it has expired in
+            ;; the cache.  it will be validated and a new body
+            ;; not returned so the old header with removed header
+            ;; lines will still be in effect
+            (sleep cache-delay)
+            (multiple-value-bind (body code headers)
+                (dohttp "/nohead" :cache cache :port port :expect 200 :name "rrr")
+              (declare (ignore body code))
+              (check-cache cache "hh"
+                           :lookups 3
+                           :alive   1
+                           :revalidate 1
+                           :validated 1)
+          
+              (test 'nil (assoc :fancy headers)
+                    :test #'equal
+                    :fail-info "333")
+              (test 'nil 
+                    (assoc :schmansy headers)
+                    :test #'equal
+                    :fail-info "333")
+              (test '(:flippy  . "flop") 
+                    (assoc :flippy headers :test #'equal)
+                    :test #'equal
+                    :fail-info "333")))
+
+                    
+
+          ;; test auto caching
+          (with-new-cache (cache :auto-cache-codes '(200) :auto-cache-seconds cache-seconds)
+            (dopublish "/autocache" :last-modified (- (get-universal-time) 60))
+            (dohttp "/autocache" :cache cache :port port :expect 200)
+            (check-cache cache "vv1"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            ;; still in cache
+            (dohttp "/autocache" :cache cache :port port :expect 200)
+            (check-cache cache "vv2"
+                         :lookups 2
+                         :alive   1
+                         :revalidate 0
+                         :validated 0)
+            ;; will expire
+            (sleep cache-delay)
+            (dohttp "/autocache" :cache cache :port port :expect 200)
+            (check-cache cache "vv3"
+                         :lookups 3
+                         :alive   1
+                         :revalidate 1
+                         :validated 1))
+            
+            
+      
+          ;; test cache flushing
+          
+          ;; first test that the cache size accounting is correct
+          (with-new-cache (cache)
+                  
+            (dopublish-prefix "/bigret" 
+                              :headers `(("cache-control" . ,(format nil "private, max-age=~A" cache-seconds))))
+            ;; cache 5 objects of size 10000, 10001 .. 10004
+                  
+            (dotimes (i 5)
+              (dohttp (format nil "/bigret~d" (+ i 10000))
+                      :cache cache
+                      :port port
+                      :expect 200
+                      :name "www"))
+            (test (+ 10000 10001 10002 10003 10004)
+                  (net.aserve.client::client-cache-cache-size cache)))
+          
+          ;; test that the cache flushing works
+          (with-new-cache (cache :max-cache-size 500000)
+            (dotimes (i 5)
+              (dohttp (format nil "/bigret~d" (+ i 100000))
+                      :cache cache
+                      :port port
+                      :expect 200
+                      :name "xxx")
+              ;; sleep one second to cause the last-used time in the cache
+              ;; to vary by one second for each new item cached
+              (sleep 1)
+              )
+            
+            ;; will fit in cache size (500000) plus slop (100000)
+            (test (+ 100000 100001 100002 100003 100004)
+                  (net.aserve.client::client-cache-cache-size cache))
+              
+            ;; one more and that's too much, will have to flush a few.
+            (dohttp (format nil "/bigret~d" 200000)
+                    :cache cache
+                    :port port
+                    :expect 200
+                    :name "zzz")
+            
+            ;; cache grew to 
+            ;; (+ 100000 100001 100002 100003 100004 200000) == 700010
+            ;; causing us to ask for it to be reduced below
+            ;;  (- 500000 (max-cache-size) 100000 (slop)) = 400000
+            ;; we cached items starting at 100000 so the will be
+            ;; removed that order.
+            ;;  we need to drop (- 700010 400000) = 300010 bytes
+            ;; so we'll need to remove
+            ;;   (+ 100000 100001 100002 100003)  == 400006 bytes
+            ;; leaving (- 700010 400006) == 300004 bytes in the cache
+            (test 300004 (net.aserve.client::client-cache-cache-size cache))
+            nil
+            )
+
+          
+          ;; test the flush-client-cache function
+          (with-new-cache (cache)
+            (dopublish "/checkflush" :last-modified (get-universal-time)
+                       :headers `(("cache-control" . ,(format nil "max-age=~A" cache-seconds))))
+            (dopublish "/checkflush2" :last-modified (get-universal-time)
+                       :headers `(("cache-control" . ,(format nil "max-age=~A" cache-seconds))))
+            ;; baseline
+            (test 0 (net.aserve.client::client-cache-cache-size cache) 
+                  :fail-info "dd1")
+             
+            (dohttp "/checkflush" :cache cache :port port :expect 200 
+                    :name "cc1")
+       
+            ;; one thing cached of 20 bytes
+             
+            (test 20  (net.aserve.client:client-cache-cache-size cache) 
+                  :fail-info "dd2")
+             
+            ;; it won't expire for cache-seconds seconds so this will not remove it
+            (net.aserve.client:flush-client-cache cache :expired t)
+             
+            (test 20  (net.aserve.client:client-cache-cache-size cache)
+                  :fail-info "dd3")
+             
+            ;; let it expire
+            (sleep cache-delay)
+             
+            ;; cache a new url
+            (dohttp "/checkflush2" :cache cache :port port :expect 200 
+                    :name "cc1")
+             
+
+            ;; now we have two things cached == 40 bytes
+            (test 40  (net.aserve.client:client-cache-cache-size cache) 
+                  :fail-info "dd4")
+             
+            ;; get rid of expired ones
+            (net.aserve.client:flush-client-cache cache :expired t)
+             
+            ;; and we're done to one
+            (test 20  (net.aserve.client:client-cache-cache-size cache)
+                  :fail-info "dd5")
+             
+            ;; get rid of everyone
+            (net.aserve.client:flush-client-cache cache :all t)
+             
+            ;; and we're down to zero
+            (test 0  (net.aserve.client:client-cache-cache-size cache) 
+                  :fail-info "dd6"))
+             
+
+          ;; test caching of redirect responses without a cache-control
+          ;; header.
+          ;; We demonstrate using auto-caching how we can cause 
+          ;; a redirect to be cached
+          ;; for a certain period of time even if the returned
+          ;; header doesn't specify a caching time.  This mirrors
+          ;; a real world example we need to support.
+          
+          (with-new-cache (cache :auto-cache-codes 
+                                 '(#.(net.aserve::response-number *response-moved-permanently*))
+                                 
+                                 :auto-cache-seconds cache-seconds)
+            (dopublish "/redirit" :response *response-moved-permanently*
+                       :headers '(("location" . "/redirit-target")))
+            (dopublish "/redirit-target" :response *response-ok*
+                       :headers `(("cache-control" . ,(format nil "public, max-age=~A" cache-seconds))))
+            
+            (dohttp "/redirit" :cache cache :port port :expect 200
+                    :name "cp1")
+            
+            ;; we did two lookups (/redirit and /redirit-target) and
+            ;; none were in the cache so zero alive
+            (check-cache cache "cp2"
+                         :lookups 2
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            
+            (dohttp "/redirit" :cache cache :port port :expect 200
+                    :name "cp3")
+            
+            ;; we did two more lookups (/redirit and /redirit-target)
+            ;; and both were alive in the cache so no network
+            ;; activity occurred.
+            (check-cache cache "cp4"
+                         :lookups 4
+                         :alive   2
+                         :revalidate 0
+                         :validated 0)
+            )
+          
+          ;; test that the accept header is sent with the revalidation
+          (with-new-cache (cache :auto-cache-seconds cache-seconds
+                                 :auto-cache-codes '(200))
+            (publish :path "/auto-accept-test"
+                     :function #'(lambda (req ent)
+                                   (let ((retval (header-slot-value req :accept)))
+                                     (with-http-response (req ent)
+                                       (with-http-body (req ent)
+                                         (format (request-reply-stream req) "~a" retval)
+                                         (force-output (request-reply-stream req))
+                                         )))))
+            
+            (test "foo/bar" (values (dohttp "/auto-accept-test" :port port
+                                            :cache cache :accept "foo/bar"
+                                            :expect 200
+                                            :name "aa1"))
+                  :test #'equal)
+            (check-cache cache "aa2"
+                         :lookups 1
+                         :alive   0
+                         :revalidate 0
+                         :validated 0)
+            
+            (test "foo/bar" (values (dohttp "/auto-accept-test" :port port
+                                            :cache cache :accept "foo/bar"
+                                            :expect 200
+                                            :name "aa2"))
+                  :test #'equal)
+            
+            (check-cache cache "aa3"
+                         :lookups 2
+                         :alive   1
+                         :revalidate 0
+                         :validated 0)
+            (sleep cache-delay)
+            
+            ;; force revalidation
+            (test "foo/bar" (values (dohttp "/auto-accept-test" :port port
+                                            :cache cache :accept "foo/bar"
+                                            :expect 200
+                                            :name "aa4"))
+                  :test #'equal)
+            
+            (check-cache cache "aa5"
+                         :lookups 3
+                         :alive   1
+                         :revalidate 1
+                         :validated 0)
+            
+            ;; should be cached again
+            (test "foo/bar" (values (dohttp "/auto-accept-test" :port port
+                                            :cache cache :accept "foo/bar"
+                                            :expect 200
+                                            :name "aa6"))
+                  :test #'equal)
+            
+            (check-cache cache "aa7"
+                         :lookups 4
+                         :alive   2
+                         :revalidate 1
+                         :validated 0)
+            
+            ))
+      
+      ;; cleanup
+      (stop-aserve-running))))
+
+(defun check-cache (cache name &key lookups alive revalidate validated)
+  (test lookups    (net.aserve.client:client-cache-lookups cache) :fail-info name)
+  (test alive      (net.aserve.client:client-cache-alive cache) :fail-info name)
+  (test revalidate (net.aserve.client:client-cache-revalidate cache) :fail-info name)
+  (test validated  (net.aserve.client:client-cache-validated cache) :fail-info name))
+
+(defun dopublish (path &key last-modified headers (response *response-ok*))
+  (let ((ent (publish  
+              :path path
+              :function #'(lambda (req ent)
+                            (with-http-response (req ent :response response)
+                              (with-http-body (req ent 
+                                                   :headers headers)
+                                  (dotimes (i 20)
+                                    (write-char #\f net.aserve::*html-stream*))
+                                  (force-output net.aserve::*html-stream*)))))))
+                                         
+    (if* last-modified
+       then (setf (net.aserve::last-modified ent) last-modified))
+    
+    ))
+
+(defun dopublish-prefix (path &key headers)
+  (publish-prefix  
+   :prefix path
+   :function 
+   #'(lambda (req ent)
+       (let ((path (net.uri:uri-path (request-uri req))))
+         (multiple-value-bind (ok whole size)
+             (match-re "([0-9]+)$" path) 
+           (declare (ignore whole))
+           (if* ok
+              then (setq size (parse-integer size))
+              else (setq size 10))
+                                    
+           (with-http-response (req ent)
+             (with-http-body (req ent 
+                                  :headers headers)
+                                                                     
+               (dotimes (i size)
+                 (write-char #\f net.aserve::*html-stream*))
+                            
+               (force-output net.aserve::*html-stream*))))))))
+    
+  
+
+(defun dohttp (path &key (port 0) cache expect (name "not-given") (accept "*/*"))
+  (multiple-value-bind (body code headers)
+      (net.aserve.client:do-http-request (format nil "http://127.0.0.1:~d~a"
+                                                 port
+                                                 path)
+        :cache cache
+        :accept accept)
+    (test expect code :fail-info name)
+    
+    (values body code headers)))
+
+  
+
+
+  
       
 
 ;; (net.aserve::debug-on :xmit)
