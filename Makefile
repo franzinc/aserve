@@ -27,8 +27,16 @@ ifeq ($(use_dcl),yes)
 
 on_macOS = $(shell if test `uname -s` = Darwin; then echo yes; fi)
 
+ifndef ACL_OPENSSL_VERSION
+ssl_env = ACL_OPENSSL_VERSION=11
+else
+ssl_env = DUMMY_ENV_VARIABLE=foo
+endif
+
 ifeq ($(on_macOS),yes)
-mlisp_env = SIXTYFOURBIT=$(SIXTYFOURBIT) MACHINE=$(MACHINE) OS_NAME=$(OS_NAME); source ../scm-bin/aclbuildenv.sh; env LD_LIBRARY_PATH=$$LD_LIBRARY_PATH
+mlisp_env = $(ssl_env) SIXTYFOURBIT=$(SIXTYFOURBIT) MACHINE=$(MACHINE) OS_NAME=$(OS_NAME); source ../scm-bin/aclbuildenv.sh; env LD_LIBRARY_PATH=$$LD_LIBRARY_PATH
+else
+mlisp_env = $(ssl_env); source ../scm-bin/aclbuildenv.sh;
 endif
 
 mlisp = $(mlisp_env) ../lisp
