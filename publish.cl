@@ -2746,7 +2746,7 @@
  	
        
 	 (if* send-headers
-	    then (format-dif :xmit-server-response-headers hsock "~a ~d  ~a~a"
+	    then (format-dif :xmit-server-response-headers hsock "~a ~d ~a~a"
 			     (request-reply-protocol-string req)
 			     (response-number code)
 			     (response-desc   code)
