@@ -1,12 +1,13 @@
-;; -*- mode: common-lisp; package: net.aserve -*-
+  ;; -*- mode: common-lisp; package: net.aserve -*-
 ;;
 ;; packages.cl
 ;;
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 27
-  "v27: 1.2.79: add client SSL handshake lock;
+(sys:defpatch "aserve" 28
+  "v28: 1.3.80: add exported function client-connection-mode;
+v27: 1.3.79: add client SSL handshake lock;
 v26: 1.3.78: increase max header size to 16k;
 v25: 1.3.77: add switch to enable TCP keepalive for sockets
 v24: 1.3.76: do-http-request can return a stream to read the body
@@ -312,7 +313,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:client-cache-alive
    #:client-cache-revalidate
    #:client-cache-validated
-   
+   #:client-connection-mode
    #:client-request  ; class
    #:client-request-close
    #:client-request-cookies

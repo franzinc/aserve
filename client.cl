@@ -911,7 +911,17 @@ headers")
   (when user
     (format nil "Basic ~a" (base64-encode (format nil "~a:~a" user password)))))
 
-(defvar *aserve-client-handshake-lock* (mp:make-process-lock :name "aserve client handshake"))
+(defvar *aserve-client-handshake-lock* nil)
+
+(defun client-connection-mode (&optional mode)
+  (ecase mode
+    (:parallel (setq *aserve-client-handshake-lock* nil) :parallel)
+    (:serial (or 
+	      *aserve-client-handshake-lock*
+	      (setq *aserve-client-handshake-lock* 
+		(mp:make-process-lock :name "aserve client handshake")))
+	     :serial)
+    ((nil) (if *aserve-client-handshake-lock*  :serial :parallel))))
 
 (defun make-http-client-request (uri &rest args
 				 &key 
