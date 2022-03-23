@@ -102,6 +102,7 @@ version of this document can be found [here][latest].
   * [**`client-request-close`**](aserve.md#f-client-request-read-close)
   * [**`compute-digest-authorization`**](aserve.md#f-compute-digest-authorization)
   * [**`uriencode-string`**](aserve.md#f-uriencode-string)
+  * [**`client-connection-mode`**](aserve.md#f-ckient-connection-mode)
 * [Proxy](#proxy)
   * [**`proxy-control`**](aserve.md#c-proxy-control)
   * [**`authorize-proxy-request`**](aserve.md#f-authorize-proxy-request)
@@ -2629,6 +2630,39 @@ printing characters and printing characters that could be confused with
 characters that separate fields in a url are encoded a %xy where xy is the
 hexadecimal representation of the char-code of the character. external-format
 defaults to the value of [**`*default-aserve-external-format*`**](aserve.md#v-default-aserve-external-format).
+
+-----
+
+<span id="f-client-connection-mode"></span>
+#### **`net.aserve.client:client-connection-mode`**
+
+```lisp
+(client-connection-mode &optional mode)
+```
+
+Switch the connection to the server in
+**<code>do-http-request</code>** between serial and parallel mode.
+In parallel mode, clients in multiple threads can
+make connections in parallel. In serial mode connections are made one
+at a time.
+The initial setting is parallel mode.
+
+If the mode argument is omitted
+or nil, the function returns the keyword **<code>:parallel</code>** or
+**<code>:serial</code>**.  Otherwise the argument must be one of those
+keywords to specify the connection mode for all subsequent calls to
+do-http-request.
+
+Experience has shown that when many clients in multiple threads
+attempt simultaneous SSL connections from the same Lisp image, one or more connections may fail
+with SSL errors, or even occasionally hang indefinitely. Switching to
+serial mode may avoid these errors, but may also have a severe impact
+on the performance of the application.  It is best to contact Franz
+support in such situations to investigate and diagnose the underlying
+cause of the errors.
+
+
+-----
 
 ## <span id="proxy"></span>Proxy
 
