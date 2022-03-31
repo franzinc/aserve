@@ -1821,7 +1821,31 @@ Returns a vector."
                                          :keep-alive t
                                          :connection socket1))
                   (declare (ignore body code headers uri))
-                  (test socket1 socket2 :fail-info "socket is not reused"))))
+                  (test socket1 socket2 :fail-info "socket is not reused")
+                  
+                  ;; here we simulate passing a pipe stream as content as well as a connection
+                  ;; to use and we want to handle the case where the connection is broken
+                  ;; and we need to restart the stream from the beginning.
+                  ;; We do this by passing in a restartable-function-input-stream object
+                  ;; which will generate a pipe stream when needed.
+                  (let ((rfis (make-restartable-function-input-stream
+                               #'(lambda (outstream)
+                                   (with-open-file (stream tfile :direction :input :element-type '(unsigned-byte 8))
+                                     (sys:copy-file stream outstream))))))
+                    (close socket2)  ; pretend it has timed out and is closed
+                    (multiple-value-bind (body code headers uri socket3)
+                        (x-do-http-request (format nil "~a/get-request-body-incr-test?use=socket2"
+                                                   prefix-local)
+                                           :method :put
+                                           :content rfis
+                                           :content-type "application/binary"
+                                           :keep-alive t
+                                           :connection socket2)
+                      (declare (ignore body code headers uri))
+                      (test t (not (eq socket2 socket3)) :fail-info "should get new socket")))
+                                     
+                                   
+                  )))
       ;; Multiple values in 'Transfer-Encoding' header are legal
       ;; accoding to the MDN resource:
       ;;    https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding,

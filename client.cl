@@ -22,6 +22,10 @@
 
 (eval-when (compile) (declaim (optimize (speed 3))))
 
+(eval-when (compile load eval)
+  (require :streamp)  ; restartable-function-input-stream
+  )
+
 
 (net.aserve::check-smp-consistency)
 
@@ -1226,6 +1230,9 @@ headers")
                      (make-instance 'file-computed-content :filename content-piece))
                     (stream
                      (make-instance 'stream-computed-content :stream content-piece))
+                    (restartable-function-input-stream
+                     (make-instance 'stream-computed-content 
+                       :stream (create-new-rfis-stream content-piece)))
                     (otherwise
                      content-piece))))
          (setq content (mapcar #'canonicalize (if (listp content) content (list content)))))
