@@ -102,7 +102,7 @@ version of this document can be found [here][latest].
   * [**`client-request-close`**](aserve.md#f-client-request-read-close)
   * [**`compute-digest-authorization`**](aserve.md#f-compute-digest-authorization)
   * [**`uriencode-string`**](aserve.md#f-uriencode-string)
-  * [**`client-connection-mode`**](aserve.md#f-ckient-connection-mode)
+  * [**`client-connection-mode`**](aserve.md#f-client-connection-mode)
 * [Proxy](#proxy)
   * [**`proxy-control`**](aserve.md#c-proxy-control)
   * [**`authorize-proxy-request`**](aserve.md#f-authorize-proxy-request)
