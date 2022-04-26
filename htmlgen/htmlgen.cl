@@ -818,7 +818,6 @@
 (def-std-html :svg t nil)
 (def-std-html :text t nil)
 (def-std-html :textPath t nil)
-(def-std-html :title t nil)
 (def-std-html :tref t nil)
 (def-std-html :tspan t nil)
 (def-std-html :use t nil)
