@@ -212,7 +212,7 @@ The function **`net.aserve:start`** is used to start the server running.
 ```lisp
 (start &key port host listeners max-listeners chunking keep-alive server
             setuid setgid debug proxy proxy-proxy cache restore-cache
-            accept-hook ssl ssl-password os-processes external-format
+            accept-hook ssl ssl-args ssl-password os-processes external-format
             compress ssl-key ssl-password ssl-method test-ssl ca-file
             ca-directory verify max-depth max-content-length)
 ```
@@ -301,6 +301,12 @@ following meanings:
     made 443 (rather than 80). This makes use of the **`accept-hook`** argument so
     if **`ssl`** is specified then **`accept-hook`** should not be specified. ssl is
     supported only in certain versions of Allegro CL.
+  - **`ssl-args`** - The preferred way to enable ssl in the server is to
+    provide the arguments to ACL's `make-ssl-server-stream` function in plist
+    form.  This allows one to use all the ssl configuration options available
+    for an ssl stream.   If you provide `ssl-args` you should not pass a
+    value for `ssl` or any of the other ssl related arguments.
+    The `ssl-args` plist must contain a value for `:certificate` or `:context`.
   - **`ssl-password`** - if the private key in the PEM encoded file referenced by
     the **`ssl`** argument is encrypted, then this is the key to decrypt it.
   - **`ssl-method`** - see [SSL/TLS](#ssltls) for the use of this argument.
