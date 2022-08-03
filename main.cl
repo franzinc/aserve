@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 83))
+(defparameter *aserve-version* '(1 3 84))
 
 (eval-when (eval load)
     (require :sock)
@@ -1139,7 +1139,6 @@ by keyword symbols and not by strings"
    
    
    
-
    ;; response
    (reply-code   ;; one of the *response-xx* objects
     :initform nil
@@ -1198,9 +1197,14 @@ by keyword symbols and not by strings"
     :accessor request-reply-protocol-string)
 
    (has-expect-continue :accessor request-has-continue-expectation
-			:initform nil))
+			:initform nil)
   
-  
+  (seized
+    ;; true if a client has taken control of
+    ;; the request and process-connection should
+    ;; do no more work
+    :initform nil
+    :accessor request-seized))
 		
   )
 
@@ -1937,88 +1941,95 @@ by keyword symbols and not by strings"
   ;; another request.
   ;; When this function returns the given socket has been closed.
   ;;
-  
-  (unwind-protect
-      (let ((header-read-timeout (wserver-header-read-timeout *wserver*))
-            req error-obj error-response (chars-seen (list nil)))
+
+  (let (seized)
+    
+    (unwind-protect
+        (let ((header-read-timeout (wserver-header-read-timeout *wserver*))
+              req error-obj error-response (chars-seen (list nil)))
             
 
-	;; run the accept hook on the socket if there is one
-	(let ((ahook (wserver-accept-hook *wserver*)))
-	  (if* ahook then (setq sock (funcall ahook sock))))
+          ;; run the accept hook on the socket if there is one
+          (let ((ahook (wserver-accept-hook *wserver*)))
+            (if* ahook then (setq sock (funcall ahook sock))))
 	
-	;; get first command
-	(loop
-	  (multiple-value-setq (req error-obj error-response)
-	    (ignore-errors
-	     (mp:with-timeout (header-read-timeout
-			       (debug-format :info "total header read timeout")
-			       (values nil nil *response-request-timeout*))
+          ;; get first command
+          (loop
+            (multiple-value-setq (req error-obj error-response)
+              (ignore-errors
+               (mp:with-timeout (header-read-timeout
+                                 (debug-format :info "total header read timeout")
+                                 (values nil nil *response-request-timeout*))
 			     
-	       (with-timeout-local ((wserver-read-request-timeout *wserver*)
-				    (debug-format :info "request timed out on read")
-				    (values nil nil *response-request-timeout*))
-		 (read-http-request sock chars-seen)))))
+                 (with-timeout-local ((wserver-read-request-timeout *wserver*)
+                                      (debug-format :info "request timed out on read")
+                                      (values nil nil *response-request-timeout*))
+                   (read-http-request sock chars-seen)))))
 	  
-	  (if* (null req)
-	     then ; end of file, means do nothing
-		  ; (logmess "eof when reading request")
+            (if* (null req)
+               then ; end of file, means do nothing
+                    ; (logmess "eof when reading request")
 		  ; end this connection by closing socket
-		  (if* error-obj
-		     then (logmess 
-			   (format nil "While reading http request~:_ from ~a:~:_ ~a" 
-				   (socket:ipaddr-to-dotted 
-				    (socket::remote-host sock))
-				   error-obj)
-                           :brief))
+                    (if* error-obj
+                       then (logmess 
+                             (format nil "While reading http request~:_ from ~a:~:_ ~a" 
+                                     (socket:ipaddr-to-dotted 
+                                      (socket::remote-host sock))
+                                     error-obj)
+                             :brief))
 
-		  ; notify the client if it's still listening
-		  (if* (car chars-seen)
-		     then (ignore-errors
-			   (let ((code (or error-response *response-bad-request*)))
-			     (format sock "HTTP/1.0 ~d  ~a~aContent-Length: 0~aConnection: close~a~a"
-				     (response-number code)
-				     (response-desc code)
-				     *crlf* *crlf* *crlf* *crlf*))
-			   (force-output sock)))
+                    ; notify the client if it's still listening
+                    (if* (car chars-seen)
+                       then (ignore-errors
+                             (let ((code (or error-response *response-bad-request*)))
+                               (format sock "HTTP/1.0 ~d  ~a~aContent-Length: 0~aConnection: close~a~a"
+                                       (response-number code)
+                                       (response-desc code)
+                                       *crlf* *crlf* *crlf* *crlf*))
+                             (force-output sock)))
 		   
-		  (return-from process-connection nil)
-	     else ;; got a request
-		  (setq *worker-request* req) 
+                    (return-from process-connection nil)
+               else ;; got a request
+                    (setq *worker-request* req) 
 		  
-		  (setf (request-request-date req) (get-universal-time))
-                  (setf (request-request-microtime req) (get-micro-real-time))
+                    (setf (request-request-date req) (get-universal-time))
+                    (setf (request-request-microtime req) (get-micro-real-time))
 
-		  (handle-request req)
-		  (setf (request-reply-date req) (get-universal-time))
-                  (setf (request-reply-microtime req) (get-micro-real-time))
+                    (handle-request req)
+                    (setf (request-reply-date req) (get-universal-time))
+                    (setf (request-reply-microtime req) (get-micro-real-time))
 		  
-		  (force-output-noblock (request-socket req))
+                    (if* (setq seized (request-seized req))
+                       then (return-from process-connection nil))
+                  
+                    (force-output-noblock (request-socket req))
 
-                  (log-request req)
+                    (log-request req)
 		  
-		  (setq *worker-request* nil)
-		  (free-req-header-block req)
+                    (setq *worker-request* nil)
+                    (free-req-header-block req)
 		  
-                  (let ((sock (request-socket req)))
-                    (if* (member :keep-alive
-                                 (request-reply-strategy req)
-                                 :test #'eq)
-                       then ;; continue to use it
-                            ;; For keep-alive sockets the header-read-timeout is now governed by
-                            ;; keep-alive timeout. Update the header-read-timeout so the timeout
-                            ;; timers are set properly for the next pass through the loop.
-                            (setf header-read-timeout (wserver-keep-alive-timeout *wserver*))
-                            (debug-format :info "request over, keep socket alive with timeout of ~d"
-                                          header-read-timeout)
-                            (force-output-noblock sock)
-                            (setf (car chars-seen) nil) ; for next use
-                            (excl::socket-bytes-written (request-socket req) 0)
-                       else (return))))))
-    ;; do it in two stages since each one could error and both have
-    ;; to be attempted
-    (ignore-errors (force-output-noblock sock))
-    (ignore-errors (close sock :abort t))))
+                    (let ((sock (request-socket req)))
+                      (if* (member :keep-alive
+                                   (request-reply-strategy req)
+                                   :test #'eq)
+                         then ;; continue to use it
+                              ;; For keep-alive sockets the header-read-timeout is now governed by
+                              ;; keep-alive timeout. Update the header-read-timeout so the timeout
+                              ;; timers are set properly for the next pass through the loop.
+                              (setf header-read-timeout (wserver-keep-alive-timeout *wserver*))
+                              (debug-format :info "request over, keep socket alive with timeout of ~d"
+                                            header-read-timeout)
+                              (force-output-noblock sock)
+                              (setf (car chars-seen) nil) ; for next use
+                              (excl::socket-bytes-written (request-socket req) 0)
+                         else (return))))))
+    
+      ;; do it in two stages since each one could error and both have
+      ;; to be attempted
+      (if* (not seized)
+         then (ignore-errors (force-output-noblock sock))
+              (ignore-errors (close sock :abort t))))))
 
 (defun force-output-noblock (stream)
   ;; do a force-output but don't get hung up if we get blocked on output
@@ -3879,3 +3890,20 @@ in get-multipart-sequence"))
 
                    
           
+(defmethod seize-request ((req http-request))
+  (setf (request-seized req) t))
+
+
+(defmethod seize-request-finish ((req http-request) &key (close t))
+  (let ((*wserver* (request-wserver req))) ;; for logging support
+    (setf (request-reply-date req) (get-universal-time))
+    (setf (request-reply-microtime req) (get-micro-real-time))
+		  
+    (log-request req)
+    (free-req-header-block req)
+    
+    (if* close
+       then (ignore-errors (force-output-noblock (request-socket req)))
+            (ignore-errors (close (request-socket req) :abort t)))))
+
+

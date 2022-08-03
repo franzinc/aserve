@@ -5,8 +5,9 @@
 ;; See the file LICENSE for the full license governing this code.
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 29
-  "v29: 1.3.81: do-http-request can be passed restartable-function-input-stream;
+(sys:defpatch "aserve" 30
+  "v30: 1.3.84: add seize-request function;
+v29: 1.3.81: do-http-request can be passed restartable-function-input-stream;
 v28: 1.3.80: add exported function client-connection-mode;
 v27: 1.3.79: add client SSL handshake lock;
 v26: 1.3.78: increase max header size to 16k;
@@ -189,6 +190,8 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:query-to-form-urlencoded
    #:reply-header-slot-value 
    #:run-cgi-program
+   #:seize-request
+   #:seize-request-finish
    #:set-basic-authorization
    #:set-trailers
    #:standard-locator
@@ -207,6 +210,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:request-query-value
    #:request-raw-request
    #:request-raw-uri
+   #:request-seized
    #:request-socket
    #:request-uri
    #:request-variable-value

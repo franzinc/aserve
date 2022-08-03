@@ -2,7 +2,7 @@
 
 # AllegroServe - A Web Application Server
 
-##### Version 1.3.75
+##### Version 1.3.84
 
 #### Copyright (c) Franz Inc.
 
@@ -38,6 +38,8 @@ version of this document can be found [here][latest].
   * [**`set-trailers`**](aserve.md#f-set-trailers)
   * [**`can-set-trailers-p`**](aserve.md#f-can-set-trailers-p)
   * [**`request-query-value`**](aserve.md#f-request-query-value)
+  * [**`seize-request`**](aserve.md#f-seize-request)
+  * [**`seize-request-finish`**](aserve.md#f-seize-request-finish)
 * [Request Variables](#request-variables)
   * [**`request-variable-value`**](aserve.md#f-request-variable-value)
 * [Request Object Readers and Accessors](#request-object-readers)
@@ -54,6 +56,7 @@ version of this document can be found [here][latest].
   * [**`request-reply-plist`**](aserve.md#f-request-reply-plist)
   * [**`request-reply-strategy`**](aserve.md#f-request-reply-strategy)
   * [**`request-reply-stream`**](aserve.md#f-request-reply-stream)
+  * [**`request-seized`**](aserve.md#f-request-seized)
 * [CGI Program Execution](#cgi-program)
   * [**`run-cgi-program`**](aserve.md#f-run-cgi-program)
 * [Form Processing](#form-processing)
@@ -126,6 +129,11 @@ version of this document can be found [here][latest].
 
 ## <span id="release-notes"></span>Release Notes
 
+ * **1.3.84**: add [**`seize-request`**](aserve.md#f-seize-request) function.
+ * **1.3.83**: remove redundant **`:title`** from last commit.
+ * **1.3.82**: add svg element to the html generator.
+ * **1.3.81**: do-http-request can be passed restartable-function-input-stream.
+ * **1.3.80**: add exported function client-connection-mode.
  * **1.3.79**: avoid race during SSL handshake in client.
  * **1.3.78**: increase max header size to 16K to allow for larger cookies.
  * **1.3.77**: add switch to enable TCP keepalive for sockets.
@@ -1154,6 +1162,40 @@ which send their data to chunking streams. It's very likely that trailers can be
 set. This function allows you to test be sure.
 
 -----
+<span id="f-seize-request"></span>
+#### **`net.aserve:seize-request`**
+```lisp
+(seize-request req)
+```
+The caller is declaring that it will be responsible for handling this request and that AllegroServe
+should take no further action on the request's socket stream.
+This then frees the AllegroServe worker thread to find another request to service.
+
+This  is called by user code that anticipates that it will be a while until a response
+is ready to be sent and thus there's no point in having a thread blocked until the
+response is ready.
+
+This is best called before `with-http-response` is called.
+
+When the user code has a response to send to this request it should call do the
+usual `with-http-response` and `with-http-body` and then send back the response.
+
+After sending the response, the function `seize-request-finish` should be called
+to log the request and to ensure the socket stream is closed.
+
+-----
+<span id="f-seize-request-finish"></span>
+#### **`net.aserve:seize-request-finish`**
+```lisp
+(seize-request-finish req &key (close t))
+```
+When a response has been sent back to a request captured by `seize-request` this function
+should be called to log the request, free up resources in the request object
+and optionally close the `request-socket`.   If you know that the socket is allready
+closed you can pass `nil` to the `:close` argument to tell `seize-request-finish` to
+not try to close the socket again.
+
+-----
 
 ## <span id="request-variables"></span>Request Variables
 
@@ -1251,6 +1293,9 @@ given about the possible strategies at a future time.
 accessor - This is the stream to be used in user code to send back the body of
 the response. This stream must be used instead of the value of
 [**`request-socket`**](aserve.md#f-request-socket).
+
+<span id="f-request-seized"></span> **`(request-seized request)`** -
+accessor - This request has had [**`seize-request`**](aserve.md#f-seize-request) called on it
 
 -----
 

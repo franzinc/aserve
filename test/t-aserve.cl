@@ -1,4 +1,4 @@
-;; -*- mode: common-lisp; package: net.aserve.test -*-
+S;; -*- mode: common-lisp; package: net.aserve.test -*-
 ;;
 ;; t-aserve.cl
 ;;
@@ -424,6 +424,7 @@
 		       (test-server-request-body port :https https)
 		       (test-request-uri port https)
 		       (test-spr44282)
+                       (test-seize-request port)
                      
 		       (if* (member :ics *features*)
 			  then (test-international port)
@@ -3579,7 +3580,34 @@ Returns a vector."
               (test nil body)))))
               
           
-            
+(defun test-seize-request (port)
+  (publish :path "/seize-request"
+           :function #'(lambda (req ent)
+                         (seize-request req)
+                                 
+                         ;; answer the request  in another
+                         ;; thread 10 seconds later
+                         (mp:process-run-function "seizer"
+                           #'(lambda ()
+                               (sleep 10)
+                               
+                               (with-http-response (req ent)
+                                 (with-http-body (req ent)
+                                   (html "foo")))
+                               (seize-request-finish req)))))
+  
+  (let ((start-time (get-universal-time)))
+    (multiple-value-bind (body code) 
+        (x-do-http-request (format nil "http://localhost:~d/seize-request" port)
+                           :method :get)
+      (test 200 code)
+      (test "foo" body :test #'equal)
+      ;; verify that it took more than 9 seconds to respond
+      ;; it should have taken 10 seconds but we don't want to
+      ;; get errors on edge cases... 9 seconds is enough to show
+      ;; the response was delayed as expected
+      (test t (>= (- (get-universal-time) start-time) 9)))))
+  
             
             
   
