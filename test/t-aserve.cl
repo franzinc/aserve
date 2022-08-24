@@ -278,10 +278,14 @@
 	   (if l-n-p
 	       (setq *log-wserver-name* log-name)
 	     (setq *log-wserver-name* nil))
-	   (with-stopper-catch
-	       :single-test-instance
-	     (test-aserve test-timeouts :direct direct :proxy proxy :proxyproxy proxyproxy 
-			  :ssl ssl :proxy-auth proxy-auth)))
+	   (with-stopper-catch :single-test-instance
+	     (let ((*aserve-test-config*
+		    (make-instance 'aserve-test-config
+		      :name "standalone aserve test"
+		      :test-timeouts test-timeouts)))
+	       (test-aserve test-timeouts :direct direct :proxy proxy
+			    :proxyproxy proxyproxy :ssl ssl
+			    :proxy-auth proxy-auth))))
 	  (otherwise
 	   (let ((procs '()))
 	     (when (cond (l-n-p (setq *log-wserver-name* log-name))
