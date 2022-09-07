@@ -789,23 +789,27 @@ after the connection goes idle")
 	    (,g-check-modified ,check-modified)
 	    (,g-trailers ,trailers)
 	    )
-       (catch 'with-http-response
-	 ;(format t "timeout is ~d~%" ,g-timeout)
-	 (if* ,g-trailers then (check-trailers-ok ,g-req ,g-trailers))
-	 (compute-strategy ,g-req ,g-ent ,g-format)
-	 (up-to-date-check ,g-check-modified ,g-req ,g-ent)
-	 (mp::with-timeout ((if* (and (fixnump ,g-timeout)  ; ok w-t
-				      (> ,g-timeout 0))
-			       then ,g-timeout
-			       else 9999999)
-			    (timedout-response ,g-req ,g-ent))
-	   ,(if* response
-	       then `(setf (request-reply-code ,g-req) ,response))
-	   ,(if* content-type
-	       then `(setf (request-reply-content-type ,g-req) ,content-type)
-	       else `(setf (request-reply-content-type ,g-req) (content-type ,g-ent)))
-	   ,@body
-	   )))))
+       (#-(version>= 11)
+	progn
+	#+(version>= 11)
+	with-unreachable-code-allowed
+	   (catch 'with-http-response
+					;(format t "timeout is ~d~%" ,g-timeout)
+	     (if* ,g-trailers then (check-trailers-ok ,g-req ,g-trailers))
+	     (compute-strategy ,g-req ,g-ent ,g-format)
+	     (up-to-date-check ,g-check-modified ,g-req ,g-ent)
+	     (mp::with-timeout ((if* (and (fixnump ,g-timeout) ; ok w-t
+					  (> ,g-timeout 0))
+				   then ,g-timeout
+				   else 9999999)
+				(timedout-response ,g-req ,g-ent))
+	       ,(if* response
+		   then `(setf (request-reply-code ,g-req) ,response))
+	       ,(if* content-type
+		   then `(setf (request-reply-content-type ,g-req) ,content-type)
+		   else `(setf (request-reply-content-type ,g-req) (content-type ,g-ent)))
+	       ,@body
+	       ))))))
 
 
 #+(and allegro (version>= 6 0))
@@ -847,10 +851,14 @@ Problems with protocol may occur." (ef-name ef)))))
        (declare (ignorable ,g-req ,g-ent ,g-external-format))
         
        (compute-response-stream ,g-req ,g-ent)
-       (if* (entity-headers ,g-ent)
-	  then (bulk-set-reply-headers ,g-req (entity-headers ,g-ent)))
-       (if* ,g-headers
-	  then (bulk-set-reply-headers ,g-req ,g-headers))
+       (#-(version>= 11)
+	progn
+	#+(version>= 11)
+	with-unreachable-code-allowed
+	 (if* (entity-headers ,g-ent)
+	    then (bulk-set-reply-headers ,g-req (entity-headers ,g-ent)))
+	 (if* ,g-headers
+	    then (bulk-set-reply-headers ,g-req ,g-headers)))
        (send-response-headers ,g-req ,g-ent :pre)
        (if* (not (member :omit-body (request-reply-strategy ,g-req) 
                          :test #'eq))
@@ -1518,8 +1526,8 @@ by keyword symbols and not by strings"
 					  :backlog backlog
 					  
 					  :type 
-					  *socket-stream-type*
-					  ))
+					  *socket-stream-type*))
+	 #+unix
 	 (is-a-child))
 
     #+unix
@@ -1578,7 +1586,7 @@ by keyword symbols and not by strings"
 		     listeners)))
     
 
-    (if* is-a-child then (loop (sleep 10000)))
+    #+unix (if* is-a-child then (loop (sleep 10000)))
     
     server
     ))
