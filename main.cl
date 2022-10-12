@@ -789,10 +789,7 @@ after the connection goes idle")
 	    (,g-check-modified ,check-modified)
 	    (,g-trailers ,trailers)
 	    )
-       (#-(version>= 11)
-	progn
-	#+(version>= 11)
-	with-unreachable-code-allowed
+       (excl:with-unreachable-code-allowed
 	   (catch 'with-http-response
 					;(format t "timeout is ~d~%" ,g-timeout)
 	     (if* ,g-trailers then (check-trailers-ok ,g-req ,g-trailers))
@@ -851,10 +848,7 @@ Problems with protocol may occur." (ef-name ef)))))
        (declare (ignorable ,g-req ,g-ent ,g-external-format))
         
        (compute-response-stream ,g-req ,g-ent)
-       (#-(version>= 11)
-	progn
-	#+(version>= 11)
-	with-unreachable-code-allowed
+       (excl:with-unreachable-code-allowed
 	 (if* (entity-headers ,g-ent)
 	    then (bulk-set-reply-headers ,g-req (entity-headers ,g-ent)))
 	 (if* ,g-headers
