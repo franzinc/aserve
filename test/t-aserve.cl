@@ -491,6 +491,7 @@
        then 
 	    (test-aserve-extra-ssl)
 	    (test-aserve-ssl-redirect) 
+            (test-ssl-http-options)
 	    )
     )
   (if* (or (> util.test::*test-errors* 0)
@@ -509,19 +510,20 @@
 		   (socket::local-port (net.aserve::wserver-socket wserver))
 		   )))
 
-(defun start-aserve-running (&optional ssl (test-ssl t))
+(defun start-aserve-running (&optional ssl (test-ssl t) http-on-ssl-port)
   ;; start aserve, return the port on which we've started aserve
   (let ((wserver (start :port nil :server :new :ssl-args (and ssl (list :certificate ssl)) 
 			:test-ssl test-ssl
 	
 			:listeners 20 ; must be at least 3 for keep-alive to be possible
+                        :http-on-ssl-port http-on-ssl-port
 			)))		; let the system pick a port
     (log-wserver-name "" wserver)
     (setq *wserver* wserver)
     (when *aserve-set-full-debug*
       (apply #'net.aserve::debug-on *aserve-set-full-debug*))
     (unpublish :all t) ; flush anything published
-    (setf (asc x-ssl) ssl)
+    (setf (asc x-ssl) (and ssl (not http-on-ssl-port)))
     (socket::local-port (net.aserve::wserver-socket wserver))
     ))
 
@@ -3413,6 +3415,70 @@ Returns a vector."
     (when server2 (shutdown :server server2))
     ))
 
+(defun test-ssl-http-options ()
+  (let (context server port)
+    (flet ((publishit (string)
+               
+             (publish :path "/httpssl"
+                      :server server
+                      :function #'(lambda (req ent)
+                                    (with-http-response (req ent)
+                                      (with-http-body (req ent)
+                                        (html (:princ string)))))))
+           )
+      (setq context (socket:make-ssl-server-context 
+                     :certificate (merge-pathnames "server.pem" *aserve-load-truename*)))
+      (setq server (start :port nil :server :new :ssl-args (list :context context)))
+      (setq port (socket:local-port (net.aserve::wserver-socket server)))
+      
+      ;; simple ssl request
+      (publishit "foo111")
+      (test:test-equal "foo111" (values (do-http-request (format nil "https://localhost:~d/httpssl" port))))
+      
+      ;; http to ssl port will fail
+      (test:test-equal nil
+                       (values (ignore-errors (do-http-request (format nil "http://localhost:~d/httpssl" port)))))
+      
+      (shutdown :server  server)
+      
+      
+      ;; allow http to ssl port
+      
+      (setq server (start :port nil :server :new :ssl-args (list :context context)
+                          :http-on-ssl-port t))
+      (setq port (socket:local-port (net.aserve::wserver-socket server)))
+      (publishit "foo222")
+      
+      (test:test-equal "foo222" (values (do-http-request (format nil "https://localhost:~d/httpssl" port))))
+      (test:test-equal (and :second "foo222") (values (do-http-request (format nil "http://localhost:~d/httpssl" port))))
+      (shutdown :server  server)
+      
+      ;; allow http to ssl port
+      ;; and redirect http to https
+      
+      (setq server (start :port nil :server :new :ssl-args (list :context context)
+                          :http-on-ssl-port t  
+                          :redirect-http-to-ssl t))
+      (setq port (socket:local-port (net.aserve::wserver-socket server)))
+      (publishit "foo333")
+
+      ;; both http and https work
+      ;; http redirects to https (but you can't see that here since the client program follows
+      ;; the redirect)
+      (test:test-equal "foo333" (values (do-http-request (format nil "https://localhost:~d/httpssl" port))))
+      (test:test-equal (and :second "foo333") (values (do-http-request (format nil "http://localhost:~d/httpssl" port))))
+      
+      ;; here we verify that the redirect is happening to https
+      (multiple-value-bind (body code headers)
+          (do-http-request (format nil "http://localhost:~d/httpssl" port)
+            :redirect nil)
+        (declare (ignore body))
+        (test:test-equal 301 code)
+        (test:test-equal (format nil "https://localhost:~d/httpssl" port)
+                         (cdr (assoc :location headers))))
+                          
+      (shutdown :server  server))))
+      
 
 (defun test-force-output-prepend-stream ()
   ;; the prepend-stream is defined in aserve

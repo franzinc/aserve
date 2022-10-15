@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 84))
+(defparameter *aserve-version* '(1 3 85))
 
 (eval-when (eval load)
     (require :sock)
@@ -464,7 +464,11 @@ after the connection goes idle")
 (defvar-mp *thread-index*  0)      ; globalcounter to gen process names
 
 (defvar *log-wserver-name* nil)
-	
+
+;; set when we detect an http request has been sent 
+;; to a port configured for ssl
+(defvar *http-request-ssl-port* nil)
+
 ;;;;;;;;;;;;;  end special vars
 
 
@@ -683,6 +687,12 @@ after the connection goes idle")
     :initform (format nil "w~d" (atomic-incf *thread-index*))
     :initarg :name
     :reader wserver-name)
+   
+   (redirect-http-to-ssl
+    ;; record the value of this option to net.aserve:start
+    :initform nil
+    :initarg :redirect-http-to-ssl
+    :accessor wserver-redirect-http-to-ssl)
 
    ;; The following 3 used to be global variables, but logically they need to
    ;; be specific to each server instance.
@@ -1201,14 +1211,19 @@ by keyword symbols and not by strings"
    (has-expect-continue :accessor request-has-continue-expectation
 			:initform nil)
   
-  (seized
+   (seized
     ;; true if a client has taken control of
     ;; the request and process-connection should
     ;; do no more work
     :initform nil
-    :accessor request-seized))
-		
-  )
+    :accessor request-seized)
+
+   (redirect-to
+    ;; set if we want to redirect to this location
+    ;; before even looking for a handler for this req
+    :initform nil
+    :accessor request-redirect-to)
+   ))
 
 
 (defstruct (response (:constructor make-resp (number desc)))
@@ -1344,6 +1359,8 @@ by keyword symbols and not by strings"
 		   ssl-password  ; for ssl: pswd to decode priv key
 		   ssl-method	 ; protocols for ssl server
 		   test-ssl      ; test ssl cert on startup
+                   http-on-ssl-port  ; if true allow http connection to ssl socket
+                   redirect-http-to-ssl ; only if http-on-ssl-port is true also
 		   verify
 		   ca-file
 		   ca-directory
@@ -1378,6 +1395,8 @@ by keyword symbols and not by strings"
      then (setq server (make-instance 'wserver
 			 :enable-compression compress)))
 
+  (setf (wserver-redirect-http-to-ssl server) redirect-http-to-ssl)
+  
   (if* efp then (setf (wserver-external-format server) external-format))
   
   (if* max-content-length-p
@@ -1426,16 +1445,22 @@ by keyword symbols and not by strings"
 				#+(version>= 8 2) :crl-check #+(version>= 8 2) crl-check
 				:method ssl-method
 				:max-depth max-depth))))
-	    (apply 'socket::make-ssl-server-stream socket args))
+            (if* (or (not http-on-ssl-port) (start-ssl-request-p socket))
+               then (apply 'socket::make-ssl-server-stream socket args)
+               else (setq *http-request-ssl-port* t) ; note this fact
+                    socket))
 	  #-(version>= 8 0)
 	  (funcall 'socket::make-ssl-server-stream socket
 		   :certificate ssl
 		   :certificate-password ssl-password)
 	  ))
 
-    (if* test-ssl
+    (if* (and test-ssl (not http-on-ssl-port))
        then ;; test the accept hook to see if the
             ;; certificates are correct
+            ;;
+            ;; No bytes are sent in this test so start-ssl-request-p will hang
+            ;; so we don't do this if http-on-ssl-port is true
 	    (let (csock psock sock)
 	      (unwind-protect 
 		  (progn
@@ -1585,6 +1610,13 @@ by keyword symbols and not by strings"
     server
     ))
 
+(defun start-ssl-request-p (socket)
+  ;; check if the first byte indicates an ssl request is coming in
+  ;; on this port configured for ssl.
+  (sys:with-timeout (60 (logmess (format nil  "ssl check timed out reading ~s" socket)) t)
+    (let ((ch (peek-char nil socket)))
+      (eql #x16 (char-code ch))  ;; first byte of an ssl request
+      )))
 
 (defun shutdown (&key (server *wserver*) save-cache)
   ;; shutdown the neo server
@@ -1944,7 +1976,9 @@ by keyword symbols and not by strings"
   ;; When this function returns the given socket has been closed.
   ;;
 
-  (let (seized)
+  (let (seized 
+        *http-request-ssl-port*   ;; accept hook function may set this
+        )
     
     (unwind-protect
         (let ((header-read-timeout (wserver-header-read-timeout *wserver*))
@@ -1971,7 +2005,7 @@ by keyword symbols and not by strings"
             (if* (null req)
                then ; end of file, means do nothing
                     ; (logmess "eof when reading request")
-		  ; end this connection by closing socket
+                    ; end this connection by closing socket
                     (if* error-obj
                        then (logmess 
                              (format nil "While reading http request~:_ from ~a:~:_ ~a" 
@@ -1992,7 +2026,26 @@ by keyword symbols and not by strings"
 		   
                     (return-from process-connection nil)
                else ;; got a request
+                    
                     (setq *worker-request* req) 
+                    
+                    (if* (and *http-request-ssl-port*
+                              (wserver-redirect-http-to-ssl *wserver*))
+                       then ;; request client use https to access site
+                            (setf (request-redirect-to req)
+                              (render-uri
+                               (copy-uri (request-uri req)
+                                         :scheme :https
+                                         ;; https has a default port of 443 whereas
+                                         ;; http has a default port of 80.  We need
+                                         ;; the request to be redirected to the same
+                                         ;; port it came in on and can't let a change
+                                         ;; in default port redirect the request to
+                                         ;; the wrong port.
+                                         :port (or (net.uri:uri-port (request-uri req))
+                                                   80))
+                               nil)))
+                            
 		  
                     (setf (request-request-date req) (get-universal-time))
                     (setf (request-request-microtime req) (get-micro-real-time))

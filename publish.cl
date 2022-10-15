@@ -127,6 +127,13 @@
     ;; of the entity being published
     (make-instance 'computed-entity))
 
+(defvar *redirect-computed-entity*
+  (make-instance 'computed-entity
+    :function #'(lambda (req ent)
+                  (with-http-response (req ent
+                                       :response *response-moved-permanently*)
+                    (setf (reply-header-slot-value req :location) (request-redirect-to req))
+                    (with-http-body (req ent))))))
 
 (defclass access-file-mixin ()
   ;; slots needed if you want to use access files during
@@ -1184,6 +1191,10 @@
 (defmethod handle-request ((req http-request))
 
   
+  (if* (request-redirect-to req)
+     then (return-from handle-request
+            (process-entity req *redirect-computed-entity*)))
+          
   ;; run all filters, starting with vhost filters
   ;  a return value of :done means don't
   ;  run any further filters

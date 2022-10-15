@@ -222,7 +222,8 @@ The function **`net.aserve:start`** is used to start the server running.
             setuid setgid debug proxy proxy-proxy cache restore-cache
             accept-hook ssl ssl-args ssl-password os-processes external-format
             compress ssl-key ssl-password ssl-method test-ssl ca-file
-            ca-directory verify max-depth max-content-length)
+            ca-directory verify max-depth max-content-length
+	    http-on-ssl-port redirect-http-to-ssl)
 ```
 
 If no arguments are given then [**`start`**](aserve.md#f-start) starts a multi-threaded web server on
@@ -318,6 +319,12 @@ following meanings:
   - **`ssl-password`** - if the private key in the PEM encoded file referenced by
     the **`ssl`** argument is encrypted, then this is the key to decrypt it.
   - **`ssl-method`** - see [SSL/TLS](#ssltls) for the use of this argument.
+  - **`http-on-ssl-port`** - if an http request is sent to a port configured for SSL
+    then handle it as if the port wasn't configured for SSL (see
+    **redirect-http-to-ssl-p** for how all http requests can be handled in a special way).
+  - **`redirect-http-to-ssl`** - if **`http-on-ssl-port`** is true for a port
+    configured for SSL, then all http requests will be redirected to be https requests
+    to the same URL
   - **`test-ssl`** - If the use of SSL is specified by other arguments then this
     will cause an SSL test to immediately be done and if it fails an error will
     be signalled. This allows you to verify the SSL certificate is valid before
