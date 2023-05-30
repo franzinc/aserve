@@ -1154,7 +1154,11 @@ Returns a vector."
 		 (multiple-value-bind (name password) (get-basic-authorization req)
                    (if* (and (equal name "foo")
                              (or (equal password "bar")
-                                 (equal password long-password)))
+                                 (equal password long-password)
+                                 (equal password ":colonfirst")
+                                 (equal password "middle:colon")
+                                 (equal password "trailingcolon:")
+                                 ))
 		      then (with-http-response (req ent)
 			     (with-http-body (req ent)
 			       (html (:head (:title "Secret page"))
@@ -1187,6 +1191,15 @@ Returns a vector."
           (values2 (x-do-http-request (format nil "~a/secret" prefix-local)
                                       :basic-authorization `("foo" . ,long-password))))
     
+    ; colon first character
+    (test 200
+	  (values2 (x-do-http-request (format nil "~a/secret" prefix-local)
+				      :basic-authorization '("foo" . ":colonfirst"))))
+    
+    ; colon middle character
+    (test 200
+	  (values2 (x-do-http-request (format nil "~a/secret" prefix-local)
+				      :basic-authorization '("foo" . "middle:colon"))))
     ; bad password
     (test 401
 	  (values2 (x-do-http-request (format nil "~a/secret" prefix-local)
@@ -1199,6 +1212,16 @@ Returns a vector."
     ; long password auth via userinfo
     (test 200
 	  (values2 (x-do-http-request (format nil "http://foo:~a@localhost:~a/secret" long-password port))))
+    
+    ; colon checks
+    (test 200
+	  (values2 (x-do-http-request (format nil "http://foo::colonfirst@localhost:~a/secret" port))))
+    
+    (test 200
+	  (values2 (x-do-http-request (format nil "http://foo:middle:colon@localhost:~a/secret" port))))
+    
+    (test 200
+	  (values2 (x-do-http-request (format nil "http://foo:trailingcolon:@localhost:~a/secret" port))))
 
 
     ; test conflicting auth headers.

@@ -2,7 +2,7 @@
 
 # AllegroServe - A Web Application Server
 
-##### Version 1.3.84
+##### Version 1.3.86
 
 #### Copyright (c) Franz Inc.
 
@@ -129,6 +129,9 @@ version of this document can be found [here][latest].
 
 ## <span id="release-notes"></span>Release Notes
 
+ * **1.3.86**: support colons in passwords for *Basic* authorization.
+ * **1.3.85**: Optionally recognize and handle HTTP requests made to
+   an SSL port.
  * **1.3.84**: add [**`seize-request`**](aserve.md#f-seize-request) function.
  * **1.3.83**: remove redundant **`:title`** from last commit.
  * **1.3.82**: add svg element to the html generator.
@@ -141,11 +144,13 @@ version of this document can be found [here][latest].
  * **1.3.75**: add support for the `:patch` HTTP verb.
  * **1.3.74**: handle input from stream for [**`make-http-client-request`**](aserve.md#f-make-http-client-request).
  * **1.3.73**: add [**`*http-free-worker-timeout*`**](aserve.md#v-http-free-worker-timeout).
+ * **1.3.72**: add SVG elements to the HTML generator.
  * **1.3.71**: cache reuses previous accept header.
  * **1.3.70**: caching of redirects.
  * **1.3.69**: automatic caching in the client.
  * **1.3.68**: [**`computed-content`**](aserve.md#c-computed-content) for [**`do-http-request`**](aserve.md#f-do-http-request).
  * **1.3.67**: improve redirection for SSL, caching for [**`do-http-request`**](aserve.md#f-do-http-request).
+ * **1.3.66**: [**`do-http-request`**](aserve.md#f-do-http-request) can now work with a cache to reduce network traffic in computing responses to HTTP requests.
  * **1.3.65**: `device-read` fix for `truncated-stream`; remove duplicate authorization header.
  * **1.3.64**: proxing HTTPS through a tunnel.
  * **1.3.63**: do request timings in microseconds.

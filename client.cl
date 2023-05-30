@@ -1285,7 +1285,8 @@ headers")
        ;; Authorization info can come from three different places: from uri, from basic-authorization or from headers.
        ;; This code ensures that those three do not disagree with each other and result in equal final authorization hash.
        ;; It also ensures that authorization information will be written to :xmit-client-request-headers only once.
-       (let* ((userinfo (when (net.uri:uri-userinfo uri) (delimited-string-to-list (net.uri:uri-userinfo uri) #\:)))
+       (let* ((userinfo (when (net.uri:uri-userinfo uri) 
+                          (net.aserve::split-on-char-once  (net.uri:uri-userinfo uri) #\:)))
               (uri-auth (make-auth-hash (first userinfo) (or (second userinfo) "")))
               (basic-auth (make-auth-hash (car basic-authorization) (cdr basic-authorization)))
               (header-auth (cdr (assoc "Authorization" headers :test #'equalp)))

@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 85))
+(defparameter *aserve-version* '(1 3 86))
 
 (eval-when (eval load)
     (require :sock)
@@ -3719,11 +3719,22 @@ in get-multipart-sequence"))
                           ;; more than one.
                           (first (delimited-string-to-list auth-value #\,)))))
 	      (if* (equalp (car words) "basic")
-		 then (setq auth-value 
-			(split-on-character (base64-decode (cadr words)) #\:))
-		      (values-list auth-value))))))
-		      
-	      
+		 then (values-list (split-on-char-once (base64-decode (cadr words)) #\:)))))))
+
+(defun split-on-char-once (string char)
+  ;; split the given string on the given character 
+  ;; and return a list of prefix and suffix
+  ;; If the character isn't present then act as if 
+  ;; it is present after the string 
+  (let ((pos (position char string)))
+    (if* pos
+       then (list (subseq string 0 pos)
+                  (if* (>= (1+ pos) (length string))
+                     then ""
+                     else (subseq string (1+ pos))))
+       else (list string ""))))
+
+  
 (defmethod set-basic-authorization ((req http-request) realm)
   ;; declare that you want to get authentication information
   ;; for the given realm.
