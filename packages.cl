@@ -4,6 +4,13 @@
 ;;
 ;; See the file LICENSE for the full license governing this code.
 
+;; 11.0.beta RC4 needs this patch
+#+(version= 11 0 beta 25)
+(sys:defpatch "aserve" 1
+  "v1: 1.3.86: support colon in a password."
+  :type :system
+  :post-loadable t)
+
 #+(version= 10 1)
 (sys:defpatch "aserve" 32
   "v32: 1.3.86: support colon in a password
