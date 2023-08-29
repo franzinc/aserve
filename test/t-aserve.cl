@@ -2014,6 +2014,14 @@ Returns a vector."
 	(x-do-http-request (format nil "~a/redir-to" prefix-local))
       (declare (ignore body headers))
       (test 200 (and :second code)))
+    
+    ;; test that a redirect with keepalive will not
+    ;; return a socket 
+    (multiple-value-bind (body code headers ignore connection)
+	(x-do-http-request (format nil "~a/redir-to" prefix-local) :keep-alive t)
+      (declare (ignore body headers ignore))
+      (test 200 (and :third code))
+      (test nil connection))
   
     ; now turn off redirect and test
     (multiple-value-bind (body code headers)

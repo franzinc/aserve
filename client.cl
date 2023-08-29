@@ -549,6 +549,11 @@ headers")
                          then (> redirect 0)
                          else t))		; unrestricted depth
                then
+                    ;; recursive call should not return socket since it may
+                    ;; not be to the website to which the client sent
+                    ;; the original request, which is confusing to the client
+                    (setf (getf args :keep-alive) nil)
+                    
                     (setq new-location
                       (cdr (assoc :location (client-request-headers creq)
                                   :test #'eq))))
