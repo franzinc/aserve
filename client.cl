@@ -621,7 +621,7 @@ headers")
                            (client-request-socket creq))
                       creq
                       )))
-              (if* read-body-hook
+              (if* (and read-body-hook (not new-location))
                  then (funcall read-body-hook creq :format format)
                elseif (and (eq return :stream) (not new-location))
                  then (retvals (make-instance 'creq-stream :creq creq))

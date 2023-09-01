@@ -6,14 +6,16 @@
 
 ;; 11.0.beta RC4 needs this patch
 #+(version= 11 0 beta 25)
-(sys:defpatch "aserve" 1
-  "v1: 1.3.86: support colon in a password."
+(sys:defpatch "aserve" 2
+  "v2: 1.3.87: handle redirects before calling read-body-hook;
+v1: 1.3.86: support colon in a password."
   :type :system
   :post-loadable t)
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 32
-  "v32: 1.3.86: support colon in a password
+(sys:defpatch "aserve" 33
+  "v33: 1.3.87: handle redirects before calling read-body-hook;
+v32: 1.3.86: support colon in a password;
 v31: 1.3.85: support http on an ssl port;
 v30: 1.3.84: add seize-request function;
 v29: 1.3.81: do-http-request can be passed restartable-function-input-stream;

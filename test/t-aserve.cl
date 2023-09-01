@@ -3424,6 +3424,10 @@ Returns a vector."
 			   :destination (concatenate 'string test-dir "testdir3/"))
 	(test-no-error (setq text (do-http-request (format nil "https://localhost:~A/" port1))))
 	(test 12 (search "topfile</body>" text))
+        (test-no-error (do-http-request (format nil "https://localhost:~A/" port1)
+                         :read-body-hook (lambda (creq &key format)
+                                           (setq text (read-response-body creq :format format)))))
+	(test 12 (search "topfile</body>" text))
 	(shutdown :server server1)
 	(setq server1 nil)
 	(sleep 1)
@@ -3432,7 +3436,10 @@ Returns a vector."
 			   :destination (concatenate 'string test-dir "testdir3/"))
 	(test-no-error (setq text (do-http-request (format nil "https://localhost:~A/" port2))))
 	(test 12 (search "topfile</body>" text))
-
+        (test-no-error (do-http-request (format nil "https://localhost:~A/" port2)
+                         :read-body-hook (lambda (creq &key format)
+                                           (setq text (read-response-body creq :format format)))))
+	(test 12 (search "topfile</body>" text))
 	)
     (when server1 (shutdown :server server1))
     (when server2 (shutdown :server server2))
@@ -3456,11 +3463,10 @@ Returns a vector."
       
       ;; simple ssl request
       (publishit "foo111")
-      (test:test-equal "foo111" (values (do-http-request (format nil "https://localhost:~d/httpssl" port))))
+      (test "foo111" (values (do-http-request (format nil "https://localhost:~d/httpssl" port))) :test #'equal)
       
       ;; http to ssl port will fail
-      (test:test-equal nil
-                       (values (ignore-errors (do-http-request (format nil "http://localhost:~d/httpssl" port)))))
+      (test nil (values (ignore-errors (do-http-request (format nil "http://localhost:~d/httpssl" port)))))
       
       (shutdown :server  server)
       
@@ -3472,8 +3478,8 @@ Returns a vector."
       (setq port (socket:local-port (net.aserve::wserver-socket server)))
       (publishit "foo222")
       
-      (test:test-equal "foo222" (values (do-http-request (format nil "https://localhost:~d/httpssl" port))))
-      (test:test-equal (and :second "foo222") (values (do-http-request (format nil "http://localhost:~d/httpssl" port))))
+      (test "foo222" (values (do-http-request (format nil "https://localhost:~d/httpssl" port))) :test #'equal)
+      (test (and :second "foo222") (values (do-http-request (format nil "http://localhost:~d/httpssl" port))) :test #'equal)
       (shutdown :server  server)
       
       ;; allow http to ssl port
@@ -3488,17 +3494,16 @@ Returns a vector."
       ;; both http and https work
       ;; http redirects to https (but you can't see that here since the client program follows
       ;; the redirect)
-      (test:test-equal "foo333" (values (do-http-request (format nil "https://localhost:~d/httpssl" port))))
-      (test:test-equal (and :second "foo333") (values (do-http-request (format nil "http://localhost:~d/httpssl" port))))
+      (test "foo333" (values (do-http-request (format nil "https://localhost:~d/httpssl" port))) :test #'equal)
+      (test (and :second "foo333") (values (do-http-request (format nil "http://localhost:~d/httpssl" port))) :test #'equal)
       
       ;; here we verify that the redirect is happening to https
       (multiple-value-bind (body code headers)
           (do-http-request (format nil "http://localhost:~d/httpssl" port)
             :redirect nil)
         (declare (ignore body))
-        (test:test-equal 301 code)
-        (test:test-equal (format nil "https://localhost:~d/httpssl" port)
-                         (cdr (assoc :location headers))))
+        (test 301 code)
+        (test (format nil "https://localhost:~d/httpssl" port) (cdr (assoc :location headers)) :test #'equal))
                           
       (shutdown :server  server))))
       
