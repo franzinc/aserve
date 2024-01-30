@@ -17,6 +17,8 @@
 
 (eval-when (compile) (declaim (optimize (speed 3))))
 
+;; In 12.0 smp and vmp are automatically consistent.
+#-(version>= 12 0)
 (check-smp-consistency)
 
 (defmacro with-mp-locked-connection-cache ((s) &rest body)

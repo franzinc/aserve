@@ -222,7 +222,12 @@
 ;;     Compile environment does not recognize SMP macros;
 ;;     8.1 without smp patches.
 ;;
+;;  In 12.0, a new mp-style-case macro is introduced.  Furthermore,
+;;  smp-macros is always loaded in (since 10.0) so the nil case need
+;; never be considered, unless the :macros case is not also in the
+;; same clause as the t case.
 
+#-(version>= 12 0)
 (defmacro smp-case (&rest clauses)
   (let* ((key
 	  #+smp t
@@ -243,6 +248,41 @@
        then (error "smp-case is missing clause for ~s" key))
     (second clause)))
 
+#+(version>= 12 0)
+(defmacro smp-case (&rest clauses)
+  (let* (t-clause nil-clause macros-clause)	 
+    (dolist (c clauses)
+      (unless (and (consp c)
+		   (consp (cdr c))
+		   (null (cddr c)))
+	(error "smp-case clause ~s is badly formed" c))
+      (let ((c-key (car c)))
+	(when (or (eq c-key t)
+		  (and (consp c-key) (member t c-key)))
+	  (setq t-clause c))
+	(when (or (eq c-key :macros)
+		  (and (consp c-key) (member :macros c-key)))
+	  (setq macros-clause c))
+	(when (or (null c-key)
+		  (and (consp c-key) (member nil c-key)))
+	  (setq nil-clause c))))
+    (if* (eq t-clause macros-clause)
+       then ;; Only one clause needed
+	    (second t-clause)
+       else `(mp-style-case
+	      (:vmp ,(or (second macros-clause) (second nil-clause)))
+	      (:smp ,(second t-clause)))))) 
+
+;; In 12.0, fasl files compiled by smp and non-smp lisps are
+;; completely compatible if they have appropriate mp-style-case
+;; forms where differences matter.  Since smp-macros are always
+;; loaded now, a (smp-case ((t :macros) <form1>) (nil <form2>))
+;; will never select form2, so there need not even be any mp-style-case
+;; macro - the t/:macros clause can be the only expansion without
+;; a style macro.
+;;
+;; Note that check-smp-consistency is not even defined in 12.0
+#-(version>= 12 0)
 (defmacro check-smp-consistency ()
   (smp-case
    (nil (if* (featurep :smp)
@@ -253,7 +293,6 @@
 	       then (error "This file requires the smp-macros patch")))
    (t (if* (not (featurep :smp))
 	 then (error "This file was compiled to run in an smp acl")))))
-   
 
 (defmacro atomic-incf (var)
   (smp-case

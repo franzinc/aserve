@@ -27,6 +27,8 @@
   )
 
 
+;; In 12.0 smp and vmp are automatically consistent.
+#-(version>= 12 0)
 (net.aserve::check-smp-consistency)
 
 (defclass client-request ()

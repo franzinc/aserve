@@ -20,6 +20,8 @@
 
 (eval-when (compile) (declaim (optimize (speed 3))))
 
+;; In 12.0 smp and vmp are automatically consistent.
+#-(version>= 12 0)
 (check-smp-consistency)
 
 ;; parseobj -- used for cons-free parsing of strings

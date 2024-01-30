@@ -19,6 +19,8 @@
 			:net.html.generator))
 (in-package :user)
 
+;; In 12.0 smp and vmp are automatically consistent.
+#-(version>= 12 0)
 (net.aserve::check-smp-consistency)
 
 (defmacro with-mp-locked-controller ((c) &body body)
