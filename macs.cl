@@ -222,7 +222,7 @@
 ;;     Compile environment does not recognize SMP macros;
 ;;     8.1 without smp patches.
 ;;
-;;  In 12.0, a new mp-style-case macro is introduced.  Furthermore,
+;;  In 12.0, a new with-style-case macro is introduced.  Furthermore,
 ;;  smp-macros is always loaded in (since 10.0) so the nil case need
 ;; never be considered, unless the :macros case is not also in the
 ;; same clause as the t case.
@@ -269,15 +269,15 @@
     (if* (eq t-clause macros-clause)
        then ;; Only one clause needed
 	    (second t-clause)
-       else `(mp-style-case
-	      (:vmp ,(or (second macros-clause) (second nil-clause)))
-	      (:smp ,(second t-clause)))))) 
+       else `(with-style-case :mp
+	       (:vmp ,(or (second macros-clause) (second nil-clause)))
+	       (:smp ,(second t-clause)))))) 
 
 ;; In 12.0, fasl files compiled by smp and non-smp lisps are
-;; completely compatible if they have appropriate mp-style-case
+;; completely compatible if they have appropriate with-style-case
 ;; forms where differences matter.  Since smp-macros are always
 ;; loaded now, a (smp-case ((t :macros) <form1>) (nil <form2>))
-;; will never select form2, so there need not even be any mp-style-case
+;; will never select form2, so there need not even be any with-style-case
 ;; macro - the t/:macros clause can be the only expansion without
 ;; a style macro.
 ;;
