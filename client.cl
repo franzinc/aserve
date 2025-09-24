@@ -1905,30 +1905,17 @@ headers")
 (defun get-header-line-buffer ()
   ;; return the next header line buffer
   (let (buff)
-    (net.aserve::smp-case
-     ((t :macros)
-      (setq buff
-	(pop-atomic *response-header-buffers*)))
-     (nil
-      (excl::atomically ;; in a #-smp form
-       (excl::fast (setq buff (pop *response-header-buffers*))))))
+    (setq buff
+      (pop-atomic *response-header-buffers*))
     (if* buff
        thenret
        else (make-array 400 :element-type 'character))))
 
 (defun put-header-line-buffer (buff &optional buff2)
   ;; put back up to two buffers
-  (net.aserve::smp-case
-   (nil
-    (mp:without-scheduling ;; in a #-smp form
-      (push buff *response-header-buffers*)
-      (if* buff2 then (push buff2 *response-header-buffers*))))
-   ((t :macros)
-    (progn
-      (push-atomic buff *response-header-buffers*)
-      (if* buff2
-	 then (push-atomic buff2 *response-header-buffers*))))
-   ))
+  (push-atomic buff *response-header-buffers*)
+  (if* buff2
+     then (push-atomic buff2 *response-header-buffers*)))
 
 
 

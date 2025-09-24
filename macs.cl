@@ -172,21 +172,9 @@
   nil)
 
 
-;---------------
-; acl 6.1 and newer support timeouts on read/write for hiper streams
-; Thus we can avoid using global timeouts in certain cases.
-;
-
 ; with-timeout-local: use with-timeout if that all we've got
 ; else use read-write timeouts
 ; 
-#-(version>= 6 1)
-(defmacro with-timeout-local ((time &rest actions) &body body)
-  ;; same as with-timeout 
-  `(mp:with-timeout (,time ,@actions) ,@body))   ; ok w-t
-
-
-#+(version>= 6 1)
 (defmacro with-timeout-local ((time &rest actions) &body body)
   (declare (ignore time))
   (let ((g-blocktag (gensym)))
@@ -217,38 +205,16 @@
 ;;     >=8.2 but not smp
 ;;     8.1 with smp patches.
 ;;
-;;  #-smp-macros
+;;  #-smp-macros  ;; never done anymore
 ;;     (smp-case (nil form) ...)
 ;;     Compile environment does not recognize SMP macros;
 ;;     8.1 without smp patches.
 ;;
-;;  In 12.0, a new with-style-case macro is introduced.  Furthermore,
-;;  smp-macros is always loaded in (since 10.0) so the nil case need
-;; never be considered, unless the :macros case is not also in the
-;; same clause as the t case.
+;;  In 12.0, a new with-style-case macro is introduced (and has been
+;; back-ported to 10.1 and 11.0).  Furthermore, smp-macros is always
+;; loaded in (since 10.0) so the nil case need never be considered,
+;; unless the :macros case is not also in the same clause as the t case.
 
-#-(version>= 12 0)
-(defmacro smp-case (&rest clauses)
-  (let* ((key
-	  #+smp t
-	  #+(and smp-macros (not smp)) :macros
-	  #-smp-macros nil
-	  )
-	 (clause (dolist (c clauses)
-		   (if* (not (and (consp c)
-				  (consp (cdr c))
-				  (null (cddr c))))
-		      then (error "smp-case clause ~s is badly formed" c))
-		   (let ((c-key (car c)))
-		     (if* (or (eq c-key key)
-			      (and (consp c-key)
-				   (member key c-key)))
-			then (return c))))))
-    (if* (not clause)
-       then (error "smp-case is missing clause for ~s" key))
-    (second clause)))
-
-#+(version>= 12 0)
 (defmacro smp-case (&rest clauses)
   (let* (t-clause nil-clause macros-clause)	 
     (dolist (c clauses)
@@ -281,7 +247,8 @@
 ;; macro - the t/:macros clause can be the only expansion without
 ;; a style macro.
 ;;
-;; Note that check-smp-consistency is not even defined in 12.0
+;; Note that check-smp-consistency is not even defined in 12.0 but is
+;; still needed in pre-12.0 lisps because the fasl files are not fat.
 #-(version>= 12 0)
 (defmacro check-smp-consistency ()
   (smp-case
@@ -294,48 +261,35 @@
    (t (if* (not (featurep :smp))
 	 then (error "This file was compiled to run in an smp acl")))))
 
+
 (defmacro atomic-incf (var)
-  (smp-case
-   (t `(incf-atomic ,var))
-   (:macros `(with-locked-object (nil :non-smp :without-scheduling) (incf ,var)))
-   (nil `(si:without-scheduling (incf ,var))))
-  )
+  `(with-style-case :mp
+     (:smp (incf-atomic ,var))
+     (:vmp (with-locked-object (nil :non-smp :without-scheduling) (incf ,var)))))
 
 (defmacro atomic-decf (var)
-  (smp-case
-   (t `(decf-atomic ,var))
-   (:macros `(with-locked-object (nil :non-smp :without-scheduling) (decf ,var)))
-   (nil `(si:without-scheduling (decf ,var)))))
+  `(with-style-case :mp
+     (:smp (decf-atomic ,var))
+     (:vmp (with-locked-object (nil :non-smp :without-scheduling) (decf ,var)))))
 
 (defmacro with-locked-server ((s) &body body)
-  (smp-case
-   ((t :macros) `(with-locked-object (,s :non-smp :without-scheduling) ,@body))
-   (nil `(si:without-scheduling ,s ,@body))))
+  `(with-locked-object (,s :non-smp :without-scheduling) ,@body))
 
 (defmacro defvar-mp (v &rest rest)
-  (smp-case
-   ((t :macros) `(defvar-nonbindable ,v ,@rest))
-   (nil `(defvar ,v ,@rest))))
+  `(defvar-nonbindable ,v ,@rest))
 
 (defmacro atomically-fast (&body body)
-  (smp-case
-   ((t :macros) `(excl::.atomically (excl::fast ,@body)))
-   (nil `(excl::atomically (excl::fast ,@body)))))
+  `(excl::.atomically (excl::fast ,@body)))
 
 
 (defmacro atomic-setf-max (place val)
-  (smp-case
-   (nil (let ((newvar (gensym)))
-	  `(let ((,newvar ,val))
-	     (without-interrupts
-	      (if* (< ,place ,newvar) then (setf ,place ,newvar) t)))))
-   ((t :macros) (let ((newvar (gensym)) (oldvar (gensym)))
-		  `(let ((,newvar ,val) ,oldvar)
-		     (loop
-		      (setq ,oldvar  ,place)
-		      (cond ((not (< ,oldvar ,newvar)) (return nil))
-			    ((atomic-conditional-setf ,place ,newvar ,oldvar)
-			     (return t)))))))))
+  (let ((newvar (gensym)) (oldvar (gensym)))
+    `(let ((,newvar ,val) ,oldvar)
+       (loop
+	 (setq ,oldvar  ,place)
+	 (cond ((not (< ,oldvar ,newvar)) (return nil))
+	       ((atomic-conditional-setf ,place ,newvar ,oldvar)
+		(return t)))))))
 
 
 ;;;;;; end of smp-aware macro definitions

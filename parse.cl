@@ -37,28 +37,14 @@
 (defvar-mp *parseobjs* nil)  ;; never bound; this is a global variable
 
 (defun allocate-parseobj ()
-  (smp-case
-   ((t :macros)
-    (let ((res (pop-atomic *parseobjs*)))
-	(if* res
-	   then (setf (parseobj-next res) 0)
-		res
-	   else (make-parseobj))))
-   (nil
-    (let (res)
-      (mp::without-scheduling  ;; in a #-smp form
-	(if* (setq res (pop *parseobjs*))
-	   then (setf (parseobj-next res) 0)
-		res
-	   else (make-parseobj)))))))
+  (let ((res (pop-atomic *parseobjs*)))
+    (if* res
+       then (setf (parseobj-next res) 0)
+	    res
+       else (make-parseobj))))
 
 (defun free-parseobj (po)
-  (smp-case
-   ((t :macros)
-    (push-atomic po (si:global-symbol-value '*parseobjs*)))
-   (nil
-    (mp::without-scheduling ;; in a #-smp form
-      (push po *parseobjs*)))))
+  (push-atomic po (si:global-symbol-value '*parseobjs*)))
 
 (defun add-to-parseobj (po start end)
   ;; add the given start,end pair to the parseobj

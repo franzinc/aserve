@@ -471,8 +471,7 @@ after the connection goes idle")
 
 ;;;;;;;;;;;;;  end special vars
 
-
-(defclass wserver (#+smp lockable-object)
+(defclass wserver (lockable-object)
   ;; all the information contained in a web server
   (
    ;;
@@ -534,7 +533,7 @@ after the connection goes idle")
     ;; function to call after the request is done to 
     ;; do the logging
     :initarg :log-function
-    :initform nil	; no logging initially
+    :initform nil			; no logging initially
     :accessor wserver-log-function)
 
    (log-stream
@@ -647,12 +646,12 @@ after the connection goes idle")
    (invalid-request
     ;; entity to invoke given a request that can't be
     ;; satisfied
-    :initform nil  ; will build on demand if not present
+    :initform nil			; will build on demand if not present
     :accessor wserver-invalid-request)
    
    (denied-request
     ;; entity to invoke given a request that was denied
-    :initform nil  ; will build on demand if not present
+    :initform nil			; will build on demand if not present
     :accessor wserver-denied-request)
    
    (ipaddrs
@@ -707,9 +706,7 @@ after the connection goes idle")
    (read-request-body-timeout
     :initarg :read-request-body-timeout
     :initform *read-request-body-timeout*
-    :accessor wserver-read-request-body-timeout)
-
-   ))
+    :accessor wserver-read-request-body-timeout)))
 
 
 
@@ -722,13 +719,8 @@ after the connection goes idle")
 		 else "-no socket-")))))
 
 (defmethod incf-free-workers ((wserver wserver) count)
-  (net.aserve::smp-case
-   ((t :macros)
-    (with-locked-object (wserver :non-smp :without-interrupts)
-      (incf (wserver-free-workers wserver) count)))
-   (nil
-    (without-interrupts
-     (incf (wserver-free-workers wserver) count)))))
+  (with-locked-object (wserver :non-smp :without-interrupts)
+    (incf (wserver-free-workers wserver) count)))
 
 ;;;;; virtual host class
 (defclass vhost ()
