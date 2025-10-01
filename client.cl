@@ -429,6 +429,9 @@ headers")
 			read-body-hook
                         cache  ;; client-cache object
                         (return :string) ; either :string or :stream
+                        connect-timeout
+                        read-timeout
+                        write-timeout 
 			
                         ;; internal
 			recursing-call ; true if we are calling ourself
@@ -476,6 +479,9 @@ headers")
 	       :max-depth max-depth
 	       :connection connection
                :cache cache
+               :connect-timeout connect-timeout
+               :read-timeout  read-timeout
+               :write-timeout write-timeout
 	       )))
 
     (if* (consp creq)
@@ -971,7 +977,9 @@ headers")
 				 connection
 				 use-socket
                                  cache  ;; client-cache object
-				     
+                                 connect-timeout 
+                                 read-timeout 
+                                 write-timeout
 				 )
   
   ;; 	        scheme  proxy  ssl    do
@@ -1066,7 +1074,7 @@ headers")
                 
                 (setq sock 
                   (or use-socket
-                      (with-socket-connect-timeout (:timeout timeout
+                      (with-socket-connect-timeout (:timeout (or connect-timeout timeout)
                                                              :host phost 
                                                              :port pport)
                         (wrap-enable-keepalive
@@ -1106,7 +1114,7 @@ headers")
 
 	      (flet ((make-new ()
 		       (setq sock
-			 (with-socket-connect-timeout (:timeout timeout
+			 (with-socket-connect-timeout (:timeout (or connect-timeout timeout)
 								:host host
 								:port port)
 			   (wrap-enable-keepalive
@@ -1153,8 +1161,8 @@ headers")
               (if* (integerp timeout)
                  then (socket:socket-control 
                        sock 
-                       :read-timeout timeout
-                       :write-timeout timeout)))
+                       :read-timeout (or read-timeout timeout)
+                       :write-timeout (or write-timeout timeout))))
               
       
       (if* query

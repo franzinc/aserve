@@ -6,14 +6,16 @@
 
 ;; 11.0.beta RC4 needs this patch
 #+(version= 11 0)
-(sys:defpatch "aserve" 1
-  "v1: 1.3.88:  keep-alive and redirects"
+(sys:defpatch "aserve" 2
+  "v2: 1.3.89: separate timeout values
+v1: 1.3.88:  keep-alive and redirects"
   :type :system
   :post-loadable t)
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 34
-  "v34: 1.3.88: keep-alive and redirects;
+(sys:defpatch "aserve" 35
+  "v35: 1.3.89: separate timeout values
+v34: 1.3.88: keep-alive and redirects;
 v33: 1.3.87: handle redirects before calling read-body-hook;
 v32: 1.3.86: support colon in a password;
 v31: 1.3.85: support http on an ssl port;
