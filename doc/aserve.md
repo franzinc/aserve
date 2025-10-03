@@ -2181,9 +2181,9 @@ If you need more control over the process you can use the functions:
                           connection
                           certificate key certificate-password ca-file
                           ca-directory verify max-depth return
-			  timeout connect-timeout
-			  read-timeout write-timeout
-			  )
+                          timeout connect-timeout read-timeout
+                          write-timeout
+                          )
 ```
 
 Sends a request to **`uri`** and returns six values:
