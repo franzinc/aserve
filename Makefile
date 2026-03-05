@@ -44,9 +44,9 @@ image = dcl.dxl
 endif
 
 ifeq ($(on_windows),yes)
-mlisp ?= "/cygdrive/c/acl100/mlisp.exe"
+mlisp ?= ../mlisp.exe
 else
-mlisp ?= /fi/cl/10.0/bin/mlisp
+mlisp ?= ../mlisp
 endif
 
 image ?= mlisp.dxl
@@ -115,9 +115,7 @@ stress: test.tmp
 	echo '(time (test-aserve-n $(NSERVERS) :exit nil))' >> test.tmp
 # iterating and setting environment is tricky, do it the easy way
 	set -eu; \
-	for i in 1 2 3 4 5 6 7 8 9 10; do \
-	    $(mlisp) -L test.tmp -kill; \
-	done
+	for i in `seq 1 10`; do $(mlisp) -L test.tmp -kill; done
 
 stresswp: test.tmp
 #### this causes failures [bug26478]
@@ -126,9 +124,7 @@ stresswp: test.tmp
 	echo '(time (test-aserve-n $(NSERVERS) :exit nil))' >> test.tmp
 # iterating and setting environment is tricky, do it the easy way
 	set -eu; \
-	for i in 1 2 3 4 5 6 7 8 9 10; do \
-	    $(mlisp) -L test.tmp -kill; \
-	done
+	for i in `seq 1 10`; do $(mlisp) -L test.tmp -kill; done
 
 test-from-asdf: FORCE
 	rm -f build.tmp
