@@ -1932,60 +1932,73 @@
 	;; Present an extremely simple directory listing, taking care
 	;; to skip files for which access has been denied.
 	(html
-	 (:pre
-	  (ignore-errors
-	   (with-output-to-string (s)
-	     (let ((files (directory dirname))
-		   ns fns dirp pretty-fns
-		   subdir-ok subdirname subdir-postfix subdir-info)
-	       (html "Files in "
-		     (:princ-safe (request-decoded-uri-path req))
-		     :newline
-		     :newline)
-	       (dolist (file files)
-		 (setq ns (namestring file))
-		 (setq fns (file-namestring file))
-		 (setq dirp (file-directory-p ns))
-		 (setq pretty-fns (format nil "~a~@[/~]" fns dirp))
-		 (cond
-		  ((or (file-should-be-denied-p ns info)
-		       (and (char= #\. (elt fns 0))
-			    (directory-hide-dot-files-p ns info))
-		       (and dirp
-			    (not (directory-show-directories-p ns info)))
-		       (and (not dirp)
-			    (not (directory-show-files-p ns info))))
-		   ;; the conditions preclude showing this item, skip...
-		   )
-		  (t
-		   (when dirp
-		     ;; If we're looking at a directory, check if access is
-		     ;; allowed for it, and only link it if it is
-		     (setq subdirname
-		       (concatenate 'simple-string dirname pretty-fns))
-		     (setq subdir-postfix
-		       (concatenate 'simple-string postfix pretty-fns))
-		     (setq subdir-ok
-		       (cond
-			((and
-			  (setq subdir-info
-			    (read-access-files dir-ent
-					       subdirname
-					       subdir-postfix))
-			  (directory-listing-allowed-p subdirname
-						       subdir-info))
-			 t)
-			(t nil))))
-		   (let ((pretty-date
-			  (locale-format-time nil (file-write-date file)
-					      t nil nil "%F %T")))
-		     (html
-		      (:princ-safe pretty-date) " "
-		      (if* (or (not dirp)
-			       (and dirp subdir-ok))
-			 then (html ((:a :href fns) (:princ-safe pretty-fns)))
-			 else (html (:princ-safe pretty-fns)))
-		      :newline)))))))))))))))
+	 (:html
+	  (:pre
+	   (ignore-errors
+	    (with-output-to-string (s)
+	      (let ((files
+		     (handler-case
+			 ;; sort the files
+			 (sort (directory dirname)
+			       (lambda (a b)
+				 (string-lessp (file-namestring a)
+					       (file-namestring b))))
+		       (error (c)
+			 (logmess (format nil
+					  "~
+listing directory ~a resulted in error: ~a"
+					  dirname c))
+			 nil)))
+		    ns fns dirp pretty-fns
+		    subdir-ok subdirname subdir-postfix subdir-info)
+		(html "Files in "
+		      (:princ-safe (request-decoded-uri-path req))
+		      :newline
+		      :newline)
+		(dolist (file files)
+		  (setq ns (namestring file))
+		  (setq fns (file-namestring file))
+		  (setq dirp (file-directory-p ns))
+		  (setq pretty-fns (format nil "~a~@[/~]" fns dirp))
+		  (cond
+		   ((or (file-should-be-denied-p ns info)
+			(and (char= #\. (elt fns 0))
+			     (directory-hide-dot-files-p ns info))
+			(and dirp
+			     (not (directory-show-directories-p ns info)))
+			(and (not dirp)
+			     (not (directory-show-files-p ns info))))
+		    ;; the conditions preclude showing this item, skip...
+		    )
+		   (t
+		    (when dirp
+		      ;; If we're looking at a directory, check if access is
+		      ;; allowed for it, and only link it if it is
+		      (setq subdirname
+			(concatenate 'simple-string dirname pretty-fns))
+		      (setq subdir-postfix
+			(concatenate 'simple-string postfix pretty-fns))
+		      (setq subdir-ok
+			(cond
+			 ((and
+			   (setq subdir-info
+			     (read-access-files dir-ent
+						subdirname
+						subdir-postfix))
+			   (directory-listing-allowed-p subdirname
+							subdir-info))
+			  t)
+			 (t nil))))
+		    (let ((pretty-date
+			   (locale-format-time nil (file-write-date file)
+					       t nil nil "%F %T")))
+		      (html
+		       (:princ-safe pretty-date) " "
+		       (if* (or (not dirp)
+				(and dirp subdir-ok))
+			  then (html ((:a :href fns) (:princ-safe pretty-fns)))
+			  else (html (:princ-safe pretty-fns)))
+		       :newline))))))))))))))))
 
 (defun standard-directory-entity-publisher (req ent realname info)
   ;; the default publisher used when directory entity finds
