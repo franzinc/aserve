@@ -9,8 +9,9 @@ the functions we mention here.
 
 ## Loading AllegroServe
 
-AllegroServe is distributed as a single fasl file: `AllegroServe.fasl`. If the
-file is installed where **`require`** can find it then you need only type
+AllegroServe is distributed as a single fasl file: `aserve.fasl`. If
+the file is installed where **`require`** can find it then you need
+only type:
 
 ```lisp
 (require :aserve)
