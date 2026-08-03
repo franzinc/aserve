@@ -11,6 +11,8 @@
 
 (in-package :cl-user)
 
+(setq excl::*hiper-socket-is-stream-socket* nil)
+
 (defvar *port-file*
     (or (sys:getenv "ATEST_PORT_FILE")
 	(die "ATEST_PORT_FILE is not defined")))
