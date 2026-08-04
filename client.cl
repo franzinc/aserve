@@ -1128,19 +1128,19 @@ headers")
 						)))))
 		     (make-ssl () 
 		       (setq sock
-                        (apply #'convert-to-ssl-stream sock :host host args)))
+                         (apply #'convert-to-ssl-stream sock :host host args)))
 		     )
 		(cond ((null ssl)
-		       ;; Without SSL, all we need is a socket.
+                       ;; Without SSL, all we need is a socket.
 		       (make-new))
 		      ((null *aserve-client-handshake-lock*)
-		       ;; With SSL, we need to prepare the stream for SSL.
+                       ;; With SSL, we need to prepare the stream for SSL.
 		       (make-new)
 		       (make-ssl))
 		      (t (mp:with-process-lock (*aserve-client-handshake-lock*)
-			   ;; By default. we take this path to serialize client
-			   ;; handshakes.  This avoids a race that causes connections
-			   ;; to fail occasionally. [rfe16663] [rfe16686]
+                           ;; By default. we take this path to serialize client
+                           ;; handshakes.  This avoids a race that causes connections
+                           ;; to fail occasionally. [rfe16663] [rfe16686]
 			   (make-new)
 			   (make-ssl)
 			   (funcall 'socket::ssl-do-handshake sock))))))                                
@@ -1204,7 +1204,11 @@ headers")
       ; for http/1.0
       (net.aserve::maybe-accumulate-log 
        (:xmit-client-request-headers "~s")
-       (if*  (not (eql scheme-default-port  port))
+       (if* (find "host" headers
+                  :key #'car
+                  :test #'(lambda (o z) (string-equal o (string z))))
+          thenret ; user supplied host header
+        elseif (not (eql scheme-default-port  port))
           then (net.aserve::format-dif :xmit-client-request-headers
                                        sock "Host: ~a:~a~a" host port crlf)
           else (net.aserve::format-dif :xmit-client-request-headers
