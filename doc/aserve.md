@@ -2,7 +2,7 @@
 
 # AllegroServe - A Web Application Server
 
-##### Version 1.3.86
+##### Version 1.3.92
 
 #### Copyright (c) Franz Inc.
 
@@ -129,6 +129,19 @@ version of this document can be found [here][latest].
 
 ## <span id="release-notes"></span>Release Notes
 
+ * **1.3.92**: the request line is limited to the **`:max-request-line`**
+   argument to [**`start`**](aserve.md#f-start) (default 8192 characters); a longer one
+   gets a 414 response. Each thread keeps its own request line buffer.
+ * **1.3.91**: [**`do-http-request`**](aserve.md#f-do-http-request) doesn't add its own Host header
+   when the caller supplies one.
+ * **1.3.90**: directory listings are sorted by name and wrapped in an
+   `<html>` element; chunker.cl requires gray streams.
+ * **1.3.89**: client requests can take separate connect, read and write
+   timeouts.
+ * **1.3.88**: with **`:keep-alive t`**, [**`do-http-request`**](aserve.md#f-do-http-request)
+   returns nil as its fifth value (no socket) when it followed a redirect.
+ * **1.3.87**: [**`do-http-request`**](aserve.md#f-do-http-request) calls **`read-body-hook`**
+   after it handles redirects.
  * **1.3.86**: support colons in passwords for *Basic* authorization.
  * **1.3.85**: Optionally recognize and handle HTTP requests made to
    an SSL port.
@@ -228,7 +241,7 @@ The function **`net.aserve:start`** is used to start the server running.
             accept-hook ssl ssl-args ssl-password os-processes external-format
             compress ssl-key ssl-password ssl-method test-ssl ca-file
             ca-directory verify max-depth max-content-length
-	    http-on-ssl-port redirect-http-to-ssl)
+	    max-request-line http-on-ssl-port redirect-http-to-ssl)
 ```
 
 If no arguments are given then [**`start`**](aserve.md#f-start) starts a multi-threaded web server on
@@ -348,6 +361,10 @@ following meanings:
   - **`max-content-length`** - The server will refuse to read a body with a declared Content-Length
     more than this amount.  The default is nil meaning there is no limit.  This limit only applies
     when **`get-request-body`** is called.  If the request body is read incrementally then there is no limit.
+  - **`max-request-line`** - The maximum length, in characters, of a request's first line (the
+    method, URI and protocol).  The server answers a longer line with a 414 (URI Too Long) response
+    and closes the connection.  The value is a positive fixnum, or nil, which means there is no
+    limit.  The default is 8192.
   - **`ssl-key`**, **`ssl-password`**, **`ca-file`**, **`ca-directory`**,
     **`verify`** and **`max-depth`** - these values are passed to
     [**`acl-socket:make-ssl-server-stream`**](https://franz.com/support/documentation/current/doc/operators/socket/make-ssl-server-stream.htm) should the

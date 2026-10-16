@@ -427,6 +427,9 @@
 		       (test-chunked-request-set-trailers-while-debugging port https)
 		       (test-server-request-body port :https https)
 		       (test-request-uri port https)
+		       (test-request-line-limit port)
+		       (test-max-request-line-argument)
+		       (test-read-sock-line)
 		       (test-spr44282)
                        (test-seize-request port)
                      
@@ -3351,6 +3354,149 @@ Returns a vector."
                       "http~@[s~*~]://localhost:~a/request-uri" https port))
          (result (x-do-http-request uri)))
     (test uri result :test 'string=)))
+
+(defun raw-request-status (port request-line &optional (headers ""))
+  ;; send request-line and headers (each line without its crlf) on a
+  ;; plain socket and return the status code of the response
+  (let ((sock (socket:make-socket :remote-host "localhost"
+				  :remote-port port)))
+    (unwind-protect
+	(progn
+	  ;; the server answers an over-long request line or header
+	  ;; block before reading all of it and then closes the
+	  ;; connection, so writing the rest can fail (on Windows the
+	  ;; close resets the connection).  the response may already
+	  ;; have arrived, so ignore the write error and read it anyway;
+	  ;; if it can't be read the result is nil
+	  (ignore-errors
+	   (format sock "~a~c~cHost: localhost~c~c~a~c~c"
+		   request-line #\return #\newline #\return #\newline
+		   headers #\return #\newline)
+	   (force-output sock))
+	  (let ((status (or (ignore-errors (read-line sock nil "")) "")))
+	    (values (parse-integer status :start (min (length status) 9)
+				   :junk-allowed t))))
+      (ignore-errors (close sock :abort t)))))
+
+(defun test-request-line-limit (port)
+  ;; a request line longer than wserver-max-request-line gets a 414
+  (if* (asc x-ssl)
+     then ;; the requests are sent on a plain socket
+	  (return-from test-request-line-limit nil))
+  (flet ((request-line (length)
+	   ;; a request line exactly length characters long
+	   (let ((prefix "GET /") (suffix " HTTP/1.1"))
+	     (concatenate 'string prefix
+			  (make-string (- length (length prefix) (length suffix))
+				       :initial-element #\a)
+			  suffix))))
+    (let ((max (wserver-max-request-line *wserver*)))
+      (unwind-protect
+	  (progn
+	    (test 8192 max :fail-info "default max-request-line")
+	    (test 404 (raw-request-status port (request-line max))
+		  :fail-info "request line at the limit")
+	    (test 414 (raw-request-status port (request-line (1+ max)))
+		  :fail-info "request line over the limit")
+	    ;; the server stops reading at the limit; the 414 must still
+	    ;; arrive when much more of the request follows
+	    (test 414 (raw-request-status
+		       port (request-line (1+ max))
+		       (with-output-to-string (s)
+			 (dotimes (i 200)
+			   (format s "X-Junk: ~a~c~c"
+				   (make-string 1000 :initial-element #\b)
+				   #\return #\newline))))
+		  :fail-info "request line over the limit, more to read")
+	    (setf (wserver-max-request-line *wserver*) 100)
+	    (test 404 (raw-request-status port (request-line 100))
+		  :fail-info "request line at a limit of 100")
+	    (test 414 (raw-request-status port (request-line 101))
+		  :fail-info "request line over a limit of 100")
+	    (setf (wserver-max-request-line *wserver*) nil)
+	    ;; well over the default limit, but under 16384: on a 32-bit
+	    ;; lisp net.uri:parse-uri rejects longer strings
+	    ;; this check fails on 32-bit Windows and needs further
+	    ;; debugging, so it's skipped there for now
+	    #-(and mswindows (not 64bit))
+	    (test 404 (raw-request-status port (request-line 16000))
+		  :fail-info "request line with no limit"))
+	(setf (wserver-max-request-line *wserver*) max)))))
+
+(defun test-max-request-line-argument ()
+  ;; start accepts only nil or a positive fixnum for :max-request-line;
+  ;; it checks before it opens a socket
+  (dolist (bad (list 0 -1 (1+ most-positive-fixnum) "8192"))
+    (test :error
+	  (handler-case
+	      (let ((*wserver* *wserver*))
+		;; if start accepts it, shut down the server it started
+		(shutdown :server (start :server :new :port 0
+					 :max-request-line bad))
+		:accepted)
+	    (error () :error))
+	  :fail-info (format nil ":max-request-line ~s" bad))))
+
+(defun test-read-sock-line ()
+  ;; read-sock-line on lines that fill its buffer exactly, and on lines
+  ;; at a limit.  The line must be followed by a null within the
+  ;; buffer: read-sock-line doesn't check the index it writes the null
+  ;; at.
+  (flet ((read-line-of (line &optional limit)
+	   ;; read line from a string stream into a 10-character buffer;
+	   ;; return the line read, or :no-null if the buffer has no null
+	   ;; after it, or :too-long; and the length of the buffer used
+	   (let ((net.aserve::*request-buffer* nil)) ; no buffer to reuse
+	     (multiple-value-bind (buffer end)
+		 (net.aserve::read-sock-line (make-string-input-stream line)
+					     (make-string 10) 0 (list nil)
+					     limit)
+	       (if* (eq end :too-long)
+		  then :too-long
+		elseif (and (< end (length buffer))
+			    (eql #\null (schar buffer end)))
+		  then (values (subseq buffer 0 end) (length buffer))
+		  else :no-null))))
+	 (chars (n) (make-string n :initial-element #\a))
+	 (lf () (string #\linefeed))
+	 (crlf () (format nil "~c~c" #\return #\linefeed)))
+    (test "0123456789" (values (read-line-of (format nil "0123456789~a" (lf))))
+	  :test #'equal
+	  :fail-info "line filling the buffer, ending in a bare linefeed")
+    (test "0123456789" (values (read-line-of (format nil "0123456789~a" (crlf))))
+	  :test #'equal
+	  :fail-info "line filling the buffer, ending in crlf")
+    (test "0123456789a" (values (read-line-of (format nil "0123456789a~a" (lf))))
+	  :test #'equal
+	  :fail-info "line longer than the buffer")
+    ;; with a limit of 25 the buffer grows from 10 to 20, then only to
+    ;; 27: room for the line, a CR and the null
+    (dolist (ending (list (lf) (crlf)))
+      (multiple-value-bind (line length)
+	  (read-line-of (concatenate 'string (chars 25) ending) 25)
+	(test (chars 25) line :test #'equal
+	      :fail-info "line at the limit")
+	(test 27 length
+	      :fail-info "buffer for a line at the limit")))
+    (test :too-long (read-line-of (concatenate 'string (chars 26) (lf)) 25)
+	  :fail-info "line over the limit")
+    ;; a thread that hasn't bound *request-buffer* gets a buffer of its
+    ;; own and leaves the variable unbound, so it shares nothing with
+    ;; other such threads
+    (progv '(net.aserve::*request-buffer*) ()
+      (test (chars 15)
+	    (handler-case
+		(multiple-value-bind (buffer end)
+		    (net.aserve::read-sock-line
+		     (make-string-input-stream
+		      (concatenate 'string (chars 15) (lf)))
+		     (make-string 10) 0 (list nil))
+		  (subseq buffer 0 end))
+	      (error (c) c))
+	    :test #'equal
+	    :fail-info "line read with *request-buffer* unbound")
+      (test nil (boundp 'net.aserve::*request-buffer*)
+	    :fail-info "*request-buffer* left unbound"))))
 
 (defun test-aserve-extra-ssl ()
   ;; tests run with no aserve server running

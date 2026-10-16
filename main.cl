@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 91))
+(defparameter *aserve-version* '(1 3 92))
 
 (eval-when (eval load)
     (require :sock)
@@ -402,6 +402,7 @@ will be logged with one log entry per line in some cases.")
 (defvar *debug-connection-reset-by-peer* nil) ; true to signal these too
 (defvar *default-aserve-external-format* :latin1-base) 
 (defvar *worker-request*)  ; set to current request object
+(defvar *request-buffer*) ; per-thread request line buffer, see get-request-buffer
 
 (defvar *read-request-timeout* 20)
 (defvar *read-request-body-timeout* 60)
@@ -600,6 +601,13 @@ after the connection goes idle")
     :initform nil
     :initarg :max-content-length
     :accessor wserver-max-content-length)
+
+   (max-request-line
+    ;; maximum length in characters of a request line; a longer one
+    ;; gets a 414 (URI Too Long) response.  nil means no limit
+    :initform 8192
+    :initarg :max-request-line
+    :accessor wserver-max-request-line)
    
    ;;
    ;; -- internal slots --
@@ -1364,6 +1372,7 @@ by keyword symbols and not by strings"
 		   backlog
 		   (compress (and (member :zlib-deflate *features*) t))
                    (max-content-length nil max-content-length-p)
+                   (max-request-line nil max-request-line-p)
 		   )
   ;; -exported-
   ;;
@@ -1397,6 +1406,16 @@ by keyword symbols and not by strings"
              then (error "max-content-length must be nil or an integer, not ~s" max-content-length))
           (if* server
              then (setf (wserver-max-content-length server) max-content-length)))
+
+  (if* max-request-line-p
+     then (if* (not (or (null max-request-line)
+                        ;; read-sock-line declares it a fixnum
+                        (typep max-request-line
+                               '(integer 1 #.most-positive-fixnum))))
+             then (error "max-request-line must be nil or a positive fixnum, not ~s"
+                         max-request-line))
+          (if* server
+             then (setf (wserver-max-request-line server) max-request-line)))
            
 	  
   ;; the only required ssl arg is a certificate. check that a certificate has been specified here, so
@@ -1645,6 +1664,7 @@ by keyword symbols and not by strings"
   ;; debug problems
   (let ((main-socket (wserver-socket *wserver*))
 	(ipaddrs (wserver-ipaddrs *wserver*))
+	(*request-buffer* nil)
 	(*default-aserve-external-format* (wserver-external-format *wserver*)))
     (unwind-protect
 	(loop
@@ -1757,6 +1777,7 @@ by keyword symbols and not by strings"
   ;; made runnable when there is an socket on which work is to be done
   (let ((*print-level* 5)
 	(*worker-request* nil)
+	(*request-buffer* nil)
 	(*default-aserve-external-format* 
 	 (wserver-external-format *wserver*))
 	)
@@ -2014,7 +2035,10 @@ by keyword symbols and not by strings"
                                        (response-number code)
                                        (response-desc code)
                                        *crlf* *crlf* *crlf* *crlf*))
-                             (force-output sock)))
+                             (force-output sock))
+			    ;; the rest of the request is still coming
+			    (if* (eq error-response *response-uri-too-long*)
+			       then (drain-request-input sock)))
 		   
                     (return-from process-connection nil)
                else ;; got a request
@@ -2099,8 +2123,7 @@ by keyword symbols and not by strings"
 	(end)
 	(raw-cmd))
     
-    (unwind-protect
-	(progn
+    (progn
 	  (loop
 	    ; loop until a non blank line is seen and is stored in
 	    ; the buffer
@@ -2109,18 +2132,15 @@ by keyword symbols and not by strings"
 	    ; since the spec says that we should (even though we don't have to)
 
 
-	    (let ((nbuffer buffer))
-	      ;; read-sock-line will not return if an error is
-	      ;; signalled in it in which case it may have freed
-	      ;; the buffer passed to it already.  So we play
-	      ;; it safe and ensure that buffer is nil to prevent
-	      ;; the freeing in the cleanup form below.
-	      (setq buffer nil)
-	      (multiple-value-setq (buffer end)
-		(read-sock-line sock nbuffer 0 chars-seen)))
+	    (multiple-value-setq (buffer end)
+	      (read-sock-line sock buffer 0 chars-seen
+			      (wserver-max-request-line *wserver*)))
 	      
       
-	    (if* (null end)
+	    (if* (eq end :too-long)
+	       then (return-from read-http-request
+		      (values nil nil *response-uri-too-long*))
+	     elseif (null end)
 	       then ; eof or error before crlf
 		    (return-from read-http-request nil))
       
@@ -2205,10 +2225,7 @@ by keyword symbols and not by strings"
 	  
 	    
 	  req ; return req object
-	  )
-    
-      ; cleanup forms
-      (if* buffer then (free-request-buffer buffer)))))
+	  )))
 
 
 				      
@@ -3170,14 +3187,30 @@ in get-multipart-sequence"))
     
       
 
-(defun read-sock-line (sock buffer start chars-seen)
+(defun drain-request-input (sock)
+  ;; After a response sent before the whole request was read, read and
+  ;; discard what the client is still sending, until it closes its side
+  ;; or for at most two seconds.  Closing a socket that has unread data
+  ;; resets the connection, and the client can lose the response.
+  ;; The socket's output isn't shut down first: in Allegro CL on
+  ;; Windows, reads then stop once 64 KB have been read in all.
+  (ignore-errors
+   (mp:with-timeout (2 nil)
+     (let ((buffer (make-array 4096 :element-type '(unsigned-byte 8))))
+       (loop
+	 (if* (zerop (read-vector buffer sock))
+	    then (return)))))))
+
+(defun read-sock-line (sock buffer start chars-seen &optional limit)
   (declare (optimize (speed 3))
 	   (type fixnum start)
 	   (type (simple-array character (*)) buffer))
   ;; read a line of data into the socket buffer, starting at start.
   ;; return  buffer and index after last character in buffer.
   ;; get bigger buffer if needed.
-  ;; If problems occur free the passed in buffer and return nil.
+  ;; If problems occur return nil.
+  ;; If limit is given and the line is longer than limit characters,
+  ;; return nil and :too-long.
   ;;
   ;; returns
   ;;   buffer
@@ -3185,13 +3218,12 @@ in get-multipart-sequence"))
   ;;   t if any characters have been read
   
   
-  (let ((max (length buffer))
+  (let ((max (1- (length buffer))) ; leave room for the null after the line
 	(prevch))
     (loop
       (let ((ch (read-char sock nil :eof)))
 	(if* (eq ch :eof)
 	   then (debug-format :info "eof on socket")
-		(free-request-buffer buffer)
 		(return-from read-sock-line nil))
 
 	(if* (null (car chars-seen)) 
@@ -3205,22 +3237,29 @@ in get-multipart-sequence"))
 
 		(return-from read-sock-line (values buffer start))
 	   else ; store character
+		;; limit counts the line's characters, not a CR before the LF
+		(if* (and limit
+			  (>= start (if* (eq ch #\return)
+				       then (1+ (the fixnum limit))
+				       else (the fixnum limit))))
+		   then (return-from read-sock-line (values nil :too-long)))
 		(if* (>= start max)
-		   then ; must grow the string
-			(let ((new-buffer (get-request-buffer (* max 2))))
+		   then ; must grow the string, but no bigger than a
+			; line at the limit needs: the line, a CR and the
+			; null
+			(let* ((size (* (length buffer) 2))
+			       (new-buffer
+				(get-request-buffer
+				 (if* limit
+				    then (min size (+ (the fixnum limit) 2))
+				    else size))))
 			  (declare (type (simple-array character (*))
 					 new-buffer))
-			  (if* (null new-buffer)
-			     then ;; too large, give up
-				  (free-request-buffer buffer)
-				  (return-from read-sock-line nil)
-			     else ; got it
-				  (dotimes (i start)
-				    (setf (schar new-buffer i) 
-				      (schar buffer i)))
-				  (setq max (length new-buffer))
-				  (free-request-buffer buffer)
-				  (setq buffer new-buffer))))
+			  (dotimes (i start)
+			    (setf (schar new-buffer i) 
+			      (schar buffer i)))
+			  (setq max (1- (length new-buffer)))
+			  (setq buffer new-buffer)))
 		;  buffer is big enough
 		(setf (schar buffer start) ch)
 		(incf start))
@@ -3577,22 +3616,26 @@ in get-multipart-sequence"))
 
 
 
-;; ----- scratch buffer resource:
+;; ----- request line buffer:
+;;
+;; Each thread that reads requests (see http-worker-thread and
+;; start-simple-server) binds *request-buffer* and reuses that one
+;; buffer for every request line it reads.  When a longer line needs
+;; a bigger buffer, the thread keeps the bigger one.  The global value
+;; is left unbound, so a thread that didn't bind it gets a new buffer
+;; each time rather than one shared with other threads.
 
-(defparameter *request-buffer-sresource* 
-    (create-sresource 
-     :one-size nil
-     :name "request-buffer"
-     :create #'(lambda (sresource &optional size)
-		 (declare (ignore sresource))
-		 (make-array (or size 2048)
-			     :element-type 'character))))
-
-(defun get-request-buffer (&optional size)
-  (get-sresource *request-buffer-sresource* size))
-
-(defun free-request-buffer (buffer)
-  (free-sresource *request-buffer-sresource* buffer))
+(defun get-request-buffer (&optional (size 2048))
+  ;; return this thread's request buffer, at least size characters long.
+  ;; A new, larger buffer is never the one the caller passed in, so the
+  ;; caller can copy from the old to the new one.
+  (if* (not (boundp '*request-buffer*))
+     then (make-array size :element-type 'character)
+     else (let ((buffer *request-buffer*))
+	    (if* (and buffer (>= (length buffer) size))
+	       then buffer
+	       else (setq *request-buffer*
+		      (make-array size :element-type 'character))))))
 
 
 
