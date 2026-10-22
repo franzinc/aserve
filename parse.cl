@@ -149,17 +149,27 @@
 (defun new-read-request-headers (req sock)
   ;; use the new strategy to read in the request headers
   ;;
-  ;; return nil if we don't get all the way to the crlf crlf
+  ;; return nil if we don't get all the way to the crlf crlf, and
+  ;; nil and :too-large if the headers don't fit in a header block
   (let ((buff (get-sresource *header-block-sresource*))
-	(end))
+	(end)
+	(why))
     
     (setf (request-header-block req) buff)
     ;; read in all the headers, stop at the last crlf
-    (if* (setq end (read-headers-into-buffer sock buff))
+    (multiple-value-setq (end why)
+      (read-headers-into-buffer sock buff))
+    (if* (eq why :too-large)
+       then (return-from new-read-request-headers (values nil :too-large)))
+    (if* end
        then (debug-format :xmit-server-request-headers "~s"
                           (octets-to-string buff :end end
                                             :external-format :octets))
-            (let ((otherheaders (parse-header-block buff 0 end)))
+            (let ((otherheaders
+		   (handler-case (parse-header-block buff 0 end)
+		     (header-block-overflow ()
+		       (return-from new-read-request-headers
+			 (values nil :too-large))))))
 	      
               (if* otherheaders
                  then ; non standard headers present...store
@@ -203,7 +213,8 @@
 (defun read-headers-into-buffer (sock buff)
   ;; read the header data into the buffer
   ;; return the index of the character following the last header
-  ;; or nil if the whole header wasn't read in
+  ;; or nil if the whole header wasn't read in; the second value is
+  ;; :too-large if that's because the headers don't fit in buff
   ;;
   (let ((len (- (length buff) 500)) ; leave space for index at end
 	(i 0)
@@ -211,7 +222,7 @@
 	
     (loop
       (if* (>= i len) 
-	 then (return nil)) ; failure
+	 then (return (values nil :too-large))) ; failure
       
       (let ((ch (read-byte sock nil nil)))
 	(if* (null ch) 

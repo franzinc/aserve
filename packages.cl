@@ -316,6 +316,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:*response-requested-range-not-satisfiable*
    #:*response-expectation-failed*
    #:*response-upgrade-required*
+   #:*response-request-header-fields-too-large*
    #:*response-internal-server-error*
    #:*response-not-implemented*
    #:*response-service-unavailable*

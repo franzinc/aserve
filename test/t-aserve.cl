@@ -430,6 +430,8 @@
 		       (test-request-line-limit port)
 		       (test-max-request-line-argument)
 		       (test-read-sock-line)
+		       (test-request-header-limit port)
+		       (test-header-index-overflow)
 		       (test-spr44282)
                        (test-seize-request port)
                      
@@ -3356,8 +3358,9 @@ Returns a vector."
     (test uri result :test 'string=)))
 
 (defun raw-request-status (port request-line &optional (headers ""))
-  ;; send request-line and headers (each line without its crlf) on a
-  ;; plain socket and return the status code of the response
+  ;; send request-line, a Host header and headers (extra header lines,
+  ;; each ending in crlf) on a plain socket and return the status code
+  ;; of the response
   (let ((sock (socket:make-socket :remote-host "localhost"
 				  :remote-port port)))
     (unwind-protect
@@ -3497,6 +3500,97 @@ Returns a vector."
 	    :fail-info "line read with *request-buffer* unbound")
       (test nil (boundp 'net.aserve::*request-buffer*)
 	    :fail-info "*request-buffer* left unbound"))))
+
+;; 240 copies of each fit in a header block, but not with their index
+(defparameter *index-overflow-headers*
+    '("Accept" "Cookie" "Pragma" "Warning" "From"))
+
+(defun test-request-header-limit (port)
+  ;; headers that don't fit in a header block get a 431
+  (if* (asc x-ssl)
+     then ;; the requests are sent on a plain socket
+	  (return-from test-request-header-limit nil))
+  (flet ((header-lines (name value count)
+	   (with-output-to-string (s)
+	     (dotimes (i count)
+	       (format s "~a: ~a~c~c" name value #\return #\newline)))))
+    (test 404 (raw-request-status port "GET /no-such-page HTTP/1.1"
+				  (header-lines "X-Small" "abc" 10))
+	  :fail-info "headers that fit")
+    ;; more header bytes than a header block holds
+    (test 431 (raw-request-status port "GET /no-such-page HTTP/1.1"
+				  (header-lines "X-Big"
+						(make-string 17000
+							     :initial-element #\a)
+						1))
+	  :fail-info "one header too large")
+    ;; the 431 must still arrive when much more of the request follows
+    (test 431 (raw-request-status port "GET /no-such-page HTTP/1.1"
+				  (concatenate 'string
+				    (header-lines "X-Big"
+						  (make-string 17000
+							       :initial-element #\a)
+						  1)
+				    (header-lines "X-Junk"
+						  (make-string 1000
+							       :initial-element #\b)
+						  200)))
+	  :fail-info "one header too large, more to read")
+    ;; header bytes that fit, but too many standard headers for the
+    ;; index stored after them (fewer than 256 copies of each)
+    (test 431 (raw-request-status port "GET /no-such-page HTTP/1.1"
+				  (apply #'concatenate 'string
+					 (mapcar #'(lambda (name)
+						     (header-lines name "x" 240))
+						 *index-overflow-headers*)))
+	  :fail-info "too many headers")
+    ;; header bytes and index that fit, but more copies of one header
+    ;; than the index can count
+    (test 431 (raw-request-status port "GET /no-such-page HTTP/1.1"
+				  (header-lines "Accept" "x" 256))
+	  :fail-info "256 copies of a header")))
+
+(defun test-header-index-overflow ()
+  ;; parse-header-block signals header-block-overflow when the headers
+  ;; don't fit with their index, or when one standard header has more
+  ;; copies than the index's one-byte count holds, and returns its
+  ;; index buffer to the resource either way
+  (let ((resource net.aserve::*header-index-sresource*)
+	(block (net.aserve::get-sresource
+		net.aserve::*header-block-sresource*)))
+    (flet ((parse-headers (names n)
+	     ;; parse n lines of each header in names; return nil or the
+	     ;; error's type
+	     (let* ((headers (with-output-to-string (s)
+			       (dolist (name names)
+				 (dotimes (i n)
+				   (format s "~a: x~c~c"
+					   name #\return #\newline)))))
+		    (end (length headers)))
+	       (dotimes (i end)
+		 (setf (aref block i) (char-code (schar headers i))))
+	       (handler-case
+		   (progn (net.aserve::parse-header-block block 0 end)
+			  nil)
+		 (error (c) (type-of c))))))
+      (unwind-protect
+	  (progn
+	    ;; at least one index buffer free, so a leak shows as one fewer
+	    (net.aserve::free-sresource
+	     resource (net.aserve::get-sresource resource))
+	    (let ((free (length (cdr (net.aserve::sresource-data resource)))))
+	      (test 'net.aserve::header-block-overflow
+		    (parse-headers *index-overflow-headers* 240)
+		    :fail-info "too many headers for the index")
+	      (test free (length (cdr (net.aserve::sresource-data resource)))
+		    :fail-info "index buffer returned after the overflow"))
+	    (test nil (parse-headers '("Accept") 255)
+		  :fail-info "255 copies of a header")
+	    (test 'net.aserve::header-block-overflow
+		  (parse-headers '("Accept") 256)
+		  :fail-info "256 copies of a header"))
+	(net.aserve::free-sresource net.aserve::*header-block-sresource*
+				    block)))))
 
 (defun test-aserve-extra-ssl ()
   ;; tests run with no aserve server running

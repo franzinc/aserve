@@ -516,50 +516,58 @@
     
       otherheaders)))
 
+(define-condition header-block-overflow (error) ()
+  ;; the headers and their index don't fit in a header block
+  (:report "header is too large"))
+
 (defun parse-header-block (buff start end)
   (let ((ans (get-sresource *header-index-sresource*))
 	(otherheaders))
+    (unwind-protect
+	(progn
+	  (setq otherheaders (parse-header-block-internal buff start end ans))
     
-    (setq otherheaders (parse-header-block-internal buff start end ans))
-    
-    ; store the info in ans into the buffer at the end
+	  ; store the info in ans into the buffer at the end
 
-    (let* ((table-index (header-block-header-index 0))
-	   (data-index (header-block-data-start)))
-      (dotimes (i (length ans))
-	(let ((data (svref ans i)))
-	  (if*  data
-	     then ; must store data and an index to it
-		  (let* ((data-len (length data))
-			 (size (+ 1 ; count
-				  (ash data-len 2) ; 4 bytes per data entry
-				  )))
-		    (decf data-index size)
+	  (let* ((table-index (header-block-header-index 0))
+		 (data-index (header-block-data-start)))
+	    (dotimes (i (length ans))
+	      (let ((data (svref ans i)))
+		(if*  data
+		   then ; must store data and an index to it
+			(let* ((data-len (length data))
+			       (size (+ 1 ; count
+					(ash data-len 2) ; 4 bytes per data entry
+					)))
+			  (if* (> data-len 255)
+			     then ; the count is stored in one byte
+				  (error 'header-block-overflow))
+			  (decf data-index size)
 
-		    (setf (unsigned-16-value buff table-index) data-index)
+			  (setf (unsigned-16-value buff table-index) data-index)
 		    
-		    (setf (aref buff data-index) data-len)
-		    (let ((i (1+ data-index)))
-		      (dolist (datum data)
-			(setf (unsigned-16-value buff i) (car datum))
-			(incf i 2)
+			  (setf (aref buff data-index) data-len)
+			  (let ((i (1+ data-index)))
+			    (dolist (datum data)
+			      (setf (unsigned-16-value buff i) (car datum))
+			      (incf i 2)
 			  
-			(setf (unsigned-16-value buff i) (cdr datum))
-			(incf i 2))))
-	     else ; nothing there, zero it out
-		  (setf (aref buff table-index) 0)
-		  (setf (aref buff (1+ table-index)) 0)))
-	(decf table-index 2))
+			      (setf (unsigned-16-value buff i) (cdr datum))
+			      (incf i 2))))
+		   else ; nothing there, zero it out
+			(setf (aref buff table-index) 0)
+			(setf (aref buff (1+ table-index)) 0)))
+	      (decf table-index 2))
 	
-      (setf (unsigned-16-value buff *header-block-used-size-index*) end)
-      (setf (unsigned-16-value buff *header-block-data-start-index* )
-	data-index)
+	    (setf (unsigned-16-value buff *header-block-used-size-index*) end)
+	    (setf (unsigned-16-value buff *header-block-data-start-index* )
+	      data-index)
 	      
     
-      (if* (> end data-index)
-	 then (error "header is too large")))
-    
-    (free-sresource *header-index-sresource* ans)
+	    (if* (> end data-index)
+	       then (error 'header-block-overflow))))
+      ;; also when the headers overflow the index
+      (free-sresource *header-index-sresource* ans))
     otherheaders))
 
 

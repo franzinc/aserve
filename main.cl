@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 92))
+(defparameter *aserve-version* '(1 3 93))
 
 (eval-when (eval load)
     (require :sock)
@@ -1283,6 +1283,9 @@ by keyword symbols and not by strings"
 ;; 418-425 unused
 (defparameter *response-upgrade-required*
     (make-resp 426 "Upgrade Required"))
+;; rfc6585
+(defparameter *response-request-header-fields-too-large*
+    (make-resp 431 "Request Header Fields Too Large"))
 ;; 5xx
 (defparameter *response-internal-server-error*
     (make-resp 500 "Internal Server Error"))
@@ -1320,6 +1323,7 @@ by keyword symbols and not by strings"
 	  *response-requested-range-not-satisfiable*
 	  *response-expectation-failed*
           *response-upgrade-required*
+          *response-request-header-fields-too-large*
 	  *response-internal-server-error*
 	  *response-not-implemented*
           *response-service-unavailable*
@@ -2037,7 +2041,9 @@ by keyword symbols and not by strings"
                                        *crlf* *crlf* *crlf* *crlf*))
                              (force-output sock))
 			    ;; the rest of the request is still coming
-			    (if* (eq error-response *response-uri-too-long*)
+			    (if* (or (eq error-response *response-uri-too-long*)
+				     (eq error-response
+					 *response-request-header-fields-too-large*))
 			       then (drain-request-input sock)))
 		   
                     (return-from process-connection nil)
@@ -2184,12 +2190,16 @@ by keyword symbols and not by strings"
 			))
 	    
 	    
-	    (if* (and (not (eq protocol :http/0.9))
-		      #+ignore (null (read-request-headers req sock buffer))
-		      (null (new-read-request-headers req sock))
-		      )
-	       then (debug-format :info "no headers, ignore")
-		    (return-from read-http-request nil))
+	    (if* (not (eq protocol :http/0.9))
+	       then (multiple-value-bind (ok why)
+			(new-read-request-headers req sock)
+		      (if* (eq why :too-large)
+			 then (return-from read-http-request
+				(values nil nil
+					*response-request-header-fields-too-large*))
+		       elseif (null ok)
+			 then (debug-format :info "no headers, ignore")
+			      (return-from read-http-request nil))))
 	    
 	    ; insert the host name and port into the uri
 	    (let ((host (header-slot-value req :host)))

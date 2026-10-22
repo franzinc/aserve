@@ -2,7 +2,7 @@
 
 # AllegroServe - A Web Application Server
 
-##### Version 1.3.92
+##### Version 1.3.93
 
 #### Copyright (c) Franz Inc.
 
@@ -129,6 +129,8 @@ version of this document can be found [here][latest].
 
 ## <span id="release-notes"></span>Release Notes
 
+ * **1.3.93**: request headers too large for the header block get a 431
+   response.
  * **1.3.92**: the request line is limited to the **`:max-request-line`**
    argument to [**`start`**](aserve.md#f-start) (default 8192 characters); a longer one
    gets a 414 response. Each thread keeps its own request line buffer.
