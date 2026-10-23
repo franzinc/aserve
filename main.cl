@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 93))
+(defparameter *aserve-version* '(1 3 94))
 
 (eval-when (eval load)
     (require :sock)
@@ -642,6 +642,31 @@ after the connection goes idle")
    (accept-thread   ;; thread accepting connetions and dispatching
     :initform nil
     :accessor wserver-accept-thread)
+
+   (log-thread  ;; thread writing the access log, or nil to write directly
+    :initform nil
+    :accessor wserver-log-thread)
+
+   (log-thread-done  ;; gate opened when the log thread exits
+    :initform nil
+    :accessor wserver-log-thread-done)
+
+   (log-pending  ;; cons whose car is the list of access log lines
+		 ;; waiting for the log thread, newest first
+    :initform (list nil)
+    :reader wserver-log-pending)
+
+   (log-gate  ;; opened to wake the log thread
+    :initform (mp:make-gate nil)
+    :reader wserver-log-gate)
+
+   (log-room  ;; closed while workers wait for room in the pending list
+    :initform (mp:make-gate t)
+    :reader wserver-log-room)
+
+   (log-pending-count  ;; cons whose car is the number of lines waiting
+    :initform (list 0)
+    :reader wserver-log-pending-count)
 
    (link-scan-threads  ;; threads scanning cached entries for links
     :initform nil
@@ -1653,6 +1678,8 @@ by keyword symbols and not by strings"
   (setf (wserver-worker-threads server) nil)
   (setf (wserver-free-worker-threads server) (make-queue-with-timeout))
   
+  (stop-log-thread server)
+  
   (dolist (hook (wserver-shutdown-hooks server))
     (funcall hook server))
   
@@ -1732,6 +1759,7 @@ by keyword symbols and not by strings"
   (setf (wserver-n-workers *wserver*) 0)
   (dotimes (i listeners) (make-worker-thread))
   
+  (start-log-thread *wserver*)
   
   ; create accept thread
   (setf (wserver-accept-thread *wserver*)

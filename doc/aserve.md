@@ -2,7 +2,7 @@
 
 # AllegroServe - A Web Application Server
 
-##### Version 1.3.93
+##### Version 1.3.94
 
 #### Copyright (c) Franz Inc.
 
@@ -129,6 +129,8 @@ version of this document can be found [here][latest].
 
 ## <span id="release-notes"></span>Release Notes
 
+ * **1.3.94**: access log lines are written by a log thread for each
+   server, instead of by each worker under the log stream's lock.
  * **1.3.93**: request headers too large for the header block get a 431
    response.
  * **1.3.92**: the request line is limited to the **`:max-request-line`**
@@ -397,6 +399,12 @@ maintain the complete state of the cache these files must be saved by the user
 as well. The information in the **`save-cache`** file refers to the disk cache
 files so those disk cache files must exist and be in the same state and location
 should the user choose to restore the state of the cache.
+
+Before **`shutdown`** returns, any access log lines that the server's log thread
+has not yet written are written to their log streams. If the log thread is stuck
+writing to a log stream for more than **`net.aserve::*log-thread-stop-timeout*`**
+seconds (default 10), **`shutdown`** stops it instead; the lines not written are
+lost, and a message on the error stream says how many.
 
 ## <span id="publishing-information"></span>Publishing information
 
@@ -2089,6 +2097,27 @@ response to the request indicated that the connection was to be kept open rather
 than being closed after the response, then **`process-connection`** loops back to
 the top to read the next request.
 
+The worker thread doesn't write the access log line itself. It formats the line
+and adds it to a list of lines waiting to be written, and goes on to the next
+request. Each server started with worker threads also has a log thread, which
+writes all the lines waiting, in the order they were added, and then calls
+**`force-output`** on the log stream. On a server that isn't busy, each line is
+written as soon as it's added. On a busy one, the lines added while the log
+thread is writing are written together next, with one **`force-output`**. A
+server started with **`:listeners 0`** has no worker threads and no log thread,
+and there the line is written as each request finishes.
+
+If the log thread gets an error writing to a log stream, it drops that stream's
+lines in the batch it's writing, and a message on the error stream says how many
+lines may have been lost. Lines for other log streams are still written, and the
+next batch tries the stream again.
+
+So that a slow or stuck log stream can't fill memory, a worker waits before
+adding its line while more than **`net.aserve::*access-log-pending-limit*`**
+lines (default 10000) are waiting, until the log thread takes them. The
+variable is read on each request, and its global value is the one used; nil
+means no limit.
+
 <span id="f-handle-request"></span>
 **`(handle-request (req http-request))`** \[generic function\]
 
@@ -3306,6 +3335,10 @@ only one thread at a time write log information to the stream. If the logging
 functions find that a a log stream doesn't have a lock associated with it then
 the log information will still be written to the stream but under heavy load the
 log information from multiple threads will become intermixed.
+
+The access log lines are written by the server's log thread (see [AllegroServe
+request processing protocol](#iseve-request-proc)), which holds the lock while
+it writes a batch of lines and calls **`force-output`**.
 
 -----
 

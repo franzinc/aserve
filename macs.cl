@@ -267,10 +267,11 @@
      (:smp (incf-atomic ,var))
      (:vmp (with-locked-object (nil :non-smp :without-scheduling) (incf ,var)))))
 
-(defmacro atomic-decf (var)
+(defmacro atomic-decf (var &optional (delta 1))
   `(with-style-case :mp
-     (:smp (decf-atomic ,var))
-     (:vmp (with-locked-object (nil :non-smp :without-scheduling) (decf ,var)))))
+     (:smp (decf-atomic ,var ,delta))
+     (:vmp (with-locked-object (nil :non-smp :without-scheduling)
+             (decf ,var ,delta)))))
 
 (defmacro with-locked-server ((s) &body body)
   `(with-locked-object (,s :non-smp :without-scheduling) ,@body))

@@ -6,16 +6,18 @@
 
 ;; 11.0.beta RC4 needs this patch
 #+(version= 11 0)
-(sys:defpatch "aserve" 3
-  "v3: 1.3.90: Require streamc for chunker.cl; better directory listings;
+(sys:defpatch "aserve" 4
+  "v4: 1.3.94: per-thread request line buffer with a length limit (414); 431 for headers too large; lock-free access log;
+v3: 1.3.90: Require streamc for chunker.cl; better directory listings;
 v2: 1.3.89: separate timeout values;
 v1: 1.3.88:  keep-alive and redirects"
   :type :system
   :post-loadable t)
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 36
-  "v36: 1.3.90: Require streamc for chunker.cl; better directory listings;
+(sys:defpatch "aserve" 37
+  "v37: 1.3.94: per-thread request line buffer with a length limit (414); 431 for headers too large; lock-free access log;
+v36: 1.3.90: Require streamc for chunker.cl; better directory listings;
 v35: 1.3.89: separate timeout values;
 v34: 1.3.88: keep-alive and redirects;
 v33: 1.3.87: handle redirects before calling read-body-hook;

@@ -434,6 +434,10 @@
 		       (test-header-index-overflow)
 		       (test-spr44282)
                        (test-seize-request port)
+		       (test-access-log)
+		       (test-access-log-limit)
+		       (test-access-log-stuck-shutdown)
+		       (test-access-log-write-error)
                      
 		       (if* (member :ics *features*)
 			  then (test-international port)
@@ -3591,6 +3595,274 @@ Returns a vector."
 		  :fail-info "256 copies of a header"))
 	(net.aserve::free-sresource net.aserve::*header-block-sresource*
 				    block)))))
+
+(defun test-access-log ()
+  ;; every request leaves one access log line, on its vhost's log
+  ;; stream, the lines from each connection are in the order of its
+  ;; requests, requests don't wait for the log stream, and shutdown
+  ;; writes any lines still waiting
+  (let* ((log (ensure-stream-lock (make-string-output-stream)))
+	 (lock (getf (excl::stream-property-list log) :lock))
+	 ;; the odd clients' requests go to a second vhost, with its own
+	 ;; log stream
+	 (log2 (ensure-stream-lock (make-string-output-stream)))
+	 (lock2 (getf (excl::stream-property-list log2) :lock))
+	 (server (start :port nil :server :new :listeners 10))
+	 (port (socket:local-port (wserver-socket server)))
+	 (clients 4)
+	 (requests 50)
+	 (left clients)
+	 (done (mp:make-gate nil))
+	 (stopped (mp:make-gate nil)))
+    (setf (vhost-log-stream (wserver-default-vhost server)) log)
+    (setf (gethash "127.0.0.1" (wserver-vhosts server))
+      (make-instance 'net.aserve::vhost :log-stream log2
+		     :names '("127.0.0.1")))
+    (publish :path "/log-test" :server server :content-type "text/plain"
+	     :function #'(lambda (req ent)
+			   (with-http-response (req ent)
+			     (with-http-body (req ent)))))
+    (flet ((client (c)
+	     (unwind-protect
+		 (ignore-errors
+		  ;; one connection per client, so its requests are
+		  ;; handled, and logged, one after another
+		  (let ((sock nil))
+		    (dotimes (r requests)
+		      (setq sock (nth-value
+				  4 (do-http-request
+					(format nil "http://~a:~d/log-test?c=~d&r=~d"
+						(if* (evenp c)
+						   then "localhost"
+						   else "127.0.0.1")
+						port c r)
+				      :keep-alive t
+				      :connection sock))))
+		    (if* sock then (close sock))))
+	       (if* (zerop (decf-atomic left))
+		  then (mp:open-gate done)))))
+      ;; hold the log streams' locks while the clients run: the log
+      ;; thread waits for them with the first lines, the rest, for
+      ;; both streams, wait in the list
+      (mp:with-process-lock (lock)
+       (mp:with-process-lock (lock2)
+	(dotimes (c clients)
+	  (mp:process-run-function "access log test client" #'client c))
+	(test t (mp:process-wait-with-timeout "access log test clients" 60
+					      #'mp:gate-open-p done)
+	      :fail-info "access log test clients finished")
+	;; shut down, and let the log thread go only once it's been told
+	;; to stop, so it exits after writing the first lines and
+	;; shutdown must write the rest
+	(mp:process-run-function "access log test shutdown"
+	  #'(lambda ()
+	      (unwind-protect (shutdown :server server)
+		(mp:open-gate stopped))))
+	(loop
+	  (if* (null (net.aserve::wserver-log-thread server)) then (return))
+	  (sleep 0.1)))))
+    (mp:process-wait "access log test shutdown" #'mp:gate-open-p stopped)
+    (flet ((check (stream parity)
+	     ;; the lines on stream are all from the clients of the given
+	     ;; parity, every request's line is there, and in order
+	     (let ((next (make-array clients :initial-element 0))
+		   (lines 0)
+		   (in-order t)
+		   (right-vhost t))
+	       (with-input-from-string (s (get-output-stream-string stream))
+		 (loop
+		   (let ((line (read-line s nil nil)))
+		     (if* (null line) then (return))
+		     (incf lines)
+		     (multiple-value-bind (ok whole c r)
+			 (match-re "/log-test\\?c=(\\d+)&r=(\\d+)" line)
+		       (declare (ignore whole))
+		       (if* ok
+			  then (let ((c (parse-integer c))
+				     (r (parse-integer r)))
+				 (if* (not (eq (if* (evenp c) then :even else :odd)
+					       parity))
+				    then (setq right-vhost nil))
+				 (if* (eql r (aref next c))
+				    then (incf (aref next c))
+				    else (setq in-order nil))))))))
+	       (test (* (/ clients 2) requests) lines
+		     :fail-info (format nil "access log lines (~(~a~))" parity))
+	       (test t in-order
+		     :fail-info (format nil "access log lines in request order (~(~a~))"
+					parity))
+	       (test t right-vhost
+		     :fail-info (format nil "access log lines on their vhost's stream (~(~a~))"
+					parity)))))
+      (check log :even)
+      (check log2 :odd))))
+
+(defun test-access-log-limit ()
+  ;; with more lines waiting than *access-log-pending-limit*, workers
+  ;; wait for the log thread, and every line is still written, in order
+  (let* ((log (ensure-stream-lock (make-string-output-stream)))
+	 (lock (getf (excl::stream-property-list log) :lock))
+	 (server (start :port nil :server :new :listeners 4))
+	 (port (socket:local-port (wserver-socket server)))
+	 (requests 20)
+	 (done (mp:make-gate nil))
+	 (old net.aserve::*access-log-pending-limit*))
+    (setf (vhost-log-stream (wserver-default-vhost server)) log)
+    (publish :path "/log-test" :server server :content-type "text/plain"
+	     :function #'(lambda (req ent)
+			   (with-http-response (req ent)
+			     (with-http-body (req ent)))))
+    (unwind-protect
+	(progn
+	  ;; set globally: the workers don't see a let binding
+	  (setq net.aserve::*access-log-pending-limit* 5)
+	  ;; hold the log stream's lock: the log thread waits for it with
+	  ;; the first lines, and then the list fills
+	  (mp:with-process-lock (lock)
+	    (mp:process-run-function "access log limit client"
+	      #'(lambda ()
+		  (unwind-protect
+		      (ignore-errors
+		       (let ((sock nil))
+			 (dotimes (r requests)
+			   (setq sock (nth-value
+				       4 (do-http-request
+					     (format nil "http://localhost:~d/log-test?r=~d"
+						     port r)
+					   :keep-alive t
+					   :connection sock))))
+			 (if* sock then (close sock))))
+		    (mp:open-gate done))))
+	    (test nil (mp:process-wait-with-timeout
+		       "access log limit client" 2 #'mp:gate-open-p done)
+		  :fail-info "requests wait while the log list is full"))
+	  (test t (mp:process-wait-with-timeout
+		   "access log limit client" 30 #'mp:gate-open-p done)
+		:fail-info "requests finish once the log is written")
+	  (shutdown :server server)
+	  (let ((next 0)
+		(lines 0)
+		(in-order t))
+	    (with-input-from-string (s (get-output-stream-string log))
+	      (loop
+		(let ((line (read-line s nil nil)))
+		  (if* (null line) then (return))
+		  (incf lines)
+		  (multiple-value-bind (ok whole r)
+		      (match-re "/log-test\\?r=(\\d+)" line)
+		    (declare (ignore whole))
+		    (if* ok
+		       then (if* (eql (parse-integer r) next)
+			       then (incf next)
+			       else (setq in-order nil)))))))
+	    (test requests lines :fail-info "access log lines with a limit")
+	    (test t in-order
+		  :fail-info "access log lines in request order with a limit")))
+      (setq net.aserve::*access-log-pending-limit* old))))
+
+(defun test-access-log-write-error ()
+  ;; an error writing to one log stream loses only that stream's lines
+  ;; in the batch, is reported once with the number lost, and the lines
+  ;; for other streams are still written
+  (let* ((broken (make-string-output-stream))
+	 (good (ensure-stream-lock (make-string-output-stream)))
+	 (errors (ensure-stream-lock (make-string-output-stream)))
+	 (server (start :port nil :server :new :listeners 2))
+	 (a (make-instance 'net.aserve::vhost :log-stream broken
+			   :names '("a")))
+	 (b (make-instance 'net.aserve::vhost :log-stream good
+			   :names '("b"))))
+    (close broken)			; writing to it signals an error
+    (setf (vhost-error-stream (wserver-default-vhost server)) errors)
+    (unwind-protect
+	(net.aserve::write-log-lines
+	 (list (cons a "a1") (cons b "b1") (cons a "a2") (cons b "b2"))
+	 server)
+      (shutdown :server server))
+    (test (format nil "b1~%b2~%") (get-output-stream-string good)
+	  :test #'equal
+	  :fail-info "lines for the good stream written")
+    (let ((messages (get-output-stream-string errors)))
+      (test 1 (let ((n 0) (start 0))
+		(loop
+		  (let ((pos (search "error writing the access log" messages
+				     :start2 start)))
+		    (if* (null pos) then (return n))
+		    (incf n)
+		    (setq start (1+ pos)))))
+	    :fail-info "one message for the broken stream")
+      (test t (and (search "up to 2 lines lost" messages) t)
+	    :fail-info "message gives the number of lines lost"))))
+
+(defun test-access-log-stuck-shutdown ()
+  ;; when the log thread is stuck writing to the log stream, shutdown
+  ;; stops it after *log-thread-stop-timeout* seconds, drops the lines
+  ;; not written, and reports how many on the error stream
+  (let* ((log (ensure-stream-lock (make-string-output-stream)))
+	 (lock (getf (excl::stream-property-list log) :lock))
+	 (errors (ensure-stream-lock (make-string-output-stream)))
+	 (server (start :port nil :server :new :listeners 2))
+	 (port (socket:local-port (wserver-socket server)))
+	 (vhost (wserver-default-vhost server))
+	 (requests 5)
+	 (stopped (mp:make-gate nil))
+	 (old net.aserve::*log-thread-stop-timeout*))
+    (setf (vhost-log-stream vhost) log)
+    (setf (vhost-error-stream vhost) errors)
+    (publish :path "/log-test" :server server :content-type "text/plain"
+	     :function #'(lambda (req ent)
+			   (with-http-response (req ent)
+			     (with-http-body (req ent)))))
+    (unwind-protect
+	(progn
+	  ;; set globally: the shutdown thread doesn't see a let binding
+	  (setq net.aserve::*log-thread-stop-timeout* 1)
+	  ;; hold the log stream's lock: the log thread is stuck waiting
+	  ;; for it with the first line, and the rest wait in the list
+	  (mp:with-process-lock (lock)
+	    (let ((sock nil))
+	      (dotimes (r requests)
+		(setq sock (nth-value
+			    4 (do-http-request
+				  (format nil "http://localhost:~d/log-test?r=~d"
+					  port r)
+				:keep-alive t
+				:connection sock))))
+	      (if* sock then (close sock)))
+	    (mp:process-run-function "access log stuck shutdown"
+	      #'(lambda ()
+		  (unwind-protect (shutdown :server server)
+		    (mp:open-gate stopped))))
+	    (test t (mp:process-wait-with-timeout
+		     "access log stuck shutdown" 6 #'mp:gate-open-p stopped)
+		  :fail-info "shutdown returns while the log stream is stuck")
+	    (test t (mp:gate-open-p (net.aserve::wserver-log-thread-done server))
+		  :fail-info "the stuck log thread has exited"))
+	  ;; the lines were dropped, not written late
+	  (sleep 0.5)
+	  (test nil (search "/log-test" (get-output-stream-string log))
+		:fail-info "no access log lines written after shutdown")
+	  ;; the report comes from a thread of its own
+	  (let ((report ""))
+	    (dotimes (i 50)
+	      (setq report (concatenate 'string report
+					(get-output-stream-string errors)))
+	      (if* (search "stuck writing a batch" report) then (return))
+	      (sleep 0.1))
+	    (multiple-value-bind (ok whole batch waiting)
+		(match-re "batch of (\\d+) lines, and (\\d+) more" report)
+	      (declare (ignore whole))
+	      (test t (and ok t)
+		    :fail-info "shutdown reports the lines not written")
+	      (if* ok
+		 then (test requests (+ (parse-integer batch)
+					(parse-integer waiting))
+			    :fail-info "the report counts every line")))))
+      (setq net.aserve::*log-thread-stop-timeout* old)
+      (if* (not (mp:gate-open-p stopped))
+	 then ; shutdown is still stuck; let it finish
+	      (mp:process-wait-with-timeout "access log stuck shutdown" 30
+					    #'mp:gate-open-p stopped)))))
 
 (defun test-aserve-extra-ssl ()
   ;; tests run with no aserve server running
