@@ -1158,7 +1158,7 @@ headers")
                        #'net.aserve::check-for-open-socket-before-gc))
       
               #+io-timeout
-              (if* (integerp timeout)
+              (if* (or timeout read-timeout write-timeout)
                  then (socket:socket-control 
                        sock 
                        :read-timeout (or read-timeout timeout)

@@ -129,6 +129,7 @@ version of this document can be found [here][latest].
 
 ## <span id="release-notes"></span>Release Notes
 
+ * **1.3.95**: fix client timeout options:  read-timeout and write-timeout are obeyed even if timeout isn't given as well.
  * **1.3.94**: access log lines are written by a log thread for each
    server, instead of by each worker under the log stream's lock.
  * **1.3.93**: request headers too large for the header block get a 431
