@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 95))
+(defparameter *aserve-version* '(1 3 96))
 
 (eval-when (eval load)
     (require :sock)
@@ -918,7 +918,7 @@ Problems with protocol may occur." (ef-name ef)))))
        
        (if* (member :keep-alive (request-reply-strategy ,g-req) :test #'eq)
 	  then ; force the body to be read so we can continue
-	       (get-request-body ,g-req))
+	       (drain-request-body ,g-req))
        (send-response-headers ,g-req ,g-ent :post))))
 			  
 
@@ -1169,11 +1169,19 @@ by keyword symbols and not by strings"
     :accessor request-header-block)
     
    (request-body 
-    ;; if we've read the request body then this 
+    ;; if we've read the request body then this
     ;; is the string holding it.
     :initform nil
     :accessor request-request-body)
-   
+
+   (body-too-large
+    ;; the request-body-too-large condition if reading the request
+    ;; body was abandoned because it exceeded wserver-max-content-length.
+    ;; The unread part of the body is still on the socket so the
+    ;; connection can't be reused.
+    :initform nil
+    :accessor request-body-too-large-p)
+
    
    
    ;; response
@@ -2115,9 +2123,11 @@ by keyword symbols and not by strings"
                     (free-req-header-block req)
 		  
                     (let ((sock (request-socket req)))
-                      (if* (member :keep-alive
-                                   (request-reply-strategy req)
-                                   :test #'eq)
+                      (if* (and (member :keep-alive
+                                        (request-reply-strategy req)
+                                        :test #'eq)
+                                ;; part of the body may be unread
+                                (not (request-body-too-large-p req)))
                          then ;; continue to use it
                               ;; For keep-alive sockets the header-read-timeout is now governed by
                               ;; keep-alive timeout. Update the header-read-timeout so the timeout
@@ -2128,6 +2138,12 @@ by keyword symbols and not by strings"
                               (force-output-noblock sock)
                               (setf (car chars-seen) nil) ; for next use
                               (excl::socket-bytes-written (request-socket req) 0)
+                       elseif (request-body-too-large-p req)
+                         then ;; The response has been sent, and flushed by
+                              ;; the force-output-noblock after handle-request,
+                              ;; but the rest of the body is unread.
+                              (drain-too-large-body req sock)
+                              (return)
                          else (return))))))
     
       ;; do it in two stages since each one could error and both have
@@ -2300,8 +2316,53 @@ by keyword symbols and not by strings"
       (setf (request-has-continue-expectation req) nil))))
 
 
+(define-condition request-body-too-large (error)
+  ((length :initarg :length :reader request-body-too-large-length)
+   (max-length :initarg :max-length :reader request-body-too-large-max-length))
+  (:report (lambda (c stream)
+	     (format stream "request body of at least ~d octets exceeds max-content-length of ~d octets"
+		     (request-body-too-large-length c)
+		     (request-body-too-large-max-length c)))))
+
+(defun signal-request-body-too-large (req length max-length)
+  ;; The body is too large and we've stopped reading it, leaving the
+  ;; rest of it on the socket.  Make sure the connection isn't reused
+  ;; (the next request would be parsed from the middle of this body)
+  ;; and that the body isn't read again, then signal the error.
+  (let ((c (make-condition 'request-body-too-large
+			   :length length :max-length max-length)))
+    (setf (request-body-too-large-p req) c)
+    (setf (request-request-body req) "") ; stop other body readers
+    (setf (request-reply-strategy req)
+      (remove :keep-alive (request-reply-strategy req) :test #'eq))
+    (error c)))
+
+(defun content-length-over-max-p (req)
+  ;; true if the request's Content-Length is more than
+  ;; wserver-max-content-length, so reading the body will signal
+  ;; request-body-too-large
+  (let ((max-length (wserver-max-content-length *wserver*)))
+    (and max-length
+	 (multiple-value-bind (length believe-it)
+	     (header-slot-value-integer req :content-length)
+	   (and believe-it (> length max-length))))))
+
+(defun drain-request-body (req)
+  ;; Called after the response has been generated to read any request
+  ;; body the handler didn't read, so the connection can be kept alive.
+  ;; If the body is too large don't signal an error, as that would
+  ;; discard the response.  Instead keep-alive has been turned off by
+  ;; signal-request-body-too-large and the connection will be closed
+  ;; after the response is sent.
+  (handler-case (get-request-body req)
+    (request-body-too-large () nil)))
+
 (defmethod get-request-body ((req http-request)
 			     &key (external-format :octets ef-supplied))
+  (let ((c (request-body-too-large-p req)))
+    (if* c
+       then ; we already gave up reading this body
+	    (error c)))
   (let* ((result
 	  ;; return a string that holds the body of the http-request
 	  ;;  cache it for later too
@@ -2332,110 +2393,118 @@ by keyword symbols and not by strings"
 	length believe-it)
             
     (unwind-protect
-	(let ()
+        
+	(let ((max-length (wserver-max-content-length *wserver*)))
+          (flet ((length-check (length)
+                   (if* (and max-length (> length max-length))
+                      then (signal-request-body-too-large req length max-length))))
 
-	  ;; must read using the octets external format because the 
-	  ;; content length is in terms of octets
-	  (setf (stream-external-format (request-socket req))
-	    (find-external-format :octets))
+            ;; must read using the octets external format because the 
+            ;; content length is in terms of octets
+            (setf (stream-external-format (request-socket req))
+              (find-external-format :octets))
     
-	  ;; Fetch the content-length value because a body can be present
-	  ;;  on any request. [rfe15456]
-	  (multiple-value-setq (length believe-it)
-	    (header-slot-value-integer req :content-length))
+            ;; Fetch the content-length value because a body can be present
+            ;;  on any request. [rfe15456]
+            (multiple-value-setq (length believe-it)
+              (header-slot-value-integer req :content-length))
     
-	  ;; Send  Continue status if requested, regardless of body indicators.
-	  (when (member (request-method req) '(:put :post :patch))
-	    (when (request-has-continue-expectation req)
-	      (send-100-continue req)))
+            ;; Check a known length before sending a 100 Continue, so the
+            ;; client isn't told to send a body we'll reject.
+            (if* (and believe-it (> length 0))
+               then (length-check length))
 
-	  (if* (and believe-it (> length 0))
-	     then ;; we know the length
-                  (if* (and (wserver-max-content-length *wserver*)
-                            (> length (wserver-max-content-length *wserver*)))
-                     then (error "Content-Length of ~s exceeds acceptable length" length))
-                  
-		  (prog1 (let ((ret (make-string length)))
-			   (read-sequence-with-timeout 
-			    ret length 
-			    (request-socket req)
-			    (wserver-read-request-body-timeout *wserver*)))
+            ;; Send  Continue status if requested, regardless of body indicators.
+            (when (member (request-method req) '(:put :post :patch))
+              (when (request-has-continue-expectation req)
+                (send-100-continue req)))
+
+            (if* (and believe-it (> length 0))
+               then ;; we know the length
+                    (prog1 (let ((ret (make-string length)))
+                             (read-sequence-with-timeout 
+                              ret length 
+                              (request-socket req)
+                              (wserver-read-request-body-timeout *wserver*)))
 	    
-		    ;; netscape (at least) is buggy in that it sends a
-		    ;; crlf after the body.  We have to eat that crlf.
-		    ;; We could check which browser is calling us but
-		    ;; it's not clear what is the set of buggy
-		    ;; browsers
-		    (let ((ch (read-char-no-hang
-			       (request-socket req)
-			       nil nil)))
-		      (if* (eq ch #\return)
-			 then		; now look for linefeed
-			      (setq ch (read-char-no-hang 
-					(request-socket req)
-					nil nil))
-			      (if* (eq ch #\linefeed)
-				 thenret 
-				 else (unread-char 
-				       ch (request-socket req)))
-		       elseif ch
-			 then (unread-char ch (request-socket
-					       req)))))
-	   elseif (and believe-it (eql length 0))
-	     then ""
-	   elseif (equalp "chunked" (header-slot-value req
-						       :transfer-encoding))
-	     then ;; chunked body
-		  (with-timeout-local
-		      ((wserver-read-request-body-timeout *wserver*) nil)
-		    (let ((ans (make-array 
-				2048 
-				:element-type 'character
-				:adjustable t
-				:fill-pointer 0))
-			  (sock (make-instance-unchunking-stream+input-handle (request-socket req)))
-			  (ch))
-		      (loop (if* (eq :eof 
-				     (setq ch (read-char sock nil :eof)))
-			       then 
-				    ;; Chunked requests may contain trailing 'headers'
-				    (close sock) ;; this *only* closes the unchunker
-				    (let ((trailers 
-					   (net.aserve.client::convert-trailers 
-					    (unchunking-trailers sock))))
-				      (if* trailers
-					 then (setf (request-headers req)
-						(append (request-headers req) trailers))))
-				    (return ans)
-			       else (vector-push-extend
-				     ch ans)))))
+                      ;; netscape (at least) is buggy in that it sends a
+                      ;; crlf after the body.  We have to eat that crlf.
+                      ;; We could check which browser is calling us but
+                      ;; it's not clear what is the set of buggy
+                      ;; browsers
+                      (let ((ch (read-char-no-hang
+                                 (request-socket req)
+                                 nil nil)))
+                        (if* (eq ch #\return)
+                           then		; now look for linefeed
+                                (setq ch (read-char-no-hang 
+                                          (request-socket req)
+                                          nil nil))
+                                (if* (eq ch #\linefeed)
+                                   thenret 
+                                   else (unread-char 
+                                         ch (request-socket req)))
+                         elseif ch
+                           then (unread-char ch (request-socket
+                                                 req)))))
+             elseif (and believe-it (eql length 0))
+               then ""
+             elseif (equalp "chunked" (header-slot-value req
+                                                         :transfer-encoding))
+               then ;; chunked body
+                    (with-timeout-local
+                        ((wserver-read-request-body-timeout *wserver*) nil)
+                      (let ((ans (make-array 
+                                  2048 
+                                  :element-type 'character
+                                  :adjustable t
+                                  :fill-pointer 0))
+                            (length 0)
+                            (sock (make-instance-unchunking-stream+input-handle (request-socket req)))
+                            (ch))
+                        (loop (if* (eq :eof 
+                                       (setq ch (read-char sock nil :eof)))
+                                 then 
+                                      ;; Chunked requests may contain trailing 'headers'
+                                      (close sock) ;; this *only* closes the unchunker
+                                      (let ((trailers 
+                                             (net.aserve.client::convert-trailers 
+                                              (unchunking-trailers sock))))
+                                        (if* trailers
+                                           then (setf (request-headers req)
+                                                  (append (request-headers req) trailers))))
+                                      (return ans)
+                                 else (length-check (incf length))
+                                      (vector-push-extend
+                                       ch ans)))))
 		  
-		  ;; no content length given
-	   elseif (keep-alive-specified req)
-	     then ;; must be no body
-		  ""
-	   elseif (member (request-method req) '(:put :post :patch))
-	     then ;; read until the end of file to collect an implied body
-		  (with-timeout-local
-		      ((wserver-read-request-body-timeout *wserver*) 
-		       nil)
-		    (let ((ans (make-array 
-				2048 
-				:element-type 'character
-				:adjustable t
-				:fill-pointer 0))
-			  (sock (request-socket req))
-			  (ch))
-		      (loop (if* (eq :eof 
-				     (setq ch
-				       (read-char 
-					sock nil :eof)))
-			       then (return  ans)
-			       else (vector-push-extend
-				     ch ans)))))
-	     else ;; Do nothing but remember that we already were here.
-		  "" 
-		  ))
+                    ;; no content length given
+             elseif (keep-alive-specified req)
+               then ;; must be no body
+                    ""
+             elseif (member (request-method req) '(:put :post :patch))
+               then ;; read until the end of file to collect an implied body
+                    (with-timeout-local
+                        ((wserver-read-request-body-timeout *wserver*) 
+                         nil)
+                      (let ((ans (make-array 
+                                  2048 
+                                  :element-type 'character
+                                  :adjustable t
+                                  :fill-pointer 0))
+                            (sock (request-socket req))
+                            (length 0)
+                            (ch))
+                        (loop (if* (eq :eof 
+                                       (setq ch
+                                         (read-char 
+                                          sock nil :eof)))
+                                 then (return  ans)
+                                 else (length-check (incf length))
+                                      (vector-push-extend ch ans)))))
+               else ;; Do nothing but remember that we already were here.
+                    "" 
+                    )))
       ;; uwp cleanup
       (setf (stream-external-format (request-socket req)) original-ef)
       )))
@@ -3225,19 +3294,51 @@ in get-multipart-sequence"))
     
       
 
-(defun drain-request-input (sock)
+(defun drain-request-input (sock &optional limit)
   ;; After a response sent before the whole request was read, read and
-  ;; discard what the client is still sending, until it closes its side
-  ;; or for at most two seconds.  Closing a socket that has unread data
-  ;; resets the connection, and the client can lose the response.
+  ;; discard what the client is still sending, until it closes its side,
+  ;; limit bytes (if given) have been read, or for at most two seconds.
+  ;; Closing a socket that has unread data resets the connection, and
+  ;; the client can lose the response.
   ;; The socket's output isn't shut down first: in Allegro CL on
   ;; Windows, reads then stop once 64 KB have been read in all.
   (ignore-errors
    (mp:with-timeout (2 nil)
-     (let ((buffer (make-array 4096 :element-type '(unsigned-byte 8))))
+     (let ((buffer (make-array 4096 :element-type '(unsigned-byte 8)))
+	   (left limit)
+	   (count))
        (loop
-	 (if* (zerop (read-vector buffer sock))
-	    then (return)))))))
+	 (if* (and left (<= left 0))
+	    then (return))
+	 (setq count (read-vector buffer sock
+				  :end (if* left
+					  then (min left (length buffer))
+					  else (length buffer))))
+	 (if* (zerop count)
+	    then (return))
+	 (if* left
+	    then (decf left count)))))))
+
+(defvar *drain-too-large-body-limit* (* 1024 1024)
+  ;; most bytes of a too-large chunked or read-to-close body to read
+  ;; and discard after the response has been sent
+  )
+
+(defun drain-too-large-body (req sock)
+  ;; The request body was too large and the response has been sent.
+  ;; Read and discard the rest of the body so closing the socket
+  ;; doesn't reset the connection and lose the response.
+  (if* (request-has-continue-expectation req)
+     then ;; the client was never sent a 100 Continue, so no body is coming
+	  nil
+     else (multiple-value-bind (length believe-it)
+	      (header-slot-value-integer req :content-length)
+	    ;; with a Content-Length, the check is made before any of
+	    ;; the body is read, so all of it remains
+	    (drain-request-input sock 
+				 (if* believe-it
+				    then length
+				    else *drain-too-large-body-limit*)))))
 
 (defun read-sock-line (sock buffer start chars-seen &optional limit)
   (declare (optimize (speed 3))

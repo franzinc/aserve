@@ -410,6 +410,7 @@
 		       (test-publish-prefix port)
 		       (test-put-patch port)
                        (test-content-length port)
+                       (test-max-content-length port)
 		       (test-authorization port)
 		       (test-encoding)
 		       (test-truncated-stream)
@@ -4196,8 +4197,200 @@ Returns a vector."
                                    :method :get)
               (test 204 code)
               (test nil body)))))
-              
-          
+
+
+(defun raw-exchange (port request &optional (read-delay 0))
+  ;; send request (a string of octets) on a plain socket and return
+  ;; everything the server sends back until it closes the connection.
+  ;; If the server hasn't closed it after 10 seconds the result
+  ;; ends with "<<timeout>>".
+  ;; Wait read-delay seconds before reading, so that if the server
+  ;; resets the connection the reset arrives before the response has
+  ;; been read, and the response is lost.
+  (let ((sock (socket:make-socket :remote-host "localhost"
+				  :remote-port port))
+	(out (make-string-output-stream)))
+    (unwind-protect
+	(progn
+	  (setf (stream-external-format sock) :octets)
+	  ;; the server may close the connection before reading all
+	  ;; of the request
+	  (ignore-errors
+	   (write-string request sock)
+	   (force-output sock))
+	  (sleep read-delay)
+	  (mp:with-timeout (10 (write-string "<<timeout>>" out))
+	    (ignore-errors
+	     (do ((ch (read-char sock nil :eof) (read-char sock nil :eof)))
+		 ((eq ch :eof))
+	       (write-char ch out)))))
+      (ignore-errors (close sock :abort t)))
+    (get-output-stream-string out)))
+
+(defun test-max-content-length (port)
+  ;; a request body larger than wserver-max-content-length signals
+  ;; request-body-too-large when read.  The rest of the body is left
+  ;; unread so the connection must not be reused for another request.
+  (if* (or (asc x-ssl) (asc x-proxy))
+     then ;; the requests are sent on a plain socket direct to the server
+	  (return-from test-max-content-length nil))
+  (let ((old (wserver-max-content-length *wserver*))
+	(catch-results nil))
+    (labels ((lines (&rest lines)
+	       (with-output-to-string (s)
+		 (dolist (line lines)
+		   (format s "~a~c~c" line #\return #\newline))))
+	     (post (kind path body)
+	       ;; a keep-alive post with the body sent with a
+	       ;; content-length or chunked
+	       (if* (eq kind :content-length)
+		  then (concatenate 'string
+			 (lines (format nil "POST ~a HTTP/1.1" path)
+				"Host: localhost"
+				(format nil "Content-Length: ~d" (length body))
+				"")
+			 body)
+		  else (concatenate 'string
+			 (lines (format nil "POST ~a HTTP/1.1" path)
+				"Host: localhost"
+				"Transfer-Encoding: chunked"
+				"")
+			 (lines (format nil "~x" (length body)) body "0" ""))))
+	     (get-hello ()
+	       ;; the request sent after the post on the same connection
+	       (lines "GET /test-mcl-hello HTTP/1.1"
+		      "Host: localhost"
+		      "Connection: close"
+		      ""))
+	     (responses (reply)
+	       ;; count the responses in the reply
+	       (do ((n 0 (1+ n))
+		    (start (search "HTTP/1.1 200" reply)
+			   (search "HTTP/1.1 200" reply :start2 (1+ start))))
+		   ((null start) n)))
+	     (respond (req ent string)
+	       (with-http-response (req ent)
+		 (with-http-body (req ent)
+		   (html (:princ string))))))
+
+      ;; never reads the body
+      (publish :path "/test-mcl-noread" :content-type "text/plain"
+	       :function #'(lambda (req ent) (respond req ent "noread-ok")))
+      ;; catches the error, then tries to read the body again
+      (publish :path "/test-mcl-catch" :content-type "text/plain"
+	       :function
+	       #'(lambda (req ent)
+		   (let* ((r1 (handler-case (get-request-body req)
+				(request-body-too-large () :too-large)))
+			  (r2 (handler-case (get-request-body req)
+				(request-body-too-large () :too-large)))
+			  (r3 (let ((n 0))
+				(get-request-body-incremental
+				 req #'(lambda (buffer count)
+					 (declare (ignore buffer))
+					 (incf n count)))
+				n)))
+		     (setq catch-results (list r1 r2 r3))
+		     (respond req ent "catch-ok"))))
+      ;; reads the body and doesn't catch the error
+      (publish :path "/test-mcl-read" :content-type "text/plain"
+	       :function
+	       #'(lambda (req ent)
+		   (respond req ent
+			    (format nil "read ~d"
+				    (length (get-request-body req))))))
+      (publish :path "/test-mcl-hello" :content-type "text/plain"
+	       :function #'(lambda (req ent) (respond req ent "hello")))
+
+      (unwind-protect
+	  (let ((small (make-string 50 :initial-element #\s))
+		(big (make-string 65536 :initial-element #\b))
+		(reply))
+	    (setf (wserver-max-content-length *wserver*) 100)
+
+	    (dolist (kind '(:content-length :chunked))
+	      ;; under the limit the connection is kept alive
+	      (setq reply (raw-exchange port
+					(concatenate 'string
+					  (post kind "/test-mcl-read" small)
+					  (get-hello))))
+	      (test 2 (responses reply)
+		    :fail-info (format nil "~s small body: two responses" kind))
+	      (test t (and (search "read 50" reply) (search "hello" reply) t)
+		    :fail-info (format nil "~s small body: replies" kind))
+
+	      ;; the handler doesn't read the body. The response is sent
+	      ;; and then the connection is closed
+	      (setq reply (raw-exchange port
+					(concatenate 'string
+					  (post kind "/test-mcl-noread" big)
+					  (get-hello))
+					1))
+	      (test t (and (search "noread-ok" reply) t)
+		    :fail-info (format nil "~s noread: response sent" kind))
+	      (test 1 (responses reply)
+		    :fail-info (format nil "~s noread: one response" kind))
+	      (test nil (search "<<timeout>>" reply)
+		    :fail-info (format nil "~s noread: connection closed" kind))
+
+	      ;; the handler catches the error.  Reading again signals the
+	      ;; error again and doesn't read from the middle of the body.
+	      (setq catch-results nil)
+	      (setq reply (raw-exchange port
+					(concatenate 'string
+					  (post kind "/test-mcl-catch" big)
+					  (get-hello))
+					1))
+	      (test t (and (search "catch-ok" reply) t)
+		    :fail-info (format nil "~s catch: response sent" kind))
+	      (test '(:too-large :too-large 0) catch-results
+		    :test #'equal
+		    :fail-info (format nil "~s catch: body not read again" kind))
+	      (test 1 (responses reply)
+		    :fail-info (format nil "~s catch: one response" kind))
+	      ;; the response is made after the body was found to be too
+	      ;; large, so it must not offer keep-alive
+	      (test nil (search "Keep-Alive" reply)
+		    :fail-info (format nil "~s catch: no Keep-Alive" kind))
+	      (test t (and (search "Connection: Close" reply) t)
+		    :fail-info (format nil "~s catch: Connection: Close" kind))
+	      (test nil (search "<<timeout>>" reply)
+		    :fail-info (format nil "~s catch: connection closed" kind))
+
+	      ;; the handler doesn't catch the error.  The connection
+	      ;; is closed with no response
+	      (setq reply (raw-exchange port (post kind "/test-mcl-read" big)))
+	      (test 0 (responses reply)
+		    :fail-info (format nil "~s uncaught: no response" kind))
+	      (test nil (search "<<timeout>>" reply)
+		    :fail-info (format nil "~s uncaught: connection closed" kind)))
+
+	    ;; With Expect: 100-continue and a Content-Length over the
+	    ;; limit the server must not send a 100 Continue.  The client
+	    ;; sends only the headers and waits for the server's answer.
+	    (dolist (path '("/test-mcl-noread" "/test-mcl-catch" "/test-mcl-read"))
+	      (setq reply (raw-exchange
+			   port
+			   (lines (format nil "POST ~a HTTP/1.1" path)
+				  "Host: localhost"
+				  "Expect: 100-continue"
+				  (format nil "Content-Length: ~d" (length big))
+				  "")))
+	      (test nil (search "100 Continue" reply)
+		    :fail-info (format nil "~a expect: no 100 Continue" path))
+	      (test (if* (equal path "/test-mcl-read") then 0 else 1)
+		    (responses reply)
+		    :fail-info (format nil "~a expect: final response" path))
+	      (test nil (search "<<timeout>>" reply)
+		    :fail-info (format nil "~a expect: connection closed" path)))
+
+	    ;; the worker threads carried on after the errors
+	    (setq reply (raw-exchange port (get-hello)))
+	    (test t (and (search "hello" reply) t)
+		  :fail-info "server still answering"))
+	(setf (wserver-max-content-length *wserver*) old)))))
+
+
 (defun test-seize-request (port)
   (publish :path "/seize-request"
            :function #'(lambda (req ent)

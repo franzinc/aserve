@@ -1246,7 +1246,10 @@
       (let ((cont (header-slot-value req :expect)))
 	(setf (request-has-continue-expectation req)
 	  (and cont (match-re "\\b100-continue\\b" cont :case-fold t :return nil))))
-      (unless (entity-will-handle-expect-continue ent)
+      ;; Don't invite the client to send a body we'll reject.  Reading
+      ;; it will signal request-body-too-large.
+      (unless (or (entity-will-handle-expect-continue ent)
+		  (content-length-over-max-p req))
 	(send-100-continue req)))
 
     ; all authorization ok. try to run it and return the 
@@ -2710,6 +2713,19 @@ listing directory ~a resulted in error: ~a"
 	      (not (member :post-headers strategy)))
        then (setf (request-reply-strategy req)
 	      (cons :delay-headers strategy))
+       else strategy)))
+
+(defmethod compute-strategy :around ((req http-request) (ent entity) format)
+  (declare (ignore format))
+  ;; If the request body was too large the rest of it is still unread
+  ;; and the connection will be closed after the response, so the
+  ;; response mustn't offer keep-alive.  This is usually computed after
+  ;; the handler has tried to read the body.
+  (let ((strategy (call-next-method)))
+    (if* (and (request-body-too-large-p req)
+	      (member :keep-alive strategy :test #'eq))
+       then (setf (request-reply-strategy req)
+	      (remove :keep-alive strategy :test #'eq))
        else strategy)))
 
   

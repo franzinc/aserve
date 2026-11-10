@@ -6,8 +6,9 @@
 
 ;; 11.0.beta RC4 needs this patch
 #+(version= 11 0)
-(sys:defpatch "aserve" 5
-  "v5: 1.3.95: fix client timeout options;
+(sys:defpatch "aserve" 6
+  "v6: 1.3.96: Enforce max-content-length;
+v5: 1.3.95: fix client timeout options;
 v4: 1.3.94: per-thread request line buffer with a length limit (414); 431 for headers too large; lock-free access log;
 v3: 1.3.90: Require streamc for chunker.cl; better directory listings;
 v2: 1.3.89: separate timeout values;
@@ -16,8 +17,9 @@ v1: 1.3.88:  keep-alive and redirects"
   :post-loadable t)
 
 #+(version= 10 1)
-(sys:defpatch "aserve" 38
-  "v38: 1.3.95: fix client timeout options;
+(sys:defpatch "aserve" 39
+  "v39: 1.3.96: Enforce max-content-length;
+v38: 1.3.95: fix client timeout options;
 v37: 1.3.94: per-thread request line buffer with a length limit (414); 431 for headers too large; lock-free access log;
 v36: 1.3.90: Require streamc for chunker.cl; better directory listings;
 v35: 1.3.89: separate timeout values;
@@ -186,6 +188,7 @@ without compression.  Original error loading deflate was:~%~a~%~:@>" c)
    #:get-multipart-sequence
    #:get-request-body
    #:get-request-body-incremental
+   #:request-body-too-large
    #:handle-request
    #:handle-uri		; add-on component..
    #:header-slot-value
