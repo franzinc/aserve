@@ -21,7 +21,7 @@
 #+ignore
 (check-smp-consistency)
 
-(defparameter *aserve-version* '(1 3 96))
+(defparameter *aserve-version* '(1 3 97))
 
 (eval-when (eval load)
     (require :sock)
@@ -3319,6 +3319,25 @@ in get-multipart-sequence"))
 	 (if* left
 	    then (decf left count)))))))
 
+(defun drain-pending-input (sock limit)
+  ;; Read and discard what has already arrived on sock, without waiting
+  ;; for more, up to limit bytes.  After the body of a request has been
+  ;; drained, this is a request the client pipelined behind it.  Left
+  ;; unread, it makes closing the socket reset the connection, and on
+  ;; Windows the client can lose the response.
+  (ignore-errors
+   (mp:with-timeout (2 nil)
+     (let ((buffer (make-array 4096 :element-type '(unsigned-byte 8)))
+	   (left limit))
+       (loop
+	 (if* (or (<= left 0) (not (listen sock)))
+	    then (return))
+	 (let ((count (read-vector buffer sock
+				   :end (min left (length buffer)))))
+	   (if* (zerop count)
+	      then (return))
+	   (decf left count)))))))
+
 (defvar *drain-too-large-body-limit* (* 1024 1024)
   ;; most bytes of a too-large chunked or read-to-close body to read
   ;; and discard after the response has been sent
@@ -3335,10 +3354,13 @@ in get-multipart-sequence"))
 	      (header-slot-value-integer req :content-length)
 	    ;; with a Content-Length, the check is made before any of
 	    ;; the body is read, so all of it remains
-	    (drain-request-input sock 
+	    (drain-request-input sock
 				 (if* believe-it
 				    then length
-				    else *drain-too-large-body-limit*)))))
+				    else *drain-too-large-body-limit*))
+	    ;; a request the client sent after the body is still unread
+	    (if* believe-it
+	       then (drain-pending-input sock *drain-too-large-body-limit*)))))
 
 (defun read-sock-line (sock buffer start chars-seen &optional limit)
   (declare (optimize (speed 3))

@@ -2,7 +2,7 @@
 
 # AllegroServe - A Web Application Server
 
-##### Version 1.3.94
+##### Version 1.3.97
 
 #### Copyright (c) Franz Inc.
 
@@ -129,6 +129,8 @@ version of this document can be found [here][latest].
 
 ## <span id="release-notes"></span>Release Notes
 
+ * **1.3.97**: after a request body over the max content length is answered, continue draining any available input,
+   even beyond content-length
  * **1.3.96**: Enforce max-content-length on chunked and read-to-close request bodies, and close the connection instead of reusing it when the limit is exceeded
  * **1.3.95**: fix client timeout options:  read-timeout and write-timeout are obeyed even if timeout isn't given as well.
  * **1.3.94**: access log lines are written by a log thread for each

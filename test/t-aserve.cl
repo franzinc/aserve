@@ -3830,6 +3830,21 @@ Returns a vector."
 				:keep-alive t
 				:connection sock))))
 	      (if* sock then (close sock)))
+            ;; We must wait for all requests to complete before issuing the
+            ;; shutdown to ensure all requests have been properly queued to
+            ;; the log thread, or we might get an incorrect count in the
+            ;; tests below.
+            ;; 
+	    ;; This uses server internals: a worker adds itself back
+	    ;; to wserver-free-workers only when process-connection returns,
+	    ;; after the last line is logged, so wait until every worker
+	    ;; is free.
+	    (test t (mp:process-wait-with-timeout
+		     "access log workers idle" 10
+		     #'(lambda ()
+			 (eql (net.aserve::wserver-free-workers server)
+			      (length (net.aserve::wserver-worker-threads server)))))
+		  :fail-info "workers finished logging the requests")
 	    (mp:process-run-function "access log stuck shutdown"
 	      #'(lambda ()
 		  (unwind-protect (shutdown :server server)
